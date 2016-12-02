@@ -35,6 +35,7 @@ my $NINST_VALUE		= `./xmlquery NINST_VALUE	-value`;
 
 my $comp="mct";
 $comp = "esmf" if ($COMP_INTERFACE eq "ESMF");
+$comp = "nuopc" if ($COMP_INTERFACE eq "NUOPC");
 
 my $useesmf = "noesmf";
 $useesmf = "esmf" if ($USE_ESMF_LIB eq "TRUE");

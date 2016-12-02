@@ -214,6 +214,17 @@ module seq_timemgr_mod
       type(EClock_pointer) :: ECP(max_clocks)    ! ESMF clocks, array of pointers
       type(ESMF_Alarm) :: EAlarm(max_clocks,max_alarms) ! array of clock alarms
    end type seq_timemgr_type
+
+   type (seq_timemgr_type),public :: seq_timemgr_SyncClock ! array of all clocks & alarm
+   type (ESMF_clock),public, target :: seq_timemgr_EClock_d      ! driver clock
+   type (ESMF_clock),public, target :: seq_timemgr_EClock_a
+   type (ESMF_clock),public, target :: seq_timemgr_EClock_l
+   type (ESMF_clock),public, target :: seq_timemgr_EClock_o
+   type (ESMF_clock),public, target :: seq_timemgr_EClock_i
+   type (ESMF_clock),public, target :: seq_timemgr_EClock_g
+   type (ESMF_clock),public, target :: seq_timemgr_EClock_r
+   type (ESMF_clock),public, target :: seq_timemgr_EClock_w
+   type (ESMF_clock),public, target :: seq_timemgr_EClock_e
  
    ! --- Private local data -------------------------------------------------------
 

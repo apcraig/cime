@@ -24,6 +24,7 @@ chdir "${OBJROOT}/${MODEL}/obj";
 
 open(file,">Filepath") or die "Could not open file Filepath to write";
 print file "${CASEROOT}/SourceMods/src.drv\n";
+print file "${CIMEROOT}/driver_cpl/nuopc\n";
 print file "${CIMEROOT}/driver_cpl/driver\n";
 close(file);
 

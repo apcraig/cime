@@ -118,6 +118,7 @@ OPTIONS
                            _CG   = gregorian calendar
                            _D    = debug
                            _E    = esmf interfaces
+                           _EN   = nuopc interfaces
                            _IOP* = PnetCDF IO test where * is  A(atm), C(cpl), G(glc),
                                    I(ice), L(lnd), O(ocn), W(wav) or blank (all components)
                            _L*   = set run length y, m, d, h, s, n(nsteps) plus integer
@@ -703,8 +704,13 @@ sub _set_confopts
     }
     if ($coptions =~ "_E" || $coptions =~ "_DE") {
 	$config->set('USE_ESMF_LIB', "TRUE");
-	$config->set('COMP_INTERFACE', "ESMF");
-	$logger->info("    confopts COMP_INTERFACE ESMF set ");
+        if ($coptions =~ "_EN" || $coptions =~ "_DEN") {
+	  $config->set('COMP_INTERFACE', "NUOPC");
+	  $logger->info("    confopts COMP_INTERFACE ESMF-NUOPC set ");
+        }else{
+	  $config->set('COMP_INTERFACE', "ESMF");
+	  $logger->info("    confopts COMP_INTERFACE ESMF set ");
+        }
     }
     if ($coptions =~ "_P") {
 	my $popt = $coptions;

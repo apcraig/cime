@@ -826,8 +826,13 @@ subroutine datm_comp_run( EClock, cdata,  x2a, a2x)
    call seq_timemgr_EClockGetData( EClock, curr_yr=yy, curr_mon=mm, curr_day=dd)
    call seq_timemgr_EClockGetData( EClock, stepno=stepno, dtime=idt)
    call seq_timemgr_EClockGetData( EClock, calendar=calendar) 
+   write(logunit,*) subname,' tcx1 ',CurrentYMD,CurrentTOD
+   write(logunit,*) subname,' tcx2 ',yy,mm,dd
+   write(logunit,*) subname,' tcx3 ',stepno,idt
+   write(logunit,*) subname,' tcx4 ',trim(calendar)
    dt = idt * 1.0_r8
-   write_restart = seq_timemgr_RestartAlarmIsOn(EClock)
+   write_restart = .false.
+!tcx   write_restart = seq_timemgr_RestartAlarmIsOn(EClock)
 
    call t_stopf('datm_run1')
 

@@ -468,6 +468,14 @@ sub buildChecks()
 	$logger->logdie($msg);
 
     }
+
+    if ($COMP_INTERFACE eq 'NUOPC' && $USE_ESMF_LIB ne 'TRUE') {
+	my $msg = " ERROR COMP_INTERFACE IS NUOPC BUT USE_ESMF_LIB IS NOT TRUE \n";
+	$msg .= " SET USE_ESMF_LIB to TRUE with  \n";
+	$msg .= "     ./xmlchange -file env_build.xml -id USE_ESMF_LIB -value TRUE \n";
+	$logger->logdie($msg);
+
+    }
 	
     if($MPILIB eq 'mpi-serial' && $USE_ESMF_LIB eq 'TRUE') {
 	my $msg = "  ERROR MPILIB is mpi-serial and USE_ESMF_LIB IS TRUE \n";

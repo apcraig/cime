@@ -112,13 +112,23 @@ module cesm_comp_mod
    use seq_timemgr_mod, only: seq_timemgr_alarm_wavrun
    use seq_timemgr_mod, only: seq_timemgr_alarm_esprun
    use seq_timemgr_mod, only: seq_timemgr_alarm_barrier
+   use seq_timemgr_mod, only: seq_SyncClock => seq_timemgr_SyncClock
+   use seq_timemgr_mod, only: EClock_d => seq_timemgr_Eclock_d
+   use seq_timemgr_mod, only: EClock_a => seq_timemgr_Eclock_a
+   use seq_timemgr_mod, only: EClock_l => seq_timemgr_Eclock_l
+   use seq_timemgr_mod, only: EClock_o => seq_timemgr_Eclock_o
+   use seq_timemgr_mod, only: EClock_i => seq_timemgr_Eclock_i
+   use seq_timemgr_mod, only: EClock_g => seq_timemgr_Eclock_g
+   use seq_timemgr_mod, only: EClock_r => seq_timemgr_Eclock_r
+   use seq_timemgr_mod, only: EClock_w => seq_timemgr_Eclock_w
+   use seq_timemgr_mod, only: EClock_e => seq_timemgr_Eclock_e
 
    ! "infodata" gathers various control flags into one datatype   
    use seq_infodata_mod, only: seq_infodata_putData, seq_infodata_GetData
    use seq_infodata_mod, only: seq_infodata_init, seq_infodata_exchange
    use seq_infodata_mod, only: seq_infodata_type, seq_infodata_orb_variable_year
-   use seq_infodata_mod, only: seq_infodata_print
-        
+   use seq_infodata_mod, only: seq_infodata_print, infodata=>seq_infodata_infodata
+
    ! domain related routines   
    use seq_domain_mct, only : seq_domain_check
 
@@ -249,22 +259,24 @@ module cesm_comp_mod
    ! Infodata: inter-model control flags, domain info
    !----------------------------------------------------------------------------
 
-   type (seq_infodata_type), target :: infodata ! single instance for cpl and all comps
+! tcraig, moved to seq_infodata_mod
+!   type (seq_infodata_type), target :: infodata ! single instance for cpl and all comps
 
    !----------------------------------------------------------------------------
    ! time management
    !----------------------------------------------------------------------------
 
-   type (seq_timemgr_type), SAVE :: seq_SyncClock ! array of all clocks & alarm
-   type (ESMF_Clock), target :: EClock_d      ! driver clock
-   type (ESMF_Clock), target :: EClock_a
-   type (ESMF_Clock), target :: EClock_l
-   type (ESMF_Clock), target :: EClock_o
-   type (ESMF_Clock), target :: EClock_i
-   type (ESMF_Clock), target :: EClock_g
-   type (ESMF_Clock), target :: EClock_r
-   type (ESMF_Clock), target :: EClock_w
-   type (ESMF_Clock), target :: EClock_e
+! tcraig, moved to seq_timemgr_mod
+!   type (seq_timemgr_type), SAVE :: seq_SyncClock ! array of all clocks & alarm
+!   type (ESMF_Clock), target :: EClock_d      ! driver clock
+!   type (ESMF_Clock), target :: EClock_a
+!   type (ESMF_Clock), target :: EClock_l
+!   type (ESMF_Clock), target :: EClock_o
+!   type (ESMF_Clock), target :: EClock_i
+!   type (ESMF_Clock), target :: EClock_g
+!   type (ESMF_Clock), target :: EClock_r
+!   type (ESMF_Clock), target :: EClock_w
+!   type (ESMF_Clock), target :: EClock_e
 
    logical  :: restart_alarm          ! restart alarm
    logical  :: history_alarm          ! history alarm
@@ -594,9 +606,14 @@ subroutine cesm_pre_init1()
    logical :: comp_iamin(num_inst_total)
    character(len=seq_comm_namelen) :: comp_name(num_inst_total)
    integer :: i, it
+   logical :: flag
 
-   call mpi_init(ierr)
-   call shr_mpi_chkerr(ierr,subname//' mpi_init')
+   call mpi_initialized(flag,ierr)
+   call shr_mpi_chkerr(ierr,subname//' mpi_initialized')
+   if (.not. flag) then
+     call mpi_init(ierr)
+     call shr_mpi_chkerr(ierr,subname//' mpi_init')
+   endif
 
    Global_Comm=MPI_COMM_WORLD
    comp_comm = MPI_COMM_NULL

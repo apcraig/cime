@@ -1071,11 +1071,10 @@ module seq_flds_mod
      call seq_flds_add(l2x_states,"Sl_ram1")
      call seq_flds_add(x2a_states,"Sl_ram1")
      longname = 'aerodynamic resistance'
-     stdname = 'aerodynamic_resistance'
-     attname = 'SI_ram1'
-     units = 's/m'
+     stdname  = 'aerodynamic_resistance'
+     attname  = 'Sl_ram1'
+     units    = 's/m'
      call metadata_set(attname, longname, stdname, units)
-
 
      ! Surface snow water equivalent (land/atm only) 
      call seq_flds_add(l2x_states,"Sl_snowh")
@@ -1108,8 +1107,8 @@ module seq_flds_mod
      call seq_flds_add(xao_states,"So_re")
      call seq_flds_add(x2a_states,"So_re")
      longname = 'Square of exch. coeff (tracers)'
-     stdname  = ''
-     units    = ''
+     stdname  = 'square_of_exch_coeff'
+     units    = '1'
      attname  = 'So_re'
      call metadata_set(attname, longname, stdname, units)
 
@@ -1121,7 +1120,7 @@ module seq_flds_mod
      longname = '10m wind'
      stdname  = '10m_wind'
      units    = 'm'
-     attname  = 'u10'
+     attname  = 'Sx_u10'
      call metadata_set(attname, longname, stdname, units)
 
      ! Zonal surface stress"
@@ -1544,7 +1543,7 @@ module seq_flds_mod
      call seq_flds_add(x2o_states,'Sw_lamult')
      longname = 'Langmuir multiplier'
      stdname  = 'wave_model_langmuir_multiplier'
-     units    = ''
+     units    = '1'
      attname  = 'Sw_lamult'
      call metadata_set(attname, longname, stdname, units)
 
@@ -1866,7 +1865,7 @@ module seq_flds_mod
         call seq_flds_add(a2x_states, "Sa_co2prog")
         call seq_flds_add(x2l_states, "Sa_co2prog")
         longname = 'Prognostic CO2 at the lowest model level'
-        stdname  = ''
+        stdname  = 'prognostic_CO2_lowest_level'
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2prog'
         call metadata_set(attname, longname, stdname, units)
@@ -1874,7 +1873,7 @@ module seq_flds_mod
         call seq_flds_add(a2x_states, "Sa_co2diag")
         call seq_flds_add(x2l_states, "Sa_co2diag")
         longname = 'Diagnostic CO2 at the lowest model level'
-        stdname  = ''
+        stdname  = 'diagnostic_CO2_lowest_level'
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2diag'
         call metadata_set(attname, longname, stdname, units)
@@ -1884,7 +1883,7 @@ module seq_flds_mod
         call seq_flds_add(a2x_states,  "Sa_co2prog")
         call seq_flds_add(x2l_states,  "Sa_co2prog")
         longname = 'Prognostic CO2 at the lowest model level'
-        stdname  = ''
+        stdname  = 'prognostic_CO2_lowest_level'
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2prog'
         call metadata_set(attname, longname, stdname, units)
@@ -1892,7 +1891,7 @@ module seq_flds_mod
         call seq_flds_add(a2x_states,  "Sa_co2diag")
         call seq_flds_add(x2l_states,  "Sa_co2diag")
         longname = 'Diagnostic CO2 at the lowest model level'
-        stdname  = ''
+        stdname  = 'diagnostic_CO2_lowest_level'
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2diag'
         call metadata_set(attname, longname, stdname, units)
@@ -1911,7 +1910,7 @@ module seq_flds_mod
         call seq_flds_add(x2l_states, "Sa_co2prog")
         call seq_flds_add(x2o_states, "Sa_co2prog")
         longname = 'Prognostic CO2 at the lowest model level'
-        stdname  = ''
+        stdname  = 'prognostic_CO2_lowest_level'
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2prog'
         call metadata_set(attname, longname, stdname, units)
@@ -1920,7 +1919,7 @@ module seq_flds_mod
         call seq_flds_add(x2l_states, "Sa_co2diag")
         call seq_flds_add(x2o_states, "Sa_co2diag")
         longname = 'Diagnostic CO2 at the lowest model level'
-        stdname  = ''
+        stdname  = 'diagnostic_CO2_lowest_level'
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2diag'
         call metadata_set(attname, longname, stdname, units)
@@ -1946,7 +1945,7 @@ module seq_flds_mod
         call seq_flds_add(a2x_states, "Sa_co2prog")
         call seq_flds_add(x2l_states, "Sa_co2prog")
         longname = 'Prognostic CO2 at the lowest model level'
-        stdname  = ''
+        stdname  = 'prognostic_CO2_lowest_level'
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2prog'
         call metadata_set(attname, longname, stdname, units)
@@ -1954,7 +1953,7 @@ module seq_flds_mod
         call seq_flds_add(a2x_states, "Sa_co2diag")
         call seq_flds_add(x2l_states, "Sa_co2diag")
         longname = 'Diagnostic CO2 at the lowest model level'
-        stdname  = ''
+        stdname  = 'diagnostic_CO2_lowest_level'
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2diag'
         call metadata_set(attname, longname, stdname, units)
@@ -2040,9 +2039,9 @@ module seq_flds_mod
         name = 'Foxx_swnet_afracr'
         call seq_flds_add(x2o_fluxes,name)
         longname = 'net shortwave radiation times atmosphere fraction'
-        stdname = 'product_of_net_downward_shortwave_flux_at_sea_water_surface_and_atmosphere_area_fraction'
-        units = 'W m-2'
-        attname = name
+        stdname  = 'product_of_net_downward_shortwave_flux_at_sea_water_surface_and_atmosphere_area_fraction'
+        units    = 'W m-2'
+        attname  = name
         call metadata_set(attname, longname, stdname, units)
      endif
 
@@ -2479,6 +2478,56 @@ module seq_flds_mod
         end do
      end if
    end subroutine set_glc_elevclass_field
+
+   !===============================================================================
+
+   subroutine seq_flds_get_num_entries(num_entries)
+
+     ! !USES:
+     implicit none
+
+     ! !INPUT/OUTPUT PARAMETERS:
+     integer, intent(out)  :: num_entries
+
+     character(len=*),parameter :: subname = '(seq_flds_get_num_entries) '
+
+     num_entries = n_entries
+
+   end subroutine seq_flds_get_num_entries
+
+   !===============================================================================
+
+   subroutine seq_flds_get_entry(nentry, shortname, longname, stdname, units)
+
+     ! !USES:
+     implicit none
+
+     ! !INPUT/OUTPUT PARAMETERS:
+     integer, intent(in)  :: nentry
+     character(len=*),optional, intent(out) :: shortname 
+     character(len=*),optional, intent(out) :: longname
+     character(len=*),optional, intent(out) :: stdname  
+     character(len=*),optional, intent(out) :: units    
+
+     character(len=*),parameter :: subname = '(seq_flds_get_entry) '
+
+     if (present(shortname)) then
+        shortname = trim(lookup_entry(nentry,1))
+     endif
+
+     if (present(longname)) then
+        longname = trim(lookup_entry(nentry,2))
+     endif
+
+     if (present(stdname)) then
+        stdname = trim(lookup_entry(nentry,3))
+     endif
+
+     if (present(units)) then
+        units = trim(lookup_entry(nentry,4))
+     endif
+
+   end subroutine seq_flds_get_entry
 
    !===============================================================================
 

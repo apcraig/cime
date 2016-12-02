@@ -1730,8 +1730,11 @@
 	<command name="load">intel/15.0.3</command>
 	<command name="load">mkl/11.1.2</command>
 	<command name="load">trilinos/11.10.2</command>
+<!--
 	<command name="load">esmf</command>
+-->
       </modules>
+<!--
       <modules compiler="intel" mpilib="!mpi-serial" debug="true">
 	<command name="load">esmf-6.3.0rp1-defio-mpi-g</command>
       </modules>
@@ -1744,6 +1747,7 @@
       <modules compiler="intel" mpilib="mpi-serial" debug="false">
 	<command name="load"> esmf-6.3.0rp1-defio-uni-O</command>
       </modules>
+-->
       <modules compiler="pgi">
 	<command name="load">pgi/15.10</command>
       </modules>
@@ -1763,6 +1767,7 @@
       </modules>
     </module_system>
     <environment_variables>
+      <env name="ESMFMKFILE">/glade/u/home/tcraig/ESMF-INSTALLS/ESMF_7_1_0_bsxx_trunk161114-Intel15.0.3-NetCDF4.3.3.1-g/lib/esmf.mk</env>
       <env name="OMP_STACKSIZE">256M</env>
       <env name="MP_LABELIO">yes</env>
       <env name="MP_INFOLEVEL">2</env>
