@@ -167,7 +167,8 @@ module MED
   type (shr_nuopc_fldList_Type) :: fldsFrRof
   type (shr_nuopc_fldList_Type) :: fldsAtmOcn
 
-  type(ESMF_Grid)    :: gridAtm, gridOcn, gridIce, gridLnd, gridRof, gridMed
+! tcraig support grids or meshes so try to hide that
+!  type(ESMF_Grid)    :: gridAtm, gridOcn, gridIce, gridLnd, gridRof, gridMed
   integer            :: dbug_flag = 5
   logical            :: statewrite_flag = .true.
   integer            :: dbrc
@@ -772,7 +773,7 @@ module MED
     
     ! local variables    
     integer                     :: i, j
-    real(kind=ESMF_KIND_R8),pointer :: lonPtr(:,:), latPtr(:,:)
+    real(kind=ESMF_KIND_R8),pointer :: lonPtr(:), latPtr(:)
     type(InternalState)         :: is_local
     integer                     :: stat
     real(ESMF_KIND_R8)          :: intervalSec
@@ -803,11 +804,11 @@ module MED
     is_local%wrap%slowcntr = 1
 
 ! tcraig hardwire 1 degree grid as backup option
-    gridMed = ESMF_GridCreate1PeriDimUfrm(maxIndex=(/360,180/), &
-      minCornerCoord=(/0._ESMF_KIND_R8, -90._ESMF_KIND_R8/), &
-      maxCornerCoord=(/360._ESMF_KIND_R8, 90._ESMF_KIND_R8/), &
-      staggerLocList=(/ESMF_STAGGERLOC_CENTER/), rc=rc)
-    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+!    gridMed = ESMF_GridCreate1PeriDimUfrm(maxIndex=(/360,180/), &
+!      minCornerCoord=(/0._ESMF_KIND_R8, -90._ESMF_KIND_R8/), &
+!      maxCornerCoord=(/360._ESMF_KIND_R8, 90._ESMF_KIND_R8/), &
+!      staggerLocList=(/ESMF_STAGGERLOC_CENTER/), rc=rc)
+!    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
 !    gridLnd = NUOPC_GridCreateSimpleSph(0._ESMF_KIND_R8, -85._ESMF_KIND_R8, &
 !      360._ESMF_KIND_R8, 85._ESMF_KIND_R8, nx_med, ny_med, &
@@ -1085,7 +1086,6 @@ module MED
       ! local variables
       type(ESMF_Field)              :: field
       type(ESMF_Grid)               :: grid
-      type(ESMF_Mesh)               :: mesh
       integer                       :: localDeCount
 
       type(ESMF_DistGrid)           :: distgrid
@@ -1138,10 +1138,7 @@ module MED
 
           if (geomtype == ESMF_GEOMTYPE_GRID) then
 
-            call ESMF_FieldGet(field, grid=grid, rc=rc)
-            if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
-
-            call med_method_Grid_Print(grid,trim(fieldNameList(n))//'_orig',rc)
+            call med_method_Field_GeomPrint(field,trim(fieldNameList(n))//'_orig',rc)
             if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
             call ESMF_AttributeGet(field, name="ArbDimCount", value=arbDimCount, &
@@ -1222,6 +1219,10 @@ module MED
               if (dbug_flag > 1) then
                 call ESMF_LogWrite(trim(subname)//trim(string)//": accept reg2reg grid for "//trim(fieldNameList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
               endif
+
+              call ESMF_FieldGet(field, grid=grid, rc=rc)
+              if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+
               call ESMF_GridGet(grid, localDeCount=localDeCount, distgrid=distgrid, rc=rc)
               if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
@@ -1322,8 +1323,7 @@ module MED
 !            do n1=n,n
             do n1=1, fieldCount
               ! access a field in the State and set the Grid
-              call ESMF_StateGet(State, field=field, &
-                itemName=fieldNameList(n1), rc=rc)
+              call ESMF_StateGet(State, field=field, itemName=fieldNameList(n1), rc=rc)
               if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
               call ESMF_FieldEmptySet(field, grid=grid, rc=rc)    
               if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
@@ -1331,16 +1331,13 @@ module MED
                 call ESMF_LogWrite(trim(subname)//trim(string)//": attach grid for "//trim(fieldNameList(n1)), ESMF_LOGMSG_INFO, rc=rc)
                 if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
               endif
-              call med_method_Grid_Print(grid,trim(fieldNameList(n))//'_new',rc)
+              call med_method_Field_GeomPrint(field,trim(fieldNameList(n))//'_new',rc)
               if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
             enddo
 
           elseif (geomtype == ESMF_GEOMTYPE_MESH) then
 
-            call ESMF_FieldGet(field, mesh=mesh, rc=rc)
-            if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
-
-            call med_method_Mesh_Print(mesh,trim(fieldNameList(n))//'_orig',rc)
+            call med_method_Field_GeomPrint(field,trim(fieldNameList(n))//'_orig',rc)
             if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
           else  ! geomtype
@@ -1391,8 +1388,8 @@ module MED
     type(ESMF_Array)            :: arrayOcn, arrayIce
     type(ESMF_RouteHandle)      :: RH_mapmask  ! unmasked conservative remapping 
     type(ESMF_Grid)             :: gridAtmCoord, gridOcnCoord
-    integer(ESMF_KIND_I4), pointer :: dataPtr_arrayOcn(:,:), dataPtr_arrayIce(:,:)
-    real(ESMF_KIND_R8), pointer :: dataPtr_fieldOcn(:,:), dataPtr_fieldAtm(:,:)
+    integer(ESMF_KIND_I4), pointer :: dataPtr_arrayOcn(:), dataPtr_arrayIce(:)
+    real(ESMF_KIND_R8), pointer :: dataPtr_fieldOcn(:), dataPtr_fieldAtm(:)
     logical                     :: isPresentOcn, isPresentIce
     character(len=*),parameter  :: subname='(module_MEDIATOR:InitializeIPDv03p5)'
 
@@ -1473,6 +1470,7 @@ module MED
 !    call ESMF_FieldGet(field, grid=gridOcn, rc=rc)
 !    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
+#if (1 == 0)
     call ESMF_StateGet(NState_atmImp, itemCount=fieldCount, rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
@@ -1582,27 +1580,25 @@ module MED
     else
       gridRof = gridMed
     endif
+#endif
 
     !----------------------------------------------------------
     !--- Diagnose Grid Info
     !----------------------------------------------------------
 
-    call med_method_Grid_Print(gridAtm,'gridAtm',rc=rc)
+    call med_method_State_GeomPrint(NState_atmExp,'gridAtmExp',rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_Grid_Print(gridOcn,'gridOcn',rc=rc)
+    call med_method_State_GeomPrint(NState_ocnExp,'gridOcnExp',rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_Grid_Print(gridIce,'gridIce',rc=rc)
+    call med_method_State_GeomPrint(NState_iceExp,'gridIceExp',rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_Grid_Print(gridLnd,'gridLnd',rc=rc)
+    call med_method_State_GeomPrint(NState_lndExp,'gridLndExp',rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_Grid_Print(gridRof,'gridRof',rc=rc)
-    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
-
-    call med_method_Grid_Print(gridMed,'gridMed',rc=rc)
+    call med_method_State_GeomPrint(NState_rofExp,'gridRofExp',rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
 #if 1
@@ -1610,22 +1606,19 @@ module MED
     ! dump the Grid coordinate arrays for reference      
     !----------------------------------------------------------
 
-    call med_method_Grid_Write(gridAtm, 'array_med_atm', rc=rc)
+    call med_method_State_GeomWrite(NState_AtmExp, 'array_med_atm', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_Grid_Write(gridOcn, 'array_med_ocn', rc=rc)
+    call med_method_State_GeomWrite(NState_OcnExp, 'array_med_ocn', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_Grid_Write(gridIce, 'array_med_ice', rc=rc)
+    call med_method_State_GeomWrite(NState_IceExp, 'array_med_ice', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_Grid_Write(gridLnd, 'array_med_lnd', rc=rc)
+    call med_method_State_GeomWrite(NState_LndExp, 'array_med_lnd', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_Grid_Write(gridRof, 'array_med_rof', rc=rc)
-    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
-
-    call med_method_Grid_Write(gridMed, 'array_med_med', rc=rc)
+    call med_method_State_GeomWrite(NState_RofExp, 'array_med_rof', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
 #endif
@@ -1645,123 +1638,123 @@ module MED
 
     !--- atm
 
-    call med_method_FB_init(is_local%wrap%FBAtm_a, grid=gridAtm, &
-      state=NState_AtmImp, name='FBAtm_a', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBAtm_a, STgeom=NState_AtmImp, &
+      STflds=NState_AtmImp, name='FBAtm_a', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBAtm_o, grid=gridOcn, &
-      state=NState_AtmImp, name='FBAtm_o', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBAtm_o, STgeom=NState_OcnExp, &
+      STflds=NState_AtmImp, name='FBAtm_o', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBAtm_i, grid=gridIce, &
-      state=NState_AtmImp, name='FBAtm_i', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBAtm_i, STgeom=NState_IceExp, &
+      STflds=NState_AtmImp, name='FBAtm_i', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBAtm_l, grid=gridLnd, &
-      state=NState_AtmImp, name='FBAtm_l', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBAtm_l, STgeom=NState_LndExp, &
+      STflds=NState_AtmImp, name='FBAtm_l', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBAtm_h, grid=gridRof, &
-      state=NState_AtmImp, name='FBAtm_h', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBAtm_h, STgeom=NState_RofExp, &
+      STflds=NState_AtmImp, name='FBAtm_h', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     !--- ocn
 
-    call med_method_FB_init(is_local%wrap%FBOcn_a, grid=gridAtm, &
-      state=NState_OcnImp, name='FBOcn_a', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBOcn_a, STgeom=NState_AtmExp, &
+      STflds=NState_OcnImp, name='FBOcn_a', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBOcn_o, grid=gridOcn, &
-      state=NState_OcnImp, name='FBOcn_o', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBOcn_o, STgeom=NState_OcnImp, &
+      STflds=NState_OcnImp, name='FBOcn_o', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBOcn_i, grid=gridIce, &
-      state=NState_OcnImp, name='FBOcn_i', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBOcn_i, STgeom=NState_IceExp, &
+      STflds=NState_OcnImp, name='FBOcn_i', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     !--- ice
 
-    call med_method_FB_init(is_local%wrap%FBIce_a, grid=gridAtm, &
-      state=NState_IceImp, name='FBIce_a', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBIce_a, STgeom=NState_AtmExp, &
+      STflds=NState_IceImp, name='FBIce_a', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBIce_o, grid=gridOcn, &
-      state=NState_IceImp, name='FBIce_o', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBIce_o, STgeom=NState_OcnExp, &
+      STflds=NState_IceImp, name='FBIce_o', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBIce_i, grid=gridIce, &
-      state=NState_IceImp, name='FBIce_i', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBIce_i, STgeom=NState_IceImp, &
+      STflds=NState_IceImp, name='FBIce_i', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBIce_if, grid=gridIce, &
-      state=NState_IceImp, name='FBIce_if', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBIce_if, STgeom=NState_IceImp, &
+      STflds=NState_IceImp, name='FBIce_if', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     !--- lnd
 
-    call med_method_FB_init(is_local%wrap%FBLnd_a, grid=gridAtm, &
-      state=NState_LndImp, name='FBLnd_a', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBLnd_a, STgeom=NState_AtmExp, &
+      STflds=NState_LndImp, name='FBLnd_a', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBLnd_l, grid=gridLnd, &
-      state=NState_LndImp, name='FBLnd_l', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBLnd_l, STgeom=NState_LndImp, &
+      STflds=NState_LndImp, name='FBLnd_l', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBLnd_h, grid=gridRof, &
-      state=NState_LndImp, name='FBLnd_h', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBLnd_h, STgeom=NState_RofExp, &
+      STflds=NState_LndImp, name='FBLnd_h', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     !--- rof
 
-    call med_method_FB_init(is_local%wrap%FBRof_l, grid=gridLnd, &
-      state=NState_RofImp, name='FBRof_l', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBRof_l, STgeom=NState_LndExp, &
+      STflds=NState_RofImp, name='FBRof_l', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBRof_a, grid=gridAtm, &
-      state=NState_RofImp, name='FBRof_a', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBRof_a, STgeom=NState_AtmExp, &
+      STflds=NState_RofImp, name='FBRof_a', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBRof_h, grid=gridRof, &
-      state=NState_RofImp, name='FBRof_h', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBRof_h, STgeom=NState_RofImp, &
+      STflds=NState_RofImp, name='FBRof_h', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     !----------------------------------------------------------
     ! Initialize Accumulators
     !----------------------------------------------------------
 
-    call med_method_FB_init(is_local%wrap%FBaccumAtm, grid=gridAtm, &
-      state=NState_AtmImp, name='FBaccumAtm', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBaccumAtm, STgeom=NState_AtmImp, &
+      STflds=NState_AtmImp, name='FBaccumAtm', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBaccumOcn, grid=gridOcn, &
-      state=NState_OcnImp, name='FBaccumOcn', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBaccumOcn, STgeom=NState_OcnImp, &
+      STflds=NState_OcnImp, name='FBaccumOcn', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBaccumIce, grid=gridIce, &
-      state=NState_IceImp, name='FBaccumIce', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBaccumIce, STgeom=NState_IceImp, &
+      STflds=NState_IceImp, name='FBaccumIce', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBaccumLnd, grid=gridLnd, &
-      state=NState_LndImp, name='FBaccumLnd', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBaccumLnd, STgeom=NState_LndImp, &
+      STflds=NState_LndImp, name='FBaccumLnd', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBaccumRof, grid=gridRof, &
-      state=NState_RofImp, name='FBaccumRof', rc=rc)
+    call med_method_FB_init(is_local%wrap%FBaccumRof, STgeom=NState_RofImp, &
+      STflds=NState_RofImp, name='FBaccumRof', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     !----------------------------------------------------------
     ! Initialize AtmOcn FBs
     !----------------------------------------------------------
 
-    call med_method_FB_init(is_local%wrap%FBAtmOcn_o, grid=gridOcn, &
+    call med_method_FB_init(is_local%wrap%FBAtmOcn_o, STgeom=NState_OcnExp, &
       fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_o', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBAtmOcn_a, grid=gridAtm, &
+    call med_method_FB_init(is_local%wrap%FBAtmOcn_a, STgeom=NState_AtmExp, &
       fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_a', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-    call med_method_FB_init(is_local%wrap%FBaccumAtmOcn, grid=gridOcn, &
+    call med_method_FB_init(is_local%wrap%FBaccumAtmOcn, STgeom=NState_OcnExp, &
       fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBaccumAtmOcn', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
@@ -1770,23 +1763,23 @@ module MED
     !----------------------------------------------------------
 
     call med_method_FB_init(is_local%wrap%FBforAtm, &
-      state=NState_AtmExp, name='FBforAtm', rc=rc)
+      STgeom=NState_AtmExp, name='FBforAtm', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     call med_method_FB_init(is_local%wrap%FBforOcn, &
-      state=NState_OcnExp, name='FBforOcn', rc=rc)
+      STgeom=NState_OcnExp, name='FBforOcn', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     call med_method_FB_init(is_local%wrap%FBforIce, &
-      state=NState_IceExp, name='FBforIce', rc=rc)
+      STgeom=NState_IceExp, name='FBforIce', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     call med_method_FB_init(is_local%wrap%FBforLnd, &
-      state=NState_LndExp, name='FBforLnd', rc=rc)
+      STgeom=NState_LndExp, name='FBforLnd', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     call med_method_FB_init(is_local%wrap%FBforRof, &
-      state=NState_RofExp, name='FBforRof', rc=rc)
+      STgeom=NState_RofExp, name='FBforRof', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     !----------------------------------------------------------
@@ -2237,7 +2230,6 @@ module MED
       integer                     :: n, fieldCount
       character(ESMF_MAXSTR),allocatable :: fieldNameList(:)
       character(ESMF_MAXSTR)      :: transferAction
-      type(ESMF_GeomType_Flag)    :: geomtype
       character(len=*),parameter  :: subname='(module_MEDIATOR:completeFieldInitialization)'
 
       if (dbug_flag > 5) then
@@ -2273,20 +2265,7 @@ module MED
           if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
         endif   ! accept
 
-        call ESMF_FieldGet(field, geomtype=geomtype, rc=rc)
-        if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
-
-        if (geomtype == ESMF_GEOMTYPE_GRID) then
-          call med_method_Field_GridPrint(field,fieldNameList(n),rc=rc)
-          if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
-        elseif (geomtype == ESMF_GEOMTYPE_MESH) then
-          call med_method_Field_MeshPrint(field,fieldNameList(n),rc=rc)
-          if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
-        else
-          call ESMF_LogWrite(trim(subname)//": ERROR in geom type ", ESMF_LOGMSG_INFO, rc=rc)
-          rc=ESMF_FAILURE
-          return
-        endif
+        call med_method_Field_GeomPrint(field, trim(subname)//':'//trim(fieldNameList(n)), rc=rc)
 
       enddo
 
@@ -2893,13 +2872,13 @@ module MED
     type(ESMF_State)            :: importState, exportState
     type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
-    real(ESMF_KIND_R8), pointer :: dataPtr1(:,:),dataPtr2(:,:),dataPtr3(:,:),dataPtr4(:,:)
-    real(ESMF_KIND_R8), pointer :: ifrac_i(:,:)                   ! ice fraction on ice grid
-    real(ESMF_KIND_R8), pointer :: ifrac_af(:,:), ifrac_afr(:,:)  ! ice fraction on atm grid consf map
-    real(ESMF_KIND_R8), pointer :: ifrac_ad(:,:), ifrac_adr(:,:)  ! ice fraction on atm grid consd map
-    real(ESMF_KIND_R8), pointer :: ifrac_ab(:,:), ifrac_abr(:,:)  ! ice fraction on atm grid bilnr map
-    real(ESMF_KIND_R8), pointer :: ifrac_ap(:,:), ifrac_apr(:,:)  ! ice fraction on atm grid patch map
-    real(ESMF_KIND_R8), pointer :: ocnwgt(:,:),icewgt(:,:),customwgt(:,:)
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
+    real(ESMF_KIND_R8), pointer :: ifrac_i(:)                   ! ice fraction on ice grid
+    real(ESMF_KIND_R8), pointer :: ifrac_af(:), ifrac_afr(:)  ! ice fraction on atm grid consf map
+    real(ESMF_KIND_R8), pointer :: ifrac_ad(:), ifrac_adr(:)  ! ice fraction on atm grid consd map
+    real(ESMF_KIND_R8), pointer :: ifrac_ab(:), ifrac_abr(:)  ! ice fraction on atm grid bilnr map
+    real(ESMF_KIND_R8), pointer :: ifrac_ap(:), ifrac_apr(:)  ! ice fraction on atm grid patch map
+    real(ESMF_KIND_R8), pointer :: ocnwgt(:),icewgt(:),customwgt(:)
     integer                     :: i,j,n
     character(len=*),parameter :: subname='(module_MEDIATOR:MedPhase_prep_atm)'
     
@@ -2998,9 +2977,9 @@ module MED
         !--- need to compute weight by the frac mapped with the correct mapping
         !--- first compute the ice fraction on the atm grid for all active mappings
 
-        call med_method_FB_GetFldPtr(is_local%wrap%FBIce_i, 'ice_fraction', dataPtr1, rc=rc)
+        call med_method_FB_GetFldPtr(is_local%wrap%FBIce_i, 'ice_fraction', fldptr1=dataPtr1, rc=rc)
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
-        allocate(ifrac_i (lbound(dataPtr1,1):ubound(dataPtr1,1),lbound(dataPtr1,2):ubound(dataPtr1,2)))
+        allocate(ifrac_i (lbound(dataPtr1,1):ubound(dataPtr1,1)))
 
         !--- conservative frac
         if (ESMF_RouteHandleIsCreated(is_local%wrap%RH_i2a_consf, rc=rc)) then
@@ -3010,28 +2989,24 @@ module MED
           if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
           !--- copy out the ifrac on ice grid and ifrac on atm grid
-          call med_method_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', dataPtr2, rc=rc)
+          call med_method_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', fldptr1=dataPtr2, rc=rc)
           if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
-          allocate(ifrac_afr(lbound(dataptr2,1):ubound(dataptr2,1),lbound(dataptr2,2):ubound(dataptr2,2)))
-          allocate(ifrac_af (lbound(dataptr2,1):ubound(dataptr2,1),lbound(dataptr2,2):ubound(dataptr2,2)))
+          allocate(ifrac_afr(lbound(dataptr2,1):ubound(dataptr2,1)))
+          allocate(ifrac_af (lbound(dataptr2,1):ubound(dataptr2,1)))
 
-          do j=lbound(dataptr1,2),ubound(dataptr1,2)
           do i=lbound(dataptr1,1),ubound(dataptr1,1)
-            ifrac_i(i,j) = dataPtr1(i,j)
-          enddo
+            ifrac_i(i) = dataPtr1(i)
           enddo
 
-          do j=lbound(dataptr2,2),ubound(dataptr2,2)
           do i=lbound(dataptr2,1),ubound(dataptr2,1)
             !--- compute ice fraction on atm grid and reciprocal
-            ifrac_af(i,j) = dataPtr2(i,j)
-            if (dataPtr2(i,j) == 0._ESMF_KIND_R8) then
-              ifrac_afr(i,j) = 1.0_ESMF_KIND_R8
+            ifrac_af(i) = dataPtr2(i)
+            if (dataPtr2(i) == 0._ESMF_KIND_R8) then
+              ifrac_afr(i) = 1.0_ESMF_KIND_R8
             else
-              ifrac_afr(i,j) = 1.0_ESMF_KIND_R8/dataPtr2(i,j)
+              ifrac_afr(i) = 1.0_ESMF_KIND_R8/dataPtr2(i)
             endif
-          enddo
           enddo
         endif
 
@@ -3046,25 +3021,21 @@ module MED
           call med_method_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', dataPtr2, rc=rc)
           if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
-          allocate(ifrac_adr(lbound(dataptr2,1):ubound(dataptr2,1),lbound(dataptr2,2):ubound(dataptr2,2)))
-          allocate(ifrac_ad (lbound(dataptr2,1):ubound(dataptr2,1),lbound(dataptr2,2):ubound(dataptr2,2)))
+          allocate(ifrac_adr(lbound(dataptr2,1):ubound(dataptr2,1)))
+          allocate(ifrac_ad (lbound(dataptr2,1):ubound(dataptr2,1)))
 
-          do j=lbound(dataptr1,2),ubound(dataptr1,2)
           do i=lbound(dataptr1,1),ubound(dataptr1,1)
-            ifrac_i(i,j) = dataPtr1(i,j)
-          enddo
+            ifrac_i(i) = dataPtr1(i)
           enddo
 
-          do j=lbound(dataptr2,2),ubound(dataptr2,2)
           do i=lbound(dataptr2,1),ubound(dataptr2,1)
             !--- compute ice fraction on atm grid and reciprocal
-            ifrac_ad(i,j) = dataPtr2(i,j)
-            if (dataPtr2(i,j) == 0._ESMF_KIND_R8) then
-              ifrac_adr(i,j) = 1.0_ESMF_KIND_R8
+            ifrac_ad(i) = dataPtr2(i)
+            if (dataPtr2(i) == 0._ESMF_KIND_R8) then
+              ifrac_adr(i) = 1.0_ESMF_KIND_R8
             else
-              ifrac_adr(i,j) = 1.0_ESMF_KIND_R8/dataPtr2(i,j)
+              ifrac_adr(i) = 1.0_ESMF_KIND_R8/dataPtr2(i)
             endif
-          enddo
           enddo
         endif
 
@@ -3079,25 +3050,21 @@ module MED
           call med_method_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', dataPtr2, rc=rc)
           if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
-          allocate(ifrac_abr(lbound(dataptr2,1):ubound(dataptr2,1),lbound(dataptr2,2):ubound(dataptr2,2)))
-          allocate(ifrac_ab (lbound(dataptr2,1):ubound(dataptr2,1),lbound(dataptr2,2):ubound(dataptr2,2)))
+          allocate(ifrac_abr(lbound(dataptr2,1):ubound(dataptr2,1)))
+          allocate(ifrac_ab (lbound(dataptr2,1):ubound(dataptr2,1)))
 
-          do j=lbound(dataptr1,2),ubound(dataptr1,2)
           do i=lbound(dataptr1,1),ubound(dataptr1,1)
-            ifrac_i(i,j) = dataPtr1(i,j)
-          enddo
+            ifrac_i(i) = dataPtr1(i)
           enddo
 
-          do j=lbound(dataptr2,2),ubound(dataptr2,2)
           do i=lbound(dataptr2,1),ubound(dataptr2,1)
             !--- compute ice fraction on atm grid and reciprocal
-            ifrac_ab(i,j) = dataPtr2(i,j)
-            if (dataPtr2(i,j) == 0._ESMF_KIND_R8) then
-              ifrac_abr(i,j) = 1.0_ESMF_KIND_R8
+            ifrac_ab(i) = dataPtr2(i)
+            if (dataPtr2(i) == 0._ESMF_KIND_R8) then
+              ifrac_abr(i) = 1.0_ESMF_KIND_R8
             else
-              ifrac_abr(i,j) = 1.0_ESMF_KIND_R8/dataPtr2(i,j)
+              ifrac_abr(i) = 1.0_ESMF_KIND_R8/dataPtr2(i)
             endif
-          enddo
           enddo
         endif
 
@@ -3112,25 +3079,21 @@ module MED
           call med_method_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', dataPtr2, rc=rc)
           if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
-          allocate(ifrac_apr(lbound(dataptr2,1):ubound(dataptr2,1),lbound(dataptr2,2):ubound(dataptr2,2)))
-          allocate(ifrac_ap (lbound(dataptr2,1):ubound(dataptr2,1),lbound(dataptr2,2):ubound(dataptr2,2)))
+          allocate(ifrac_apr(lbound(dataptr2,1):ubound(dataptr2,1)))
+          allocate(ifrac_ap (lbound(dataptr2,1):ubound(dataptr2,1)))
 
-          do j=lbound(dataptr1,2),ubound(dataptr1,2)
           do i=lbound(dataptr1,1),ubound(dataptr1,1)
-            ifrac_i(i,j) = dataPtr1(i,j)
-          enddo
+            ifrac_i(i) = dataPtr1(i)
           enddo
 
-          do j=lbound(dataptr2,2),ubound(dataptr2,2)
           do i=lbound(dataptr2,1),ubound(dataptr2,1)
             !--- compute ice fraction on atm grid and reciprocal
-            ifrac_ap(i,j) = dataPtr2(i,j)
-            if (dataPtr2(i,j) == 0._ESMF_KIND_R8) then
-              ifrac_apr(i,j) = 1.0_ESMF_KIND_R8
+            ifrac_ap(i) = dataPtr2(i)
+            if (dataPtr2(i) == 0._ESMF_KIND_R8) then
+              ifrac_apr(i) = 1.0_ESMF_KIND_R8
             else
-              ifrac_apr(i,j) = 1.0_ESMF_KIND_R8/dataPtr2(i,j)
+              ifrac_apr(i) = 1.0_ESMF_KIND_R8/dataPtr2(i)
             endif
-          enddo
           enddo
         endif
 
@@ -3141,10 +3104,8 @@ module MED
               med_method_FB_FldChk(is_local%wrap%FBIce_if,fldsFrIce%shortname(n), rc=rc)) then
             call med_method_FB_GetFldPtr(is_local%wrap%FBIce_i , fldsFrIce%shortname(n), dataPtr3, rc=rc)
             call med_method_FB_GetFldPtr(is_local%wrap%FBIce_if, fldsFrIce%shortname(n), dataPtr4, rc=rc)
-            do j=lbound(dataptr3,2),ubound(dataptr3,2)
             do i=lbound(dataptr3,1),ubound(dataptr3,1)
-              dataPtr4(i,j) = dataPtr3(i,j) * ifrac_i(i,j)
-            enddo
+              dataPtr4(i) = dataPtr3(i) * ifrac_i(i)
             enddo
           endif
         enddo
@@ -3166,28 +3127,20 @@ module MED
           if (med_method_FB_FldChk(is_local%wrap%FBIce_a, fldsFrIce%shortname(n), rc=rc)) then
             call med_method_FB_GetFldPtr(is_local%wrap%FBIce_a, fldsFrIce%shortname(n), dataPtr3, rc=rc)
             if (fldsFrIce%mapping(n) == "conservefrac") then
-              do j=lbound(dataptr3,2),ubound(dataptr3,2)
               do i=lbound(dataptr3,1),ubound(dataptr3,1)
-                dataPtr3(i,j) = dataPtr3(i,j) * ifrac_afr(i,j)
-              enddo
+                dataPtr3(i) = dataPtr3(i) * ifrac_afr(i)
               enddo
             elseif (fldsFrIce%mapping(n) == "conservedst") then
-              do j=lbound(dataptr3,2),ubound(dataptr3,2)
               do i=lbound(dataptr3,1),ubound(dataptr3,1)
-                dataPtr3(i,j) = dataPtr3(i,j) * ifrac_adr(i,j)
-              enddo
+                dataPtr3(i) = dataPtr3(i) * ifrac_adr(i)
               enddo
             elseif (fldsFrIce%mapping(n) == 'bilinear') then
-              do j=lbound(dataptr3,2),ubound(dataptr3,2)
               do i=lbound(dataptr3,1),ubound(dataptr3,1)
-                dataPtr3(i,j) = dataPtr3(i,j) * ifrac_abr(i,j)
-              enddo
+                dataPtr3(i) = dataPtr3(i) * ifrac_abr(i)
               enddo
             elseif (fldsFrIce%mapping(n) == 'patch') then
-              do j=lbound(dataptr3,2),ubound(dataptr3,2)
               do i=lbound(dataptr3,1),ubound(dataptr3,1)
-                dataPtr3(i,j) = dataPtr3(i,j) * ifrac_apr(i,j)
-              enddo
+                dataPtr3(i) = dataPtr3(i) * ifrac_apr(i)
               enddo
             else
               call ESMF_LogWrite(trim(subname)//": mapping name error "//trim(fldsFrIce%mapping(n)), ESMF_LOGMSG_INFO, rc=rc)
@@ -3198,10 +3151,8 @@ module MED
         enddo
         !--- make sure ifrac_a in the mapped bundle is correct
         call med_method_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', dataPtr3, rc=rc)
-        do j=lbound(dataptr3,2),ubound(dataptr3,2)
         do i=lbound(dataptr3,1),ubound(dataptr3,1)
-          dataPtr3(i,j) = ifrac_af(i,j)
-        enddo
+          dataPtr3(i) = ifrac_af(i)
         enddo
 
         deallocate(ifrac_i)
@@ -3409,8 +3360,8 @@ module MED
     type(InternalState)         :: is_local
     integer                     :: i,j,n
     character(ESMF_MAXSTR)      :: fieldname1(10),fieldname2(10),fieldname3(10)
-    real(ESMF_KIND_R8), pointer :: dataPtr1(:,:),dataPtr2(:,:),dataPtr3(:,:)
-    real(ESMF_KIND_R8), pointer :: atmwgt(:,:),icewgt(:,:),customwgt(:,:)
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:)
+    real(ESMF_KIND_R8), pointer :: atmwgt(:),icewgt(:),customwgt(:)
     logical                     :: checkOK, checkOK1, checkOK2
     character(len=*),parameter  :: subname='(module_MEDIATOR:MedPhase_prep_ocn)'
 

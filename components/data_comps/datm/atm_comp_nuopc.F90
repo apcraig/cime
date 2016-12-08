@@ -46,7 +46,7 @@ module atm_comp_nuopc
   integer                 :: mpicom, iam
   integer                 :: dbrc
   character(len=1024)     :: tmpstr
-  character(len=*),parameter :: grid_option = "grid_de"  ! grid_de, grid_arb, grid_reg, mesh
+  character(len=*),parameter :: grid_option = "mesh"  ! grid_de, grid_arb, grid_reg, mesh
 
   !----- formats -----
   character(*),parameter :: modName =  "(atm_comp_nuopc)"

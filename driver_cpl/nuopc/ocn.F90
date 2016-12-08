@@ -347,7 +347,7 @@ module OCN
     call ESMF_StateGet(exportState, itemNameList=fieldNameList, rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
     do n = 1, fieldCount
-      call med_method_State_GetFldPtr(exportState, fieldNameList(n), dataPtr, rc=rc)
+      call med_method_State_GetFldPtr(exportState, fieldNameList(n), fldptr2=dataPtr, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
       do j=lbound(dataPtr,2),ubound(dataPtr,2)

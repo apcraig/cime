@@ -53,7 +53,7 @@ contains
     do n = 1,nflds
       call shr_string_listGetName(rList, n, fldname, rc)
       call ESMF_LogWrite(trim(subname)//": fldname = "//trim(fldname), ESMF_LOGMSG_INFO, rc=dbrc)
-      call med_method_State_GetFldPtr(State, fldname, dataPtr,rc=rc)
+      call med_method_State_GetFldPtr(State, fldname, fldptr2=dataPtr,rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
       if (n == 1) then
         write(tmpstr,'(A,i8)') subname//' dataPtr dim1 size = ',lbound(dataPtr,dim=1),ubound(dataPtr,dim=1)
