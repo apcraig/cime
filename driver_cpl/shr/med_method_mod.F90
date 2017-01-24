@@ -6,7 +6,9 @@ module med_method_mod
 
   use ESMF
   use NUOPC
-  use shr_nuopc_fldList_mod
+  use shr_nuopc_fldList_mod, only : shr_nuopc_fldList_Type
+  use seq_flds_mod, only : seq_flds_scalar_name, seq_flds_scalar_num
+  use mpi
  
   implicit none
   
@@ -66,11 +68,15 @@ module med_method_mod
   public med_method_State_GeomPrint
   public med_method_State_GeomWrite
   public med_method_State_GetFldPtr
+  public med_method_State_SetScalar
+  public med_method_State_GetScalar
   public med_method_Grid_Write
   public med_method_Field_GeomPrint
   public med_method_Clock_TimePrint
   public med_method_Grid_CopyCoord
   public med_method_Grid_CopyItem
+  public med_method_CopyStateToScalar
+  public med_method_CopyScalarToState
   public med_method_RH_init
   public med_method_UpdateTimestamp
   public med_method_ChkErr
@@ -575,12 +581,16 @@ module med_method_mod
     integer               , intent(out) :: rc
 
     ! local variables
-    integer                    :: i,j,n,fieldCount,fieldCountgeom
+    integer                    :: i,j,n,n1
+    integer                    :: fieldCount,fieldCountgeom
+    logical                    :: found
     character(ESMF_MAXSTR)     :: lname
     character(ESMF_MAXSTR),allocatable :: lfieldNameList(:)
     type(ESMF_Field)           :: field,lfield
     type(ESMF_Grid)            :: lgrid
     type(ESMF_Mesh)            :: lmesh
+    type(ESMF_StaggerLoc)      :: staggerloc
+    type(ESMF_MeshLoc)         :: meshloc
     character(len=*),parameter :: subname='(med_method_FB_init)'
 
     if (dbug_flag > 10) then
@@ -631,35 +641,56 @@ module med_method_mod
       fieldcount = size(fieldNameList)
       allocate(lfieldNameList(fieldcount))
       lfieldNameList = fieldNameList
+      call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from argument", ESMF_LOGMSG_INFO, rc=rc)
     elseif (present(FBflds)) then
       call ESMF_FieldBundleGet(FBflds, fieldCount=fieldCount, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
       allocate(lfieldNameList(fieldCount))
       call ESMF_FieldBundleGet(FBflds, fieldNameList=lfieldNameList, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+      call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from FBflds", ESMF_LOGMSG_INFO, rc=rc)
     elseif (present(STflds)) then
       call ESMF_StateGet(STflds, itemCount=fieldCount, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
       allocate(lfieldNameList(fieldCount))
       call ESMF_StateGet(STflds, itemNameList=lfieldNameList, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+      call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from STflds", ESMF_LOGMSG_INFO, rc=rc)
     elseif (present(FBgeom)) then
       call ESMF_FieldBundleGet(FBgeom, fieldCount=fieldCount, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
       allocate(lfieldNameList(fieldCount))
       call ESMF_FieldBundleGet(FBgeom, fieldNameList=lfieldNameList, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+      call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from FBgeom", ESMF_LOGMSG_INFO, rc=rc)
     elseif (present(STgeom)) then
       call ESMF_StateGet(STgeom, itemCount=fieldCount, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
       allocate(lfieldNameList(fieldCount))
       call ESMF_StateGet(STgeom, itemNameList=lfieldNameList, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+      call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from STflds", ESMF_LOGMSG_INFO, rc=rc)
     else
       call ESMF_LogWrite(trim(subname)//": ERROR fieldNameList, FBflds, STflds, FBgeom, or STgeom must be passed", ESMF_LOGMSG_INFO, rc=rc)
       rc = ESMF_FAILURE
       return
     endif
+
+    !--- remove scalar field from field bundle
+
+    found = .true.
+    do while (found)
+      found = .false.
+      do n = 1, fieldCount
+        if (lfieldnamelist(n) == trim(seq_flds_scalar_name)) then
+          found = .true.
+          do n1 = n, fieldCount-1
+            lfieldnamelist(n1) = lfieldnamelist(n1+1)
+          enddo
+          fieldCount = fieldCount - 1
+        endif
+      enddo  ! n
+    enddo  ! while
 
     !--- field grid or mesh
 
@@ -668,9 +699,11 @@ module med_method_mod
       if (present(FBgeom)) then
         call med_method_FB_getFieldN(FBgeom, 1, lfield, rc=rc)
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+        call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" grid/mesh from FBgeom", ESMF_LOGMSG_INFO, rc=rc)
       elseif (present(STgeom)) then
         call med_method_State_getFieldN(STgeom, 1, lfield, rc=rc)
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+        call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" grid/mesh from STgeom", ESMF_LOGMSG_INFO, rc=rc)
       else
         call ESMF_LogWrite(trim(subname)//": ERROR FBgeom or STgeom must be passed", ESMF_LOGMSG_INFO, rc=rc)
         rc = ESMF_FAILURE
@@ -688,11 +721,13 @@ module med_method_mod
       call ESMF_FieldGet(lfield, geomtype=geomtype, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
       if (geomtype == ESMF_GEOMTYPE_GRID) then
-        call ESMF_FieldGet(lfield, grid=lgrid, rc=rc)
+        call ESMF_FieldGet(lfield, grid=lgrid, staggerloc=staggerloc, rc=rc)
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+        call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" use grid", ESMF_LOGMSG_INFO, rc=rc)
       elseif (geomtype == ESMF_GEOMTYPE_MESH) then
-        call ESMF_FieldGet(lfield, mesh=lmesh, rc=rc)
+        call ESMF_FieldGet(lfield, mesh=lmesh, meshloc=meshloc, rc=rc)
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+        call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" use mesh", ESMF_LOGMSG_INFO, rc=rc)
       else  ! geomtype
         call ESMF_LogWrite(trim(subname)//": ERROR geomtype not supported ", ESMF_LOGMSG_INFO, rc=rc)
         rc = ESMF_FAILURE
@@ -710,11 +745,15 @@ module med_method_mod
 
       do n = 1, fieldCount
         if (geomtype == ESMF_GEOMTYPE_GRID) then
-          field = ESMF_FieldCreate(lgrid, ESMF_TYPEKIND_R8, name=lfieldNameList(n), rc=rc)
+          field = ESMF_FieldCreate(lgrid, ESMF_TYPEKIND_R8, staggerloc=staggerloc, name=lfieldNameList(n), rc=rc)
           if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
         elseif (geomtype == ESMF_GEOMTYPE_MESH) then
-          field = ESMF_FieldCreate(lmesh, ESMF_TYPEKIND_R8, name=lfieldNameList(n), rc=rc)
+          field = ESMF_FieldCreate(lmesh, ESMF_TYPEKIND_R8, meshloc=meshloc, name=lfieldNameList(n), rc=rc)
           if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+        else  ! geomtype
+          call ESMF_LogWrite(trim(subname)//": ERROR no grid/mesh for field ", ESMF_LOGMSG_INFO, rc=rc)
+          rc = ESMF_FAILURE
+          return
         endif
         call ESMF_FieldBundleAdd(FBout, (/field/), rc=rc)
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
@@ -1178,8 +1217,13 @@ module med_method_mod
     endif
 
     do n = 1,fldlist%num
-      if (med_method_FB_FldChk(FBin , fldlist%shortname(n), rc=rc) .and. &
-          med_method_FB_FldChk(FBout, fldlist%shortname(n), rc=rc)) then
+      if (fldlist%shortname(n) == trim(seq_flds_scalar_name)) then
+        if (dbug_flag > 1) then
+          call ESMF_LogWrite(trim(subname)//trim(lstring)//": skip : fld="//trim(fldlist%shortname(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+        endif
+   
+      elseif (med_method_FB_FldChk(FBin , fldlist%shortname(n), rc=rc) .and. &
+              med_method_FB_FldChk(FBout, fldlist%shortname(n), rc=rc)) then
 
         if (dbug_flag > 1) then
           call ESMF_LogWrite(trim(subname)//trim(lstring)//": map="//trim(fldlist%mapping(n))// &
@@ -1657,11 +1701,21 @@ module med_method_mod
       call med_method_FB_GetFldPtr(FB, lfieldnamelist(n), dataPtr1, dataPtr2, lrank, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
       if (lrank == 1) then
-        write(msgString,'(A,3g14.7)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
-          minval(dataPtr1),maxval(dataPtr1),sum(dataPtr1)
+        if (size(dataPtr1) > 0) then
+          write(msgString,'(A,3g14.7,i8)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
+            minval(dataPtr1),maxval(dataPtr1),sum(dataPtr1),size(dataPtr1)
+        else
+          write(msgString,'(A,a)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
+            " no data"
+        endif
       elseif (lrank == 2) then
-        write(msgString,'(A,3g14.7)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
-          minval(dataPtr2),maxval(dataPtr2),sum(dataPtr2)
+        if (size(dataPtr2) > 0) then
+          write(msgString,'(A,3g14.7,i8)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
+            minval(dataPtr2),maxval(dataPtr2),sum(dataPtr2),size(dataPtr2)
+        else
+          write(msgString,'(A,a)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
+            " no data"
+        endif
       else
         call ESMF_LogWrite(trim(subname)//": ERROR rank not supported ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
         rc = ESMF_FAILURE
@@ -1723,7 +1777,7 @@ module med_method_mod
     ! ----------------------------------------------
     ! Diagnose status of FB
     ! ----------------------------------------------
-    type(ESMF_State), intent(inout) :: State
+    type(ESMF_State), intent(in) :: State
     character(len=*), intent(in), optional :: string
     integer         , intent(out)   :: rc
 
@@ -1755,11 +1809,21 @@ module med_method_mod
       call med_method_State_GetFldPtr(State, lfieldnamelist(n), dataPtr1, dataPtr2, lrank, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
       if (lrank == 1) then
-        write(msgString,'(A,3g14.7)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
-          minval(dataPtr1),maxval(dataPtr1),sum(dataPtr1)
+        if (size(dataPtr1) > 0) then
+          write(msgString,'(A,3g14.7,i8)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
+            minval(dataPtr1),maxval(dataPtr1),sum(dataPtr1),size(dataPtr1)
+        else
+          write(msgString,'(A,a)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
+            " no data"
+        endif
       elseif (lrank == 2) then
-        write(msgString,'(A,3g14.7)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
-          minval(dataPtr2),maxval(dataPtr2),sum(dataPtr2)
+        if (size(dataPtr2) > 0) then
+          write(msgString,'(A,3g14.7,i8)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
+            minval(dataPtr2),maxval(dataPtr2),sum(dataPtr2),size(dataPtr2)
+        else
+          write(msgString,'(A,a)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
+            " no data"
+        endif
       else
         call ESMF_LogWrite(trim(subname)//": ERROR rank not supported ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
         rc = ESMF_FAILURE
@@ -1871,7 +1935,6 @@ module med_method_mod
     character(ESMF_MAXSTR) ,pointer  :: lfieldnamelist(:)
     logical                     :: exists
     logical                     :: lcopy
-    type(ESMF_StateItem_Flag)   :: itemType
     real(ESMF_KIND_R8), pointer :: dataPtri1(:)  , dataPtro1(:)
     real(ESMF_KIND_R8), pointer :: dataPtri2(:,:), dataPtro2(:,:)
     character(len=*),parameter :: subname='(med_method_FB_accumFB2FB)'
@@ -1904,8 +1967,9 @@ module med_method_mod
         if (lranki == 1 .and. lranko == 1) then
 
           if (.not.med_method_FieldPtr_Compare(dataPtro1, dataPtri1, subname, rc)) then
-             call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr1 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=rc)
-             return
+            call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr1 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=rc)
+            rc = ESMF_FAILURE
+            return
           endif
 
           if (lcopy) then
@@ -1921,8 +1985,9 @@ module med_method_mod
         elseif (lranki == 2 .and. lranko == 2) then
 
           if (.not.med_method_FieldPtr_Compare(dataPtro2, dataPtri2, subname, rc)) then
-             call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr2 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=rc)
-             return
+            call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr2 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=rc)
+            rc = ESMF_FAILURE
+            return
           endif
 
           if (lcopy) then
@@ -1941,6 +2006,8 @@ module med_method_mod
 
         else
 
+          write(msgString,'(a,2i8)') trim(subname)//": ranki, ranko = ",lranki,lranko
+          call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
           call ESMF_LogWrite(trim(subname)//": ERROR ranki ranko not supported "//trim(lfieldnamelist(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
           rc = ESMF_FAILURE
           return
@@ -2005,7 +2072,8 @@ module med_method_mod
         if (lrankS == 1 .and. lrankB == 1) then
 
           if (.not.med_method_FieldPtr_Compare(dataPtrS1, dataPtrB1, subname, rc)) then
-            call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr2 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=rc)
+            call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr1 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=rc)
+            rc = ESMF_FAILURE
             return
           endif
 
@@ -2023,6 +2091,7 @@ module med_method_mod
 
           if (.not.med_method_FieldPtr_Compare(dataPtrS2, dataPtrB2, subname, rc)) then
             call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr2 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=rc)
+            rc = ESMF_FAILURE
             return
           endif
 
@@ -2042,6 +2111,8 @@ module med_method_mod
 
         else
 
+          write(msgString,'(a,2i8)') trim(subname)//": rankB, ranks = ",lrankB,lrankS
+          call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
           call ESMF_LogWrite(trim(subname)//": ERROR rankB rankS not supported "//trim(lfieldnamelist(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
           rc = ESMF_FAILURE
           return
@@ -2107,7 +2178,8 @@ module med_method_mod
         if (lrankB == 1 .and. lrankS == 1) then
 
           if (.not.med_method_FieldPtr_Compare(dataPtrS1, dataPtrB1, subname, rc)) then
-            call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr2 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=rc)
+            call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr1 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=rc)
+            rc = ESMF_FAILURE
             return
           endif
 
@@ -2121,10 +2193,11 @@ module med_method_mod
             enddo
           endif
 
-        elseif (lrankB == 1 .and. lrankS == 1) then
+        elseif (lrankB == 2 .and. lrankS == 2) then
 
           if (.not.med_method_FieldPtr_Compare(dataPtrS2, dataPtrB2, subname, rc)) then
             call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr2 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=rc)
+            rc = ESMF_FAILURE
             return
           endif
 
@@ -2144,6 +2217,8 @@ module med_method_mod
 
         else
 
+          write(msgString,'(a,2i8)') trim(subname)//": rankB, ranks = ",lrankB,lrankS
+          call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
           call ESMF_LogWrite(trim(subname)//": ERROR rankB rankS not supported "//trim(lfieldnamelist(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
           rc = ESMF_FAILURE
           return
@@ -2481,9 +2556,9 @@ module med_method_mod
         ubound(fldptr2,1) /= ubound(fldptr1,1)) then
       call ESMF_LogWrite(trim(subname)//": ERROR in data size "//trim(cstring), ESMF_LOGMSG_ERROR, rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
-      write(msgString,*) trim(subname)//': fldptr2 ',lbound(fldptr2),ubound(fldptr2)
-      call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
       write(msgString,*) trim(subname)//': fldptr1 ',lbound(fldptr1),ubound(fldptr1)
+      call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+      write(msgString,*) trim(subname)//': fldptr2 ',lbound(fldptr2),ubound(fldptr2)
       call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
     else
       med_method_FieldPtr_Compare1 = .true.
@@ -3666,16 +3741,199 @@ module med_method_mod
 
   end subroutine med_method_Grid_CopyItem
 
+!================================================================================
+
+  subroutine med_method_CopyStateToScalar(State, data, mpicom, rc)
+    ! ----------------------------------------------
+    ! Copy scalar data from State to local data on root then broadcast data
+    ! to all PETs in component.
+    ! ----------------------------------------------
+    type(ESMF_State),  intent(in)     :: State
+    real(ESMF_KIND_R8),intent(inout)  :: data(:)
+    integer,           intent(in)     :: mpicom
+    integer,           intent(inout)  :: rc
+
+    ! local variables
+    integer :: mytask, ierr, len
+    character(MPI_MAX_ERROR_STRING) :: lstring
+    type(ESMF_Field) :: field
+    type(ESMF_StateItem_Flag)   :: itemType
+    real(ESMF_KIND_R8), pointer :: farrayptr(:,:)
+    character(len=*), parameter :: subname='(med_method_CopyStateToScalar)'
+
+    rc = ESMF_SUCCESS
+
+    call MPI_COMM_RANK(mpicom, mytask, rc)
+    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), itemType=itemType, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+    if (itemType == ESMF_STATEITEM_NOTFOUND) then
+      call ESMF_LogWrite(trim(subname)//": "//trim(seq_flds_scalar_name)//" not found", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+    else
+      call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+      if (mytask == 0) then
+        call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+        if (size(data) < seq_flds_scalar_num .or. size(farrayptr) < seq_flds_scalar_num) then
+          call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+          rc = ESMF_FAILURE
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+        endif
+        data(1:seq_flds_scalar_num) = farrayptr(1,1:seq_flds_scalar_num)
+      endif
+
+      call MPI_BCAST(data, seq_flds_scalar_num, MPI_REAL8, 0, mpicom, rc)
+      if (rc /= MPI_SUCCESS) then
+        call MPI_ERROR_STRING(rc,lstring,len,ierr)
+        call ESMF_LogWrite(trim(subname)//": ERROR "//trim(lstring), ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+        rc = ESMF_FAILURE
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      endif
+    endif
+
+  end subroutine med_method_CopyStateToScalar
+
+!================================================================================
+
+  subroutine med_method_CopyScalarToState(data, State, mpicom, rc)
+    ! ----------------------------------------------
+    ! Copy local scalar data into State, root only, 
+    ! but called on all PETs in component
+    ! ----------------------------------------------
+    real(ESMF_KIND_R8),intent(in)     :: data(:)
+    type(ESMF_State),  intent(inout)  :: State
+    integer,           intent(in)     :: mpicom
+    integer,           intent(inout)  :: rc
+
+    ! local variables
+    integer :: mytask
+    type(ESMF_Field) :: field
+    type(ESMF_StateItem_Flag) :: ItemType
+    real(ESMF_KIND_R8), pointer :: farrayptr(:,:)
+    character(len=*), parameter :: subname='(med_method_CopyScalarToState)'
+
+    rc = ESMF_SUCCESS
+
+    call MPI_COMM_RANK(mpicom, mytask, rc)
+
+    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), itemType=itemType, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+    if (itemType == ESMF_STATEITEM_NOTFOUND) then
+      call ESMF_LogWrite(trim(subname)//": "//trim(seq_flds_scalar_name)//" not found", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+    else
+      call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (mytask == 0) then
+        call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+        if (size(data) < seq_flds_scalar_num .or. size(farrayptr) < seq_flds_scalar_num) then
+          call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+          rc = ESMF_FAILURE
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+        endif
+        farrayptr(1,1:seq_flds_scalar_num) = data(1:seq_flds_scalar_num)
+      endif
+    endif
+
+  end subroutine med_method_CopyScalarToState
+
+!================================================================================
+
+  subroutine med_method_State_GetScalar(State, scalar_id, value, mpicom, rc)
+    ! ----------------------------------------------
+    ! Get scalar data from State for a particular name
+    ! ----------------------------------------------
+    type(ESMF_State),  intent(in)     :: State
+    integer,           intent(in)     :: scalar_id
+    real(ESMF_KIND_R8),intent(out)    :: value
+    integer,           intent(in)     :: mpicom
+    integer,           intent(inout)  :: rc
+
+    ! local variables
+    integer :: mytask, ierr, len
+    character(MPI_MAX_ERROR_STRING) :: lstring
+    type(ESMF_Field) :: field
+    real(ESMF_KIND_R8), pointer :: farrayptr(:,:)
+    character(len=*), parameter :: subname='(med_method_State_GetScalar)'
+
+    rc = ESMF_SUCCESS
+
+    call MPI_COMM_RANK(mpicom, mytask, rc)
+    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+    if (mytask == 0) then
+      call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (scalar_id < 0 .or. scalar_id > seq_flds_scalar_num) then
+        call ESMF_LogWrite(trim(subname)//": ERROR in scalar_id", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+        rc = ESMF_FAILURE
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      endif
+      value = farrayptr(1,scalar_id)  
+    endif
+ 
+    call MPI_BCAST(value, 1, MPI_REAL8, 0, mpicom, rc)
+    if (rc /= MPI_SUCCESS) then
+      call MPI_ERROR_STRING(rc,lstring,len,ierr)
+      call ESMF_LogWrite(trim(subname)//": ERROR "//trim(lstring), ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+      rc = ESMF_FAILURE
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    endif
+
+  end subroutine med_method_State_GetScalar
+
+!================================================================================
+
+  subroutine med_method_State_SetScalar(value, scalar_id, State, mpicom, rc)
+    ! ----------------------------------------------
+    ! Set scalar data from State for a particular name
+    ! ----------------------------------------------
+    real(ESMF_KIND_R8),intent(in)     :: value
+    integer,           intent(in)     :: scalar_id
+    type(ESMF_State),  intent(inout)  :: State
+    integer,           intent(in)     :: mpicom
+    integer,           intent(inout)  :: rc
+
+    ! local variables
+    integer :: mytask, ierr, len
+    character(MPI_MAX_ERROR_STRING) :: lstring
+    type(ESMF_Field) :: field
+    real(ESMF_KIND_R8), pointer :: farrayptr(:,:)
+    character(len=*), parameter :: subname='(med_method_State_SetScalar)'
+
+    rc = ESMF_SUCCESS
+
+    call MPI_COMM_RANK(mpicom, mytask, rc)
+    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+    if (mytask == 0) then
+      call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (scalar_id < 0 .or. scalar_id > seq_flds_scalar_num) then
+        call ESMF_LogWrite(trim(subname)//": ERROR in scalar_id", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+        rc = ESMF_FAILURE
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      endif
+      farrayptr(1,scalar_id) = value
+    endif
+ 
+  end subroutine med_method_State_SetScalar
+
   !-----------------------------------------------------------------------------
 
   subroutine med_method_State_UpdateTimestamp(state, time, rc)
-    type(ESMF_State)      :: state
-    type(ESMF_Time)       :: time
+    type(ESMF_State), intent(inout) :: state
+    type(ESMF_Time), intent(in)     :: time
     integer, intent(out)  :: rc
 
     ! local variables
-    integer               :: i
-    type(ESMF_Field),       pointer       :: fieldList(:)
+    integer :: i
+    type(ESMF_Field),pointer    :: fieldList(:)
     character(len=*), parameter :: subname='(med_method_State_UpdateTimestamp)'
 
     rc = ESMF_SUCCESS
@@ -3693,8 +3951,8 @@ module med_method_mod
   !-----------------------------------------------------------------------------
 
   subroutine med_method_Field_UpdateTimestamp(field, time, rc)
-    type(ESMF_Field)      :: field
-    type(ESMF_Time)       :: time
+    type(ESMF_Field), intent(inout) :: field
+    type(ESMF_Time) , intent(in)    :: time
     integer, intent(out)  :: rc
 
     ! local variables

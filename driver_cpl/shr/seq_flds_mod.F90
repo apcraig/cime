@@ -121,7 +121,7 @@ module seq_flds_mod
   ! variables CCSM_VOC, CCSM_BGC and GLC_NEC.  
   !====================================================================
  
-   use shr_kind_mod,   only : CX => shr_kind_CX, CXX => shr_kind_CXX
+   use shr_kind_mod,   only : CX => shr_kind_CX, CXX => shr_kind_CXX, R8 => shr_kind_R8
    use shr_sys_mod,    only : shr_sys_abort
    use seq_drydep_mod, only : seq_drydep_init, seq_drydep_readnl, lnd_drydep
    use seq_comm_mct,   only : seq_comm_iamroot, seq_comm_setptrs, logunit
@@ -154,6 +154,16 @@ module seq_flds_mod
    integer         ,parameter :: nmax      = 1000        ! maximum number of entries in lookup_entry
    integer                    :: n_entries = 0           ! actual number of entries in lookup_entry
    character(len=CSS), dimension(nmax, 4) :: lookup_entry = undef
+
+   !----------------------------------------------------------------------------
+   ! for the scalars
+   !----------------------------------------------------------------------------
+
+   character(len=*) ,parameter :: seq_flds_scalar_name = "cpl_scalars"
+   integer          ,parameter :: seq_flds_scalar_num = 2
+   character(len=32),parameter :: seq_flds_scalar_flds(seq_flds_scalar_num)  = &
+                                  (/ "scalar_nextsw_cday              ", &
+                                     "scalar_atm_phase                "/)
 
    !----------------------------------------------------------------------------
    ! for the domain
@@ -488,6 +498,16 @@ module seq_flds_mod
            exit
         end if
      end do
+
+     !----------------------------------------------------------
+     ! scalar information
+     !----------------------------------------------------------
+
+     longname = trim(seq_flds_scalar_name)
+     stdname  = trim(seq_flds_scalar_name)
+     units    = 'unitless'
+     attname  = trim(seq_flds_scalar_name)
+     call metadata_set(attname, longname, stdname, units)
 
      !----------------------------------------------------------
      ! domain coordinates

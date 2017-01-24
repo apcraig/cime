@@ -198,6 +198,8 @@ module atm_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
     call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_fluxes, "will provide", subname//":seq_flds_x2a_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    call shr_nuopc_fldList_Add(fldsToAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
     ! create export fields list
     call shr_nuopc_fldList_Zero(fldsFrAtm, rc=rc)
@@ -212,6 +214,8 @@ module atm_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
     call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_fluxes, "will provide", subname//":seq_flds_a2x_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    call shr_nuopc_fldList_Add(fldsFrAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
     ! advertise import and export
 
@@ -340,6 +344,8 @@ module atm_comp_nuopc
 !    call mct_gGrid_exportRattr(ggrid,'area',farray1,lsize)
 
   elseif (grid_option == 'grid_de') then
+
+    ! 1 gridcell per DE
 
     call seq_infodata_GetData(n_infodata, atm_nx=nx_global, atm_ny=ny_global)
     lsize = mct_gsMap_lsize(gsMap, mpicom)
@@ -719,6 +725,7 @@ module atm_comp_nuopc
     type(ESMF_State)              :: importState, exportState
     integer :: CurrentYMD, CurrentTOD, yy, mm, dd, stepno, idt
     integer :: logunit, shrloglev
+    real(r8) :: value
     character(len=128) :: calendar
     character(len=*),parameter  :: subname=trim(modName)//':(ModelAdvance) '
 
@@ -753,11 +760,23 @@ module atm_comp_nuopc
     write(logunit,*) subname,' stepno, idt = ',stepno,idt
     write(logunit,*) subname,' calendar = ',trim(calendar)
 
+    call med_method_State_GetScalar(importState, 1, value, mpicom, rc)
+    write(logunit,*) subname,' get scalar(1) = ',value
+    call med_method_State_GetScalar(importState, 2, value, mpicom, rc)
+    write(logunit,*) subname,' get scalar(2) = ',value
+
     ! HERE THE MODEL ADVANCES: currTime -> currTime + timeStep
 !    call atm_run_esmf(gcomp, importState, exportState, n_EClock_a, rc)
     call atm_run_esmf(gcomp, importState, exportState, clock, rc)
 !    call datm_comp_run(n_EClock_a, cdata, x2d, d2x)
-    
+
+    value = -currentYMD
+    write(logunit,*) subname,' set scalar(1) = ',value
+    call med_method_State_SetScalar(value, 1, exportState, mpicom, rc)
+    value = -currentTOD
+    write(logunit,*) subname,' set scalar(2) = ',value
+    call med_method_State_SetScalar(value, 2, exportState, mpicom, rc)
+
     ! Because of the way that the internal Clock was set in SetClock(),
     ! its timeStep is likely smaller than the parent timeStep. As a consequence
     ! the time interval covered by a single parent timeStep will result in 
@@ -978,6 +997,7 @@ module atm_comp_nuopc
     character(len=CS)  :: fldname
     type(ESMF_Field)   :: lfield
     real(ESMF_KIND_R8), pointer :: farray2(:,:)
+    real(ESMF_KIND_R8), pointer :: farray1(:)
     real(ESMF_KIND_R8), pointer :: favect(:)
 
     character(*),parameter :: subName = trim(modName)//":(avect2state) "
@@ -1013,6 +1033,21 @@ module atm_comp_nuopc
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
           farray2(1,1) = favect(n)
         enddo
+      elseif (grid_option == 'mesh' .or. grid_option == 'arb') then
+        call ESMF_LogWrite(trim(subname)//": fldname = "//trim(fldname)//" copy", ESMF_LOGMSG_INFO, rc=dbrc)
+        call mct_aVect_exportRAttr(avect, trim(fldname), favect, lsize)
+        do n = 1,lsize
+!         write(tmpstr,'(a,3i8)') subname//' n,lsize ',n,lsize
+!         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+!         write(tmpstr,'(a,i8,4g13.6)') subname//' grid values ',DE,falon(n),falat(n),famask(n),faarea(n)
+!         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+          call ESMF_FieldGet(lfield, farrayPtr=farray1, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+          farray1(n) = favect(n)
+        enddo
+        write(tmpstr,'(a,3g13.6)') trim(subname)//":"//trim(fldname)//"=",minval(farray1),maxval(farray1),sum(farray1)
+        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
       else
         call ESMF_LogWrite(trim(subname)//": fldname = "//trim(fldname)//" copy skipped due to grid_option", ESMF_LOGMSG_INFO, rc=dbrc)
 !        rc=ESMF_Failure

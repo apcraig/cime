@@ -8,8 +8,10 @@ module shr_nuopc_fldList_mod
   use shr_sys_mod, only : shr_sys_abort
   use shr_log_mod, only : loglev  => shr_log_Level
   use shr_log_mod, only : logunit => shr_log_Unit
+  use shr_mpi_mod, only : shr_mpi_bcast
   use shr_string_mod, only : shr_string_listGetNum, shr_string_listGetName
   use seq_flds_mod, only : seq_flds_lookup, seq_flds_get_num_entries, seq_flds_get_entry
+  use seq_flds_mod, only : seq_flds_scalar_name, seq_flds_scalar_num
   use ESMF
   use NUOPC
 
@@ -24,6 +26,7 @@ module shr_nuopc_fldList_mod
   public :: shr_nuopc_fldList_Add
   public :: shr_nuopc_fldList_Advertise
   public :: shr_nuopc_fldList_Realize
+  public :: shr_nuopc_fldList_SetScalarField
 
   type shr_nuopc_fldList_Type
     integer :: num
@@ -393,7 +396,12 @@ contains
 
         else   ! provide
 
-          if (present(grid)) then
+          if (fldlist%shortname(n) == trim(seq_flds_scalar_name)) then
+            call ESMF_LogWrite(trim(subname)//trim(tag)//" Field = "//trim(fldlist%shortname(n))//" is connected on root pe", &
+              ESMF_LOGMSG_INFO, rc=dbrc)
+            call shr_nuopc_fldList_SetScalarField(field, rc=rc)
+            if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+          elseif (present(grid)) then
             call ESMF_LogWrite(trim(subname)//trim(tag)//" Field = "//trim(fldlist%shortname(n))//" is connected using grid", &
               ESMF_LOGMSG_INFO, rc=dbrc)
             field = ESMF_FieldCreate(grid, ESMF_TYPEKIND_R8, name=fldlist%shortname(n),rc=rc)
@@ -430,6 +438,107 @@ contains
     call ESMF_LogWrite(subname//' done ', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine shr_nuopc_fldList_Realize
+
+!================================================================================
+
+  subroutine shr_nuopc_fldList_SetScalarField(field, rc)
+    ! ----------------------------------------------
+    ! create a field with scalar data on the root pe
+    ! ----------------------------------------------
+    type(ESMF_Field), intent(inout)  :: field
+    integer,          intent(inout)  :: rc
+
+    ! local variables
+    type(ESMF_Distgrid) :: distgrid
+    type(ESMF_Grid)     :: grid
+    character(len=*), parameter :: subname='(shr_nuopc_fldList_SetScalarField)'
+
+    rc = ESMF_SUCCESS
+
+    ! create a DistGrid with a single index space element, which gets mapped
+    ! onto DE 0.
+    distgrid = ESMF_DistGridCreate(minIndex=(/1/), maxIndex=(/1/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    grid = ESMF_GridCreate(distgrid, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    field = ESMF_FieldCreate(name=trim(seq_flds_scalar_name), grid=grid, &
+      typekind=ESMF_TYPEKIND_R8, &
+      ungriddedLBound=(/1/), ungriddedUBound=(/seq_flds_scalar_num/), & ! num of scalar values
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+  end subroutine shr_nuopc_fldList_SetScalarField
+
+!================================================================================
+
+  subroutine shr_nuopc_fldList_CopyStateToScalar(State, data, mpicom, rc)
+    ! ----------------------------------------------
+    ! Copy scalar data from State to local data on root then broadcast
+    ! ----------------------------------------------
+    type(ESMF_State), intent(in)     :: State
+    real(r8),         intent(inout)  :: data(:)
+    integer,          intent(in)     :: mpicom
+    integer,          intent(inout)  :: rc
+
+    ! local variables
+    integer :: mytask
+    type(ESMF_Field) :: field
+    real(ESMF_KIND_R8), pointer :: farrayptr(:)
+    character(len=*), parameter :: subname='(shr_nuopc_fldList_CopyStateToScalar)'
+
+    rc = ESMF_SUCCESS
+
+    call MPI_COMM_RANK(mpicom, mytask, rc)
+    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (mytask == 0) then
+      call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (size(data) < seq_flds_scalar_num .or. size(farrayptr) < seq_flds_scalar_num) then
+        call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+        rc = ESMF_FAILURE
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      endif
+      data(1:seq_flds_scalar_num) = farrayptr(1:seq_flds_scalar_num)
+    endif
+    call shr_mpi_bcast(data, mpicom)
+
+  end subroutine shr_nuopc_fldList_CopyStateToScalar
+
+!================================================================================
+
+  subroutine shr_nuopc_fldList_CopyScalarToState(data, State, mpicom, rc)
+    ! ----------------------------------------------
+    ! Copy local scalar data into State, root only
+    ! ----------------------------------------------
+    real(r8),         intent(in)     :: data(:)
+    type(ESMF_State), intent(inout)  :: State
+    integer,          intent(in)     :: mpicom
+    integer,          intent(inout)  :: rc
+
+    ! local variables
+    integer :: mytask
+    type(ESMF_Field) :: field
+    real(ESMF_KIND_R8), pointer :: farrayptr(:)
+    character(len=*), parameter :: subname='(shr_nuopc_fldList_CopyScalarToState)'
+
+    rc = ESMF_SUCCESS
+
+    call MPI_COMM_RANK(mpicom, mytask, rc)
+    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (mytask == 0) then
+      call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (size(data) < seq_flds_scalar_num .or. size(farrayptr) < seq_flds_scalar_num) then
+        call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+        rc = ESMF_FAILURE
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      endif
+      farrayptr(1:seq_flds_scalar_num) = data(1:seq_flds_scalar_num)
+    endif
+
+  end subroutine shr_nuopc_fldList_CopyScalarToState
 
 !================================================================================
 #endif

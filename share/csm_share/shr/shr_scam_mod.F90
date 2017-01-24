@@ -20,10 +20,9 @@ module shr_scam_mod
 
 ! !USES:
 
-   use shr_kind_mod  ! defines kinds
+   use shr_kind_mod,    only : R8=>SHR_KIND_R8,IN=>SHR_KIND_IN,CL=>SHR_KIND_CL
    use shr_sys_mod   ! system calls
    use shr_file_mod  ! file utilities
-   use shr_kind_mod,    only : R8=>SHR_KIND_R8,IN=>SHR_KIND_IN,CL=>SHR_KIND_CL
    use shr_log_mod,     only : s_loglev  => shr_log_Level
    use shr_log_mod,     only : s_logunit => shr_log_Unit
 

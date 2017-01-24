@@ -20,15 +20,15 @@ module MED
   use shr_nuopc_fldList_mod
   use med_method_mod
   use seq_flds_mod
- 
+
   implicit none
   
   private
   
   ! private internal state to keep instance data
   type InternalStateStruct
-    integer               :: slowcntr
-    integer               :: fastcntr
+    integer               :: ocncntr
+    integer               :: atmcntr
     integer               :: accumcntAtm ! accumulator counter
     integer               :: accumcntOcn ! accumulator counter
     integer               :: accumcntIce ! accumulator counter
@@ -138,6 +138,8 @@ module MED
     logical               :: i2o_active
     logical               :: l2h_active
     logical               :: h2l_active
+    real(r8), pointer     :: scalar_data(:)
+    integer               :: mpicom
   end type
 
   type InternalState
@@ -304,6 +306,42 @@ module MED
       specPhaseLabel="MedPhase_accum_fast", specRoutine=MedPhase_accum_fast, rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
+    ! prep_med2atm
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"MedPhase_prep_med2atm"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="MedPhase_prep_med2atm", specRoutine=MedPhase_prep_med2atm, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+
+    ! post_atm2med
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"MedPhase_post_atm2med"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="MedPhase_post_atm2med", specRoutine=MedPhase_post_atm2med, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+
+    ! prep_med2ocn
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"MedPhase_prep_med2ocn"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="MedPhase_prep_med2ocn", specRoutine=MedPhase_prep_med2ocn, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+
+    ! post_ocn2med
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"MedPhase_post_ocn2med"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="MedPhase_post_ocn2med", specRoutine=MedPhase_post_ocn2med, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+
     ! prep_atm
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"MedPhase_prep_atm"/), &
@@ -341,7 +379,7 @@ module MED
   end subroutine SetServices
   
   !-----------------------------------------------------------------------------
-
+#if (1 == 0)
   subroutine InitializeP1(gcomp, importState, exportState, clock, rc)
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
@@ -490,7 +528,7 @@ module MED
 #endif
 
   end subroutine InitializeP2
-
+#endif
   !-----------------------------------------------------------------------------
 
   subroutine InitializeP0(gcomp, importState, exportState, clock, rc)
@@ -500,9 +538,10 @@ module MED
     integer, intent(out)  :: rc
 
     ! local variables
-    character(len=NUOPC_PhaseMapStringLength) :: initPhases(6)
     character(len=*),parameter :: subname='(module_MEDIATOR:InitializeP0)'
-    character(len=10)                         :: value
+    character(len=10)          :: value
+
+    rc = ESMF_SUCCESS
 
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, defaultValue="max", &
       convention="NUOPC", purpose="Instance", rc=rc)
@@ -516,7 +555,6 @@ module MED
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
-    rc = ESMF_SUCCESS
 
     ! Switch to IPDv03 by filtering all other phaseMap entries
     call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, &
@@ -583,12 +621,16 @@ module MED
 !    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
     call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_fluxes, "cannot provide", subname//":seq_flds_x2a_fluxes", "bilinear", rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+    call shr_nuopc_fldList_Add(fldsToAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
     call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_states, "cannot provide", subname//":seq_flds_a2x_states", "bilinear", rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 !    call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_fluxes, "cannot provide", subname//":seq_flds_a2x_fluxes", "conservefrac", rc=rc)
 !    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
     call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_fluxes, "cannot provide", subname//":seq_flds_a2x_fluxes", "bilinear", rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+    call shr_nuopc_fldList_Add(fldsFrAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
 !    call shr_nuopc_fldList_Add(fldsFrOcn, "sea_surface_temperature"  ,"will provide",subname//':fldsFrOcn',mapping='bilinear',rc=rc)
@@ -772,13 +814,13 @@ module MED
     integer, intent(out) :: rc
     
     ! local variables    
-    integer                     :: i, j
+    integer                    :: i, j
     real(kind=ESMF_KIND_R8),pointer :: lonPtr(:), latPtr(:)
-    type(InternalState)         :: is_local
-    integer                     :: stat
-    real(ESMF_KIND_R8)          :: intervalSec
-    type(ESMF_TimeInterval)     :: timeStep
-    character(ESMF_MAXSTR)      :: transferAction
+    type(ESMF_VM)              :: vm
+    type(InternalState)        :: is_local
+    integer                    :: stat, lmpicom
+    real(ESMF_KIND_R8)         :: intervalSec
+    type(ESMF_TimeInterval)    :: timeStep
 ! tcx XGrid
 !    type(ESMF_Field)            :: fieldX, fieldA, fieldO
 !    type(ESMF_XGrid)            :: xgrid
@@ -800,8 +842,14 @@ module MED
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
       
     ! Initialize the internal state members
-    is_local%wrap%fastcntr = 1
-    is_local%wrap%slowcntr = 1
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+    call ESMF_VMGet(vm, mpiCommunicator=lmpicom, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+    call MPI_Comm_Dup(lmpicom, is_local%wrap%mpicom, stat)
+
+    is_local%wrap%atmcntr = 0
+    is_local%wrap%ocncntr = 0
 
 ! tcraig hardwire 1 degree grid as backup option
 !    gridMed = ESMF_GridCreate1PeriDimUfrm(maxIndex=(/360,180/), &
@@ -1031,7 +1079,6 @@ module MED
 !    integer, allocatable          :: minIndexPTile(:,:), maxIndexPTile(:,:)
 !    integer, allocatable          :: regDecompPTile(:,:)
 !    integer                       :: i, j, n, n1
-!    character(ESMF_MAXSTR)        :: transferAction
     
     character(len=*),parameter :: subname='(module_MEDIATOR:InitializeIPDv03p4)'
 
@@ -1099,9 +1146,9 @@ module MED
       integer                       :: i, j, n, n1, fieldCount, nxg, i1, i2
       type(ESMF_GeomType_Flag)      :: geomtype
       character(ESMF_MAXSTR),allocatable :: fieldNameList(:)
-      character(ESMF_MAXSTR)        :: transferAction
+      type(ESMF_FieldStatus_Flag)   :: fieldStatus 
       character(len=*),parameter :: subname='(module_MEDIATOR:realizeConnectedGrid)'
-    
+
       !NOTE: All fo the Fields that set their TransferOfferGeomObject Attribute
       !NOTE: to "cannot provide" should now have the accepted Grid available.
       !NOTE: Go and pull out this Grid for one of a representative Field and 
@@ -1127,11 +1174,10 @@ module MED
 
         call ESMF_StateGet(State, field=field, itemName=fieldNameList(n), rc=rc)
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
-        call NUOPC_GetAttribute(field, name="TransferActionGeomObject", &
-          value=transferAction, rc=rc)
+        call ESMF_FieldGet(field, status=fieldStatus, rc=rc)
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-        if (trim(transferAction) == "accept") then
+        if (fieldStatus==ESMF_FIELDSTATUS_GRIDSET) then 
           ! while this is still an empty field, it does now hold a Grid with DistGrid
           call ESMF_FieldGet(field, geomtype=geomtype, rc=rc)
           if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
@@ -1348,11 +1394,17 @@ module MED
 
           endif ! geomtype
 
-        else    ! accept
+        elseif (fieldStatus==ESMF_FIELDSTATUS_EMPTY) then 
 
           call ESMF_LogWrite(trim(subname)//trim(string)//": provide grid for "//trim(fieldNameList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
 
-        endif   ! accept
+        else
+
+          call ESMF_LogWrite(trim(subname)//": ERROR fieldStatus not supported ", ESMF_LOGMSG_INFO, rc=rc)
+          rc=ESMF_FAILURE
+          return
+
+        endif   ! fieldStatus
 
       enddo   ! nflds
 
@@ -1781,6 +1833,13 @@ module MED
     call med_method_FB_init(is_local%wrap%FBforRof, &
       STgeom=NState_RofExp, name='FBforRof', rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
+
+    !----------------------------------------------------------
+    ! Initialize scalar data
+    !----------------------------------------------------------
+
+    allocate(is_local%wrap%scalar_data(seq_flds_scalar_num))
+    is_local%wrap%scalar_data = -9999
 
     !----------------------------------------------------------
     !--- Check for active regrid directions
@@ -2229,7 +2288,7 @@ module MED
     
       integer                     :: n, fieldCount
       character(ESMF_MAXSTR),allocatable :: fieldNameList(:)
-      character(ESMF_MAXSTR)      :: transferAction
+      type(ESMF_FieldStatus_Flag) :: fieldStatus 
       character(len=*),parameter  :: subname='(module_MEDIATOR:completeFieldInitialization)'
 
       if (dbug_flag > 5) then
@@ -2248,13 +2307,12 @@ module MED
 
         call ESMF_StateGet(State, field=field, itemName=fieldNameList(n), rc=rc)
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
-        call NUOPC_GetAttribute(field, name="TransferActionGeomObject", &
-          value=transferAction, rc=rc)
+        call ESMF_FieldGet(field, status=fieldStatus, rc=rc) 
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
 
-        if (trim(transferAction) == "accept") then
+        if (fieldStatus==ESMF_FIELDSTATUS_GRIDSET) then 
           if (dbug_flag > 1) then
-            call ESMF_LogWrite(subname//" is accepting grid for field "//trim(fieldNameList(n)), &
+            call ESMF_LogWrite(subname//" is allocating field memory for field "//trim(fieldNameList(n)), &
               ESMF_LOGMSG_INFO, rc=rc)
             if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
           endif
@@ -2263,7 +2321,7 @@ module MED
           ! The ESMF_FieldEmptyComplete is not allocating memory for this 3rd dimension
           call ESMF_FieldEmptyComplete(field, typekind=ESMF_TYPEKIND_R8, rc=rc)
           if (med_method_ChkErr(rc,__LINE__,__FILE__)) return 
-        endif   ! accept
+        endif   ! fieldStatus
 
         call med_method_Field_GeomPrint(field, trim(subname)//':'//trim(fieldNameList(n)), rc=rc)
 
@@ -2858,6 +2916,228 @@ module MED
   !-----------------------------------------------------------------------------
   !-----------------------------------------------------------------------------
 
+  subroutine MedPhase_prep_med2atm(gcomp, rc)
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    
+    ! local variables
+    type(ESMF_Clock)            :: clock
+    type(ESMF_State)            :: importState, exportState
+    type(InternalState)         :: is_local
+    character(len=*),parameter :: subname='(module_MEDIATOR:MedPhase_prep_med2atm)'
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    ! query the Component for its clock, importState and exportState
+    call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
+      exportState=exportState, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+      
+    ! Get the internal state from Component.
+    nullify(is_local%wrap)
+    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    call Med_Connector_Diagnose(NState_AtmExp, is_local%wrap%atmcntr, "med_to_atm", rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    !-------------------------
+    ! copy local scalar to State and synchronize data in export and import state
+    !-------------------------
+
+    call med_method_CopyScalarToState(is_local%wrap%scalar_data,NState_AtmExp,is_local%wrap%mpicom,rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+    call med_method_CopyScalarToState(is_local%wrap%scalar_data,NState_AtmImp,is_local%wrap%mpicom,rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine MedPhase_prep_med2atm
+
+  !-----------------------------------------------------------------------------
+
+  subroutine MedPhase_prep_med2ocn(gcomp, rc)
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    
+    ! local variables
+    type(ESMF_Clock)            :: clock
+    type(ESMF_State)            :: importState, exportState
+    type(InternalState)         :: is_local
+    character(len=*),parameter :: subname='(module_MEDIATOR:MedPhase_prep_med2ocn)'
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    ! query the Component for its clock, importState and exportState
+    call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
+      exportState=exportState, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+      
+    ! Get the internal state from Component.
+    nullify(is_local%wrap)
+    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+    
+    call Med_Connector_Diagnose(NState_OcnExp, is_local%wrap%ocncntr, "med_to_ocn", rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    !-------------------------
+    ! copy local scalar to State and synchronize data in export and import state
+    !-------------------------
+
+    call med_method_CopyScalarToState(is_local%wrap%scalar_data,NState_OcnExp,is_local%wrap%mpicom,rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+    call med_method_CopyScalarToState(is_local%wrap%scalar_data,NState_OcnImp,is_local%wrap%mpicom,rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine MedPhase_prep_med2ocn
+
+  !-----------------------------------------------------------------------------
+
+  subroutine MedPhase_post_atm2med(gcomp, rc)
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    
+    ! local variables
+    type(ESMF_Clock)            :: clock
+    type(ESMF_State)            :: importState, exportState
+    type(InternalState)         :: is_local
+    character(len=*),parameter :: subname='(module_MEDIATOR:MedPhase_post_atm2med)'
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    ! query the Component for its clock, importState and exportState
+    call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
+      exportState=exportState, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+      
+    ! Get the internal state from Component.
+    nullify(is_local%wrap)
+    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    call Med_Connector_Diagnose(NState_AtmImp, is_local%wrap%atmcntr, "med_from_atm", rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    !-------------------------
+    ! copy import state scalar data to local datatype
+    !-------------------------
+
+    call med_method_CopyStateToScalar(NState_AtmImp,is_local%wrap%scalar_data,is_local%wrap%mpicom,rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine MedPhase_post_atm2med
+
+  !-----------------------------------------------------------------------------
+
+  subroutine MedPhase_post_ocn2med(gcomp, rc)
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    
+    ! local variables
+    type(ESMF_Clock)            :: clock
+    type(ESMF_State)            :: importState, exportState
+    type(InternalState)         :: is_local
+    character(len=*),parameter :: subname='(module_MEDIATOR:MedPhase_post_ocn2med)'
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    ! query the Component for its clock, importState and exportState
+    call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
+      exportState=exportState, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+      
+    ! Get the internal state from Component.
+    nullify(is_local%wrap)
+    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+    
+    call Med_Connector_Diagnose(NState_OcnImp, is_local%wrap%ocncntr, "med_from_ocn", rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    !-------------------------
+    ! copy import state scalar data to local datatype
+    !-------------------------
+
+    call med_method_CopyStateToScalar(NState_OcnImp,is_local%wrap%scalar_data,is_local%wrap%mpicom,rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine MedPhase_post_ocn2med
+
+  !-----------------------------------------------------------------------------
+
+  subroutine Med_Connector_Diagnose(State, cntr, string, rc)
+    type(ESMF_State), intent(in)    :: State
+    integer         , intent(inout) :: cntr
+    character(len=*), intent(in)    :: string
+    integer         , intent(out)   :: rc
+    
+    ! local variables
+    integer :: fieldCount
+    character(ESMF_MAXSTR),pointer :: fieldnamelist(:)
+    character(len=*),parameter :: subname='(module_MEDIATOR:Med_Connector_Diagnose)'
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//trim(string)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    call ESMF_StateGet(State, itemCount=fieldCount, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    allocate(fieldnamelist(fieldCount))
+    call ESMF_StateGet(State, itemNameList=fieldnamelist, rc=rc)
+    if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    if (dbug_flag > 1) then
+      call med_method_State_diagnose(State, trim(subname)//trim(string), rc=rc)
+    endif
+
+    if (cntr > 0 .and. statewrite_flag) then
+      ! write the fields exported to atm to file
+      call NUOPC_Write(State, &
+        fieldnamelist(1:fieldCount), &
+        "field_"//trim(string)//"_", timeslice=cntr, &
+        overwrite=.true., relaxedFlag=.true., rc=rc)
+      if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+    endif
+
+    deallocate(fieldnamelist)
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//trim(string)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine Med_Connector_Diagnose
+
+  !-----------------------------------------------------------------------------
+
   subroutine MedPhase_prep_atm(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
@@ -2880,7 +3160,7 @@ module MED
     real(ESMF_KIND_R8), pointer :: ifrac_ap(:), ifrac_apr(:)  ! ice fraction on atm grid patch map
     real(ESMF_KIND_R8), pointer :: ocnwgt(:),icewgt(:),customwgt(:)
     integer                     :: i,j,n
-    character(len=*),parameter :: subname='(module_MEDIATOR:MedPhase_prep_atm)'
+    character(len=*),parameter  :: subname='(module_MEDIATOR:MedPhase_prep_atm)'
     
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -2896,6 +3176,12 @@ module MED
     nullify(is_local%wrap)
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
+
+    !---------------------------------------
+
+    is_local%wrap%atmcntr = is_local%wrap%atmcntr + 1
+
+    !---------------------------------------
 
     call ESMF_ClockGet(clock,currtime=time,rc=rc)
     call ESMF_TimeGet(time,timestring=timestr)
@@ -3218,14 +3504,14 @@ module MED
       ! write the fields imported from ocn to file
       if (is_local%wrap%o2a_active) then
         call ESMF_FieldBundleWrite(is_local%wrap%FBOcn_a, 'fields_med_ocn_a.nc', &
-          singleFile=.true., overwrite=.true., timeslice=is_local%wrap%fastcntr, &
+          singleFile=.true., overwrite=.true., timeslice=is_local%wrap%atmcntr, &
           iofmt=ESMF_IOFMT_NETCDF, rc=rc)  
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
       endif
 
       if (is_local%wrap%i2a_active) then
         call ESMF_FieldBundleWrite(is_local%wrap%FBIce_a, 'fields_med_ice_a.nc', &
-          singleFile=.true., overwrite=.true., timeslice=is_local%wrap%fastcntr, &
+          singleFile=.true., overwrite=.true., timeslice=is_local%wrap%atmcntr, &
           iofmt=ESMF_IOFMT_NETCDF, rc=rc)  
         if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
       endif
@@ -3304,6 +3590,16 @@ module MED
 #endif
 
     !---------------------------------------
+    !--- update local scalar data
+    !---------------------------------------
+
+#if (1 == 1)
+! tcraig test data
+    is_local%wrap%scalar_data(1) = 100._r8 + is_local%wrap%atmcntr
+    is_local%wrap%scalar_data(2) = 110._r8 + is_local%wrap%atmcntr
+#endif
+
+    !---------------------------------------
     !--- set export State to special value for testing
     !---------------------------------------
 
@@ -3321,6 +3617,7 @@ module MED
     call med_method_FB_copy(NState_AtmExp, is_local%wrap%FBforAtm, rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
+#if (1 == 0)
     if (dbug_flag > 1) then
       call med_method_State_diagnose(NState_AtmExp, trim(subname)//' AtmExp_final ', rc=rc)
     endif
@@ -3329,10 +3626,11 @@ module MED
       ! write the fields exported to atm to file
       call NUOPC_Write(NState_AtmExp, &
         fldsToAtm%shortname(1:fldsToAtm%num), &
-        "field_med_to_atm_", timeslice=is_local%wrap%fastcntr, &
+        "field_med_to_atm_", timeslice=is_local%wrap%atmcntr, &
         overwrite=.true., relaxedFlag=.true., rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
     endif
+#endif
     
     !---------------------------------------
     !--- clean up
@@ -3380,6 +3678,12 @@ module MED
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
+    !---------------------------------------
+
+    is_local%wrap%ocncntr = is_local%wrap%ocncntr + 1
+
+    !---------------------------------------
+
     call ESMF_ClockGet(clock,currtime=time,rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
     call ESMF_TimeGet(time,timestring=timestr)
@@ -3392,14 +3696,16 @@ module MED
       preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
+#if (1 == 0)
     if (statewrite_flag) then
       ! write the fields imported from ocn to file
       call NUOPC_Write(NState_OcnImp, &
         fldsFrOcn%shortname(1:fldsFrOcn%num), &
-        "field_med_from_ocn_", timeslice=is_local%wrap%slowcntr, &
+        "field_med_from_ocn_", timeslice=is_local%wrap%ocncntr, &
         overwrite=.true., relaxedFlag=.true., rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
     endif
+#endif
 
     !---------------------------------------
     !--- average atm, ice, lnd accumulators
@@ -3641,7 +3947,19 @@ module MED
 !tcx      call med_method_FB_diagnose(is_local%wrap%FBaccumAtmOcn, trim(subname)//' FBacc_AFzero ', rc=rc)
     endif
 
+    !---------------------------------------
+    !--- update local scalar data
+    !---------------------------------------
+
+#if (1 == 1)
+! tcraig test data
+    is_local%wrap%scalar_data(1) = 200._r8 + is_local%wrap%ocncntr
+    is_local%wrap%scalar_data(2) = 210._r8 + is_local%wrap%ocncntr
+#endif
+
+    !---------------------------------------
     !--- set export State to special value for testing
+    !---------------------------------------
 
     call med_method_State_reset(NState_OcnExp, value=spval, rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
@@ -3661,18 +3979,16 @@ module MED
       call med_method_State_diagnose(NState_OcnExp, trim(subname)//' es_AFcp ', rc=rc)
     endif
 
+#if (1 == 0)
     if (statewrite_flag) then
       ! write the fields exported to ocn to file
       call NUOPC_Write(NState_OcnExp, &
         fldsToOcn%shortname(1:fldsToOcn%num), &
-        "field_med_to_ocn_", timeslice=is_local%wrap%slowcntr, &
+        "field_med_to_ocn_", timeslice=is_local%wrap%ocncntr, &
         overwrite=.true., relaxedFlag=.true., rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
     endif
-
-    !---------------------------------------
-
-    is_local%wrap%slowcntr = is_local%wrap%slowcntr + 1
+#endif
 
     !---------------------------------------
     !--- clean up
@@ -3727,35 +4043,37 @@ module MED
       preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
     if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
+#if (1 == 0)
     if (statewrite_flag) then
       ! write the fields imported from atm to file
       call NUOPC_Write(NState_AtmImp, &
         fldsFrAtm%shortname(1:fldsFrAtm%num), &
-        "field_med_from_atm_", timeslice=is_local%wrap%fastcntr, &
+        "field_med_from_atm_", timeslice=is_local%wrap%atmcntr, &
         overwrite=.true., relaxedFlag=.true., rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
       ! write the fields imported from ice to file
       call NUOPC_Write(NState_IceImp, &
         fldsFrIce%shortname(1:fldsFrIce%num), &
-        "field_med_from_ice_", timeslice=is_local%wrap%fastcntr, &
+        "field_med_from_ice_", timeslice=is_local%wrap%atmcntr, &
         overwrite=.true., relaxedFlag=.true., rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
       ! write the fields imported from lnd to file
       call NUOPC_Write(NState_LndImp, &
         fieldNameList=fldsFrLnd%shortname(1:fldsFrLnd%num), &
-        fileNamePrefix="field_med_from_lnd_", timeslice=is_local%wrap%fastcntr, &
+        fileNamePrefix="field_med_from_lnd_", timeslice=is_local%wrap%atmcntr, &
         overwrite=.true., relaxedFlag=.true., rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
 
       ! write the fields imported from rof to file
       call NUOPC_Write(NState_RofImp, &
         fieldNameList=fldsFrRof%shortname(1:fldsFrRof%num), &
-        fileNamePrefix="field_med_from_rof_", timeslice=is_local%wrap%fastcntr, &
+        fileNamePrefix="field_med_from_rof_", timeslice=is_local%wrap%atmcntr, &
         overwrite=.true., relaxedFlag=.true., rc=rc)
       if (med_method_ChkErr(rc,__LINE__,__FILE__)) return
     endif
+#endif
 
     !---------------------------------------
     !--- atm, ice, lnd, rof accumulator for ocean
@@ -3803,12 +4121,6 @@ module MED
 
     !---------------------------------------
     !--- clean up
-    !---------------------------------------
-
-    !---------------------------------------
-
-    is_local%wrap%fastcntr = is_local%wrap%fastcntr + 1
-
     !---------------------------------------
 
     if (dbug_flag > 5) then
