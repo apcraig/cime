@@ -49,6 +49,7 @@ MODULE seq_infodata_mod
    public :: seq_infodata_Exchange        ! exchange data across pes
 
 ! !PUBLIC DATA MEMBERS:
+   public :: seq_infodata_infodata        ! instance of infodata datatype
 
 !EOP
 
@@ -229,6 +230,8 @@ MODULE seq_infodata_mod
       !--- set from restart file ---
       character(SHR_KIND_CL)  :: rest_case_name  ! Short case identification
    end type seq_infodata_type
+
+   type (seq_infodata_type), target :: seq_infodata_infodata ! single instance for cpl and all comps
 
    ! --- public interfaces --------------------------------------------------------
    interface seq_infodata_GetData

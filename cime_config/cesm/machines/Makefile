@@ -91,6 +91,8 @@ endif
 # ESMF_INTERFACE is currently only defined in env_build.xml
 ifeq ($(COMP_INTERFACE), ESMF)
    CPPDEFS += -DESMF_INTERFACE
+else ifeq ($(COMP_INTERFACE), NUOPC)
+   CPPDEFS += -DNUOPC_INTERFACE
 else
    CPPDEFS += -DMCT_INTERFACE
 endif

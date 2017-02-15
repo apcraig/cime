@@ -1,3 +1,9 @@
+#ifdef NUOPC_INTERFACE
+
+! do not need a top level driver
+
+#else
+
 program cesm_driver
 
 !-------------------------------------------------------------------------------
@@ -73,3 +79,5 @@ program cesm_driver
    call ESMF_Finalize( )
 
 end program cesm_driver
+
+#endif

@@ -57,11 +57,12 @@ CONTAINS
 
 
 ! NOOP
-   SUBROUTINE ESMF_Initialize( vm, defaultCalendar, rc )
+   SUBROUTINE ESMF_Initialize( vm, logappend, defaultCalendar, rc )
       USE ESMF_BaseMod
       USE ESMF_CalendarMod
 !     USE ESMF_TimeMod,     only: defaultCal
       TYPE(ESMF_VM),           INTENT(IN   ), OPTIONAL :: vm
+      LOGICAL,                 INTENT(IN   ), OPTIONAL :: logappend
       TYPE(ESMF_CalKind_Flag), INTENT(IN   ), OPTIONAL :: defaultCalendar
       INTEGER,                 INTENT(  OUT), OPTIONAL :: rc
 

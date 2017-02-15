@@ -890,7 +890,12 @@ subroutine datm_comp_run( EClock, cdata,  x2a, a2x)
    call seq_timemgr_EClockGetData( EClock, stepno=stepno, dtime=idt)
    call seq_timemgr_EClockGetData( EClock, calendar=calendar)
    dt = idt * 1.0_r8
+#ifdef XXX_NUOPC_INTERFACE 
+   write_restart = .false.
+   !still needs to be set
+#else
    write_restart = seq_timemgr_RestartAlarmIsOn(EClock)
+#endif
 
    call t_stopf('datm_run1')
 

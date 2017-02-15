@@ -34,8 +34,11 @@ def _main_func():
         os.environ["PIO_VERSION"] = str(case.get_value("PIO_VERSION"))
 
     with open('Filepath', 'w') as out:
+        comp_interface = case.get_value("COMP_INTERFACE")
         out.write(os.path.join(caseroot, "SourceMods", "src.drv") + "\n")
         out.write(os.path.join(cimeroot, "driver_cpl", "driver") + "\n")
+        if (comp_interface == "NUOPC"):
+          out.write(os.path.join(cimeroot, "driver_cpl", "driver_nuopc") + "\n")
 
     # build model executable
 

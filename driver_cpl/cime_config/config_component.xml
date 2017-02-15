@@ -667,7 +667,7 @@
 
   <entry id="COMP_INTERFACE">
     <type>char</type>
-    <valid_values>MCT</valid_values>
+    <valid_values>MCT,NUOPC</valid_values>
     <default_value>MCT</default_value>
     <group>build_def</group>
     <file>env_build.xml</file>
