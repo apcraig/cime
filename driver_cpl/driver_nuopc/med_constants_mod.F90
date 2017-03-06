@@ -1,0 +1,22 @@
+module med_constants_mod
+
+  !-----------------------------------------------------------------------------
+  ! Mediator Internal State Datatype.
+  !-----------------------------------------------------------------------------
+
+  use ESMF
+
+  implicit none
+  
+  public
+  
+  integer           , parameter :: med_constants_dbug_flag = 5
+  real(ESMF_KIND_R8), parameter :: med_constants_spval_init = 0.0_ESMF_KIND_R8  ! spval for initialization
+  real(ESMF_KIND_R8), parameter :: med_constants_spval = 0.0_ESMF_KIND_R8  ! spval
+  real(ESMF_KIND_R8), parameter :: med_constants_czero = 0.0_ESMF_KIND_R8  ! spval
+  integer           , parameter :: med_constants_ispval_mask = -987987     ! spval for RH mask values
+
+  !-----------------------------------------------------------------------------
+
+end module med_constants_mod
+
