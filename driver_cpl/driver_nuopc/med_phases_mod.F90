@@ -15,8 +15,8 @@ module med_phases_mod
   
   private
   
-  integer            :: dbug_flag   = med_constants_dbug_flag
-  logical            :: statewrite_flag = .true.
+  integer           , parameter :: dbug_flag   = med_constants_dbug_flag
+  logical           , parameter :: statewrite_flag = med_constants_statewrite_flag
   real(ESMF_KIND_R8), parameter :: spval_init  = med_constants_spval_init
   real(ESMF_KIND_R8), parameter :: spval       = med_constants_spval
   real(ESMF_KIND_R8), parameter :: czero       = med_constants_czero

@@ -13,14 +13,15 @@ module med_connectors_mod
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_CopyInfodataToState
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_State_diagnose
   use med_internalstate_mod
+  use med_constants_mod
   use seq_infodata_mod, only: infodata=>seq_infodata_infodata
 
   implicit none
   
   private
 
-  integer            :: dbug_flag = 5
-  logical            :: statewrite_flag = .true.
+  integer            :: dbug_flag = med_constants_dbug_flag
+  logical            :: statewrite_flag = med_constants_statewrite_flag
   integer            :: dbrc
   character(*),parameter :: u_FILE_u = &
     __FILE__

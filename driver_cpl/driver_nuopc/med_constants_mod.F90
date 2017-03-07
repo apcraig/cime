@@ -11,6 +11,7 @@ module med_constants_mod
   public
   
   integer           , parameter :: med_constants_dbug_flag = 5
+  logical           , parameter :: med_constants_statewrite_flag = .true.
   real(ESMF_KIND_R8), parameter :: med_constants_spval_init = 0.0_ESMF_KIND_R8  ! spval for initialization
   real(ESMF_KIND_R8), parameter :: med_constants_spval = 0.0_ESMF_KIND_R8  ! spval
   real(ESMF_KIND_R8), parameter :: med_constants_czero = 0.0_ESMF_KIND_R8  ! spval

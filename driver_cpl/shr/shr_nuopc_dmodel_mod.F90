@@ -1,13 +1,13 @@
 !================================================================================
-module shr_nuopc_stuff_mod
+module shr_nuopc_dmodel_mod
 
 #ifdef NUOPC_INTERFACE 
 
-  use shr_kind_mod,only : r8 => shr_kind_r8
+  use shr_kind_mod,only : r8 => SHR_KIND_r8, IN => SHR_KIND_I4, CXX => SHR_KIND_CXX
   use shr_kind_mod,only : CL => SHR_KIND_CL, CX => SHR_KIND_CX, CS => SHR_KIND_CS
   use shr_sys_mod, only : shr_sys_abort
-  use shr_log_mod, only : loglev  => shr_log_Level
-  use shr_log_mod, only : logunit => shr_log_Unit
+  use seq_infodata_mod, only: seq_infodata_type, seq_infodata_PutData
+  use shr_nuopc_methods_mod, only: shr_nuopc_methods_State_reset
   use ESMF
   use NUOPC
   use mct_mod
@@ -17,70 +17,20 @@ module shr_nuopc_stuff_mod
   private
   integer :: dbrc
 
-  public :: shr_nuopc_stuff_ClockTimePrint
-  public :: shr_nuopc_stuff_dmodelgridinit
+  public :: shr_nuopc_dmodel_GridInit
+  public :: shr_nuopc_dmodel_AttrCopyToInfodata
+  public :: shr_nuopc_dmodel_AvectToState
+  public :: shr_nuopc_dmodel_StateToAvect
+
+  character(len=1024) :: tmpstr
+  character(len=*), parameter :: u_FILE_u = &
+    __FILE__
 
 !================================================================================
 contains
-!================================================================================
-
-  subroutine shr_nuopc_stuff_ClockTimePrint(clock,string,rc)
-
-    type(ESMF_Clock),intent(in) :: clock
-    character(len=*),intent(in),optional :: string
-    integer, intent(out) :: rc
-
-    type(ESMF_Time)      :: time
-    type(ESMF_TimeInterval) :: timeStep
-    character(len=64)    :: timestr
-    character(len=512)   :: lstring
-    character(len=*),parameter :: subname='(shr_nuopc_stuff_ClockTimePrint)'
-
-    rc = ESMF_SUCCESS
-
-    if (present(string)) then
-      lstring = trim(subname)//":"//trim(string)
-    else
-      lstring = trim(subname)
-    endif
-
-    call ESMF_ClockGet(clock,currtime=time,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, file=__FILE__)) return  ! bail out
-    call ESMF_TimeGet(time,timestring=timestr,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, file=__FILE__)) return  ! bail out
-    call ESMF_LogWrite(trim(lstring)//": currtime = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    call ESMF_ClockGet(clock,starttime=time,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, file=__FILE__)) return  ! bail out
-    call ESMF_TimeGet(time,timestring=timestr,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, file=__FILE__)) return  ! bail out
-    call ESMF_LogWrite(trim(lstring)//": startime = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    call ESMF_ClockGet(clock,stoptime=time,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, file=__FILE__)) return  ! bail out
-    call ESMF_TimeGet(time,timestring=timestr,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, file=__FILE__)) return  ! bail out
-    call ESMF_LogWrite(trim(lstring)//": stoptime = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    call ESMF_ClockGet(clock,timestep=timestep,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, file=__FILE__)) return  ! bail out
-    call ESMF_TimeIntervalGet(timestep,timestring=timestr,rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, file=__FILE__)) return  ! bail out
-    call ESMF_LogWrite(trim(lstring)//": timestep = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
-
-  end subroutine shr_nuopc_stuff_ClockTimePrint
-
 !-----------------------------------------------------------------------------
 
-  subroutine shr_nuopc_stuff_dmodelgridinit(nx_global,ny_global,mpicom,gsMap,gGrid,grid_option,EGrid,Emesh,rc)
+  subroutine shr_nuopc_dmodel_GridInit(nx_global,ny_global,mpicom,gsMap,gGrid,grid_option,EGrid,Emesh,rc)
 
     ! initialize an Egrid or Emesh from gsmap
 
@@ -99,7 +49,6 @@ contains
     integer :: iam,ierr
     integer :: lsize,gsize,nblocks_tot,ngseg
     integer :: lbnd(2),ubnd(2)
-    character(len=1024) :: tmpstr
     type(ESMF_DELayout)  :: delayout
     type(ESMF_DistGrid)  :: distgrid
     type(ESMF_DistGridConnection), allocatable :: connectionList(:)
@@ -131,7 +80,7 @@ contains
     real(r8),pointer     :: nodeCoords(:)
 
     type(mct_gGrid)      :: ggridG
-    character(len=*),parameter :: subname='(shr_nuopc_stuff_dmodelgridinit)'
+    character(len=*),parameter :: subname='(shr_nuopc_dmodel_GridInit)'
 
     rc = ESMF_SUCCESS
 
@@ -154,41 +103,41 @@ contains
       Egrid=ESMF_GridCreate1PeriDim(minIndex = (/1,1/), maxIndex = (/nx_global,ny_global/), &
          arbIndexCount = lsize, arbIndexList = localArbIndex, &
          periodicDim = 1, coordSys = ESMF_COORDSYS_SPH_DEG, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
       deallocate(gindex1, localArbIndex)
 
       DE = 0
       call ESMF_GridAddCoord(Egrid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 !      call ESMF_GridAddCoord(Egrid, staggerLoc=ESMF_STAGGERLOC_CORNER, rc=rc)
-!      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+!      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
       call ESMF_GridAddItem(Egrid, itemFlag=ESMF_GRIDITEM_MASK, itemTypeKind=ESMF_TYPEKIND_I4, &
          staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
       call ESMF_GridAddItem(Egrid, itemFlag=ESMF_GRIDITEM_AREA, itemTypeKind=ESMF_TYPEKIND_R8, &
          staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
       call ESMF_GridGetCoord(Egrid, coordDim=1, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, & 
         farrayPtr=farray1, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
       call mct_gGrid_exportRattr(ggrid,'lon',farray1,lsize)
 
       call ESMF_GridGetCoord(Egrid, coordDim=2, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, & 
         farrayPtr=farray1, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
       call mct_gGrid_exportRattr(ggrid,'lat',farray1,lsize)
 
 !      call ESMF_GridGetItem(Egrid, itemflag=ESMF_GRIDITEM_MASK, localDE=DE, staggerloc=ESMF_STAGGERLOC_CENTER, &
 !        farrayPtr=iarray1, rc=rc)
-!      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+!      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 !      call mct_gGrid_exportRattr(ggrid,'mask',farray1,lsize)
 !      iarray1 = nint(farray1)
 
 !      call ESMF_GridGetItem(Egrid, itemflag=ESMF_GRIDITEM_AREA, localDE=DE, staggerloc=ESMF_STAGGERLOC_CENTER, &
 !        farrayPtr=farray1, rc=rc)
-!      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+!      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 !      call mct_gGrid_exportRattr(ggrid,'area',farray1,lsize)
 
     elseif (grid_option == 'grid_de') then
@@ -230,14 +179,14 @@ contains
       enddo
 
       delayout = ESMF_DELayoutCreate(petMap, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
       allocate(connectionList(1))
       call ESMF_DistGridConnectionSet(connectionList(1), tileIndexA=1, &
         tileIndexB=1, positionVector=(/nx_global, 0/), rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__, &
-        file=__FILE__)) &
+        file=u_FILE_u)) &
         return  ! bail out
 
       distgrid = ESMF_DistGridCreate(minIndex=(/1,1/), maxIndex=(/nx_global,ny_global/), &
@@ -246,7 +195,7 @@ contains
           delayout=delayout, &
           connectionList=connectionList, &
           rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
       deallocate(deBlockList)
       deallocate(petMap)
@@ -255,16 +204,16 @@ contains
       call ESMF_DistGridPrint(distgrid=distgrid, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__, &
-        file=__FILE__)) &
+        file=u_FILE_u)) &
         return  ! bail out
 
       call ESMF_DistGridGet(distgrid=distgrid, localDE=0, elementCount=cnt, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
       allocate(indexList(cnt))
 !      write(tmpstr,'(a,i8)') subname//' distgrid cnt= ',cnt
 !      call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
       call ESMF_DistGridGet(distgrid=distgrid, localDE=0, seqIndexList=indexList, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 !      write(tmpstr,'(a,4i8)') subname//' distgrid list= ',indexList(1),indexList(cnt),minval(indexList), maxval(indexList)
 !      call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
       deallocate(IndexList)
@@ -273,10 +222,10 @@ contains
          coordSys = ESMF_COORDSYS_SPH_DEG, &
          gridEdgeLWidth=(/0,0/), gridEdgeUWidth=(/0,1/), &
          rc = rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
       call ESMF_GridGet(Egrid, localDEcount=DEcount, dimCount=dimCount, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
 !      write(tmpstr,'(a,2i8)') subname//' localDEcount = ',DEcount,lsize
 !      call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
@@ -288,15 +237,15 @@ contains
       endif
 
       call ESMF_GridAddCoord(Egrid, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 !      call ESMF_GridAddCoord(Egrid, staggerLoc=ESMF_STAGGERLOC_CORNER, rc=rc)
-!      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+!      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
       call ESMF_GridAddItem(Egrid, itemFlag=ESMF_GRIDITEM_MASK, itemTypeKind=ESMF_TYPEKIND_I4, &
          staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
       call ESMF_GridAddItem(Egrid, itemFlag=ESMF_GRIDITEM_AREA, itemTypeKind=ESMF_TYPEKIND_R8, &
          staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
       allocate(falon(lsize),falat(lsize),famask(lsize),faarea(lsize))
       call mct_gGrid_exportRattr(ggrid,'lon',falon,lsize)
@@ -315,7 +264,7 @@ contains
          call ESMF_GridGetCoord(Egrid, coordDim=1, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, & 
            computationalLBound=lbnd, computationalUBound=ubnd, &
            farrayPtr=farray2, rc=rc)
-         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
          farray2(1,1) = falon(n)
 
 !         write(tmpstr,'(a,5i8)') subname//' lbnd ubnd ',DE,lbnd,ubnd       
@@ -323,17 +272,17 @@ contains
 
          call ESMF_GridGetCoord(Egrid, coordDim=2, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, & 
            farrayPtr=farray2, rc=rc)
-         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
          farray2(1,1) = falat(n)
 
          call ESMF_GridGetItem(Egrid, itemflag=ESMF_GRIDITEM_MASK, localDE=DE, staggerloc=ESMF_STAGGERLOC_CENTER, &
             farrayPtr=iarray2, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
           iarray2(1,1) = nint(famask(n))
 
          call ESMF_GridGetItem(Egrid, itemflag=ESMF_GRIDITEM_AREA, localDE=DE, staggerloc=ESMF_STAGGERLOC_CENTER, &
            farrayPtr=farray2, rc=rc)
-         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
          farray2(1,1) = faarea(n)
 
       enddo
@@ -348,7 +297,7 @@ contains
         rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__, &
-        file=__FILE__)) &
+        file=u_FILE_u)) &
         return  ! bail out
 
     elseif (grid_option == 'mesh') then
@@ -483,7 +432,7 @@ contains
            elementTypes=elemTypes, elementConn=elemConn, &
            elementCoords=elemCoords, &
            rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
       deallocate(nodeIds, nodeCoords, nodeOwners)
       deallocate(elemIds, elemTypes, elemConn, elemCoords)
@@ -492,15 +441,313 @@ contains
 
       call ESMF_LogWrite(subname//' ERROR: grid_option invalid = '//trim(grid_option), ESMF_LOGMSG_INFO, rc=dbrc)
       rc = ESMF_FAILURE
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     endif   ! grid_option
 
-  end subroutine shr_nuopc_stuff_dmodelgridinit
+  end subroutine shr_nuopc_dmodel_GridInit
   
+!-----------------------------------------------------------------------------
+
+  subroutine shr_nuopc_dmodel_AttrCopyToInfodata(gcomp, infodata, rc)
+    ! Get specific set of attributes from gcomp and copy to infodata
+    type(ESMF_GridComp)    ,intent(in)    :: gcomp
+    type(seq_infodata_type),intent(inout) :: infodata
+    integer                ,intent(inout) :: rc
+
+    ! locals
+    character(len=CL) :: cvalue
+    integer  :: ivalue, n
+    real(r8) :: rvalue
+    logical  :: lvalue
+    integer, parameter :: nattrlist = 22
+    character(len=*), parameter, dimension(nattrlist) :: attrList = &
+      (/ "case_name     ", "single_column ", "scmlat        ", "scmlon         ", &
+         "orb_eccen     ", "orb_obliqr    ", "orb_lambm0    ", "orb_mvelpp     ", &
+         "read_restart  ", "start_type    ", "tfreeze_option", "model_version  ", &
+         "info_debug    ", "atm_aero      ", "atm_adiabatic ", "atm_ideal_phys ", &
+         "aqua_planet   ", "brnch_rcase   ", "perpetual     ", "perpetual_ymd  ", &
+         "hostname      ", "username      " /)
+    character(len=*), parameter :: subname = "(shr_nuopc_dmodel_AttrCopyToInfodata)"
+
+    rc = ESMF_Success
+
+    do n = 1,nattrlist
+
+      call NUOPC_CompAttributeGet(gcomp, name=trim(attrList(n)), value=cvalue, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__, &
+        file=u_FILE_u)) &
+        return  ! bail out
+
+      select case(trim(attrList(n)))
+
+      case("case_name")
+        call seq_infodata_PutData(infodata, case_name=cvalue)
+
+      case("single_column")
+        lvalue = (trim(cvalue) == "true")
+        call seq_infodata_PutData(infodata, single_column=lvalue)
+
+      case ("scmlat")
+        read(cvalue,*) rvalue
+        call seq_infodata_PutData(infodata, scmlat=rvalue)
+
+      case ("scmlon")
+        read(cvalue,*) rvalue
+        call seq_infodata_PutData(infodata, scmlon=rvalue)
+
+      case("orb_eccen")
+        read(cvalue,*) rvalue
+        call seq_infodata_PutData(infodata, orb_eccen=rvalue)
+
+      case("orb_obliqr")
+        read(cvalue,*) rvalue
+        call seq_infodata_PutData(infodata, orb_obliqr=rvalue)
+
+      case("orb_lambm0")
+        read(cvalue,*) rvalue
+        call seq_infodata_PutData(infodata, orb_lambm0=rvalue)
+
+      case("orb_mvelpp")
+        read(cvalue,*) rvalue
+        call seq_infodata_PutData(infodata, orb_mvelpp=rvalue)
+
+      case("read_restart")
+        lvalue = (trim(cvalue) == "true")
+        call seq_infodata_PutData(infodata, read_restart=lvalue)
+
+      case("start_type")
+        call seq_infodata_PutData(infodata, start_type=cvalue)
+
+      case("tfreeze_option")
+        call seq_infodata_PutData(infodata, tfreeze_option=cvalue)
+
+      case("model_version")
+        call seq_infodata_PutData(infodata, model_version=cvalue)
+
+      case("info_debug")
+        read(cvalue,*) ivalue
+        call seq_infodata_PutData(infodata, info_debug=ivalue)
+
+      case("atm_aero")
+        lvalue = (trim(cvalue) == "true")
+        call seq_infodata_PutData(infodata, atm_aero=lvalue)
+
+      case("atm_adiabatic")
+        lvalue = (trim(cvalue) == "true")
+        call seq_infodata_PutData(infodata, atm_adiabatic=lvalue)
+
+      case("atm_ideal_phys")
+        lvalue = (trim(cvalue) == "true")
+        call seq_infodata_PutData(infodata, atm_ideal_phys=lvalue)
+
+      case("aqua_planet")
+        lvalue = (trim(cvalue) == "true")
+        call seq_infodata_PutData(infodata, aqua_planet=lvalue)
+
+      case("brnch_rcase")
+        lvalue = (trim(cvalue) == "true")
+        call seq_infodata_PutData(infodata, brnch_retain_casename=lvalue)
+
+      case("perpetual")
+        lvalue = (trim(cvalue) == "true")
+        call seq_infodata_PutData(infodata, perpetual=lvalue)
+
+      case("perpetual_ymd")
+        read(cvalue,*) ivalue
+        call seq_infodata_PutData(infodata, perpetual_ymd=ivalue)
+
+      case("hostname")
+        call seq_infodata_PutData(infodata, hostname=cvalue)
+
+      case("username")
+        call seq_infodata_PutData(infodata, username=cvalue)
+
+      case default
+        rc = ESMF_Failure
+        call ESMF_LogWrite(trim(subname)//": unknown attrlist = "//trim(attrList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+          line=__LINE__, &
+          file=u_FILE_u)) &
+          return  ! bail out
+
+      end select
+
+    enddo
+
+
+  end subroutine shr_nuopc_dmodel_AttrCopyToInfodata
+
+!-----------------------------------------------------------------------------
+
+  subroutine shr_nuopc_dmodel_AvectToState(avect, state, grid_option, rc)
+
+    ! copy avect data to state fields
+
+    implicit none
+
+    !----- arguments -----
+    type(mct_aVect) , intent(in)    :: avect
+    type(ESMF_State), intent(inout) :: state
+    character(len=*), intent(in)    :: grid_option
+    integer, intent(out)            :: rc
+
+    !----- local -----
+    integer(IN) :: nflds, lsize, n, nf, DE
+    character(len=CXX) :: rList
+    character(len=CS)  :: fldname
+    type(ESMF_Field)   :: lfield
+    real(ESMF_KIND_R8), pointer :: farray2(:,:)
+    real(ESMF_KIND_R8), pointer :: farray1(:)
+    real(ESMF_KIND_R8), pointer :: favect(:)
+
+    character(*),parameter :: subName = "(shr_nuopc_dmodel_AvectToState)"
+    !----------------------------------------------------------
+
+    rc = ESMF_SUCCESS
+
+    nflds = mct_avect_nRattr(avect)
+    lsize = mct_avect_lsize(avect)
+    rList = " "
+    if (nflds > 0) rList = mct_aVect_ExportRList2c(avect)
+    call shr_nuopc_methods_State_reset(state, value = -9999._R8, rc=rc)
+    allocate(favect(lsize))
+
+    do nf = 1,nflds
+
+      rc = ESMF_SUCCESS
+      call shr_string_listGetName(rList, nf, fldname, dbrc)
+      call ESMF_StateGet(state, itemName=trim(fldname), field=lfield, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) then
+        call ESMF_LogWrite(trim(subname)//": fldname = "//trim(fldname)//" not found on state", ESMF_LOGMSG_INFO, rc=dbrc)
+      elseif (grid_option == "grid_de") then
+        call ESMF_LogWrite(trim(subname)//": fldname = "//trim(fldname)//" copy", ESMF_LOGMSG_INFO, rc=dbrc)
+        call mct_aVect_exportRAttr(avect, trim(fldname), favect, lsize)
+        do n = 1,lsize
+          DE = n-1
+!         write(tmpstr,'(a,3i8)') subname//' n,DE,lsize ',n,DE,lsize
+!         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+!         write(tmpstr,'(a,i8,4g13.6)') subname//' grid values ',DE,falon(n),falat(n),famask(n),faarea(n)
+!         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+          call ESMF_FieldGet(lfield, localDE=DE, farrayPtr=farray2, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+          farray2(1,1) = favect(n)
+        enddo
+      elseif (grid_option == 'mesh' .or. grid_option == 'arb') then
+        call ESMF_LogWrite(trim(subname)//": fldname = "//trim(fldname)//" copy", ESMF_LOGMSG_INFO, rc=dbrc)
+        call mct_aVect_exportRAttr(avect, trim(fldname), favect, lsize)
+        do n = 1,lsize
+!         write(tmpstr,'(a,3i8)') subname//' n,lsize ',n,lsize
+!         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+!         write(tmpstr,'(a,i8,4g13.6)') subname//' grid values ',DE,falon(n),falat(n),famask(n),faarea(n)
+!         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+          call ESMF_FieldGet(lfield, farrayPtr=farray1, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+          farray1(n) = favect(n)
+        enddo
+        write(tmpstr,'(a,3g13.6)') trim(subname)//":"//trim(fldname)//"=",minval(farray1),maxval(farray1),sum(farray1)
+        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      else
+        call ESMF_LogWrite(trim(subname)//": fldname = "//trim(fldname)//" copy skipped due to grid_option", ESMF_LOGMSG_INFO, rc=dbrc)
+!        rc=ESMF_Failure
+!        call ESMF_LogWrite(subname//" ERROR for grid_option = "//trim(grid_option), ESMF_LOGMSG_INFO, rc=dbrc)
+!        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+      endif
+
+    enddo
+
+    deallocate(favect)
+
+  end subroutine shr_nuopc_dmodel_AvectToState
+
+!-----------------------------------------------------------------------------
+
+  subroutine shr_nuopc_dmodel_StateToAvect(state, avect, grid_option, rc)
+
+    ! copy state fields to avect data
+
+    implicit none
+
+    !----- arguments -----
+    type(ESMF_State), intent(in)    :: state
+    type(mct_aVect) , intent(inout) :: avect
+    character(len=*), intent(in)    :: grid_option
+    integer         , intent(out)   :: rc
+
+    !----- local -----
+    integer(IN) :: nflds, lsize, n, nf, DE
+    character(len=CXX) :: rList
+    character(len=CS)  :: fldname
+    type(ESMF_Field)   :: lfield
+    real(ESMF_KIND_R8), pointer :: farray2(:,:)
+    real(ESMF_KIND_R8), pointer :: farray1(:)
+    real(ESMF_KIND_R8), pointer :: favect(:)
+
+    character(*),parameter :: subName = "(shr_nuopc_dmodel_StateToAvect)"
+    !----------------------------------------------------------
+
+    rc = ESMF_SUCCESS
+
+    nflds = mct_avect_nRattr(avect)
+    lsize = mct_avect_lsize(avect)
+    rList = " "
+    if (nflds > 0) rList = mct_aVect_ExportRList2c(avect)
+    call mct_avect_zero(avect)
+    allocate(favect(lsize))
+
+    do nf = 1,nflds
+
+      rc = ESMF_SUCCESS
+      call shr_string_listGetName(rList, nf, fldname, dbrc)
+      call ESMF_StateGet(state, itemName=trim(fldname), field=lfield, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) then
+        call ESMF_LogWrite(trim(subname)//": fldname = "//trim(fldname)//" not found on state", ESMF_LOGMSG_INFO, rc=dbrc)
+      elseif (grid_option == "grid_de") then
+        call ESMF_LogWrite(trim(subname)//": fldname = "//trim(fldname)//" copy", ESMF_LOGMSG_INFO, rc=dbrc)
+        do n = 1,lsize
+          DE = n-1
+!         write(tmpstr,'(a,3i8)') subname//' n,DE,lsize ',n,DE,lsize
+!         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+!         write(tmpstr,'(a,i8,4g13.6)') subname//' grid values ',DE,falon(n),falat(n),famask(n),faarea(n)
+!         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+          call ESMF_FieldGet(lfield, localDE=DE, farrayPtr=farray2, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+          favect(n) = farray2(1,1)
+        enddo
+        call mct_aVect_importRAttr(avect, trim(fldname), favect, lsize)
+      elseif (grid_option == 'mesh' .or. grid_option == 'arb') then
+        call ESMF_LogWrite(trim(subname)//": fldname = "//trim(fldname)//" copy", ESMF_LOGMSG_INFO, rc=dbrc)
+        do n = 1,lsize
+!         write(tmpstr,'(a,3i8)') subname//' n,lsize ',n,lsize
+!         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+!         write(tmpstr,'(a,i8,4g13.6)') subname//' grid values ',DE,falon(n),falat(n),famask(n),faarea(n)
+!         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+          call ESMF_FieldGet(lfield, farrayPtr=farray1, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+          favect(n) = farray1(n)
+        enddo
+        call mct_aVect_importRAttr(avect, trim(fldname), favect, lsize)
+        write(tmpstr,'(a,3g13.6)') trim(subname)//":"//trim(fldname)//"=",minval(farray1),maxval(farray1),sum(farray1)
+        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      else
+        call ESMF_LogWrite(trim(subname)//": fldname = "//trim(fldname)//" copy skipped due to grid_option", ESMF_LOGMSG_INFO, rc=dbrc)
+!        rc=ESMF_Failure
+!        call ESMF_LogWrite(subname//" ERROR for grid_option = "//trim(grid_option), ESMF_LOGMSG_INFO, rc=dbrc)
+!        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+      endif
+
+    enddo
+
+    deallocate(favect)
+
+  end subroutine shr_nuopc_dmodel_StateToAvect
+
 !-----------------------------------------------------------------------------
   
 #endif
   
-end module shr_nuopc_stuff_mod
+end module shr_nuopc_dmodel_mod
   

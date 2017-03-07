@@ -48,7 +48,7 @@ module dlnd_comp_mod
   integer(IN)   :: my_task               ! my task in mpi communicator mpicom
   integer(IN)   :: npes                  ! total number of tasks
   integer(IN),parameter :: master_task=0 ! task number of master task
-  integer(IN)   :: logunit               ! logging unit number
+  integer(IN),public :: logunit          ! logging unit number
   integer       :: inst_index            ! number of current instance (ie. 1)
   character(len=16) :: inst_name         ! fullname of current instance (ie. "lnd_0001")
   character(len=16) :: inst_suffix       ! char string associated with instance

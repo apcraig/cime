@@ -124,7 +124,7 @@ module seq_flds_mod
    use shr_kind_mod,   only : CX => shr_kind_CX, CXX => shr_kind_CXX, R8 => shr_kind_R8
    use shr_sys_mod,    only : shr_sys_abort
    use seq_drydep_mod, only : seq_drydep_init, seq_drydep_readnl, lnd_drydep
-   use seq_comm_mct,   only : seq_comm_iamroot, seq_comm_setptrs, logunit
+   use seq_comm_mct,   only : seq_comm_iamroot, seq_comm_setptrs, llogunit => logunit
    use shr_megan_mod,  only : shr_megan_readnl, shr_megan_mechcomps_n
    use shr_fire_emis_mod,  only : shr_fire_emis_readnl, shr_fire_emis_mechcomps_n, shr_fire_emis_ztop_token
    use shr_carma_mod,  only : shr_carma_readnl
@@ -397,7 +397,7 @@ module seq_flds_mod
         seq_flds_i2o_per_cat = .false.
 
         unitn = shr_file_getUnit()
-        write(logunit,"(A)") subname//': read seq_cplflds_inparm namelist from: '&
+        write(llogunit,"(A)") subname//': read seq_cplflds_inparm namelist from: '&
              //trim(nmlfile)
         open( unitn, file=trim(nmlfile), status='old' )
         ierr = 1
@@ -434,7 +434,7 @@ module seq_flds_mod
         cplflds_custom(:) = ' '
 
         unitn = shr_file_getUnit()
-        write(logunit,"(A)") subname//': read seq_cplflds_userspec namelist from: '&
+        write(llogunit,"(A)") subname//': read seq_cplflds_userspec namelist from: '&
              //trim(nmlfile)
         open( unitn, file=trim(nmlfile), status='old' )
         ierr = 1
@@ -470,7 +470,7 @@ module seq_flds_mod
               is_state = .false.
               is_flux  = .true.
            else
-              write(logunit,*) subname//'ERROR: fldname must start with S,F,P, not ',trim(fldname)
+              write(llogunit,*) subname//'ERROR: fldname must start with S,F,P, not ',trim(fldname)
               call shr_sys_abort(subname//"ERROR: fldname must start with S, F, or P")
            end if
 
@@ -512,7 +512,7 @@ module seq_flds_mod
               if (is_state) call seq_flds_add(x2g_states,trim(fldname))
               if (is_flux ) call seq_flds_add(x2g_fluxes,trim(fldname))
            case default
-              write(logunit,*) subname//'ERROR: ',trim(cplflds_custom(n)),&
+              write(llogunit,*) subname//'ERROR: ',trim(cplflds_custom(n)),&
                    ' not a recognized value'
               call shr_sys_abort()
            end select
@@ -1087,10 +1087,13 @@ module seq_flds_mod
      call metadata_set(attname, longname, stdname, units)
 
      ! Surface temperature
+     call seq_flds_add(o2x_states,"So_t")
      call seq_flds_add(l2x_states,"Sl_t")
      call seq_flds_add(i2x_states,"Si_t")
-     call seq_flds_add(x2a_states,"So_t")
      call seq_flds_add(x2a_states,"Sx_t")
+     call seq_flds_add(x2a_states,"So_t")
+     call seq_flds_add(x2i_states,"So_t")
+     call seq_flds_add(x2w_states,"So_t")
      longname = 'Surface temperature'
      stdname  = 'surface_temperature'
      units    = 'K'
@@ -1298,6 +1301,8 @@ module seq_flds_mod
      call metadata_set(attname, longname, stdname, units)
      attname  = 'Faxx_evap'
      call metadata_set(attname, longname, stdname, units)
+     attname  = 'Foxx_evap'
+     call metadata_set(attname, longname, stdname, units)
 
      ! Dust flux (particle bin number 1)
      call seq_flds_add(l2x_fluxes,"Fall_flxdst1")
@@ -1476,11 +1481,6 @@ module seq_flds_mod
      attname  = 'Fioi_flxdst'
      call metadata_set(attname, longname, stdname, units)
 
-     ! Sea surface temperature
-     call seq_flds_add(o2x_states,"So_t")
-     call seq_flds_add(x2i_states,"So_t")
-     call seq_flds_add(x2w_states,"So_t")
-
      ! Sea surface  salinity
      call seq_flds_add(o2x_states,"So_s")
      call seq_flds_add(x2i_states,"So_s")
@@ -1508,6 +1508,7 @@ module seq_flds_mod
      stdname  = 'northward_sea_water_velocity'
      units    = 'm s-1'
      attname  = 'So_v'
+     call metadata_set(attname, longname, stdname, units)
 
      ! Zonal sea surface slope
      call seq_flds_add(o2x_states,"So_dhdx")
@@ -3233,38 +3234,38 @@ module seq_flds_mod
      seq_flds_r2o_ice_fluxes = trim(r2o_ice_fluxes)
 
      if (seq_comm_iamroot(ID)) then
-        write(logunit,"(A)") subname//': seq_flds_a2x_states= ',trim(seq_flds_a2x_states)
-        write(logunit,"(A)") subname//': seq_flds_a2x_fluxes= ',trim(seq_flds_a2x_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_x2a_states= ',trim(seq_flds_x2a_states)
-        write(logunit,"(A)") subname//': seq_flds_x2a_fluxes= ',trim(seq_flds_x2a_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_l2x_states= ',trim(seq_flds_l2x_states)
-        write(logunit,"(A)") subname//': seq_flds_l2x_fluxes= ',trim(seq_flds_l2x_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_x2l_states= ',trim(seq_flds_x2l_states)
-        write(logunit,"(A)") subname//': seq_flds_x2l_fluxes= ',trim(seq_flds_x2l_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_i2x_states= ',trim(seq_flds_i2x_states)
-        write(logunit,"(A)") subname//': seq_flds_i2x_fluxes= ',trim(seq_flds_i2x_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_x2i_states= ',trim(seq_flds_x2i_states)
-        write(logunit,"(A)") subname//': seq_flds_x2i_fluxes= ',trim(seq_flds_x2i_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_o2x_states= ',trim(seq_flds_o2x_states)
-        write(logunit,"(A)") subname//': seq_flds_o2x_fluxes= ',trim(seq_flds_o2x_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_x2o_states= ',trim(seq_flds_x2o_states)
-        write(logunit,"(A)") subname//': seq_flds_x2o_fluxes= ',trim(seq_flds_x2o_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_g2x_states= ',trim(seq_flds_g2x_states)
-        write(logunit,"(A)") subname//': seq_flds_g2x_fluxes= ',trim(seq_flds_g2x_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_x2g_states= ',trim(seq_flds_x2g_states)
-        write(logunit,"(A)") subname//': seq_flds_x2g_fluxes= ',trim(seq_flds_x2g_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_xao_states= ',trim(seq_flds_xao_states)
-        write(logunit,"(A)") subname//': seq_flds_xao_fluxes= ',trim(seq_flds_xao_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_xao_albedo= ',trim(seq_flds_xao_albedo)
-        write(logunit,"(A)") subname//': seq_flds_xao_diurnl= ',trim(seq_flds_xao_diurnl)
-        write(logunit,"(A)") subname//': seq_flds_r2x_states= ',trim(seq_flds_r2x_states)
-        write(logunit,"(A)") subname//': seq_flds_r2x_fluxes= ',trim(seq_flds_r2x_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_x2r_states= ',trim(seq_flds_x2r_states)
-        write(logunit,"(A)") subname//': seq_flds_x2r_fluxes= ',trim(seq_flds_x2r_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_w2x_states= ',trim(seq_flds_w2x_states)
-        write(logunit,"(A)") subname//': seq_flds_w2x_fluxes= ',trim(seq_flds_w2x_fluxes)
-        write(logunit,"(A)") subname//': seq_flds_x2w_states= ',trim(seq_flds_x2w_states)
-        write(logunit,"(A)") subname//': seq_flds_x2w_fluxes= ',trim(seq_flds_x2w_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_a2x_states= ',trim(seq_flds_a2x_states)
+        write(llogunit,"(A)") subname//': seq_flds_a2x_fluxes= ',trim(seq_flds_a2x_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_x2a_states= ',trim(seq_flds_x2a_states)
+        write(llogunit,"(A)") subname//': seq_flds_x2a_fluxes= ',trim(seq_flds_x2a_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_l2x_states= ',trim(seq_flds_l2x_states)
+        write(llogunit,"(A)") subname//': seq_flds_l2x_fluxes= ',trim(seq_flds_l2x_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_x2l_states= ',trim(seq_flds_x2l_states)
+        write(llogunit,"(A)") subname//': seq_flds_x2l_fluxes= ',trim(seq_flds_x2l_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_i2x_states= ',trim(seq_flds_i2x_states)
+        write(llogunit,"(A)") subname//': seq_flds_i2x_fluxes= ',trim(seq_flds_i2x_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_x2i_states= ',trim(seq_flds_x2i_states)
+        write(llogunit,"(A)") subname//': seq_flds_x2i_fluxes= ',trim(seq_flds_x2i_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_o2x_states= ',trim(seq_flds_o2x_states)
+        write(llogunit,"(A)") subname//': seq_flds_o2x_fluxes= ',trim(seq_flds_o2x_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_x2o_states= ',trim(seq_flds_x2o_states)
+        write(llogunit,"(A)") subname//': seq_flds_x2o_fluxes= ',trim(seq_flds_x2o_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_g2x_states= ',trim(seq_flds_g2x_states)
+        write(llogunit,"(A)") subname//': seq_flds_g2x_fluxes= ',trim(seq_flds_g2x_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_x2g_states= ',trim(seq_flds_x2g_states)
+        write(llogunit,"(A)") subname//': seq_flds_x2g_fluxes= ',trim(seq_flds_x2g_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_xao_states= ',trim(seq_flds_xao_states)
+        write(llogunit,"(A)") subname//': seq_flds_xao_fluxes= ',trim(seq_flds_xao_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_xao_albedo= ',trim(seq_flds_xao_albedo)
+        write(llogunit,"(A)") subname//': seq_flds_xao_diurnl= ',trim(seq_flds_xao_diurnl)
+        write(llogunit,"(A)") subname//': seq_flds_r2x_states= ',trim(seq_flds_r2x_states)
+        write(llogunit,"(A)") subname//': seq_flds_r2x_fluxes= ',trim(seq_flds_r2x_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_x2r_states= ',trim(seq_flds_x2r_states)
+        write(llogunit,"(A)") subname//': seq_flds_x2r_fluxes= ',trim(seq_flds_x2r_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_w2x_states= ',trim(seq_flds_w2x_states)
+        write(llogunit,"(A)") subname//': seq_flds_w2x_fluxes= ',trim(seq_flds_w2x_fluxes)
+        write(llogunit,"(A)") subname//': seq_flds_x2w_states= ',trim(seq_flds_x2w_states)
+        write(llogunit,"(A)") subname//': seq_flds_x2w_fluxes= ',trim(seq_flds_x2w_fluxes)
      end if
 
      call catFields(seq_flds_dom_fields, seq_flds_dom_coord , seq_flds_dom_other )
@@ -3327,8 +3328,8 @@ module seq_flds_mod
         outfld = trim(outfld)//':'//trim(str)
      end if
      if (len_trim(outfld) >= CXX) then
-        write(logunit,*)'fields are = ',trim(outfld)
-        write(logunit,*)'fields length = ',len_trim(outfld)
+        write(llogunit,*)'fields are = ',trim(outfld)
+        write(llogunit,*)'fields length = ',len_trim(outfld)
         call shr_sys_abort(subname//'ERROR: maximum length of xxx_states or xxx_fluxes has been exceeded')
      end if
 
@@ -3474,7 +3475,7 @@ module seq_flds_mod
 
 
      if (n_entries .ge. nmax) then
-        write(logunit,*)'n_entries= ',n_entries,' nmax = ',nmax,' attname= ',trim(attname)
+        write(llogunit,*)'n_entries= ',n_entries,' nmax = ',nmax,' attname= ',trim(attname)
         call shr_sys_abort(subname//'ERROR: nmax fields in lookup_entry table exceeded')
      end if
 
