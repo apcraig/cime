@@ -35,6 +35,7 @@ $ENV{PIO_VERSION}  	= `./xmlquery PIO_VERSION	-value`;
 
 my $comp="mct";
 $comp = "esmf" if ($COMP_INTERFACE eq "ESMF");
+$comp = "nuopc" if ($COMP_INTERFACE eq "NUOPC");
 
 my $useesmf = "noesmf";
 $useesmf = "esmf" if ($USE_ESMF_LIB eq "TRUE");
@@ -54,10 +55,12 @@ my @filepath = ( "$CASEROOT/SourceMods/src.share",
 		 "$CIMEROOT/src/share/RandNum/src/mt19937",
 		 );
 
+if($comp eq "nuopc"){
+    push(@filepath,"$CIMEROOT/src/drivers/nuopc/shr");
+}
+
 if($useesmf eq "noesmf"){
     push(@filepath,"$CIMEROOT/src/share/esmf_wrf_timemgr");
-}else{
-    push(@filepath,"$CIMEROOT/src/drivers/mct/shr_esmf");
 }
 
 my @fp;

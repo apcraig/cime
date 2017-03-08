@@ -460,12 +460,12 @@ contains
     integer  :: ivalue, n
     real(r8) :: rvalue
     logical  :: lvalue
-    integer, parameter :: nattrlist = 22
+    integer, parameter :: nattrlist = 20
     character(len=*), parameter, dimension(nattrlist) :: attrList = &
       (/ "case_name     ", "single_column ", "scmlat        ", "scmlon         ", &
          "orb_eccen     ", "orb_obliqr    ", "orb_lambm0    ", "orb_mvelpp     ", &
          "read_restart  ", "start_type    ", "tfreeze_option", "model_version  ", &
-         "info_debug    ", "atm_aero      ", "atm_adiabatic ", "atm_ideal_phys ", &
+         "info_debug    ", "atm_aero      ", &
          "aqua_planet   ", "brnch_rcase   ", "perpetual     ", "perpetual_ymd  ", &
          "hostname      ", "username      " /)
     character(len=*), parameter :: subname = "(shr_nuopc_dmodel_AttrCopyToInfodata)"
@@ -533,14 +533,6 @@ contains
       case("atm_aero")
         lvalue = (trim(cvalue) == "true")
         call seq_infodata_PutData(infodata, atm_aero=lvalue)
-
-      case("atm_adiabatic")
-        lvalue = (trim(cvalue) == "true")
-        call seq_infodata_PutData(infodata, atm_adiabatic=lvalue)
-
-      case("atm_ideal_phys")
-        lvalue = (trim(cvalue) == "true")
-        call seq_infodata_PutData(infodata, atm_ideal_phys=lvalue)
 
       case("aqua_planet")
         lvalue = (trim(cvalue) == "true")

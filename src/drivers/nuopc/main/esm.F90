@@ -478,12 +478,12 @@ module ESM
     integer  :: ivalue, n
     real(r8) :: rvalue
     logical  :: lvalue
-    integer, parameter :: nattrlist = 23
+    integer, parameter :: nattrlist = 21
     character(len=*), parameter, dimension(nattrlist) :: attrList = &
       (/ "case_name     ", "single_column ", "scmlat        ", "scmlon         ", &
          "orb_eccen     ", "orb_obliqr    ", "orb_lambm0    ", "orb_mvelpp     ", &
          "read_restart  ", "start_type    ", "tfreeze_option", "model_version  ", &
-         "info_debug    ", "atm_aero      ", "atm_adiabatic ", "atm_ideal_phys ", &
+         "info_debug    ", "atm_aero      ", &
          "aqua_planet   ", "brnch_rcase   ", "perpetual     ", "perpetual_ymd  ", &
          "hostname      ", "username      ", "MCTID         " /)
     character(len=*), parameter :: subname = "(esm.F90:esm_AddAttributes)"
@@ -549,16 +549,6 @@ module ESM
 
       case("atm_aero")
         call seq_infodata_GetData(infodata, atm_aero=lvalue)
-        cvalue = "false"
-        if (lvalue) cvalue = "true"
-
-      case("atm_adiabatic")
-        call seq_infodata_GetData(infodata, atm_adiabatic=lvalue)
-        cvalue = "false"
-        if (lvalue) cvalue = "true"
-
-      case("atm_ideal_phys")
-        call seq_infodata_GetData(infodata, atm_ideal_phys=lvalue)
         cvalue = "false"
         if (lvalue) cvalue = "true"
 
