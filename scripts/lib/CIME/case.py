@@ -864,6 +864,10 @@ class Case(object):
             else:
                 shutil.copy(os.path.join(machines_dir, "syslog.noop"), os.path.join(casetools, "mach_syslog"))
 
+        # copy cesm.runconfig file into caseroot for NUOPC
+        driverconfigdir = os.path.join(self.get_value("CIMEROOT"),"src","drivers","mct","cime_config")
+        shutil.copy(os.path.join(driverconfigdir,"cesm.runconfig"), os.path.join(self._caseroot, "cesm.runconfig"))
+
     def _create_caseroot_sourcemods(self):
         components = self.get_compset_components()
         for component in components:

@@ -1,0 +1,29 @@
+#########
+# CESM run sequence and config file
+#########
+
+driverAttributes::
+  Verbosity = 0
+  Profiling = 0
+::
+
+runSeq::
+     @86400             # 1 day time step
+       MED med_phases_prep_ocn
+       MED med_connectors_prep_med2ocn
+       MED -> OCN
+       OCN
+       @1800             # 30min time step
+         MED med_phases_prep_atm
+         MED med_connectors_prep_med2atm
+         MED -> ATM
+         ATM
+         ATM -> MED
+         MED med_connectors_post_atm2med
+         MED med_phases_accum_fast
+       @
+       OCN -> MED
+       MED med_connectors_post_ocn2med
+     @
+::
+

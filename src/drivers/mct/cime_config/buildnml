@@ -172,7 +172,13 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     nmlgen.write_seq_maps(seq_maps_file)
 
     #--------------------------------
-    # (3) Construct and write out drv_flds_in
+    # (3) Place hold for generation of cesm.runconfig for NUOPC driver
+    #--------------------------------
+#    cesm_run_file = os.path.join(confdir, "cesm.runconfig")
+#    nmlgen.write_cesm_run(cesm_run_file)
+
+    #--------------------------------
+    # (4) Construct and write out drv_flds_in
     #--------------------------------
     # In thte following, all values come simply from the infiles - no default values need to be added
     # FIXME - do want to add the possibility that will use a user definition file for drv_flds_in
@@ -316,6 +322,7 @@ def buildnml(case, caseroot, component):
         shutil.copy(drv_flds_in, rundir)
 
     shutil.copy(os.path.join(confdir,"seq_maps.rc"), rundir)
+    shutil.copy(os.path.join(caseroot,"cesm.runconfig"), rundir)
 
     for filename in glob.glob(os.path.join(confdir, "*modelio*")):
         shutil.copy(filename, rundir)
