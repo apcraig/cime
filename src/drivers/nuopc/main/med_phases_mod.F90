@@ -27,6 +27,11 @@ module med_phases_mod
 
   public med_phases_prep_atm
   public med_phases_prep_ocn
+  public med_phases_prep_ice
+  public med_phases_prep_lnd
+  public med_phases_prep_rof
+  public med_phases_prep_wav
+  public med_phases_prep_glc
   public med_phases_accum_fast
   
   !-----------------------------------------------------------------------------
@@ -97,12 +102,12 @@ module med_phases_mod
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBOcn_o, value=czero, rc=rc)
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBIce_i, value=czero, rc=rc)
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBLnd_l, value=czero, rc=rc)
-      call shr_nuopc_methods_FB_reset(is_local%wrap%FBRof_h, value=czero, rc=rc)
+      call shr_nuopc_methods_FB_reset(is_local%wrap%FBRof_r, value=czero, rc=rc)
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtm_a, trim(subname)//' FBAtm_a zero', rc=rc)
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBOcn_o, trim(subname)//' FBOcn_o zero', rc=rc)
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBIce_i, trim(subname)//' FBIce_i zero', rc=rc)
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBLnd_l, trim(subname)//' FBLnd_l zero', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBRof_h, trim(subname)//' FBrof_h zero', rc=rc)
+      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBRof_r, trim(subname)//' FBrof_r zero', rc=rc)
       call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_AtmImp, trim(subname)//' AtmImp ', rc=rc)
       call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_OcnImp, trim(subname)//' OcnImp ', rc=rc)
       call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_IceImp, trim(subname)//' IceImp ', rc=rc)
@@ -114,14 +119,14 @@ module med_phases_mod
     call shr_nuopc_methods_FB_copy(is_local%wrap%FBOcn_o, is_local%wrap%NState_OcnImp, rc=rc)
     call shr_nuopc_methods_FB_copy(is_local%wrap%FBIce_i, is_local%wrap%NState_IceImp, rc=rc)
     call shr_nuopc_methods_FB_copy(is_local%wrap%FBLnd_l, is_local%wrap%NState_LndImp, rc=rc)
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBRof_h, is_local%wrap%NState_RofImp, rc=rc)
+    call shr_nuopc_methods_FB_copy(is_local%wrap%FBRof_r, is_local%wrap%NState_RofImp, rc=rc)
 
     if (dbug_flag > 1) then
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtm_a, trim(subname)//' FBAtm_a ', rc=rc)
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBOcn_o, trim(subname)//' FBOcn_o ', rc=rc)
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBIce_i, trim(subname)//' FBIce_i ', rc=rc)
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBLnd_l, trim(subname)//' FBLnd_l ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBRof_h, trim(subname)//' FBRof_h ', rc=rc)
+      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBRof_r, trim(subname)//' FBRof_r ', rc=rc)
     endif
 
     ! Regrid Full Field Bundles conservatively
@@ -367,13 +372,13 @@ module med_phases_mod
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
-    if (is_local%wrap%h2a_active) then
-      call shr_nuopc_methods_FB_Regrid(fldsFrRof, is_local%wrap%FBRof_h, is_local%wrap%FBRof_a, &
-         consfmap=is_local%wrap%RH_h2a_consf, &
-         consdmap=is_local%wrap%RH_h2a_consd, &
-         bilnrmap=is_local%wrap%RH_h2a_bilnr, &
-         patchmap=is_local%wrap%RH_h2a_patch, &
-         string='h2a', rc=rc)
+    if (is_local%wrap%r2a_active) then
+      call shr_nuopc_methods_FB_Regrid(fldsFrRof, is_local%wrap%FBRof_r, is_local%wrap%FBRof_a, &
+         consfmap=is_local%wrap%RH_r2a_consf, &
+         consdmap=is_local%wrap%RH_r2a_consd, &
+         bilnrmap=is_local%wrap%RH_r2a_bilnr, &
+         patchmap=is_local%wrap%RH_r2a_patch, &
+         string='r2a', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
@@ -538,6 +543,469 @@ module med_phases_mod
   end subroutine med_phases_prep_atm
 
   !-----------------------------------------------------------------------------
+  subroutine med_phases_prep_ice(gcomp, rc)
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    
+    ! Prepares the ICE import Fields.
+    
+    ! local variables
+    type(ESMF_Clock)            :: clock
+    type(ESMF_Time)             :: time
+    character(len=64)           :: timestr
+    type(ESMF_State)            :: importState, exportState
+    type(ESMF_Field)            :: field
+    type(InternalState)         :: is_local
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
+    integer                     :: i,j,n
+    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_ice)'
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    ! query the Component for its clock, importState and exportState
+    call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
+      exportState=exportState, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      
+    ! Get the internal state from Component.
+    nullify(is_local%wrap)
+    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+
+    is_local%wrap%icecntr = is_local%wrap%icecntr + 1
+
+    !---------------------------------------
+
+    call ESMF_ClockGet(clock,currtime=time,rc=rc)
+    call ESMF_TimeGet(time,timestring=timestr)
+    if (dbug_flag > 1) then
+      call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+    call ESMF_ClockPrint(clock, options="currTime", &
+      preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+    !--- set export State to special value for testing
+    !---------------------------------------
+
+    call shr_nuopc_methods_State_reset(is_local%wrap%NState_IceExp, value=spval, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (dbug_flag > 1) then
+      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_IceExp, trim(subname)//' IceExp_99 ', rc=rc)
+    endif
+
+    !---------------------------------------
+    !--- copy into export state
+    !---------------------------------------
+
+    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_IceExp, is_local%wrap%FBforIce, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+#if (1 == 0)
+    if (dbug_flag > 1) then
+      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_IceExp, trim(subname)//' IceExp_final ', rc=rc)
+    endif
+
+    if (statewrite_flag) then
+      ! write the fields exported to ice to file
+      call NUOPC_Write(is_local%wrap%NState_IceExp, &
+        fldsToIce%shortname(1:fldsToIce%num), &
+        "field_med_to_ice_", timeslice=is_local%wrap%icecntr, &
+        overwrite=.true., relaxedFlag=.true., rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    endif
+#endif
+    
+    !---------------------------------------
+    !--- clean up
+    !---------------------------------------
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine med_phases_prep_ice
+
+  !-----------------------------------------------------------------------------
+
+  subroutine med_phases_prep_lnd(gcomp, rc)
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    
+    ! Prepares the LND import Fields.
+    
+    ! local variables
+    type(ESMF_Clock)            :: clock
+    type(ESMF_Time)             :: time
+    character(len=64)           :: timestr
+    type(ESMF_State)            :: importState, exportState
+    type(ESMF_Field)            :: field
+    type(InternalState)         :: is_local
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
+    integer                     :: i,j,n
+    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_lnd)'
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    ! query the Component for its clock, importState and exportState
+    call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
+      exportState=exportState, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      
+    ! Get the internal state from Component.
+    nullify(is_local%wrap)
+    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+
+    is_local%wrap%lndcntr = is_local%wrap%lndcntr + 1
+
+    !---------------------------------------
+
+    call ESMF_ClockGet(clock,currtime=time,rc=rc)
+    call ESMF_TimeGet(time,timestring=timestr)
+    if (dbug_flag > 1) then
+      call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+    call ESMF_ClockPrint(clock, options="currTime", &
+      preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+    !--- set export State to special value for testing
+    !---------------------------------------
+
+    call shr_nuopc_methods_State_reset(is_local%wrap%NState_LndExp, value=spval, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (dbug_flag > 1) then
+      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_LndExp, trim(subname)//' LndExp_99 ', rc=rc)
+    endif
+
+    !---------------------------------------
+    !--- copy into export state
+    !---------------------------------------
+
+    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_LndExp, is_local%wrap%FBforLnd, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+#if (1 == 0)
+    if (dbug_flag > 1) then
+      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_LndExp, trim(subname)//' LndExp_final ', rc=rc)
+    endif
+
+    if (statewrite_flag) then
+      ! write the fields exported to lnd to file
+      call NUOPC_Write(is_local%wrap%NState_LndExp, &
+        fldsToLnd%shortname(1:fldsToLnd%num), &
+        "field_med_to_lnd_", timeslice=is_local%wrap%lndcntr, &
+        overwrite=.true., relaxedFlag=.true., rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    endif
+#endif
+    
+    !---------------------------------------
+    !--- clean up
+    !---------------------------------------
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine med_phases_prep_lnd
+
+  !-----------------------------------------------------------------------------
+
+  subroutine med_phases_prep_rof(gcomp, rc)
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    
+    ! Prepares the ROF import Fields.
+    
+    ! local variables
+    type(ESMF_Clock)            :: clock
+    type(ESMF_Time)             :: time
+    character(len=64)           :: timestr
+    type(ESMF_State)            :: importState, exportState
+    type(ESMF_Field)            :: field
+    type(InternalState)         :: is_local
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
+    integer                     :: i,j,n
+    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_rof)'
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    ! query the Component for its clock, importState and exportState
+    call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
+      exportState=exportState, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      
+    ! Get the internal state from Component.
+    nullify(is_local%wrap)
+    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+
+    is_local%wrap%rofcntr = is_local%wrap%rofcntr + 1
+
+    !---------------------------------------
+
+    call ESMF_ClockGet(clock,currtime=time,rc=rc)
+    call ESMF_TimeGet(time,timestring=timestr)
+    if (dbug_flag > 1) then
+      call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+    call ESMF_ClockPrint(clock, options="currTime", &
+      preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+    !--- set export State to special value for testing
+    !---------------------------------------
+
+    call shr_nuopc_methods_State_reset(is_local%wrap%NState_RofExp, value=spval, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (dbug_flag > 1) then
+      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_RofExp, trim(subname)//' RofExp_99 ', rc=rc)
+    endif
+
+    !---------------------------------------
+    !--- copy into export state
+    !---------------------------------------
+
+    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_RofExp, is_local%wrap%FBforRof, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+#if (1 == 0)
+    if (dbug_flag > 1) then
+      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_RofExp, trim(subname)//' RofExp_final ', rc=rc)
+    endif
+
+    if (statewrite_flag) then
+      ! write the fields exported to rof to file
+      call NUOPC_Write(is_local%wrap%NState_RofExp, &
+        fldsToRof%shortname(1:fldsToRof%num), &
+        "field_med_to_rof_", timeslice=is_local%wrap%rofcntr, &
+        overwrite=.true., relaxedFlag=.true., rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    endif
+#endif
+    
+    !---------------------------------------
+    !--- clean up
+    !---------------------------------------
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine med_phases_prep_rof
+
+  !-----------------------------------------------------------------------------
+
+  subroutine med_phases_prep_wav(gcomp, rc)
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    
+    ! Prepares the WAV import Fields.
+    
+    ! local variables
+    type(ESMF_Clock)            :: clock
+    type(ESMF_Time)             :: time
+    character(len=64)           :: timestr
+    type(ESMF_State)            :: importState, exportState
+    type(ESMF_Field)            :: field
+    type(InternalState)         :: is_local
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
+    integer                     :: i,j,n
+    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_wav)'
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    ! query the Component for its clock, importState and exportState
+    call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
+      exportState=exportState, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      
+    ! Get the internal state from Component.
+    nullify(is_local%wrap)
+    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+
+    is_local%wrap%wavcntr = is_local%wrap%wavcntr + 1
+
+    !---------------------------------------
+
+    call ESMF_ClockGet(clock,currtime=time,rc=rc)
+    call ESMF_TimeGet(time,timestring=timestr)
+    if (dbug_flag > 1) then
+      call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+    call ESMF_ClockPrint(clock, options="currTime", &
+      preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+    !--- set export State to special value for testing
+    !---------------------------------------
+
+    call shr_nuopc_methods_State_reset(is_local%wrap%NState_WavExp, value=spval, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (dbug_flag > 1) then
+      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_WavExp, trim(subname)//' WavExp_99 ', rc=rc)
+    endif
+
+    !---------------------------------------
+    !--- copy into export state
+    !---------------------------------------
+
+    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_WavExp, is_local%wrap%FBforWav, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+#if (1 == 0)
+    if (dbug_flag > 1) then
+      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_WavExp, trim(subname)//' WavExp_final ', rc=rc)
+    endif
+
+    if (statewrite_flag) then
+      ! write the fields exported to wav to file
+      call NUOPC_Write(is_local%wrap%NState_WavExp, &
+        fldsToWav%shortname(1:fldsToWav%num), &
+        "field_med_to_wav_", timeslice=is_local%wrap%wavcntr, &
+        overwrite=.true., relaxedFlag=.true., rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    endif
+#endif
+    
+    !---------------------------------------
+    !--- clean up
+    !---------------------------------------
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine med_phases_prep_wav
+
+  !-----------------------------------------------------------------------------
+
+  subroutine med_phases_prep_glc(gcomp, rc)
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+    
+    ! Prepares the GLC import Fields.
+    
+    ! local variables
+    type(ESMF_Clock)            :: clock
+    type(ESMF_Time)             :: time
+    character(len=64)           :: timestr
+    type(ESMF_State)            :: importState, exportState
+    type(ESMF_Field)            :: field
+    type(InternalState)         :: is_local
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
+    integer                     :: i,j,n
+    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_glc)'
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    ! query the Component for its clock, importState and exportState
+    call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, &
+      exportState=exportState, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      
+    ! Get the internal state from Component.
+    nullify(is_local%wrap)
+    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+
+    is_local%wrap%glccntr = is_local%wrap%glccntr + 1
+
+    !---------------------------------------
+
+    call ESMF_ClockGet(clock,currtime=time,rc=rc)
+    call ESMF_TimeGet(time,timestring=timestr)
+    if (dbug_flag > 1) then
+      call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+    call ESMF_ClockPrint(clock, options="currTime", &
+      preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+    !--- set export State to special value for testing
+    !---------------------------------------
+
+    call shr_nuopc_methods_State_reset(is_local%wrap%NState_GlcExp, value=spval, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (dbug_flag > 1) then
+      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_GlcExp, trim(subname)//' GlcExp_99 ', rc=rc)
+    endif
+
+    !---------------------------------------
+    !--- copy into export state
+    !---------------------------------------
+
+    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_GlcExp, is_local%wrap%FBforGlc, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+#if (1 == 0)
+    if (dbug_flag > 1) then
+      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_GlcExp, trim(subname)//' GlcExp_final ', rc=rc)
+    endif
+
+    if (statewrite_flag) then
+      ! write the fields exported to glc to file
+      call NUOPC_Write(is_local%wrap%NState_GlcExp, &
+        fldsToGlc%shortname(1:fldsToGlc%num), &
+        "field_med_to_glc_", timeslice=is_local%wrap%glccntr, &
+        overwrite=.true., relaxedFlag=.true., rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    endif
+#endif
+    
+    !---------------------------------------
+    !--- clean up
+    !---------------------------------------
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine med_phases_prep_glc
+
   !-----------------------------------------------------------------------------
 
   subroutine med_phases_prep_ocn(gcomp, rc)

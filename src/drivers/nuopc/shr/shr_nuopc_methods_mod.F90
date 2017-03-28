@@ -1641,7 +1641,9 @@ module shr_nuopc_methods_mod
         call shr_nuopc_methods_FB_GetFldPtr(FB, lfieldnamelist(n), dataPtr1, dataPtr2, lrank, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-        if (lrank == 1) then
+        if (lrank == 0) then
+          ! no local data
+        elseif (lrank == 1) then
           do i=lbound(dataptr1,1),ubound(dataptr1,1)
             dataptr1(i) = dataptr1(i) / real(count, ESMF_KIND_R8)
           enddo
@@ -1704,7 +1706,9 @@ module shr_nuopc_methods_mod
     do n = 1, fieldCount
       call shr_nuopc_methods_FB_GetFldPtr(FB, lfieldnamelist(n), dataPtr1, dataPtr2, lrank, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-      if (lrank == 1) then
+      if (lrank == 0) then
+        ! no local data
+      elseif (lrank == 1) then
         if (size(dataPtr1) > 0) then
           write(msgString,'(A,3g14.7,i8)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
             minval(dataPtr1),maxval(dataPtr1),sum(dataPtr1),size(dataPtr1)
@@ -1812,7 +1816,9 @@ module shr_nuopc_methods_mod
     do n = 1, fieldCount
       call shr_nuopc_methods_State_GetFldPtr(State, lfieldnamelist(n), dataPtr1, dataPtr2, lrank, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-      if (lrank == 1) then
+      if (lrank == 0) then
+        ! no local data
+      elseif (lrank == 1) then
         if (size(dataPtr1) > 0) then
           write(msgString,'(A,3g14.7,i8)') trim(subname)//' '//trim(lstring)//':'//trim(lfieldnamelist(n)), &
             minval(dataPtr1),maxval(dataPtr1),sum(dataPtr1),size(dataPtr1)
@@ -2073,7 +2079,11 @@ module shr_nuopc_methods_mod
         call shr_nuopc_methods_FB_GetFldPtr(FBout, lfieldnamelist(n), dataPtrB1, dataPtrB2, lrankB, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-        if (lrankS == 1 .and. lrankB == 1) then
+        if (lrankB == 0 .and. lrankS == 0) then
+
+          ! no local data
+
+        elseif (lrankS == 1 .and. lrankB == 1) then
 
           if (.not.shr_nuopc_methods_FieldPtr_Compare(dataPtrS1, dataPtrB1, subname, rc)) then
             call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr1 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=rc)
@@ -2179,7 +2189,11 @@ module shr_nuopc_methods_mod
         call shr_nuopc_methods_State_GetFldPtr(STout, lfieldnamelist(n), dataPtrS1, dataPtrS2, lrankS, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-        if (lrankB == 1 .and. lrankS == 1) then
+        if (lrankB == 0 .and. lrankS == 0) then
+
+          ! no local data
+
+        elseif (lrankB == 1 .and. lrankS == 1) then
 
           if (.not.shr_nuopc_methods_FieldPtr_Compare(dataPtrS1, dataPtrB1, subname, rc)) then
             call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr1 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=rc)
@@ -2283,7 +2297,8 @@ module shr_nuopc_methods_mod
     integer                    , intent(out)  , optional :: rc
 
     ! local variables
-    integer :: lrank
+    type(ESMF_Mesh)  :: lmesh
+    integer :: lrank, nnodes, nelements
     logical :: labort
     character(len=*),parameter :: subname='(shr_nuopc_methods_Field_GetFldPtr)'
 
@@ -2310,10 +2325,12 @@ module shr_nuopc_methods_mod
 
     if (status /= ESMF_FIELDSTATUS_COMPLETE) then
       lrank = 0
-      call ESMF_LogWrite(trim(subname)//": ERROR data not allocated ", ESMF_LOGMSG_INFO, rc=rc)
       if (labort) then
+        call ESMF_LogWrite(trim(subname)//": ERROR data not allocated ", ESMF_LOGMSG_INFO, rc=rc)
         rc = ESMF_FAILURE
         return
+      else
+        call ESMF_LogWrite(trim(subname)//": WARNING data not allocated ", ESMF_LOGMSG_INFO, rc=rc)
       endif
     else
 
@@ -2325,13 +2342,20 @@ module shr_nuopc_methods_mod
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       elseif (geomtype == ESMF_GEOMTYPE_MESH) then
         lrank = 1
+        call ESMF_FieldGet(field, mesh=lmesh, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        call ESMF_MeshGet(lmesh, numOwnedNodes=nnodes, numOwnedElements=nelements, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (nnodes == 0 .and. nelements == 0) lrank = 0
       else  ! geomtype
         call ESMF_LogWrite(trim(subname)//": ERROR geomtype not supported ", ESMF_LOGMSG_INFO, rc=rc)
         rc = ESMF_FAILURE
         return
       endif ! geomtype
 
-      if (lrank == 1) then
+      if (lrank == 0) then
+          call ESMF_LogWrite(trim(subname)//": no local nodes or elements ", ESMF_LOGMSG_INFO, rc=dbrc)
+      elseif (lrank == 1) then
         if (.not.present(fldptr1)) then
           call ESMF_LogWrite(trim(subname)//": ERROR missing rank=1 array ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
@@ -2437,7 +2461,9 @@ module shr_nuopc_methods_mod
     call shr_nuopc_methods_FB_GetFldPtr(FB, fldname, fldptr1, fldptr2, lrank, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    if (lrank == 1) then
+    if (lrank == 0) then
+      ! no local data
+    elseif (lrank == 1) then
       fldptr1 = val
     elseif (lrank == 2) then
       fldptr2 = val
@@ -2523,7 +2549,9 @@ module shr_nuopc_methods_mod
     call shr_nuopc_methods_State_GetFldPtr(ST, fldname, fldptr1, fldptr2, lrank, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    if (lrank == 1) then
+    if (lrank == 0) then
+      ! no local data
+    elseif (lrank == 1) then
       fldptr1 = val
     elseif (lrank == 2) then
       fldptr2 = val
@@ -2726,7 +2754,9 @@ module shr_nuopc_methods_mod
     call shr_nuopc_methods_Field_GetFldPtr(field, dataPtr1, dataPtr2, lrank, abort=.false., rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    if (lrank == 1) then
+    if (lrank == 0) then
+      ! no local data
+    elseif (lrank == 1) then
       write (msgString,*) trim(subname)//":"//trim(string)//": dataptr bounds dim=1 ",lbound(dataptr1,1),ubound(dataptr1,1)
       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 

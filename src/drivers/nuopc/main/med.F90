@@ -30,8 +30,6 @@ module MED
   
   private
   
-! tcraig support grids or meshes so try to hide that
-!  type(ESMF_Grid)    :: gridAtm, gridOcn, gridIce, gridLnd, gridRof, gridMed
   integer            :: dbug_flag = med_constants_dbug_flag
   integer            :: dbrc
   integer            :: stat
@@ -57,42 +55,66 @@ module MED
     
     rc = ESMF_SUCCESS
     
+    !------------------
     ! the NUOPC model component will register the generic methods
+    !------------------
+
     call NUOPC_CompDerive(gcomp, mediator_routine_SS, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     
+    !------------------
     ! set entry point for methods that require specific implementation
     ! Provide InitializeP0 to switch from default IPDv00 to IPDv03
+    !------------------
+
     call ESMF_GridCompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       InitializeP0, phase=0, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    !------------------
     ! IPDv03p1: advertise Fields
+    !------------------
+
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv03p1"/), userRoutine=InitializeIPDv03p1, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    !------------------
     ! IPDv03p3: realize connected Fields with transfer action "provide"
+    !------------------
+
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv03p3"/), userRoutine=InitializeIPDv03p3, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    !------------------
     ! IPDv03p4: optionally modify the decomp/distr of transferred Grid/Mesh
+    !------------------
+
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv03p4"/), userRoutine=InitializeIPDv03p4, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    !------------------
     ! IPDv03p5: realize all Fields with transfer action "accept"
+    !------------------
+
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv03p5"/), userRoutine=InitializeIPDv03p5, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    ! attach specializing method(s)
+    !------------------
+    ! attach specializing method for DataInitialize
+    !------------------
+
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_DataInitialize, &
       specRoutine=DataInitialize, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    ! set entry point for Run( phase = accum_fast ) and specialize
+    !------------------
+    ! set mediator phase for fast accumulate
+    !------------------
+
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_phases_accum_fast"/), &
       userRoutine=mediator_routine_Run, rc=rc)
@@ -101,7 +123,10 @@ module MED
       specPhaseLabel="med_phases_accum_fast", specRoutine=med_phases_accum_fast, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    ! prep_med2atm
+    !------------------
+    ! prep and post phases for connectors
+    !------------------
+
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_prep_med2atm"/), &
       userRoutine=mediator_routine_Run, rc=rc)
@@ -110,7 +135,6 @@ module MED
       specPhaseLabel="med_connectors_prep_med2atm", specRoutine=med_connectors_prep_med2atm, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    ! post_atm2med
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_post_atm2med"/), &
       userRoutine=mediator_routine_Run, rc=rc)
@@ -119,7 +143,6 @@ module MED
       specPhaseLabel="med_connectors_post_atm2med", specRoutine=med_connectors_post_atm2med, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    ! prep_med2ocn
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_prep_med2ocn"/), &
       userRoutine=mediator_routine_Run, rc=rc)
@@ -128,7 +151,6 @@ module MED
       specPhaseLabel="med_connectors_prep_med2ocn", specRoutine=med_connectors_prep_med2ocn, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    ! post_ocn2med
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_post_ocn2med"/), &
       userRoutine=mediator_routine_Run, rc=rc)
@@ -137,7 +159,90 @@ module MED
       specPhaseLabel="med_connectors_post_ocn2med", specRoutine=med_connectors_post_ocn2med, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    ! prep_atm
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_connectors_prep_med2ice"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_connectors_prep_med2ice", specRoutine=med_connectors_prep_med2ice, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_connectors_post_ice2med"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_connectors_post_ice2med", specRoutine=med_connectors_post_ice2med, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_connectors_prep_med2lnd"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_connectors_prep_med2lnd", specRoutine=med_connectors_prep_med2lnd, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_connectors_post_lnd2med"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_connectors_post_lnd2med", specRoutine=med_connectors_post_lnd2med, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_connectors_prep_med2rof"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_connectors_prep_med2rof", specRoutine=med_connectors_prep_med2rof, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_connectors_post_rof2med"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_connectors_post_rof2med", specRoutine=med_connectors_post_rof2med, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_connectors_prep_med2wav"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_connectors_prep_med2wav", specRoutine=med_connectors_prep_med2wav, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_connectors_post_wav2med"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_connectors_post_wav2med", specRoutine=med_connectors_post_wav2med, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_connectors_prep_med2glc"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_connectors_prep_med2glc", specRoutine=med_connectors_prep_med2glc, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_connectors_post_glc2med"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_connectors_post_glc2med", specRoutine=med_connectors_post_glc2med, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
+    ! prep routines for model imports
+    !------------------
+
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_phases_prep_atm"/), &
       userRoutine=mediator_routine_Run, rc=rc)
@@ -146,7 +251,6 @@ module MED
       specPhaseLabel="med_phases_prep_atm", specRoutine=med_phases_prep_atm, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    ! prep_ocn
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_phases_prep_ocn"/), &
       userRoutine=mediator_routine_Run, rc=rc)
@@ -155,16 +259,62 @@ module MED
       specPhaseLabel="med_phases_prep_ocn", specRoutine=med_phases_prep_ocn, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_phases_prep_ice"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_phases_prep_ice", specRoutine=med_phases_prep_ice, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_phases_prep_lnd"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_phases_prep_lnd", specRoutine=med_phases_prep_lnd, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_phases_prep_rof"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_phases_prep_rof", specRoutine=med_phases_prep_rof, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_phases_prep_wav"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_phases_prep_wav", specRoutine=med_phases_prep_wav, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"med_phases_prep_glc"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
+      specPhaseLabel="med_phases_prep_glc", specRoutine=med_phases_prep_glc, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
     ! attach specializing method(s)
     ! -> NUOPC specializes by default --->>> first need to remove the default
+    !------------------
+
     call ESMF_MethodRemove(gcomp, mediator_label_CheckImport, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_CheckImport, &
       specRoutine=NUOPC_NoOp, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    !------------------
     ! attach specializing method(s)
     ! -> NUOPC specializes by default --->>> first need to remove the default
+    !------------------
+
     call ESMF_MethodRemove(gcomp, mediator_label_SetRunClock, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_SetRunClock, &
@@ -173,7 +323,6 @@ module MED
 
   end subroutine SetServices
   
-  !-----------------------------------------------------------------------------
   !-----------------------------------------------------------------------------
 
   subroutine InitializeP0(gcomp, importState, exportState, clock, rc)
@@ -240,19 +389,24 @@ module MED
     call ESMF_GridCompSetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       
-    ! importable fields:
-
+    !------------------
     ! add a namespace
+    !------------------
+
     call NUOPC_AddNamespace(importState, namespace="ATM", nestedStateName="NestedState-AtmImp", nestedState=is_local%wrap%NState_AtmImp, rc=rc)
     call NUOPC_AddNamespace(importState, namespace="OCN", nestedStateName="NestedState-OcnImp", nestedState=is_local%wrap%NState_OcnImp, rc=rc)
     call NUOPC_AddNamespace(importState, namespace="ICE", nestedStateName="NestedState-IceImp", nestedState=is_local%wrap%NState_IceImp, rc=rc)
     call NUOPC_AddNamespace(importState, namespace="LND", nestedStateName="NestedState-LndImp", nestedState=is_local%wrap%NState_LndImp, rc=rc)
     call NUOPC_AddNamespace(importState, namespace="ROF", nestedStateName="NestedState-RofImp", nestedState=is_local%wrap%NState_RofImp, rc=rc)
+    call NUOPC_AddNamespace(importState, namespace="WAV", nestedStateName="NestedState-WavImp", nestedState=is_local%wrap%NState_WavImp, rc=rc)
+    call NUOPC_AddNamespace(importState, namespace="GLC", nestedStateName="NestedState-GlcImp", nestedState=is_local%wrap%NState_GlcImp, rc=rc)
     call NUOPC_AddNamespace(exportState, namespace="ATM", nestedStateName="NestedState-AtmExp", nestedState=is_local%wrap%NState_AtmExp, rc=rc)
     call NUOPC_AddNamespace(exportState, namespace="OCN", nestedStateName="NestedState-OcnExp", nestedState=is_local%wrap%NState_OcnExp, rc=rc)
     call NUOPC_AddNamespace(exportState, namespace="ICE", nestedStateName="NestedState-IceExp", nestedState=is_local%wrap%NState_IceExp, rc=rc)
     call NUOPC_AddNamespace(exportState, namespace="LND", nestedStateName="NestedState-LndExp", nestedState=is_local%wrap%NState_LndExp, rc=rc)
     call NUOPC_AddNamespace(exportState, namespace="ROF", nestedStateName="NestedState-RofExp", nestedState=is_local%wrap%NState_RofExp, rc=rc)
+    call NUOPC_AddNamespace(exportState, namespace="WAV", nestedStateName="NestedState-WavExp", nestedState=is_local%wrap%NState_WavExp, rc=rc)
+    call NUOPC_AddNamespace(exportState, namespace="GLC", nestedStateName="NestedState-GlcExp", nestedState=is_local%wrap%NState_GlcExp, rc=rc)
 
     call shr_nuopc_fldList_Zero(fldsFrAtm, rc=rc)
     call shr_nuopc_fldList_Zero(fldsToAtm, rc=rc)
@@ -264,7 +418,15 @@ module MED
     call shr_nuopc_fldList_Zero(fldsToLnd, rc=rc)
     call shr_nuopc_fldList_Zero(fldsFrRof, rc=rc)
     call shr_nuopc_fldList_Zero(fldsToRof, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsFrWav, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsToWav, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsFrGlc, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsToGlc, rc=rc)
     call shr_nuopc_fldList_Zero(fldsAtmOcn, rc=rc)
+
+    !------------------
+    ! fldsToAtm
+    !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_states, "cannot provide", subname//":seq_flds_x2a_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
@@ -275,6 +437,10 @@ module MED
     call shr_nuopc_fldList_Add(fldsToAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    !------------------
+    ! fldsFrAtm
+    !------------------
+
     call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_states, "cannot provide", subname//":seq_flds_a2x_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 !    call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_fluxes, "cannot provide", subname//":seq_flds_a2x_fluxes", "conservefrac", rc=rc)
@@ -284,10 +450,9 @@ module MED
     call shr_nuopc_fldList_Add(fldsFrAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-!    call shr_nuopc_fldList_Add(fldsFrOcn, "sea_surface_temperature"  ,"cannot provide",subname//':fldsFrOcn',mapping='bilinear',rc=rc)
-
-!    call shr_nuopc_fldList_Add(fldsToOcn, "air_pressure_at_sea_level","cannot provide",subname//':fldsToOcn',mapping='bilinear',rc=rc)
-!    call shr_nuopc_fldList_Add(fldsToOcn, "surface_net_downward_shortwave_flux","cannot provide",subname//':fldsToOcn',mapping='bilinear',rc=rc)
+    !------------------
+    ! fldsToOcn
+    !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_states, "cannot provide", subname//":seq_flds_x2o_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
@@ -298,6 +463,10 @@ module MED
     call shr_nuopc_fldList_Add(fldsToOcn, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    !------------------
+    ! fldsFrOcn
+    !------------------
+
     call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_states, "cannot provide", subname//":seq_flds_o2x_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 !    call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_fluxes, "cannot provide", subname//":seq_flds_o2x_fluxes", "conservefrac", rc=rc)
@@ -307,26 +476,168 @@ module MED
     call shr_nuopc_fldList_Add(fldsFrOcn, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    !------------------
+    ! fldsToIce
+    !------------------
+
+    call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_states, "cannot provide", subname//":seq_flds_x2i_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_fluxes, "cannot provide", subname//":seq_flds_x2i_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_fluxes, "cannot provide", subname//":seq_flds_x2i_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Add(fldsToIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
+    ! fldsFrIce
+    !------------------
+
+    call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_states, "cannot provide", subname//":seq_flds_i2x_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_fluxes, "cannot provide", subname//":seq_flds_i2x_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_fluxes, "cannot provide", subname//":seq_flds_i2x_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Add(fldsFrIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
+    ! fldsToLnd
+    !------------------
+
+    call shr_nuopc_fldList_fromseqflds(fldsToLnd, seq_flds_x2l_states, "cannot provide", subname//":seq_flds_x2l_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    call shr_nuopc_fldList_fromseqflds(fldsToLnd, seq_flds_x2l_fluxes, "cannot provide", subname//":seq_flds_x2l_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsToLnd, seq_flds_x2l_fluxes, "cannot provide", subname//":seq_flds_x2l_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Add(fldsToLnd, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
+    ! fldsFrLnd
+    !------------------
+
+    call shr_nuopc_fldList_fromseqflds(fldsFrLnd, seq_flds_l2x_states, "cannot provide", subname//":seq_flds_l2x_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    call shr_nuopc_fldList_fromseqflds(fldsFrLnd, seq_flds_l2x_fluxes, "cannot provide", subname//":seq_flds_l2x_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsFrLnd, seq_flds_l2x_fluxes, "cannot provide", subname//":seq_flds_l2x_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Add(fldsFrLnd, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
+    ! fldsToRof
+    !------------------
+
+    call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_states, "cannot provide", subname//":seq_flds_x2r_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Add(fldsToRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
+    ! fldsFrRof
+    !------------------
+
+    call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_states, "cannot provide", subname//":seq_flds_r2x_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Add(fldsFrRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
+    ! fldsToWav
+    !------------------
+
+    call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2r_states, "cannot provide", subname//":seq_flds_x2r_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Add(fldsToWav, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
+    ! fldsFrWav
+    !------------------
+
+    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_r2x_states, "cannot provide", subname//":seq_flds_r2x_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Add(fldsFrWav, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
+    ! fldsToGlc
+    !------------------
+
+    call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2r_states, "cannot provide", subname//":seq_flds_x2r_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Add(fldsToGlc, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
+    ! fldsFrGlc
+    !------------------
+
+    call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_r2x_states, "cannot provide", subname//":seq_flds_r2x_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Add(fldsFrGlc, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    !------------------
+    ! Advertise
+    !------------------
+
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_AtmImp, fldsFrAtm, subname//':FrAtm', rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_LndImp, fldsFrLnd, subname//':FrLnd', rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    call shr_nuopc_fldList_Advertise(is_local%wrap%NState_RofImp, fldsFrRof, subname//':FrRof', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_OcnImp, fldsFrOcn, subname//':FrOcn', rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_IceImp, fldsFrIce, subname//':FrIce', rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Advertise(is_local%wrap%NState_RofImp, fldsFrRof, subname//':FrRof', rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Advertise(is_local%wrap%NState_WavImp, fldsFrWav, subname//':FrWav', rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Advertise(is_local%wrap%NState_GlcImp, fldsFrGlc, subname//':FrGlc', rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_AtmExp, fldsToAtm, subname//':ToAtm', rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_LndExp, fldsToLnd, subname//':ToLnd', rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    call shr_nuopc_fldList_Advertise(is_local%wrap%NState_RofExp, fldsToRof, subname//':ToRof', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_OcnExp, fldsToOcn, subname//':ToOcn', rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_IceExp, fldsToIce, subname//':ToIce', rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Advertise(is_local%wrap%NState_RofExp, fldsToRof, subname//':ToRof', rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Advertise(is_local%wrap%NState_WavExp, fldsToWav, subname//':ToWav', rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Advertise(is_local%wrap%NState_GlcExp, fldsToGlc, subname//':ToGlc', rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     if (dbug_flag > 5) then
@@ -375,6 +686,11 @@ module MED
 
     is_local%wrap%atmcntr = 0
     is_local%wrap%ocncntr = 0
+    is_local%wrap%icecntr = 0
+    is_local%wrap%lndcntr = 0
+    is_local%wrap%rofcntr = 0
+    is_local%wrap%wavcntr = 0
+    is_local%wrap%glccntr = 0
 
 ! tcraig hardwire 1 degree grid as backup option
 !    gridMed = ESMF_GridCreate1PeriDimUfrm(maxIndex=(/360,180/), &
@@ -416,22 +732,30 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_LndImp, fldlist=fldsFrLnd, tag=subname//':FrLnd', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    call shr_nuopc_fldList_Realize(is_local%wrap%NState_RofImp, fldlist=fldsFrRof, tag=subname//':FrRof', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_OcnImp, fldlist=fldsFrOcn, tag=subname//':FrOcn', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_IceImp, fldlist=fldsFrIce, tag=subname//':FrIce', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Realize(is_local%wrap%NState_RofImp, fldlist=fldsFrRof, tag=subname//':FrRof', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Realize(is_local%wrap%NState_WavImp, fldlist=fldsFrWav, tag=subname//':FrWav', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Realize(is_local%wrap%NState_GlcImp, fldlist=fldsFrGlc, tag=subname//':FrGlc', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_AtmExp, fldlist=fldsToAtm, tag=subname//':ToAtm', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_LndExp, fldlist=fldsToLnd, tag=subname//':ToLnd', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    call shr_nuopc_fldList_Realize(is_local%wrap%NState_RofExp, fldlist=fldsToRof, tag=subname//':ToRof', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_OcnExp, fldlist=fldsToOcn, tag=subname//':ToOcn', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_IceExp, fldlist=fldsToIce, tag=subname//':ToIce', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Realize(is_local%wrap%NState_RofExp, fldlist=fldsToRof, tag=subname//':ToRof', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Realize(is_local%wrap%NState_WavExp, fldlist=fldsToWav, tag=subname//':ToWav', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_Realize(is_local%wrap%NState_GlcExp, fldlist=fldsToGlc, tag=subname//':ToGlc', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     if (dbug_flag > 5) then
@@ -502,6 +826,18 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     call realizeConnectedGrid(is_local%wrap%NState_rofExp, 'RofExp', rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call realizeConnectedGrid(is_local%wrap%NState_wavImp, 'WavImp', rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call realizeConnectedGrid(is_local%wrap%NState_wavExp, 'WavExp', rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call realizeConnectedGrid(is_local%wrap%NState_glcImp, 'GlcImp', rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call realizeConnectedGrid(is_local%wrap%NState_glcExp, 'GlcExp', rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     if (dbug_flag > 5) then
@@ -896,6 +1232,26 @@ module MED
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_rofExp, value=spval_init, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    call completeFieldInitialization(is_local%wrap%NState_wavImp, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_methods_State_reset(is_local%wrap%NState_wavImp, value=spval_init, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call completeFieldInitialization(is_local%wrap%NState_wavExp, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_methods_State_reset(is_local%wrap%NState_wavExp, value=spval_init, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call completeFieldInitialization(is_local%wrap%NState_glcImp, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_methods_State_reset(is_local%wrap%NState_glcImp, value=spval_init, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call completeFieldInitialization(is_local%wrap%NState_glcExp, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_methods_State_reset(is_local%wrap%NState_glcExp, value=spval_init, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
     !----------------------------------------------------------
     !--- Diagnose Grid Info
     !----------------------------------------------------------
@@ -915,7 +1271,12 @@ module MED
     call shr_nuopc_methods_State_GeomPrint(is_local%wrap%NState_rofExp,'gridRofExp',rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-#if 1
+    call shr_nuopc_methods_State_GeomPrint(is_local%wrap%NState_wavExp,'gridWavExp',rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call shr_nuopc_methods_State_GeomPrint(is_local%wrap%NState_glcExp,'gridGlcExp',rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
     !----------------------------------------------------------
     ! dump the Grid coordinate arrays for reference      
     !----------------------------------------------------------
@@ -935,7 +1296,11 @@ module MED
     call shr_nuopc_methods_State_GeomWrite(is_local%wrap%NState_RofExp, 'array_med_rof', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-#endif
+    call shr_nuopc_methods_State_GeomWrite(is_local%wrap%NState_WavExp, 'array_med_wav', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call shr_nuopc_methods_State_GeomWrite(is_local%wrap%NState_GlcExp, 'array_med_glc', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !----------------------------------------------------------
     ! NOW allocate other Mediator datatypes
@@ -968,8 +1333,8 @@ module MED
       STflds=is_local%wrap%NState_AtmImp, name='FBAtm_l', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_h, STgeom=is_local%wrap%NState_RofExp, &
-      STflds=is_local%wrap%NState_AtmImp, name='FBAtm_h', rc=rc)
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_r, STgeom=is_local%wrap%NState_RofExp, &
+      STflds=is_local%wrap%NState_AtmImp, name='FBAtm_r', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !--- ocn
@@ -1014,8 +1379,8 @@ module MED
       STflds=is_local%wrap%NState_LndImp, name='FBLnd_l', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBLnd_h, STgeom=is_local%wrap%NState_RofExp, &
-      STflds=is_local%wrap%NState_LndImp, name='FBLnd_h', rc=rc)
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBLnd_r, STgeom=is_local%wrap%NState_RofExp, &
+      STflds=is_local%wrap%NState_LndImp, name='FBLnd_r', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !--- rof
@@ -1028,8 +1393,8 @@ module MED
       STflds=is_local%wrap%NState_RofImp, name='FBRof_a', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_h, STgeom=is_local%wrap%NState_RofImp, &
-      STflds=is_local%wrap%NState_RofImp, name='FBRof_h', rc=rc)
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_r, STgeom=is_local%wrap%NState_RofImp, &
+      STflds=is_local%wrap%NState_RofImp, name='FBRof_r', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !----------------------------------------------------------
@@ -1054,6 +1419,14 @@ module MED
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumRof, STgeom=is_local%wrap%NState_RofImp, &
       STflds=is_local%wrap%NState_RofImp, name='FBaccumRof', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumWav, STgeom=is_local%wrap%NState_WavImp, &
+      STflds=is_local%wrap%NState_WavImp, name='FBaccumWav', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumGlc, STgeom=is_local%wrap%NState_GlcImp, &
+      STflds=is_local%wrap%NState_GlcImp, name='FBaccumGlc', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !----------------------------------------------------------
@@ -1096,6 +1469,14 @@ module MED
       STgeom=is_local%wrap%NState_RofExp, name='FBforRof', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBforWav, &
+      STgeom=is_local%wrap%NState_WavExp, name='FBforWav', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBforGlc, &
+      STgeom=is_local%wrap%NState_GlcExp, name='FBforGlc', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
     !----------------------------------------------------------
     !--- Check for active regrid directions
     !----------------------------------------------------------
@@ -1104,17 +1485,17 @@ module MED
     is_local%wrap%a2o_active = .false.
     is_local%wrap%a2i_active = .false.
     is_local%wrap%a2l_active = .false.
-    is_local%wrap%a2h_active = .false.
+    is_local%wrap%a2r_active = .false.
     is_local%wrap%o2a_active = .false.
     is_local%wrap%o2i_active = .false.
     is_local%wrap%i2a_active = .false.
     is_local%wrap%i2o_active = .false.
     is_local%wrap%l2a_active = .false.
-    is_local%wrap%l2h_active = .false.
-    is_local%wrap%h2l_active = .false.
-    is_local%wrap%h2a_active = .false.
+    is_local%wrap%l2r_active = .false.
+    is_local%wrap%r2l_active = .false.
+    is_local%wrap%r2a_active = .false.
 
-    ! a2o, a2i, a2l, a2h
+    ! a2o, a2i, a2l, a2r
     call ESMF_FieldBundleGet(is_local%wrap%FBAtm_a, fieldCount=fieldCount, rc=rc) ! Atmosphere Export Field Count
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     if (fieldCount > 0) then
@@ -1136,7 +1517,7 @@ module MED
       call ESMF_FieldBundleGet(is_local%wrap%FBforRof, fieldCount=fieldCount, rc=rc) ! Rof Import Field Count
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       if (fieldCount > 0) then
-        is_local%wrap%a2h_active = .true.
+        is_local%wrap%a2r_active = .true.
       endif
     endif
     
@@ -1172,7 +1553,7 @@ module MED
       endif
     endif
     
-    ! l2a, l2h
+    ! l2a, l2r
     call ESMF_FieldBundleGet(is_local%wrap%FBLnd_l, fieldCount=fieldCount, rc=rc) ! Land Export Field Count
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     if (fieldCount > 0) then
@@ -1184,23 +1565,23 @@ module MED
       call ESMF_FieldBundleGet(is_local%wrap%FBforRof, fieldCount=fieldCount, rc=rc) ! Rof Import Field Count
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       if (fieldCount > 0) then
-        is_local%wrap%l2h_active = .true.
+        is_local%wrap%l2r_active = .true.
       endif
     endif
 
-    ! h2l, h2a
-    call ESMF_FieldBundleGet(is_local%wrap%FBRof_h, fieldCount=fieldCount, rc=rc) ! Rof Export Field Count
+    ! r2l, r2a
+    call ESMF_FieldBundleGet(is_local%wrap%FBRof_r, fieldCount=fieldCount, rc=rc) ! Rof Export Field Count
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     if (fieldCount > 0) then
       call ESMF_FieldBundleGet(is_local%wrap%FBforLnd, fieldCount=fieldCount, rc=rc) ! Land Import Field Count
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       if (fieldCount > 0) then
-        is_local%wrap%h2l_active = .true.
+        is_local%wrap%r2l_active = .true.
       endif
       call ESMF_FieldBundleGet(is_local%wrap%FBforAtm, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       if (fieldCount > 0) then
-        is_local%wrap%h2a_active = .true.
+        is_local%wrap%r2a_active = .true.
       endif
     endif
 
@@ -1210,8 +1591,8 @@ module MED
     call ESMF_LogWrite(trim(subname)//": a2i active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
     write(msgString,*) is_local%wrap%a2l_active
     call ESMF_LogWrite(trim(subname)//": a2l active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-    write(msgString,*) is_local%wrap%a2h_active
-    call ESMF_LogWrite(trim(subname)//": a2h active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+    write(msgString,*) is_local%wrap%a2r_active
+    call ESMF_LogWrite(trim(subname)//": a2r active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
 
     write(msgString,*) is_local%wrap%o2a_active
     call ESMF_LogWrite(trim(subname)//": o2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
@@ -1225,13 +1606,13 @@ module MED
 
     write(msgString,*) is_local%wrap%l2a_active
     call ESMF_LogWrite(trim(subname)//": l2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-    write(msgString,*) is_local%wrap%l2h_active
-    call ESMF_LogWrite(trim(subname)//": l2h active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+    write(msgString,*) is_local%wrap%l2r_active
+    call ESMF_LogWrite(trim(subname)//": l2r active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
 
-    write(msgString,*) is_local%wrap%h2l_active
-    call ESMF_LogWrite(trim(subname)//": h2l active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-    write(msgString,*) is_local%wrap%h2a_active
-    call ESMF_LogWrite(trim(subname)//": h2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+    write(msgString,*) is_local%wrap%r2l_active
+    call ESMF_LogWrite(trim(subname)//": r2l active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+    write(msgString,*) is_local%wrap%r2a_active
+    call ESMF_LogWrite(trim(subname)//": r2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
 
     !----------------------------------------------------------
     !--- Initialize route handles
@@ -1280,14 +1661,14 @@ module MED
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
-    if (is_local%wrap%a2h_active) then
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_h, &
-        bilnrmap=is_local%wrap%RH_a2h_bilnr, &
-        consfmap=is_local%wrap%RH_a2h_consf, &
-        consdmap=is_local%wrap%RH_a2h_consd, &
-        patchmap=is_local%wrap%RH_a2h_patch, &
-        fcopymap=is_local%wrap%RH_a2h_fcopy, &
-        fldlist1=FldsFrAtm, string='a2h_weights', rc=rc)
+    if (is_local%wrap%a2r_active) then
+      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_r, &
+        bilnrmap=is_local%wrap%RH_a2r_bilnr, &
+        consfmap=is_local%wrap%RH_a2r_consf, &
+        consdmap=is_local%wrap%RH_a2r_consd, &
+        patchmap=is_local%wrap%RH_a2r_patch, &
+        fcopymap=is_local%wrap%RH_a2r_fcopy, &
+        fldlist1=FldsFrAtm, string='a2r_weights', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
@@ -1353,36 +1734,36 @@ module MED
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
-    if (is_local%wrap%l2h_active) then
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_h, &
-        bilnrmap=is_local%wrap%RH_l2h_bilnr, &
-        consfmap=is_local%wrap%RH_l2h_consf, &
-        consdmap=is_local%wrap%RH_l2h_consd, &
-        patchmap=is_local%wrap%RH_l2h_patch, &
-        fcopymap=is_local%wrap%RH_l2h_fcopy, &
-        fldlist1=FldsFrLnd, string='l2h_weights', rc=rc)
+    if (is_local%wrap%l2r_active) then
+      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_r, &
+        bilnrmap=is_local%wrap%RH_l2r_bilnr, &
+        consfmap=is_local%wrap%RH_l2r_consf, &
+        consdmap=is_local%wrap%RH_l2r_consd, &
+        patchmap=is_local%wrap%RH_l2r_patch, &
+        fcopymap=is_local%wrap%RH_l2r_fcopy, &
+        fldlist1=FldsFrLnd, string='l2r_weights', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
-    if (is_local%wrap%h2a_active) then
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_h, FBdst=is_local%wrap%FBRof_a, &
-        bilnrmap=is_local%wrap%RH_h2a_bilnr, &
-        consfmap=is_local%wrap%RH_h2a_consf, &
-        consdmap=is_local%wrap%RH_h2a_consd, &
-        patchmap=is_local%wrap%RH_h2a_patch, &
-        fcopymap=is_local%wrap%RH_h2a_fcopy, &
-        fldlist1=FldsFrRof, string='h2a_weights', rc=rc)
+    if (is_local%wrap%r2a_active) then
+      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_a, &
+        bilnrmap=is_local%wrap%RH_r2a_bilnr, &
+        consfmap=is_local%wrap%RH_r2a_consf, &
+        consdmap=is_local%wrap%RH_r2a_consd, &
+        patchmap=is_local%wrap%RH_r2a_patch, &
+        fcopymap=is_local%wrap%RH_r2a_fcopy, &
+        fldlist1=FldsFrRof, string='r2a_weights', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
-    if (is_local%wrap%h2l_active) then
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_h, FBdst=is_local%wrap%FBRof_l, &
-        bilnrmap=is_local%wrap%RH_h2l_bilnr, &
-        consfmap=is_local%wrap%RH_h2l_consf, &
-        consdmap=is_local%wrap%RH_h2l_consd, &
-        patchmap=is_local%wrap%RH_h2l_patch, &
-        fcopymap=is_local%wrap%RH_h2l_fcopy, &
-        fldlist1=FldsFrRof, string='h2l_weights', rc=rc)
+    if (is_local%wrap%r2l_active) then
+      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_l, &
+        bilnrmap=is_local%wrap%RH_r2l_bilnr, &
+        consfmap=is_local%wrap%RH_r2l_consf, &
+        consdmap=is_local%wrap%RH_r2l_consd, &
+        patchmap=is_local%wrap%RH_r2l_patch, &
+        fcopymap=is_local%wrap%RH_r2l_fcopy, &
+        fldlist1=FldsFrRof, string='r2l_weights', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
@@ -1427,14 +1808,12 @@ module MED
               ESMF_LOGMSG_INFO, rc=rc)
             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
           endif
-          ! the transferred Grid is already set, allocate field data memory
-          ! DCR - The WRFROFRO soil fields have an ungridded 3rd dimension.
-          ! The ESMF_FieldEmptyComplete is not allocating memory for this 3rd dimension
           call ESMF_FieldEmptyComplete(field, typekind=ESMF_TYPEKIND_R8, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
         endif   ! fieldStatus
 
         call shr_nuopc_methods_Field_GeomPrint(field, trim(subname)//':'//trim(fieldNameList(n)), rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
       enddo
 
@@ -1554,6 +1933,16 @@ module MED
       call shr_nuopc_methods_State_reset(is_local%wrap%NState_rofImp, value=spval_init, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_wavImp,infodata,'wav2cpli',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_State_reset(is_local%wrap%NState_wavImp, value=spval_init, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_glcImp,infodata,'glc2cpli',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_State_reset(is_local%wrap%NState_glcImp, value=spval_init, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumAtm, value=czero, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       is_local%wrap%accumcntAtm = 0
@@ -1573,6 +1962,14 @@ module MED
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumRof, value=czero, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       is_local%wrap%accumcntRof = 0
+
+      call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumWav, value=czero, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      is_local%wrap%accumcntWav = 0
+
+      call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumGlc, value=czero, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      is_local%wrap%accumcntGlc = 0
 
 #if (1 == 0)
       !---------------------------------------
@@ -1709,6 +2106,14 @@ module MED
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumRof,read_rest_FBaccumRof,rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    fname = trim(bfname)//'_FBaccumWav_restart.nc'
+    call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumWav,read_rest_FBaccumWav,rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    fname = trim(bfname)//'_FBaccumGlc_restart.nc'
+    call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumGlc,read_rest_FBaccumGlc,rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
     fname = trim(bfname)//'_FBaccumAtmOcn_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumAtmOcn,read_rest_FBaccumAtmOcn,rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
@@ -1745,11 +2150,27 @@ module MED
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
-    fname = trim(bfname)//'_FBRof_h_restart.nc'
-    call FieldBundle_RWFields(mode,fname,is_local%wrap%FBRof_h,read_rest_FBRof_h,rc=rc)
+    fname = trim(bfname)//'_FBRof_r_restart.nc'
+    call FieldBundle_RWFields(mode,fname,is_local%wrap%FBRof_r,read_rest_FBRof_r,rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     if (mode == 'read') then
-      call shr_nuopc_methods_FB_copy(is_local%wrap%NState_RofImp, is_local%wrap%FBRof_h, rc=rc)
+      call shr_nuopc_methods_FB_copy(is_local%wrap%NState_RofImp, is_local%wrap%FBRof_r, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    endif
+
+    fname = trim(bfname)//'_FBWav_r_restart.nc'
+    call FieldBundle_RWFields(mode,fname,is_local%wrap%FBWav_r,read_rest_FBWav_r,rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (mode == 'read') then
+      call shr_nuopc_methods_FB_copy(is_local%wrap%NState_WavImp, is_local%wrap%FBWav_r, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    endif
+
+    fname = trim(bfname)//'_FBGlc_r_restart.nc'
+    call FieldBundle_RWFields(mode,fname,is_local%wrap%FBGlc_r,read_rest_FBGlc_r,rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (mode == 'read') then
+      call shr_nuopc_methods_FB_copy(is_local%wrap%NState_GlcImp, is_local%wrap%FBGlc_r, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
@@ -1768,6 +2189,8 @@ module MED
       write(funit,*) is_local%wrap%accumcntAtmOcn
       write(funit,*) is_local%wrap%accumcntLnd
       write(funit,*) is_local%wrap%accumcntRof
+      write(funit,*) is_local%wrap%accumcntWav
+      write(funit,*) is_local%wrap%accumcntGlc
       close(funit)
     elseif (mode == 'read') then
       inquire(file=fname,exist=fexists)
@@ -1782,12 +2205,16 @@ module MED
         is_local%wrap%accumcntAtmOcn=0
         is_local%wrap%accumcntLnd=0
         is_local%wrap%accumcntRof=0
+        is_local%wrap%accumcntWav=0
+        is_local%wrap%accumcntGlc=0
         read (funit,*) is_local%wrap%accumcntAtm
         read (funit,*) is_local%wrap%accumcntOcn
         read (funit,*) is_local%wrap%accumcntIce
         read (funit,*) is_local%wrap%accumcntAtmOcn
-!        read (funit,*) is_local%wrap%accumcntLnd
-!        read (funit,*) is_local%wrap%accumcntRof
+        read (funit,*) is_local%wrap%accumcntLnd
+        read (funit,*) is_local%wrap%accumcntRof
+        read (funit,*) is_local%wrap%accumcntWav
+        read (funit,*) is_local%wrap%accumcntGlc
         close(funit)
       else
         read_rest_FBaccumAtm = .false.
@@ -1795,6 +2222,8 @@ module MED
         read_rest_FBaccumIce = .false.
         read_rest_FBaccumLnd = .false.
         read_rest_FBaccumRof = .false.
+        read_rest_FBaccumWav = .false.
+        read_rest_FBaccumGlc = .false.
         read_rest_FBaccumAtmOcn = .false.
       endif
     endif
