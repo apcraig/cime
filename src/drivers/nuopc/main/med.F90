@@ -21,6 +21,7 @@ module MED
   use shr_nuopc_methods_mod
   use seq_flds_mod
   use seq_infodata_mod, only: infodata=>seq_infodata_infodata
+  use shr_mct_mod, only: shr_mct_queryConfigFile
   use med_constants_mod
   use med_internalstate_mod
   use med_connectors_mod
@@ -1165,6 +1166,8 @@ module MED
     integer(ESMF_KIND_I4), pointer :: dataPtr_arrayOcn(:), dataPtr_arrayIce(:)
     real(ESMF_KIND_R8), pointer :: dataPtr_fieldOcn(:), dataPtr_fieldAtm(:)
     logical                     :: isPresentOcn, isPresentIce
+    character(len=*),parameter  :: maprcfile = "seq_maps.rc"
+    character(len=512)          :: fmapfile, smapfile, vmapfile, rmapfile, rimapfile, rlmapfile
     character(len=*),parameter  :: subname='(module_MEDIATOR:InitializeIPDv03p5)'
 
     if (dbug_flag > 5) then
@@ -1485,7 +1488,6 @@ module MED
     is_local%wrap%a2o_active = .false.
     is_local%wrap%a2i_active = .false.
     is_local%wrap%a2l_active = .false.
-    is_local%wrap%a2r_active = .false.
     is_local%wrap%o2a_active = .false.
     is_local%wrap%o2i_active = .false.
     is_local%wrap%i2a_active = .false.
@@ -1493,9 +1495,9 @@ module MED
     is_local%wrap%l2a_active = .false.
     is_local%wrap%l2r_active = .false.
     is_local%wrap%r2l_active = .false.
-    is_local%wrap%r2a_active = .false.
+    is_local%wrap%r2o_active = .false.
 
-    ! a2o, a2i, a2l, a2r
+    ! a2o, a2i, a2l
     call ESMF_FieldBundleGet(is_local%wrap%FBAtm_a, fieldCount=fieldCount, rc=rc) ! Atmosphere Export Field Count
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     if (fieldCount > 0) then
@@ -1513,11 +1515,6 @@ module MED
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       if (fieldCount > 0) then
         is_local%wrap%a2l_active = .true.
-      endif
-      call ESMF_FieldBundleGet(is_local%wrap%FBforRof, fieldCount=fieldCount, rc=rc) ! Rof Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-      if (fieldCount > 0) then
-        is_local%wrap%a2r_active = .true.
       endif
     endif
     
@@ -1569,7 +1566,7 @@ module MED
       endif
     endif
 
-    ! r2l, r2a
+    ! r2l, r2o
     call ESMF_FieldBundleGet(is_local%wrap%FBRof_r, fieldCount=fieldCount, rc=rc) ! Rof Export Field Count
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     if (fieldCount > 0) then
@@ -1578,10 +1575,10 @@ module MED
       if (fieldCount > 0) then
         is_local%wrap%r2l_active = .true.
       endif
-      call ESMF_FieldBundleGet(is_local%wrap%FBforAtm, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
+      call ESMF_FieldBundleGet(is_local%wrap%FBforOCN, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       if (fieldCount > 0) then
-        is_local%wrap%r2a_active = .true.
+        is_local%wrap%r2o_active = .true.
       endif
     endif
 
@@ -1591,8 +1588,6 @@ module MED
     call ESMF_LogWrite(trim(subname)//": a2i active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
     write(msgString,*) is_local%wrap%a2l_active
     call ESMF_LogWrite(trim(subname)//": a2l active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-    write(msgString,*) is_local%wrap%a2r_active
-    call ESMF_LogWrite(trim(subname)//": a2r active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
 
     write(msgString,*) is_local%wrap%o2a_active
     call ESMF_LogWrite(trim(subname)//": o2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
@@ -1611,8 +1606,8 @@ module MED
 
     write(msgString,*) is_local%wrap%r2l_active
     call ESMF_LogWrite(trim(subname)//": r2l active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-    write(msgString,*) is_local%wrap%r2a_active
-    call ESMF_LogWrite(trim(subname)//": r2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+    write(msgString,*) is_local%wrap%r2o_active
+    call ESMF_LogWrite(trim(subname)//": r2o active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
 
     !----------------------------------------------------------
     !--- Initialize route handles
@@ -1624,6 +1619,10 @@ module MED
     endif
 
     if (is_local%wrap%a2o_active) then
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2ocn_fmapname:',fmapfile)
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2ocn_smapname:',smapfile)
+      call ESMF_LogWrite(" fmapname "//trim(fmapfile), ESMF_LOGMSG_INFO)
+      call ESMF_LogWrite(" smapname "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_o, &
         bilnrmap=is_local%wrap%RH_a2o_bilnr, &
         consfmap=is_local%wrap%RH_a2o_consf, &
@@ -1632,13 +1631,15 @@ module MED
         fcopymap=is_local%wrap%RH_a2o_fcopy, &
         dstMaskValue=0, &
         fldlist1=FldsFrAtm, string='a2o_weights', &
-        bilnrfn="/glade/p/cesmdata/cseg/inputdata/cpl/cpl6/map_T31_to_gx3v7_patch_090903.nc", &
-        consffn="/glade/p/cesmdata/cseg/inputdata/cpl/cpl6/map_T31_to_gx3v7_aave_da_090903.nc", &
+        bilnrfn=trim(smapfile), &
+        consffn=trim(fmapfile), &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
     if (is_local%wrap%a2i_active) then
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2ice_fmapname:',fmapfile)
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2ice_smapname:',smapfile)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_i, &
         bilnrmap=is_local%wrap%RH_a2i_bilnr, &
         consfmap=is_local%wrap%RH_a2i_consf, &
@@ -1646,33 +1647,32 @@ module MED
         patchmap=is_local%wrap%RH_a2i_patch, &
         fcopymap=is_local%wrap%RH_a2i_fcopy, &
         dstMaskValue=0, &
-        fldlist1=FldsFrAtm, string='a2i_weights', rc=rc)
+        fldlist1=FldsFrAtm, string='a2i_weights', &
+        bilnrfn=trim(smapfile), &
+        consffn=trim(fmapfile), &
+        rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
     if (is_local%wrap%a2l_active) then
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2lnd_fmapname:',fmapfile)
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2lnd_smapname:',smapfile)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_l, &
         bilnrmap=is_local%wrap%RH_a2l_bilnr, &
         consfmap=is_local%wrap%RH_a2l_consf, &
         consdmap=is_local%wrap%RH_a2l_consd, &
         patchmap=is_local%wrap%RH_a2l_patch, &
         fcopymap=is_local%wrap%RH_a2l_fcopy, &
-        fldlist1=FldsFrAtm, string='a2l_weights', rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    endif
-
-    if (is_local%wrap%a2r_active) then
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_r, &
-        bilnrmap=is_local%wrap%RH_a2r_bilnr, &
-        consfmap=is_local%wrap%RH_a2r_consf, &
-        consdmap=is_local%wrap%RH_a2r_consd, &
-        patchmap=is_local%wrap%RH_a2r_patch, &
-        fcopymap=is_local%wrap%RH_a2r_fcopy, &
-        fldlist1=FldsFrAtm, string='a2r_weights', rc=rc)
+        fldlist1=FldsFrAtm, string='a2l_weights', &
+        bilnrfn=trim(smapfile), &
+        consffn=trim(fmapfile), &
+        rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
     if (is_local%wrap%o2a_active) then
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ocn2atm_fmapname:',fmapfile)
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ocn2atm_smapname:',smapfile)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBOcn_o, FBdst=is_local%wrap%FBOcn_a, &
         bilnrmap=is_local%wrap%RH_o2a_bilnr, &
         consfmap=is_local%wrap%RH_o2a_consf, &
@@ -1681,13 +1681,17 @@ module MED
         fcopymap=is_local%wrap%RH_o2a_fcopy, &
         srcMaskValue=0, &
         fldlist1=FldsFrOcn, fldlist2=FldsAtmOcn, string='o2a_weights', &
-        bilnrfn="/glade/p/cesmdata/cseg/inputdata/cpl/cpl6/map_gx3v7_to_T31_aave_da_090903.nc", &
-        consffn="/glade/p/cesmdata/cseg/inputdata/cpl/cpl6/map_gx3v7_to_T31_aave_da_090903.nc", &
+        bilnrfn=trim(smapfile), &
+        consffn=trim(fmapfile), &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
     if (is_local%wrap%o2i_active) then
+!      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ocn2ice_fmapname:',fmapfile)
+!      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ocn2ice_smapname:',smapfile)
+      fmapfile = "idmap"
+      smapfile = "idmap"
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBOcn_o, FBdst=is_local%wrap%FBOcn_i, &
         bilnrmap=is_local%wrap%RH_o2i_bilnr, &
         consfmap=is_local%wrap%RH_o2i_consf, &
@@ -1695,11 +1699,16 @@ module MED
         patchmap=is_local%wrap%RH_o2i_patch, &
         fcopymap=is_local%wrap%RH_o2i_fcopy, &
         srcMaskValue=0, dstMaskValue=0, &
-        fldlist1=FldsFrOcn, string='o2i_weights', rc=rc)
+        fldlist1=FldsFrOcn, string='o2i_weights', &
+        bilnrfn=trim(smapfile), &
+        consffn=trim(fmapfile), &
+        rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
     if (is_local%wrap%i2a_active) then
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ice2atm_fmapname:',fmapfile)
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ice2atm_smapname:',smapfile)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBIce_i, FBdst=is_local%wrap%FBIce_a, &
         bilnrmap=is_local%wrap%RH_i2a_bilnr, &
         consfmap=is_local%wrap%RH_i2a_consf, &
@@ -1707,11 +1716,18 @@ module MED
         patchmap=is_local%wrap%RH_i2a_patch, &
         fcopymap=is_local%wrap%RH_i2a_fcopy, &
         srcMaskValue=0, &
-        fldlist1=FldsFrIce, string='i2a_weights', rc=rc)
+        fldlist1=FldsFrIce, string='i2a_weights', &
+        bilnrfn=trim(smapfile), &
+        consffn=trim(fmapfile), &
+        rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
     if (is_local%wrap%i2o_active) then
+!      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ice2ocn_fmapname:',fmapfile)
+!      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ice2ocn_smapname:',smapfile)
+      fmapfile = "idmap"
+      smapfile = "idmap"
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBIce_i, FBdst=is_local%wrap%FBIce_o, &
         bilnrmap=is_local%wrap%RH_i2o_bilnr, &
         consfmap=is_local%wrap%RH_i2o_consf, &
@@ -1719,51 +1735,74 @@ module MED
         patchmap=is_local%wrap%RH_i2o_patch, &
         fcopymap=is_local%wrap%RH_i2o_fcopy, &
         srcMaskValue=0, dstMaskValue=0, &
-        fldlist1=FldsFrIce, string='i2o_weights', rc=rc)
+        fldlist1=FldsFrIce, string='i2o_weights', &
+        bilnrfn=trim(smapfile), &
+        consffn=trim(fmapfile), &
+        rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
     if (is_local%wrap%l2a_active) then
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'lnd2atm_fmapname:',fmapfile)
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'lnd2atm_smapname:',smapfile)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_a, &
         bilnrmap=is_local%wrap%RH_l2a_bilnr, &
         consfmap=is_local%wrap%RH_l2a_consf, &
         consdmap=is_local%wrap%RH_l2a_consd, &
         patchmap=is_local%wrap%RH_l2a_patch, &
         fcopymap=is_local%wrap%RH_l2a_fcopy, &
-        fldlist1=FldsFrLnd, string='l2a_weights', rc=rc)
+        fldlist1=FldsFrLnd, string='l2a_weights', &
+        bilnrfn=trim(smapfile), &
+        consffn=trim(fmapfile), &
+        rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
     if (is_local%wrap%l2r_active) then
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'lnd2rof_fmapname:',fmapfile)
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'lnd2rof_smapname:',smapfile)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_r, &
         bilnrmap=is_local%wrap%RH_l2r_bilnr, &
         consfmap=is_local%wrap%RH_l2r_consf, &
         consdmap=is_local%wrap%RH_l2r_consd, &
         patchmap=is_local%wrap%RH_l2r_patch, &
         fcopymap=is_local%wrap%RH_l2r_fcopy, &
-        fldlist1=FldsFrLnd, string='l2r_weights', rc=rc)
+        fldlist1=FldsFrLnd, string='l2r_weights', &
+        bilnrfn=trim(smapfile), &
+        consffn=trim(fmapfile), &
+        rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
-    if (is_local%wrap%r2a_active) then
+    if (is_local%wrap%r2o_active) then
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2ocn_ice_rmapname:',rimapfile)
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2ocn_liq_rmapname:',rlmapfile)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_a, &
-        bilnrmap=is_local%wrap%RH_r2a_bilnr, &
-        consfmap=is_local%wrap%RH_r2a_consf, &
-        consdmap=is_local%wrap%RH_r2a_consd, &
-        patchmap=is_local%wrap%RH_r2a_patch, &
-        fcopymap=is_local%wrap%RH_r2a_fcopy, &
-        fldlist1=FldsFrRof, string='r2a_weights', rc=rc)
+        bilnrmap=is_local%wrap%RH_r2o_bilnr, &
+        consfmap=is_local%wrap%RH_r2o_consf, &
+        consdmap=is_local%wrap%RH_r2o_consd, &
+        patchmap=is_local%wrap%RH_r2o_patch, &
+        fcopymap=is_local%wrap%RH_r2o_fcopy, &
+        fldlist1=FldsFrRof, string='r2o_weights', &
+        bilnrfn=trim(rimapfile), &
+        consffn=trim(rlmapfile), &
+        rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
     if (is_local%wrap%r2l_active) then
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2lnd_fmapname:',fmapfile)
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2lnd_smapname:',smapfile)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_l, &
         bilnrmap=is_local%wrap%RH_r2l_bilnr, &
         consfmap=is_local%wrap%RH_r2l_consf, &
         consdmap=is_local%wrap%RH_r2l_consd, &
         patchmap=is_local%wrap%RH_r2l_patch, &
         fcopymap=is_local%wrap%RH_r2l_fcopy, &
-        fldlist1=FldsFrRof, string='r2l_weights', rc=rc)
+        fldlist1=FldsFrRof, string='r2l_weights', &
+        bilnrfn=trim(smapfile), &
+        consffn=trim(fmapfile), &
+        rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 

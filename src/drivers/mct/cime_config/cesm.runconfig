@@ -2,8 +2,9 @@
 # CESM run sequence and config file
 #########
 
-#CESM_component_list: ATM OCN ICE MED
-CESM_component_list: ATM OCN MED
+#CESM_component_list: ATM OCN ICE LND ROF MED
+CESM_component_list: ATM OCN ICE ROF MED
+#CESM_component_list: ATM OCN MED
 
 # MED #
 MED_model:                      cesm
@@ -33,6 +34,20 @@ ICE_attributes::
   Verbosity = 0
 ::
 
+# ROF #
+ROF_model:                      drof
+#ROF_petlist_bounds:             _rof_petlist_bounds_
+ROF_attributes::
+  Verbosity = 0
+::
+
+# LND #
+LND_model:                      dlnd
+#LND_petlist_bounds:             _lnd_petlist_bounds_
+LND_attributes::
+  Verbosity = 0
+::
+
 driverAttributes::
   Verbosity = 0
   Profiling = 0
@@ -47,12 +62,24 @@ runSeq::
        MED -> OCN :remapMethod=redist
        OCN
        @1800             # 30min time step
-#I         MED med_phases_prep_ice
-#I         MED med_connectors_prep_med2ice
-#I         MED -> ICE :remapMethod=redist
-#I         ICE
-#I         ICE -> MED :remapMethod=redist
-#I         MED med_connectors_post_ice2med
+         MED med_phases_prep_ice
+         MED med_connectors_prep_med2ice
+         MED -> ICE :remapMethod=redist
+#         MED med_phases_prep_lnd
+#         MED med_connectors_prep_med2lnd
+#         MED -> LND :remapMethod=redist
+         MED med_phases_prep_rof
+         MED med_connectors_prep_med2rof
+         MED -> ROF :remapMethod=redist
+         ICE
+#         LND
+         ROF
+         ROF -> MED :remapMethod=redist
+         MED med_connectors_post_rof2med
+#         LND -> MED :remapMethod=redist
+#         MED med_connectors_post_lnd2med
+         ICE -> MED :remapMethod=redist
+         MED med_connectors_post_ice2med
          MED med_phases_prep_atm
          MED med_connectors_prep_med2atm
          MED -> ATM :remapMethod=redist

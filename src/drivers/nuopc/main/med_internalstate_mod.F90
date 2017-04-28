@@ -92,60 +92,55 @@ module med_internalstate_mod
     type(ESMF_RouteHandle):: RH_i2a_bilnr  ! ice to atm
     type(ESMF_RouteHandle):: RH_a2l_bilnr  ! atm to lnd
     type(ESMF_RouteHandle):: RH_l2a_bilnr  ! lnd to atm
-    type(ESMF_RouteHandle):: RH_a2r_bilnr  ! atm to rof
-    type(ESMF_RouteHandle):: RH_r2a_bilnr  ! rof to atm
     type(ESMF_RouteHandle):: RH_o2i_bilnr  ! ocn to ice
     type(ESMF_RouteHandle):: RH_i2o_bilnr  ! ice to ocn
     type(ESMF_RouteHandle):: RH_l2r_bilnr  ! lnd to rof
     type(ESMF_RouteHandle):: RH_r2l_bilnr  ! rof to lnd
+    type(ESMF_RouteHandle):: RH_r2o_bilnr  ! rof to atm
     type(ESMF_RouteHandle):: RH_a2o_consf  ! atm to ocn conservative fracarea
     type(ESMF_RouteHandle):: RH_o2a_consf  ! ocn to atm
     type(ESMF_RouteHandle):: RH_a2i_consf  ! atm to ice
     type(ESMF_RouteHandle):: RH_i2a_consf  ! ice to atm
     type(ESMF_RouteHandle):: RH_a2l_consf  ! atm to lnd
     type(ESMF_RouteHandle):: RH_l2a_consf  ! lnd to atm
-    type(ESMF_RouteHandle):: RH_a2r_consf  ! atm to rof
-    type(ESMF_RouteHandle):: RH_r2a_consf  ! rof to atm
     type(ESMF_RouteHandle):: RH_o2i_consf  ! ocn to ice
     type(ESMF_RouteHandle):: RH_i2o_consf  ! ice to ocn
     type(ESMF_RouteHandle):: RH_l2r_consf  ! lnd to rof
     type(ESMF_RouteHandle):: RH_r2l_consf  ! rof to lnd
+    type(ESMF_RouteHandle):: RH_r2o_consf  ! rof to atm
     type(ESMF_RouteHandle):: RH_a2o_consd  ! atm to ocn conservative dstarea
     type(ESMF_RouteHandle):: RH_o2a_consd  ! ocn to atm
     type(ESMF_RouteHandle):: RH_a2i_consd  ! atm to ice
     type(ESMF_RouteHandle):: RH_i2a_consd  ! ice to atm
     type(ESMF_RouteHandle):: RH_a2l_consd  ! atm to lnd
     type(ESMF_RouteHandle):: RH_l2a_consd  ! lnd to atm
-    type(ESMF_RouteHandle):: RH_a2r_consd  ! atm to rof
-    type(ESMF_RouteHandle):: RH_r2a_consd  ! rof to atm
     type(ESMF_RouteHandle):: RH_o2i_consd  ! ocn to ice
     type(ESMF_RouteHandle):: RH_i2o_consd  ! ice to ocn
     type(ESMF_RouteHandle):: RH_l2r_consd  ! lnd to rof
     type(ESMF_RouteHandle):: RH_r2l_consd  ! rof to lnd
+    type(ESMF_RouteHandle):: RH_r2o_consd  ! rof to atm
     type(ESMF_RouteHandle):: RH_a2o_patch  ! atm to ocn patch
     type(ESMF_RouteHandle):: RH_o2a_patch  ! ocn to atm
     type(ESMF_RouteHandle):: RH_a2i_patch  ! atm to ice
     type(ESMF_RouteHandle):: RH_i2a_patch  ! ice to atm
     type(ESMF_RouteHandle):: RH_a2l_patch  ! atm to lnd
     type(ESMF_RouteHandle):: RH_l2a_patch  ! lnd to atm
-    type(ESMF_RouteHandle):: RH_a2r_patch  ! atm to rof
-    type(ESMF_RouteHandle):: RH_r2a_patch  ! rof to atm
     type(ESMF_RouteHandle):: RH_o2i_patch  ! ocn to ice
     type(ESMF_RouteHandle):: RH_i2o_patch  ! ice to ocn
     type(ESMF_RouteHandle):: RH_l2r_patch  ! lnd to rof
     type(ESMF_RouteHandle):: RH_r2l_patch  ! rof to lnd
+    type(ESMF_RouteHandle):: RH_r2o_patch  ! rof to atm
     type(ESMF_RouteHandle):: RH_a2o_fcopy  ! atm to ocn fcopy
     type(ESMF_RouteHandle):: RH_o2a_fcopy  ! ocn to atm
     type(ESMF_RouteHandle):: RH_a2i_fcopy  ! atm to ice
     type(ESMF_RouteHandle):: RH_i2a_fcopy  ! ice to atm
     type(ESMF_RouteHandle):: RH_a2l_fcopy  ! atm to lnd
     type(ESMF_RouteHandle):: RH_l2a_fcopy  ! lnd to atm
-    type(ESMF_RouteHandle):: RH_a2r_fcopy  ! atm to rof
-    type(ESMF_RouteHandle):: RH_r2a_fcopy  ! rof to atm
     type(ESMF_RouteHandle):: RH_o2i_fcopy  ! ocn to ice
     type(ESMF_RouteHandle):: RH_i2o_fcopy  ! ice to ocn
     type(ESMF_RouteHandle):: RH_l2r_fcopy  ! lnd to rof
     type(ESMF_RouteHandle):: RH_r2l_fcopy  ! rof to lnd
+    type(ESMF_RouteHandle):: RH_r2o_fcopy  ! rof to atm
 
     logical               :: a2o_active
     logical               :: o2a_active
@@ -153,12 +148,11 @@ module med_internalstate_mod
     logical               :: i2a_active
     logical               :: a2l_active
     logical               :: l2a_active
-    logical               :: a2r_active
-    logical               :: r2a_active
     logical               :: o2i_active
     logical               :: i2o_active
     logical               :: l2r_active
     logical               :: r2l_active
+    logical               :: r2o_active
     integer               :: mpicom
   end type
 
