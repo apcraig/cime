@@ -209,6 +209,8 @@ module shr_nuopc_methods_mod
 
 
     ! local variables
+    type(ESMF_Mesh)                 :: srcmesh, dstmesh
+    logical                         :: debug_mesh = .false.
     integer :: n
     character(len=128) :: lstring
     logical :: do_consf, do_consd, do_bilnr, do_patch, do_fcopy
@@ -337,6 +339,17 @@ module shr_nuopc_methods_mod
           srcTermProcessing=srcTermProcessing_Value, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       else
+        if(debug_mesh) then
+          call ESMF_FieldGet(fldsrc, mesh=srcmesh, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          call ESMF_MeshWrite(srcmesh, "med_srcmesh", rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          call ESMF_FieldGet(flddst, mesh=dstmesh, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          call ESMF_MeshWrite(dstmesh, "med_dstmesh", rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        endif
+
         call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=bilnrmap, &
           srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
           regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
