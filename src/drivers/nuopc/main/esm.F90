@@ -14,7 +14,9 @@ module ESM
   use atm_comp_nuopc, only: datm_SS => SetServices
   use ocn_comp_nuopc, only: docn_SS => SetServices
   use ice_comp_nuopc, only: dice_SS => SetServices
+  use rof_comp_nuopc, only: drof_SS => SetServices
 #if (1 == 3)
+  use lnd_comp_nuopc, only: dlnd_SS => SetServices
   use   datm_comp_nuopc, only:   datm_SS => SetServices
   use   docn_comp_nuopc, only:   docn_SS => SetServices
   use   dice_comp_nuopc, only:   dice_SS => SetServices
@@ -330,7 +332,6 @@ module ESM
         call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-#if (1 == 3)
       !--------
       ! LND
       !--------
@@ -339,11 +340,13 @@ module ESM
 
         call seq_comm_petlist(LNDID(1),petList)
         if (trim(model) == "dlnd") then
+#if (1 == 3)
           call NUOPC_DriverAddComp(driver, "LND", dlnd_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         elseif (trim(model) == "clm") then
           call NUOPC_DriverAddComp(driver, "LND",  clm_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+#endif
         else
           call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
             msg=subname//' invalid model = '//trim(prefix)//':'//trim(model), &
@@ -374,12 +377,14 @@ module ESM
         if (trim(model) == "drof") then
           call NUOPC_DriverAddComp(driver, "ROF", drof_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+#if (1 == 3)
         elseif (trim(model) == "rtm") then
           call NUOPC_DriverAddComp(driver, "ROF", rtm_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         elseif (trim(model) == "mosart") then
           call NUOPC_DriverAddComp(driver, "ROF", mosart_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+#endif
         else
           call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
             msg=subname//' invalid model = '//trim(prefix)//':'//trim(model), &
@@ -399,7 +404,6 @@ module ESM
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-#endif
 
       !--------
       ! MED
@@ -447,60 +451,6 @@ module ESM
     !--------
     deallocate(compLabels)
 
-#if (1 == 0) 
-    !--------
-    ! SetServices for Connectors
-    !--------
-
-    call SetFromConfig(driver, mode="setServicesConnectors", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-#endif
-#if (1 == 0) 
-    !--------
-    ! SetServices for xxx2med
-    !--------
-
-    call NUOPC_DriverAddComp(driver, srcCompLabel="ATM", dstCompLabel="MED", &
-      compSetServicesRoutine=cpl_SS, rc=rc)
-    call NUOPC_DriverAddComp(driver, srcCompLabel="OCN", dstCompLabel="MED", &
-      compSetServicesRoutine=cpl_SS, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-#if (1 == 3)
-    call NUOPC_DriverAddComp(driver, srcCompLabel="ICE", dstCompLabel="MED", &
-      compSetServicesRoutine=cpl_SS, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_DriverAddComp(driver, srcCompLabel="LND", dstCompLabel="MED", &
-      compSetServicesRoutine=cpl_SS, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_DriverAddComp(driver, srcCompLabel="ROF", dstCompLabel="MED", &
-      compSetServicesRoutine=cpl_SS, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-#endif
-      
-    !--------
-    ! SetServices for med2xxx
-    !--------
-
-    call NUOPC_DriverAddComp(driver, srcCompLabel="MED", dstCompLabel="ATM", &
-      compSetServicesRoutine=cpl_SS, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_DriverAddComp(driver, srcCompLabel="MED", dstCompLabel="OCN", &
-      compSetServicesRoutine=cpl_SS, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-#if (1 == 3)
-    call NUOPC_DriverAddComp(driver, srcCompLabel="MED", dstCompLabel="ICE", &
-      compSetServicesRoutine=cpl_SS, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_DriverAddComp(driver, srcCompLabel="MED", dstCompLabel="LND", &
-      compSetServicesRoutine=cpl_SS, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_DriverAddComp(driver, srcCompLabel="MED", dstCompLabel="ROF", &
-      compSetServicesRoutine=cpl_SS, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-#endif
-#endif 
-     
     !--------
     ! Set baseline clock
     !--------

@@ -334,10 +334,16 @@ module shr_nuopc_methods_mod
 
     if (do_bilnr) then
       if (present(bilnrfn)) then
-        call ESMF_FieldSMMStore(fldsrc, flddst, bilnrfn, routehandle=bilnrmap, &
-          ignoreUnmatchedIndices=.true., &
-          srcTermProcessing=srcTermProcessing_Value, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (trim(bilnrfn) == "idmap") then
+          call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=bilnrmap, &
+            ignoreUnmatchedIndices = .true., rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        else
+          call ESMF_FieldSMMStore(fldsrc, flddst, bilnrfn, routehandle=bilnrmap, &
+            ignoreUnmatchedIndices=.true., &
+            srcTermProcessing=srcTermProcessing_Value, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        endif
       else
         if(debug_mesh) then
           call ESMF_FieldGet(fldsrc, mesh=srcmesh, rc=rc)
@@ -377,19 +383,32 @@ module shr_nuopc_methods_mod
     !---------------------------------------------------
 
     if (do_consf) then
-      call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=consfmap, &
-        srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
-        regridmethod=ESMF_REGRIDMETHOD_CONSERVE, &
-        normType=ESMF_NORMTYPE_FRACAREA, &
-        srcTermProcessing=srcTermProcessing_Value, &
-        factorList=factorList, ignoreDegenerate=.true., &
-        unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-      if (rhprint_flag) then
-        call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_consf.nc", rc)
+      if (present(consffn)) then
+        if (trim(consffn) == "idmap") then
+          call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=consfmap, &
+            ignoreUnmatchedIndices = .true., rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        else
+          call ESMF_FieldSMMStore(fldsrc, flddst, consffn, routehandle=consfmap, &
+            ignoreUnmatchedIndices=.true., &
+            srcTermProcessing=srcTermProcessing_Value, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        endif
+      else
+        call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=consfmap, &
+          srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
+          regridmethod=ESMF_REGRIDMETHOD_CONSERVE, &
+          normType=ESMF_NORMTYPE_FRACAREA, &
+          srcTermProcessing=srcTermProcessing_Value, &
+          factorList=factorList, ignoreDegenerate=.true., &
+          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-        call ESMF_RouteHandlePrint(consfmap, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (rhprint_flag) then
+          call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_consf.nc", rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          call ESMF_RouteHandlePrint(consfmap, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        endif
       endif
       if (ESMF_RouteHandleIsCreated(consfmap, rc=rc)) then
         call ESMF_LogWrite(trim(subname)//trim(lstring)//": computed RH consf", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -403,19 +422,32 @@ module shr_nuopc_methods_mod
     !---------------------------------------------------
 
     if (do_consd) then
-      call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=consdmap, &
-        srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
-        regridmethod=ESMF_REGRIDMETHOD_CONSERVE, &
-        normType=ESMF_NORMTYPE_DSTAREA, &
-        srcTermProcessing=srcTermProcessing_Value, &
-        factorList=factorList, ignoreDegenerate=.true., &
-        unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-      if (rhprint_flag) then
-        call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_consd.nc", rc)
+      if (present(consdfn)) then
+        if (trim(consdfn) == "idmap") then
+          call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=consdmap, &
+            ignoreUnmatchedIndices = .true., rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        else
+          call ESMF_FieldSMMStore(fldsrc, flddst, consdfn, routehandle=consdmap, &
+            ignoreUnmatchedIndices=.true., &
+            srcTermProcessing=srcTermProcessing_Value, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        endif
+      else
+        call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=consdmap, &
+          srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
+          regridmethod=ESMF_REGRIDMETHOD_CONSERVE, &
+          normType=ESMF_NORMTYPE_DSTAREA, &
+          srcTermProcessing=srcTermProcessing_Value, &
+          factorList=factorList, ignoreDegenerate=.true., &
+          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-        call ESMF_RouteHandlePrint(consdmap, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (rhprint_flag) then
+          call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_consd.nc", rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          call ESMF_RouteHandlePrint(consdmap, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        endif
       endif
       if (ESMF_RouteHandleIsCreated(consdmap, rc=rc)) then
         call ESMF_LogWrite(trim(subname)//trim(lstring)//": computed RH consd", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -429,19 +461,32 @@ module shr_nuopc_methods_mod
     !---------------------------------------------------
 
     if (do_patch) then
-      call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=patchmap, &
-        srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
-        regridmethod=ESMF_REGRIDMETHOD_PATCH, &
-        polemethod=polemethod, &
-        srcTermProcessing=srcTermProcessing_Value, &
-        factorList=factorList, ignoreDegenerate=.true., &
-        unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-      if (rhprint_flag) then
-        call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_patch.nc", rc)
+      if (present(patchfn)) then
+        if (trim(patchfn) == "idmap") then
+          call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=patchmap, &
+            ignoreUnmatchedIndices = .true., rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        else
+          call ESMF_FieldSMMStore(fldsrc, flddst, patchfn, routehandle=patchmap, &
+            ignoreUnmatchedIndices=.true., &
+            srcTermProcessing=srcTermProcessing_Value, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        endif
+      else
+        call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=patchmap, &
+          srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
+          regridmethod=ESMF_REGRIDMETHOD_PATCH, &
+          polemethod=polemethod, &
+          srcTermProcessing=srcTermProcessing_Value, &
+          factorList=factorList, ignoreDegenerate=.true., &
+          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-        call ESMF_RouteHandlePrint(patchmap, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (rhprint_flag) then
+          call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_patch.nc", rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          call ESMF_RouteHandlePrint(patchmap, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        endif
       endif
       if (ESMF_RouteHandleIsCreated(patchmap, rc=rc)) then
         call ESMF_LogWrite(trim(subname)//trim(lstring)//": computed RH patch", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -3926,6 +3971,16 @@ module shr_nuopc_methods_mod
         call seq_infodata_putData(infodata,nextsw_cday=data(seq_flds_scalar_index_nextsw_cday))
       elseif (type == 'ocn2cpl') then
         call seq_infodata_putData(infodata,precip_fact=data(seq_flds_scalar_index_precip_fact))
+      elseif (type == 'ice2cpl') then
+        ! nothing
+      elseif (type == 'lnd2cpl') then
+        ! nothing
+      elseif (type == 'rof2cpl') then
+        ! nothing
+      elseif (type == 'wav2cpl') then
+        ! nothing
+      elseif (type == 'glc2cpl') then
+        ! nothing
       else
         call ESMF_LogWrite(trim(subname)//": ERROR in type = "//trim(type), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
         rc = ESMF_FAILURE

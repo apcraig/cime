@@ -372,16 +372,6 @@ module med_phases_mod
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
-    if (is_local%wrap%r2a_active) then
-      call shr_nuopc_methods_FB_Regrid(fldsFrRof, is_local%wrap%FBRof_r, is_local%wrap%FBRof_a, &
-         consfmap=is_local%wrap%RH_r2a_consf, &
-         consdmap=is_local%wrap%RH_r2a_consd, &
-         bilnrmap=is_local%wrap%RH_r2a_bilnr, &
-         patchmap=is_local%wrap%RH_r2a_patch, &
-         string='r2a', rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
     if (dbug_flag > 1) then
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBOcn_a, trim(subname)//' FBOcn_a ', rc=rc)
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBIce_a, trim(subname)//' FBIce_a ', rc=rc)
