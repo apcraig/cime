@@ -1633,6 +1633,7 @@ module MED
         fldlist1=FldsFrAtm, string='a2o_weights', &
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
+        srcName="atm", dstName="ocn", &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
@@ -1650,6 +1651,7 @@ module MED
         fldlist1=FldsFrAtm, string='a2i_weights', &
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
+        srcName="atm", dstName="ice", &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
@@ -1666,6 +1668,7 @@ module MED
         fldlist1=FldsFrAtm, string='a2l_weights', &
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
+        srcName="atm", dstName="lnd", &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
@@ -1683,6 +1686,7 @@ module MED
         fldlist1=FldsFrOcn, fldlist2=FldsAtmOcn, string='o2a_weights', &
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
+        srcName="ocn", dstName="atm", &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
@@ -1702,6 +1706,7 @@ module MED
         fldlist1=FldsFrOcn, string='o2i_weights', &
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
+        srcName="ocn", dstName="ice", &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
@@ -1719,6 +1724,7 @@ module MED
         fldlist1=FldsFrIce, string='i2a_weights', &
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
+        srcName="ice", dstName="atm", &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
@@ -1738,6 +1744,7 @@ module MED
         fldlist1=FldsFrIce, string='i2o_weights', &
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
+        srcName="ice", dstName="ocn", &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
@@ -1754,6 +1761,7 @@ module MED
         fldlist1=FldsFrLnd, string='l2a_weights', &
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
+        srcName="lnd", dstName="atm", &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
@@ -1770,6 +1778,7 @@ module MED
         fldlist1=FldsFrLnd, string='l2r_weights', &
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
+        srcName="lnd", dstName="rof", &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
@@ -1786,6 +1795,7 @@ module MED
         fldlist1=FldsFrRof, string='r2o_weights', &
         bilnrfn=trim(rimapfile), &
         consffn=trim(rlmapfile), &
+        srcName="rof", dstName="atm", &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
@@ -1802,6 +1812,7 @@ module MED
         fldlist1=FldsFrRof, string='r2l_weights', &
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
+        srcName="rof", dstName="lnd", &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif

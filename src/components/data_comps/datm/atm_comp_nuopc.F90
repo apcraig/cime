@@ -17,6 +17,8 @@ module atm_comp_nuopc
   use seq_infodata_mod, only: seq_infodata_type, seq_infodata_GetData, seq_infodata_PutData
   use shr_nuopc_fldList_mod
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_Clock_TimePrint
+  use shr_nuopc_methods_mod, only: shr_nuopc_methods_write_2d
+  use shr_nuopc_dmodel_mod, only: shr_nuopc_dmodel_gridinit
   use shr_nuopc_dmodel_mod, only: shr_nuopc_dmodel_gridinit
   use shr_nuopc_dmodel_mod, only: shr_nuopc_dmodel_AttrCopyToInfodata
   use shr_nuopc_dmodel_mod, only: shr_nuopc_dmodel_AvectToState
@@ -55,7 +57,7 @@ module atm_comp_nuopc
   type(mct_aVect)         :: x2d
   type(mct_aVect)         :: d2x
   integer                 :: mpicom, iam
-  integer                 :: dbrc
+  integer                 :: dbrc, imtimeslice=1, extimeslice=1
   character(len=1024)     :: tmpstr
   character(len=*),parameter :: grid_option = "mesh"  ! grid_de, grid_arb, grid_reg, mesh
   integer, parameter      :: dbug = 10
@@ -528,6 +530,10 @@ module atm_comp_nuopc
     ! Unpack export state
     !--------------------------------
 
+    call shr_nuopc_methods_write_2d(importState, filenamePrefix="field_dice_import_2d_", timeslice=imtimeslice, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    imtimeslice = imtimeslice + 1
+
     call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
@@ -546,6 +552,9 @@ module atm_comp_nuopc
     call seq_infodata_GetData(infodata, nextsw_cday=nextsw_cday)
     call shr_nuopc_methods_State_SetScalar(nextsw_cday,    seq_flds_scalar_index_nextsw_cday, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    call shr_nuopc_methods_write_2d(exportState, filenamePrefix="field_dice_export_2d_", timeslice=extimeslice, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    extimeslice = extimeslice + 1
 
     !--------------------------------
     ! diagnostics

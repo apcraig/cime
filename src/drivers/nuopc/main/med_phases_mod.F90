@@ -391,6 +391,16 @@ module med_phases_mod
     endif
 
     if (statewrite_flag) then
+      ! write the fields imported from atm to file
+        call ESMF_FieldBundleWrite(is_local%wrap%FBAtm_a, 'fields_med_atm_a.nc', &
+          singleFile=.true., overwrite=.true., timeslice=is_local%wrap%atmcntr, &
+          iofmt=ESMF_IOFMT_NETCDF, rc=rc)  
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        !call shr_nuopc_methods_write_2d(is_local%wrap%FBAtm_a, &
+        !    filenamePrefix='fields_med_atm_a_2d', &
+        !    timeslice=is_local%wrap%atmcntr, rc=rc)  
+        !if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
       ! write the fields imported from ocn to file
       if (is_local%wrap%o2a_active) then
         call ESMF_FieldBundleWrite(is_local%wrap%FBOcn_a, 'fields_med_ocn_a.nc', &

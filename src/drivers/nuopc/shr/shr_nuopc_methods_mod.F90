@@ -38,6 +38,11 @@ module shr_nuopc_methods_mod
     shr_nuopc_methods_Field_UpdateTimestamp
   end interface
 
+  interface shr_nuopc_methods_write_2d; module procedure &
+    shr_nuopc_methods_write_2d_st, &
+    shr_nuopc_methods_write_2d_fb
+  end interface
+
   ! used/reused in module
 
   integer            :: dbug_flag = 6
@@ -84,6 +89,7 @@ module shr_nuopc_methods_mod
   public shr_nuopc_methods_RH_init
   public shr_nuopc_methods_UpdateTimestamp
   public shr_nuopc_methods_ChkErr
+  public shr_nuopc_methods_write_2d
 
   private shr_nuopc_methods_Grid_Print
   private shr_nuopc_methods_Mesh_Print
@@ -185,7 +191,8 @@ module shr_nuopc_methods_mod
   subroutine shr_nuopc_methods_RH_init(FBsrc, FBdst, bilnrmap, consfmap, consdmap, patchmap, fcopymap, &
                          srcMaskValue, dstMaskValue, &
                          fldlist1, fldlist2, fldlist3, fldlist4, string, &
-                         bilnrfn, consffn, consdfn, patchfn, fcopyfn, rc)
+                         bilnrfn, consffn, consdfn, patchfn, fcopyfn, srcName, &
+                         dstName, rc)
     type(ESMF_FieldBundle) :: FBsrc
     type(ESMF_FieldBundle) :: FBdst
     type(ESMF_Routehandle),optional :: bilnrmap
@@ -205,12 +212,14 @@ module shr_nuopc_methods_mod
     character(len=*)      ,optional :: consdfn
     character(len=*)      ,optional :: patchfn
     character(len=*)      ,optional :: fcopyfn
+    character(len=*)      ,optional :: srcName
+    character(len=*)      ,optional :: dstName
     integer               ,optional :: rc
 
 
     ! local variables
     type(ESMF_Mesh)                 :: srcmesh, dstmesh
-    logical                         :: debug_mesh = .false.
+    logical                         :: debug_mesh = .true.
     integer :: n
     character(len=128) :: lstring
     logical :: do_consf, do_consd, do_bilnr, do_patch, do_fcopy
@@ -328,6 +337,17 @@ module shr_nuopc_methods_mod
     call shr_nuopc_methods_FB_getFieldN(FBdst, 1, flddst, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
+    if(debug_mesh) then
+      call ESMF_FieldGet(fldsrc, mesh=srcmesh, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_MeshWrite(srcmesh, "med_srcmesh_"//trim(srcName), rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_FieldGet(flddst, mesh=dstmesh, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_MeshWrite(dstmesh, "med_dstmesh_"//trim(dstName), rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    endif
+
     !---------------------------------------------------
     !--- bilinear
     !---------------------------------------------------
@@ -345,17 +365,6 @@ module shr_nuopc_methods_mod
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
         endif
       else
-        if(debug_mesh) then
-          call ESMF_FieldGet(fldsrc, mesh=srcmesh, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-          call ESMF_MeshWrite(srcmesh, "med_srcmesh", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-          call ESMF_FieldGet(flddst, mesh=dstmesh, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-          call ESMF_MeshWrite(dstmesh, "med_dstmesh", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-        endif
-
         call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=bilnrmap, &
           srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
           regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
@@ -4218,6 +4227,203 @@ module shr_nuopc_methods_mod
     endif
 
   end function shr_nuopc_methods_ChkErr
+
+  subroutine shr_nuopc_methods_write_2d_st(state, filenamePrefix, timeslice, rc)
+
+    type(ESMF_State), intent(in) :: state
+    character(len=*), intent(in), optional :: filenamePrefix
+    integer, intent(in), optional :: timeslice
+    integer, intent(out), optional :: rc
+
+    type(ESMF_Grid)               :: grid2d
+    type(ESMF_Field)              :: field2d, fldSrc
+    type(ESMF_ROUTEHANDLE)        :: RHbl
+    type(ESMF_State)              :: stateDst
+    type(ESMF_FieldBundle)        :: FBSrc, FBDst
+    type(ESMF_Field), allocatable :: srcflist(:), dstflist(:)
+
+    integer                    :: srcTermProcessing_Value = 0
+    type(ESMF_PoleMethod_Flag) :: polemethod=ESMF_POLEMETHOD_ALLAVG
+    integer                    :: nFields, i, j
+    character(len=64), allocatable :: fnameList(:)
+
+    grid2d = ESMF_GridCreate1PeriDimUfrm(maxIndex=(/360,180/), &
+      minCornerCoord=(/0._ESMF_KIND_R8, -90._ESMF_KIND_R8/), &
+      maxCornerCoord=(/360._ESMF_KIND_R8, 90._ESMF_KIND_R8/), &
+      staggerLocList=(/ESMF_STAGGERLOC_CENTER/), rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    field2d = ESMF_FieldCreate(grid2d, typekind=ESMF_TYPEKIND_R8, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call shr_nuopc_methods_State_getFieldN(State, 1, fldSrc, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call ESMF_FieldRegridStore(fldsrc, field2d, routehandle=RHbl, &
+      regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+      polemethod=polemethod, &
+      srcTermProcessing=srcTermProcessing_Value, &
+      ignoreDegenerate=.true., &
+      unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    ! Create src fieldBundle from state input argument
+    call ESMF_StateGet(state, itemCount=nFields, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    ! Exclude cpl_scalars
+    allocate(fnameList(nFields), srcflist(nFields-1), dstflist(nFields-1))
+    call ESMF_StateGet(state, itemNameList=fnameList, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    j = 1
+    do i = 1, nFields
+      call ESMF_LogWrite("Retriving item: "//trim(fnameList(i)), rc=rc)
+      if(trim(fnameList(i)) == 'cpl_scalars') cycle
+      call ESMF_StateGet(state, itemName=fnameList(i), field=srcflist(j), rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      dstflist(j) = ESMF_FieldCreate(grid2d, TYPEKIND=ESMF_TYPEKIND_R8, name=fnameList(i), rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      j = j + 1
+    enddo
+    FBSrc=ESMF_FieldBundleCreate(fieldList=srcflist, name="srcBundle", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    ! Create dst fieldBundle from a list of Fields
+    FBDst = ESMF_FieldBundleCreate(fieldList=dstflist, name="dstBundle", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    ! Regrid from src FieldBundle to dst FieldBundle
+    call ESMF_FieldBundleRegrid(FBSrc, &
+        FBDst, RHbl, &
+        termorderflag=(/ESMF_TERMORDER_SRCSEQ/), rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    ! Create dst State with Dst fieldbundle
+    StateDst=ESMF_StateCreate(fieldBundleList=(/FBDst/),rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call NUOPC_Write(StateDst, filenamePrefix=filenamePrefix, &
+      overwrite=.true., timeslice=timeslice, &
+      relaxedFlag=.true., rc=rc)  
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call ESMF_FieldBundleWrite(FBDst, fileNamePrefix//'_fields.nc', &
+      singleFile=.true., timeslice=timeslice, &
+      overwrite=.true., &
+      status=ESMF_FILESTATUS_REPLACE, &
+      iofmt=ESMF_IOFMT_NETCDF, rc=rc)  
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call ESMF_RoutehandleRelease(RHbl, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    do i = 1, nFields - 1
+      call ESMF_FieldDestroy(dstflist(i), noGarbage=.true., rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    enddo
+
+    call ESMF_FieldBundleDestroy(FBSrc, noGarbage=.true., rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_FieldBundleDestroy(FBDst, noGarbage=.true., rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    deallocate(fnameList, srcflist, dstflist)
+
+  end subroutine shr_nuopc_methods_write_2d_st 
+
+  subroutine shr_nuopc_methods_write_2d_fb(fbsrc, filenamePrefix, timeslice, rc)
+
+    type(ESMF_FieldBundle), intent(in) :: fbsrc
+    character(len=*), intent(in), optional :: filenamePrefix
+    integer, intent(in), optional :: timeslice
+    integer, intent(out), optional :: rc
+
+    type(ESMF_Grid)               :: grid2d
+    type(ESMF_Field)              :: field2d, fldSrc
+    type(ESMF_ROUTEHANDLE)        :: RHbl
+    type(ESMF_State)              :: stateDst
+    type(ESMF_FieldBundle)        :: FBDst
+    type(ESMF_Field), allocatable :: dstflist(:)
+
+    integer                    :: srcTermProcessing_Value = 0
+    type(ESMF_PoleMethod_Flag) :: polemethod=ESMF_POLEMETHOD_ALLAVG
+    integer                    :: nFields, i, j
+    character(len=64), allocatable :: fnameList(:)
+
+    grid2d = ESMF_GridCreate1PeriDimUfrm(maxIndex=(/360,180/), &
+      minCornerCoord=(/0._ESMF_KIND_R8, -90._ESMF_KIND_R8/), &
+      maxCornerCoord=(/360._ESMF_KIND_R8, 90._ESMF_KIND_R8/), &
+      staggerLocList=(/ESMF_STAGGERLOC_CENTER/), rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    field2d = ESMF_FieldCreate(grid2d, typekind=ESMF_TYPEKIND_R8, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call ESMF_FieldBundleGet(FBSrc, 1, fldSrc, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    call ESMF_FieldRegridStore(fldsrc, field2d, routehandle=RHbl, &
+      regridmethod=ESMF_REGRIDMETHOD_CONSERVE, &
+      srcTermProcessing=srcTermProcessing_Value, &
+      ignoreDegenerate=.true., &
+      unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    ! Create src fieldBundle from state input argument
+    call ESMF_FieldBundleGet(FBSrc, fieldCount=nFields, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    ! Exclude cpl_scalars
+    allocate(fnameList(nFields), dstflist(nFields))
+    call ESMF_FieldBundleGet(FBSrc, fieldNameList=fnameList, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    j = 1
+    do i = 1, nFields
+      call ESMF_LogWrite("Retriving item: "//trim(fnameList(i)), rc=rc)
+      if(trim(fnameList(i)) == 'cpl_scalars') cycle
+      dstflist(j) = ESMF_FieldCreate(grid2d, TYPEKIND=ESMF_TYPEKIND_R8, name=fnameList(i), rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      j = j + 1
+    enddo
+
+    ! Create dst fieldBundle from a list of Fields
+    FBDst = ESMF_FieldBundleCreate(fieldList=dstflist, name="dstBundle", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+    ! Regrid from src FieldBundle to dst FieldBundle
+    call ESMF_FieldBundleRegrid(FBSrc, &
+        FBDst, RHbl, &
+        termorderflag=(/ESMF_TERMORDER_SRCSEQ/), rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    ! Create dst State with Dst fieldbundle
+    StateDst=ESMF_StateCreate(fieldBundleList=(/FBDst/),rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call NUOPC_Write(StateDst, filenamePrefix=filenamePrefix, &
+      overwrite=.true., timeslice=timeslice, &
+      relaxedFlag=.true., rc=rc)  
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call ESMF_FieldBundleWrite(FBDst, fileNamePrefix//'_fields.nc', &
+      singleFile=.true., timeslice=timeslice, &
+      overwrite=.true., &
+      status=ESMF_FILESTATUS_REPLACE, &
+      iofmt=ESMF_IOFMT_NETCDF, rc=rc)  
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call ESMF_RoutehandleRelease(RHbl, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    do i = 1, nFields - 1
+      call ESMF_FieldDestroy(dstflist(i), noGarbage=.true., rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    enddo
+
+    call ESMF_FieldBundleDestroy(FBDst, noGarbage=.true., rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    deallocate(fnameList, dstflist)
+
+  end subroutine shr_nuopc_methods_write_2d_fb
 
   !-----------------------------------------------------------------------------
 #endif

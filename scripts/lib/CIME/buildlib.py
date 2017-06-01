@@ -3,7 +3,7 @@ common utilities for buildlib
 """
 
 from CIME.XML.standard_module_setup import *
-from CIME.utils import handle_standard_logging_options, setup_standard_logging_options
+from CIME.utils import parse_args_and_handle_standard_logging_options, setup_standard_logging_options
 from CIME.case  import Case
 import sys, os, argparse, doctest
 
@@ -30,9 +30,7 @@ def parse_input(argv):
     parser.add_argument("bldroot",
                         help="root for building library")
 
-    args = parser.parse_args()
-
-    handle_standard_logging_options(args)
+    args = parse_args_and_handle_standard_logging_options(argv, parser)
 
     return args.caseroot, args.libroot, args.bldroot
 
@@ -49,7 +47,7 @@ def build_data_lib(argv, compclass):
         # Write directory list (Filepath)
         compname = "d" + compclass
         with open('Filepath', 'w') as out:
-            out.write(os.path.join(caseroot, "SourceMods", "src.%s" %compname) + "\n")
+            out.write(os.path.join(caseroot, "SourceMods", "src.{}\n".format(compname)) + "\n")
             out.write(os.path.join(cimeroot, "src", "components", "data_comps", compname) + "\n")
 
         # Build the component
@@ -68,7 +66,7 @@ def build_xcpl_lib(argv, compclass):
         # Write directory list
         compname = "x" + compclass
         with open('Filepath', 'w') as out:
-            out.write(os.path.join(caseroot, "SourceMods", "src.%s", compname) + "\n")
+            out.write(os.path.join(caseroot, "SourceMods", "src.{}", compname) + "\n")
             out.write(os.path.join(cimeroot, "src", "components", "xcpl_comps", "xshare") + "\n")
             out.write(os.path.join(cimeroot, "src", "components", "xcpl_comps",compname, "cpl") + "\n")
 
@@ -88,7 +86,7 @@ def build_stub_lib(argv, compclass):
         # Write directory list
         compname = "s" + compclass
         with open('Filepath', 'w') as out:
-            out.write(os.path.join(caseroot, "SourceMods", "src.%s", compname) + "\n")
+            out.write(os.path.join(caseroot, "SourceMods", "src.{}", compname) + "\n")
             out.write(os.path.join(cimeroot, "src", "components", "stub_comps", "xshare") + "\n")
             out.write(os.path.join(cimeroot, "src", "components", "stub_comps",compname, "cpl") + "\n")
 
@@ -107,21 +105,21 @@ def run_gmake(case, compclass, libroot, libname="", user_cppdefs=""):
 
     complib = ""
     if libname:
-        complib  = os.path.join(libroot, "lib%s.a" % libname)
+        complib  = os.path.join(libroot, "lib{}.a".format(libname))
     else:
-        complib  = os.path.join(libroot, "lib%s.a" % compclass)
+        complib  = os.path.join(libroot, "lib{}.a".format(compclass))
 
     makefile = os.path.join(casetools, "Makefile")
-    macfile  = os.path.join(caseroot, "Macros.%s" % mach)
+    macfile  = os.path.join(caseroot, "Macros.{}".format(mach))
 
     if user_cppdefs:
-        cmd = "%s complib -j %d MODEL=%s COMPLIB=%s -f %s MACFILE=%s USER_CPPDEFS='%s'" \
-            % (gmake, gmake_j, compclass, complib, makefile, macfile, user_cppdefs )
+        cmd = "{} complib -j {:d} MODEL={} COMPLIB={} -f {} MACFILE={} USER_CPPDEFS='{}'" \
+            .format(gmake, gmake_j, compclass, complib, makefile, macfile, user_cppdefs )
     else:
-        cmd = "%s complib -j %d MODEL=%s COMPLIB=%s -f %s MACFILE=%s " \
-            % (gmake, gmake_j, compclass, complib, makefile, macfile )
+        cmd = "{} complib -j {:d} MODEL={} COMPLIB={} -f {} MACFILE={} " \
+            .format(gmake, gmake_j, compclass, complib, makefile, macfile )
 
     rc, out, err = run_cmd(cmd)
-    expect(rc == 0, "Command %s failed rc=%d\nout=%s\nerr=%s" % (cmd, rc, out, err))
+    expect(rc == 0, "Command {} failed rc={:d}\nout={}\nerr={}".format(cmd, rc, out, err))
 
-    logger.info("Command %s completed with output %s\nerr %s" ,cmd, out, err)
+    logger.info("Command {} completed with output {}\nerr {}".format(cmd, out, err))

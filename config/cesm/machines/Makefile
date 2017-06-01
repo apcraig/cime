@@ -227,7 +227,9 @@ endif
 
 
 ifeq ($(MPILIB),mpi-serial)
-  undefine PNETCDF_PATH
+  ifdef PNETCDF_PATH
+    undefine PNETCDF_PATH
+  endif
 else
   ifdef PNETCDF_PATH
     ifndef $(INC_PNETCDF)
@@ -564,7 +566,7 @@ CMAKE_OPTS += -D CMAKE_Fortran_FLAGS:STRING="$(FFLAGS) $(INCLDIR)" \
 	      -D CMAKE_VERBOSE_MAKEFILE:BOOL=ON \
 	      -D GPTL_PATH:STRING=$(INSTALL_SHAREDPATH) \
 	      -D PIO_ENABLE_TESTS:BOOL=OFF \
-	      -D USER_CMAKE_MODULE_PATH:STRING=$(CIMEROOT)/src/externals/CMake
+	      -D USER_CMAKE_MODULE_PATH:LIST="$(CIMEROOT)/src/externals/CMake;$(CIMEROOT)/src/externals/pio2/cmake" \
 
 # Allow for separate installations of the NetCDF C and Fortran libraries
 ifeq ($(NETCDF_SEPARATE), false)

@@ -17,16 +17,16 @@ from CIME.test_status     import *
 def parse_command_line(args, description):
 ###############################################################################
     parser = argparse.ArgumentParser(
-        usage="""\n%s [--verbose] [--clean [atm lnd pio ...]] [--clean-all]
+        usage="""\n{0} [--verbose] [--clean [atm lnd pio ...]] [--clean-all]
 OR
-%s --help
+{0} --help
 OR
-%s --test
+{0} --test
 
 \033[1mEXAMPLES:\033[0m
     \033[1;32m# Build case \033[0m
-    > %s
-""" % ((os.path.basename(args[0]), ) * 4),
+    > {0}
+""".format(os.path.basename(args[0])),
         description=description,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -56,9 +56,7 @@ OR
     parser.add_argument("--clean-all", action="store_true",
                         help="clean all objects including sharedlibobjects that may be used by other builds")
 
-    args = parser.parse_args(args[1:])
-
-    CIME.utils.handle_standard_logging_options(args)
+    args = CIME.utils.parse_args_and_handle_standard_logging_options(args, parser)
 
     cleanlist = args.clean if args.clean is None or len(args.clean) else comps
 
@@ -80,8 +78,8 @@ def _main_func(description):
         if cleanlist is not None or clean_all:
             build.clean(case, cleanlist, clean_all)
         elif(testname is not None):
-            logging.warn("Building test for %s in directory %s" %
-                         (testname, caseroot))
+            logging.warn("Building test for {} in directory {}".format(testname,
+                                                                       caseroot))
             try:
                 # The following line can throw exceptions if the testname is
                 # not found or the test constructor throws. We need to be
