@@ -32,10 +32,10 @@ module shr_nuopc_fldList_mod
 
   type shr_nuopc_fldList_Type
     integer :: num
-    character(CS),pointer :: stdname(:)
-    character(CS),pointer :: shortname(:)
-    character(CS),pointer :: transferOffer(:)  ! provide or accept
-    character(CS),pointer :: mapping(:)
+    character(CS),pointer :: stdname(:)       => null()
+    character(CS),pointer :: shortname(:)     => null()
+    character(CS),pointer :: transferOffer(:) => null()  ! provide or accept
+    character(CS),pointer :: mapping(:)       => null()
   end type shr_nuopc_fldList_Type
 
   integer :: dbrc
@@ -123,10 +123,10 @@ contains
     rc = ESMF_SUCCESS
 
     fldlist%num = 0
-    if (allocated(fldlist%stdname))       deallocate(fldlist%stdname)
-    if (allocated(fldlist%shortname))     deallocate(fldlist%shortname)
-    if (allocated(fldlist%transferOffer)) deallocate(fldlist%transferOffer)
-    if (allocated(fldlist%mapping))       deallocate(fldlist%mapping)
+    if (associated(fldlist%stdname))       deallocate(fldlist%stdname)
+    if (associated(fldlist%shortname))     deallocate(fldlist%shortname)
+    if (associated(fldlist%transferOffer)) deallocate(fldlist%transferOffer)
+    if (associated(fldlist%mapping))       deallocate(fldlist%mapping)
     allocate(fldlist%stdname(10))
     allocate(fldlist%shortname(10))
     allocate(fldlist%transferOffer(10))
@@ -156,8 +156,8 @@ contains
     rc = ESMF_SUCCESS
 
     ! make sure fldlist has been zero-ed out first
-    if (.not.allocated(fldlist%stdname) .or. .not.allocated(fldlist%shortname) .or. &
-        .not.allocated(fldlist%transferOffer) .or. .not.allocated(fldlist%mapping)) then
+    if (.not.associated(fldlist%stdname) .or. .not.associated(fldlist%shortname) .or. &
+        .not.associated(fldlist%transferOffer) .or. .not.associated(fldlist%mapping)) then
       call ESMF_LogWrite(trim(subname)//":"//trim(tag)//" ERROR in fldlist, call shr_nuopc_fldList_Zero first "//trim(stdname), &
         ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
       rc = ESMF_FAILURE

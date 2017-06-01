@@ -27,18 +27,19 @@ class Compsets(GenericXML):
         nodes = self.get_nodes("compset")
         alias = None
         lname = None
+
         science_support = []
+
         for node in nodes:
             alias = self.get_element_text("alias",root=node)
             lname = self.get_element_text("lname",root=node)
             if alias == name or lname == name:
                 science_support_nodes = self.get_nodes("science_support", root=node)
-                for node in science_support_nodes:
-                    science_support.append(node.get("grid"))
-
-                logger.debug("Found node match with alias: %s and lname: %s" % (alias, lname))
+                for snode in science_support_nodes:
+                    science_support.append(snode.get("grid"))
+                logger.debug("Found node match with alias: {} and lname: {}".format(alias, lname))
                 return (lname, alias, science_support)
-        return (None, None, False)
+        return (None, None, [False])
 
     def get_compset_var_settings(self, compset, grid):
         '''
@@ -55,6 +56,7 @@ class Compsets(GenericXML):
                 result.append((node.get("id"), value))
         return result
 
+    #pylint: disable=arguments-differ
     def get_value(self, name, attribute=None, resolved=False, subgroup=None):
         expect(subgroup is None, "This class does not support subgroups")
         if name == "help":
@@ -66,7 +68,7 @@ class Compsets(GenericXML):
             nodes = self.get_nodes(nodename="compset")
             for node in nodes:
                 for child in node:
-                    logger.debug ("Here child is %s with value %s"%(child.tag,child.text))
+                    logger.debug ("Here child is {} with value {}".format(child.tag,child.text))
                     if child.tag == "alias":
                         alias = child.text
                     if child.tag == "lname":
@@ -74,15 +76,15 @@ class Compsets(GenericXML):
                 compsets[alias] = lname
             return compsets
 
-    def print_values(self):
+    def print_values(self, arg_help=True):
         help_text = self.get_value(name="help")
         compsets_text = self.get_value("names")
-        logger.info(" %s " %help_text)
+        if arg_help:
+            logger.info(" {} ".format(help_text))
 
         logger.info("       --------------------------------------")
-        logger.info("       Compset Short Name: Compset Long Name ")
+        logger.info("       Compset Alias: Compset Long Name ")
         logger.info("       --------------------------------------")
         for v in compsets_text.iteritems():
             label, definition = v
-            logger.info("   %20s : %s" %(label, definition))
-
+            logger.info("   {:20} : {}".format(label, definition))
