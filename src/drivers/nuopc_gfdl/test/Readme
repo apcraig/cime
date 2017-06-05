@@ -1,0 +1,12 @@
+Build:
+1. export ESMFMKFILE=$PATH_TO_ESMF_MK_FILE
+For example:
+export ESMFMKFILE=/home/feiliu/ESMF/esmf/DEFAULTINSTALLDIR/lib/libg/Linux.gfortran.64.openmpi.default/esmf.mk
+
+2. gmake
+
+Run:
+1. Retrieve grid description files 
+wget --no-check-certificate https://raw.githubusercontent.com/feiliuesmf/esmftest/master/xgrid/test1/ll1deg_grid.nc
+wget --no-check-certificate https://raw.githubusercontent.com/feiliuesmf/esmftest/master/xgrid/test1/ll2.5deg_grid.nc
+3. mpirun -np $np ./xgridEx1
