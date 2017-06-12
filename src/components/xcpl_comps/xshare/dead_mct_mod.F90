@@ -1,43 +1,44 @@
 module dead_mct_mod
 
-  use shr_kind_mod		, only : IN =>SHR_KIND_IN, R8=>SHR_KIND_R8
-  use shr_sys_mod		, only : shr_sys_abort, shr_sys_flush
-  use seq_flds_mod		, only : seq_flds_dom_coord, seq_flds_dom_other
-  use shr_file_mod		, only : shr_file_getlogunit, shr_file_getunit, shr_file_setio, shr_file_getloglevel, &
-                                         shr_file_setlogunit, shr_file_freeunit,shr_file_setloglevel
-  use esmf                      , only : esmf_clock
-  use seq_cdata_mod		, only : seq_cdata, seq_cdata_setptrs
-  use seq_infodata_mod		, only : seq_infodata_type, seq_infodata_getData, seq_infodata_PutData
-  use mct_mod			, only : mct_gsmap, mct_ggrid, mct_avect, mct_ggrid_init, mct_gsmap_lsize, mct_ggrid_lsize, &
-                                         mct_avect_lsize, MCT_AVECT_NRATTR, mct_avect_indexra,mct_avect_zero, &
-                                         mct_ggrid_importiattr, mct_ggrid_importrattr, mct_gsmap_init, mct_aVect_init, &
-                                         mct_gsmap_orderedpoints
-  use dead_data_mod		, only : dead_grid_lat, dead_grid_lon, dead_grid_area, dead_grid_mask, dead_grid_frac, dead_grid_index
-  use dead_mod			, only : dead_setnewgrid
-  use seq_comm_mct		, only : seq_comm_suffix, seq_comm_name,seq_comm_inst, seq_comm_get_ncomps
-  use shr_const_mod		, only : shr_const_pi
-  use seq_timemgr_mod		, only : seq_timemgr_EClockGetData
-  use shr_mpi_mod		, only : shr_mpi_bcast
+  use shr_kind_mod    , only : IN =>SHR_KIND_IN, R8=>SHR_KIND_R8
+  use shr_sys_mod     , only : shr_sys_abort, shr_sys_flush
+  use seq_flds_mod    , only : seq_flds_dom_coord, seq_flds_dom_other
+  use shr_file_mod    , only : shr_file_getlogunit, shr_file_getunit, shr_file_setio, shr_file_getloglevel, &
+                               shr_file_setlogunit, shr_file_freeunit,shr_file_setloglevel
+  use esmf            , only : esmf_clock
+  use seq_cdata_mod   , only : seq_cdata, seq_cdata_setptrs
+  use seq_infodata_mod, only : seq_infodata_type, seq_infodata_getData, seq_infodata_PutData
+  use mct_mod         , only : mct_gsmap, mct_ggrid, mct_avect, mct_ggrid_init, mct_gsmap_lsize, mct_ggrid_lsize, &
+                               mct_avect_lsize, MCT_AVECT_NRATTR, mct_avect_indexra,mct_avect_zero, &
+                               mct_ggrid_importiattr, mct_ggrid_importrattr, mct_gsmap_init, mct_aVect_init, &
+                               mct_gsmap_orderedpoints
+  use dead_data_mod   , only : dead_grid_lat, dead_grid_lon, dead_grid_area, dead_grid_mask, dead_grid_frac, dead_grid_index
+  use dead_mod        , only : dead_setnewgrid
+  use seq_comm_mct    , only : seq_comm_suffix, seq_comm_name,seq_comm_inst, seq_comm_get_ncomps
+  use shr_const_mod   , only : shr_const_pi
+  use seq_timemgr_mod , only : seq_timemgr_EClockGetData
+  use shr_mpi_mod     , only : shr_mpi_bcast
 
   implicit none
   private
   save
 
-  public		:: dead_domain_mct, dead_init_mct, dead_run_mct, dead_final_mct
-  integer, parameter	:: master_task=0
-  integer, pointer	:: logunits(:) => null()
+  public              :: dead_domain_mct, dead_init_mct, dead_run_mct, dead_final_mct
+  public              :: dead_get_logunit
+  integer, parameter  :: master_task=0
+  integer, pointer    :: logunits(:) => null()
 
   interface dead_domain_mct ; module procedure &
        dead_domain_mct_new
   end interface
 
-  real(r8), pointer	:: gbuf_atm(:,:)
-  real(r8), pointer	:: gbuf_lnd(:,:)
-  real(r8), pointer	:: gbuf_ice(:,:)
-  real(r8), pointer	:: gbuf_ocn(:,:)
-  real(r8), pointer	:: gbuf_glc(:,:)
-  real(r8), pointer	:: gbuf_rof(:,:)
-  real(r8), pointer	:: gbuf_wav(:,:)
+  real(r8), pointer   :: gbuf_atm(:,:)
+  real(r8), pointer   :: gbuf_lnd(:,:)
+  real(r8), pointer   :: gbuf_ice(:,:)
+  real(r8), pointer   :: gbuf_ocn(:,:)
+  real(r8), pointer   :: gbuf_glc(:,:)
+  real(r8), pointer   :: gbuf_rof(:,:)
+  real(r8), pointer   :: gbuf_wav(:,:)
 
   !===============================================================================
 contains
@@ -47,19 +48,19 @@ contains
 
     !-------------------------------------------------------------------
     !---arguments---
-    integer(IN)		, intent(in)		:: mpicom
-    real(R8)		, intent(in)		:: gbuf(:,:)
-    type(mct_gsMap)	, intent(in)		:: gsMap
-    type(mct_ggrid)	, intent(out)	        :: domain
+    integer(IN)    , intent(in)  :: mpicom
+    real(R8)       , intent(in)  :: gbuf(:,:)
+    type(mct_gsMap), intent(in)  :: gsMap
+    type(mct_ggrid), intent(out) :: domain
 
     !---local variables---
-    integer(IN)				:: my_task               ! mpi task within communicator
-    integer(IN)				:: lsize                 ! temporary
-    integer(IN)				:: n	,j,i                 ! indices
-    integer(IN)				:: ier                   ! error status
-    real(R8), pointer		        :: data(:)     ! temporary
-    integer(IN), pointer		:: idata(:)    ! temporary
-    integer(IN)				:: logunit
+    integer(IN)          :: my_task     ! mpi task within communicator
+    integer(IN)          :: lsize       ! temporary
+    integer(IN)          :: n    ,j,i   ! indices
+    integer(IN)          :: ier         ! error status
+    real(R8), pointer    :: data(:)     ! temporary
+    integer(IN), pointer :: idata(:)    ! temporary
+    integer(IN)          :: logunit
     !-------------------------------------------------------------------
 
     call shr_file_getlogunit(logunit)
@@ -151,34 +152,34 @@ contains
     integer(IN)   :: totpe       ! total number of pes
     integer(IN), allocatable :: gindex(:)  ! global index
 
-    integer(IN)                         :: COMPID
-    integer(IN)                         :: mpicom
-    integer(IN)                         :: lsize
-    type(mct_gsMap)        , pointer	:: gsMap
-    type(mct_gGrid)        , pointer	:: dom
-    type(seq_infodata_type), pointer	:: infodata   ! Input init object
-    integer(IN)				:: shrlogunit, shrloglev ! original log unit and level
-    integer(IN)				:: nproc_x
-    integer(IN)				:: seg_len
-    integer(IN)				:: nxg           ! global dim i-direction
-    integer(IN)				:: nyg           ! global dim j-direction
-    integer(IN)				:: decomp_type
-    integer(IN)				:: my_task
-    character(len=16)			:: inst_suffix       ! char string associated with instance
-    integer(IN)				:: phase
-    integer(IN)				:: logunit
-    logical				:: flood=.false.     ! rof flood flag
-    real(r8), pointer			:: gbuf(:,:)
+    integer(IN)        :: COMPID
+    integer(IN)        :: mpicom
+    integer(IN)        :: lsize
+    type(mct_gsMap)        , pointer :: gsMap
+    type(mct_gGrid)        , pointer :: dom
+    type(seq_infodata_type), pointer :: infodata ! Input init object
+    integer(IN)        :: shrlogunit, shrloglev  ! original log unit and level
+    integer(IN)        :: nproc_x
+    integer(IN)        :: seg_len
+    integer(IN)        :: nxg               ! global dim i-direction
+    integer(IN)        :: nyg               ! global dim j-direction
+    integer(IN)        :: decomp_type
+    integer(IN)        :: my_task
+    character(len=16)  :: inst_suffix       ! char string associated with instance
+    integer(IN)        :: phase
+    integer(IN)        :: logunit
+    logical            :: flood=.false.     ! rof flood flag
+    real(r8), pointer  :: gbuf(:,:)
 
     !--- formats ---
-    character(*), parameter		:: F00   = "('(',a,'_init_mct) ',8a)"
-    character(*), parameter		:: F01   = "('(',a,'_init_mct) ',a,4i8)"
-    character(*), parameter		:: F02   = "('(',a,'_init_mct) ',a,4es13.6)"
-    character(*), parameter		:: F03   = "('(',a,'_init_mct) ',a,i8,a)"
-    character(*), parameter              :: F04   = "('(rof_init_mct) ',a,l4)"
-    character(*), parameter		:: F90   = "('(',a,'_init_mct) ',73('='))"
-    character(*), parameter		:: F91   = "('(',a,'_init_mct) ',73('-'))"
-    character(*), parameter		:: subName = "(dead_init_mct) "
+    character(*), parameter :: F00   = "('(',a,'_init_mct) ',8a)"
+    character(*), parameter :: F01   = "('(',a,'_init_mct) ',a,4i8)"
+    character(*), parameter :: F02   = "('(',a,'_init_mct) ',a,4es13.6)"
+    character(*), parameter :: F03   = "('(',a,'_init_mct) ',a,i8,a)"
+    character(*), parameter :: F04   = "('(rof_init_mct) ',a,l4)"
+    character(*), parameter :: F90   = "('(',a,'_init_mct) ',73('='))"
+    character(*), parameter :: F91   = "('(',a,'_init_mct) ',73('-'))"
+    character(*), parameter :: subName = "(dead_init_mct) "
     !-------------------------------------------------------------------------------
     !
     !-------------------------------------------------------------------------------
@@ -407,33 +408,33 @@ contains
     implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
-    character(len=*)            ,intent(in)    :: model
-    type(ESMF_Clock)            ,intent(inout) :: EClock
-    type(seq_cdata)             ,intent(inout) :: cdata
-    type(mct_aVect)             ,intent(inout) :: x2d        ! driver -> dead
-    type(mct_aVect)             ,intent(inout) :: d2x        ! dead   -> driver
+    character(len=*),intent(in)    :: model
+    type(ESMF_Clock),intent(inout) :: EClock
+    type(seq_cdata) ,intent(inout) :: cdata
+    type(mct_aVect) ,intent(inout) :: x2d        ! driver -> dead
+    type(mct_aVect) ,intent(inout) :: d2x        ! dead   -> driver
 
     !EOP
     !--- local ---
-    integer(IN)				:: CurrentYMD        ! model date
-    integer(IN)				:: CurrentTOD        ! model sec into model date
-    integer(IN)				:: n                 ! index
-    integer(IN)				:: nf                ! fields loop index
-    integer(IN)				:: ki                ! index of ifrac
-    integer(IN)				:: lsize             ! size of AttrVect
-    real(R8)				:: lat               ! latitude
-    real(R8)				:: lon               ! longitude
-    real(r8), pointer			:: gbuf(:,:)
-    integer(IN)				:: shrlogunit, shrloglev ! original log unit and level
-    integer				:: nflds_d2x, nflds_x2d
-    integer				:: ncomp
-    integer				:: compid
-    integer				:: mpicom, ierr, my_task
-    real(R8)				:: nextsw_cday ! calendar of next atm shortwave
-    type(seq_infodata_type), pointer	:: infodata   ! Input init object
-    character(*), parameter		:: F00   = "('(',a,'_run_mct) ',8a)"
-    character(*), parameter		:: F04   = "('(',a,'_run_mct) ',2a,2i8,'s')"
-    character(*), parameter		:: subName = "(dead_run_mct) "
+    integer(IN)             :: CurrentYMD        ! model date
+    integer(IN)             :: CurrentTOD        ! model sec into model date
+    integer(IN)             :: n                 ! index
+    integer(IN)             :: nf                ! fields loop index
+    integer(IN)             :: ki                ! index of ifrac
+    integer(IN)             :: lsize             ! size of AttrVect
+    real(R8)                :: lat               ! latitude
+    real(R8)                :: lon               ! longitude
+    real(r8), pointer       :: gbuf(:,:)
+    integer(IN)             :: shrlogunit, shrloglev ! original log unit and level
+    integer                 :: nflds_d2x, nflds_x2d
+    integer                 :: ncomp
+    integer                 :: compid
+    integer                 :: mpicom, ierr, my_task
+    real(R8)                :: nextsw_cday ! calendar of next atm shortwave
+    type(seq_infodata_type), pointer :: infodata   ! Input init object
+    character(*), parameter :: F00   = "('(',a,'_run_mct) ',8a)"
+    character(*), parameter :: F04   = "('(',a,'_run_mct) ',2a,2i8,'s')"
+    character(*), parameter :: subName = "(dead_run_mct) "
     !-------------------------------------------------------------------------------
 
     !----------------------------------------------------------------------------
@@ -591,5 +592,17 @@ contains
     end if
 
   end subroutine dead_final_mct
+
   !===============================================================================
+
+  function dead_get_logunit(compid)
+    integer(IN), intent(in) :: compid
+    integer(IN)  :: dead_get_logunit
+
+    dead_get_logunit = logunits(compid)
+
+  end function dead_get_logunit
+
+  !===============================================================================
+
 end module dead_mct_mod

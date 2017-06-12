@@ -135,7 +135,6 @@ module med_phases_mod
     call shr_nuopc_methods_FB_reset(is_local%wrap%FBIce_a, value=czero, rc=rc)
     call shr_nuopc_methods_FB_reset(is_local%wrap%FBIce_if, value=czero, rc=rc)
     call shr_nuopc_methods_FB_reset(is_local%wrap%FBLnd_a, value=czero, rc=rc)
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBRof_a, value=czero, rc=rc)
     call shr_nuopc_methods_FB_reset(is_local%wrap%FBAtmOcn_a, value=czero, rc=rc)
 
     if (is_local%wrap%o2a_active) then
@@ -376,14 +375,12 @@ module med_phases_mod
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBOcn_a, trim(subname)//' FBOcn_a ', rc=rc)
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBIce_a, trim(subname)//' FBIce_a ', rc=rc)
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBLnd_a, trim(subname)//' FBLnd_a ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBRof_a, trim(subname)//' FBRof_a ', rc=rc)
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtmOcn_a, trim(subname)//' FBAtmOcn_a ', rc=rc)
     endif
 
     call shr_nuopc_methods_FB_copy(is_local%wrap%FBforAtm, is_local%wrap%FBOcn_a, rc=rc)
     call shr_nuopc_methods_FB_copy(is_local%wrap%FBforAtm, is_local%wrap%FBIce_a, rc=rc)
     call shr_nuopc_methods_FB_copy(is_local%wrap%FBforAtm, is_local%wrap%FBLnd_a, rc=rc)
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBforAtm, is_local%wrap%FBRof_a, rc=rc)
     call shr_nuopc_methods_FB_copy(is_local%wrap%FBforAtm, is_local%wrap%FBAtmOcn_a, rc=rc)
 
     if (dbug_flag > 1) then

@@ -1,4 +1,4 @@
-module ice_comp_nuopc
+module xrof_comp_nuopc
 
 !----------------------------------------------------------------------------
 ! This is the NUOPC cap
@@ -33,8 +33,8 @@ module ice_comp_nuopc
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Finalize  => label_Finalize
 
-  use dice_comp_mod, only: dice_comp_init, dice_comp_run, dice_comp_final
-  use dice_comp_mod, only: logunit
+  use dead_mct_mod, only : dead_init_mct, dead_run_mct, dead_final_mct
+  use dead_mct_mod, only : dead_get_logunit
   use perf_mod
   use mct_mod
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
@@ -45,8 +45,8 @@ module ice_comp_nuopc
 
   private ! except
 
-  type (shr_nuopc_fldList_Type) :: fldsToIce
-  type (shr_nuopc_fldList_Type) :: fldsFrIce
+  type (shr_nuopc_fldList_Type) :: fldsToRof
+  type (shr_nuopc_fldList_Type) :: fldsFrRof
 
   type(seq_cdata)         :: cdata
   type(seq_infodata_type),target :: infodata
@@ -56,12 +56,13 @@ module ice_comp_nuopc
   type(mct_aVect)         :: d2x
   integer                 :: mpicom, iam
   integer                 :: dbrc
+  integer                 :: logunit
   character(len=1024)     :: tmpstr
   character(len=*),parameter :: grid_option = "mesh"  ! grid_de, grid_arb, grid_reg, mesh
   integer, parameter      :: dbug = 10
 
   !----- formats -----
-  character(*),parameter :: modName =  "(ice_comp_nuopc)"
+  character(*),parameter :: modName =  "(xrof_comp_nuopc)"
   character(*),parameter :: u_FILE_u = &
     __FILE__
 
@@ -202,35 +203,35 @@ module ice_comp_nuopc
     ! create import fields list
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsToIce, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsToRof, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_states, "will provide", subname//":seq_flds_x2i_states", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_states, "will provide", subname//":seq_flds_x2r_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_fluxes, "will provide", subname//":seq_flds_x2i_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_fluxes, "will provide", subname//":seq_flds_x2r_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Add(fldsToIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsToRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! create export fields list
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsFrIce, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsFrRof, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_states, "will provide", subname//":seq_flds_i2x_states", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_states, "will provide", subname//":seq_flds_r2x_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_fluxes, "will provide", subname//":seq_flds_i2x_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_fluxes, "will provide", subname//":seq_flds_r2x_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Add(fldsFrIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFrRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    call shr_nuopc_fldList_Advertise(importState, fldsToIce, subname//':diceImport', rc)
+    call shr_nuopc_fldList_Advertise(importState, fldsToRof, subname//':drofImport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Advertise(exportState, fldsFrIce, subname//':diceExport', rc)
+    call shr_nuopc_fldList_Advertise(exportState, fldsFrRof, subname//':drofExport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
@@ -295,9 +296,9 @@ module ice_comp_nuopc
        ! initialize cleanly on data model side
        ! don't use seq_cdata_init as it grabs stuff from seq_comm
        !--------------------------------
-!       call seq_cdata_init(cdata,MCTID,ggrid,gsmap,infodata,'dice')
+!       call seq_cdata_init(cdata,MCTID,ggrid,gsmap,infodata,'drof')
 !       call seq_cdata_setptrs(cdata,mpicom=mpicom)
-       cdata%name     =  'dice'
+       cdata%name     =  'drof'
        cdata%ID       =  MCTID
        cdata%mpicom   =  mpicom
        cdata%dom      => ggrid
@@ -307,7 +308,7 @@ module ice_comp_nuopc
        call MPI_COMM_RANK(mpicom, iam, rc)
        call shr_nuopc_dmodel_AttrCopyToInfodata(gcomp, infodata, rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-       call seq_infodata_PutData(infodata,ice_phase=phase)
+       call seq_infodata_PutData(infodata,rof_phase=phase)
     else
        call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -317,18 +318,18 @@ module ice_comp_nuopc
     ! call init routine
     !--------------------------------
 
-    call dice_comp_init(clock, cdata, x2d, d2x, NLFilename)
+    call dead_init_mct('rof', seq_flds_r2x_fields, seq_flds_x2r_fields, clock, cdata, x2d, d2x, NLFilename )
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
-    call shr_file_setLogUnit (logunit)
+    logunit = dead_get_logunit(MCTID)
 
     !--------------------------------
     ! generate the grid or mesh from the gsmap and ggrid
     ! grid_option specifies grid or mesh
     !--------------------------------
 
-    call seq_infodata_GetData(infodata, ice_nx=nx_global, ice_ny=ny_global)
+    call seq_infodata_GetData(infodata, rof_nx=nx_global, rof_ny=ny_global)
     call shr_nuopc_dmodel_gridinit(nx_global,ny_global,mpicom,gsMap,ggrid,grid_option,EGrid,Emesh,rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -338,16 +339,16 @@ module ice_comp_nuopc
 
     if (grid_option == 'mesh') then
 
-      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
+      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToRof, tag=subname//':drofImport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrIce, tag=subname//':diceExport', rc=rc)
+      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrRof, tag=subname//':drofExport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     else
 
-      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
+      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToRof, tag=subname//':drofImport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrIce, tag=subname//':diceExport', rc=rc)
+      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrRof, tag=subname//':drofExport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     endif
@@ -393,27 +394,18 @@ module ice_comp_nuopc
     call ESMF_AttributeAdd(comp,  &
          convention=convCIM, purpose=purpComp, rc=rc)
 
-    call ESMF_AttributeSet(comp, "ShortName", "DICE", &
+    call ESMF_AttributeSet(comp, "ShortName", "XROF", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "LongName", &
-         "Climatological Ocean Data Model", &
+         "Runoff Dead Model", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "Description", &
-         "The CESM data models perform the basic function of " // &
-         "reading external data, modifying that data, and then " // &
-         "sending it to the driver via standard CESM coupling " // &
-         "interfaces. The driver and other models have no " // &
-         "fundamental knowledge of whether another component " // &
-         "is fully active or just a data model.  In some cases, " // &
-         "data models are prognostic and also receive and use " // &
-         "some data sent by the driver to the data model.  But " // &
-         "in most cases, the data models are not running " // &
-         "prognostically and have no need to receive any data " // &
-         "from the driver.", &
+         "The CESM dead models stand in as test model for active " // &
+         "components.  Coupling data is artificially generated ", &
          convention=convCIM, purpose=purpComp, rc=rc)
-    call ESMF_AttributeSet(comp, "ReleaseDate", "2010", &
+    call ESMF_AttributeSet(comp, "ReleaseDate", "2017", &
          convention=convCIM, purpose=purpComp, rc=rc)
-    call ESMF_AttributeSet(comp, "ModelType", "Ocean", &
+    call ESMF_AttributeSet(comp, "ModelType", "Runoff", &
          convention=convCIM, purpose=purpComp, rc=rc)
 
     !   call ESMF_AttributeSet(comp, "Name", "Cecile Hannay", &
@@ -532,13 +524,16 @@ module ice_comp_nuopc
     ! Run model
     !--------------------------------
 
-    call dice_comp_run(clock, cdata, x2d, d2x)
+    call dead_run_mct('rof',clock, cdata, x2d, d2x)
 
     !--------------------------------
     ! Pack export state
     !--------------------------------
 
     call shr_nuopc_dmodel_AvectToState(d2x, exportState, grid_option, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    call seq_infodata_GetData(infodata, nextsw_cday=nextsw_cday)
+    call shr_nuopc_methods_State_SetScalar(nextsw_cday,    seq_flds_scalar_index_nextsw_cday, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
@@ -552,7 +547,7 @@ module ice_comp_nuopc
     endif
 
     call ESMF_ClockPrint(clock, options="currTime", &
-      preString="------>Advancing ICE from: ", rc=rc)
+      preString="------>Advancing ROF from: ", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=u_FILE_u)) &
@@ -666,6 +661,7 @@ module ice_comp_nuopc
     integer, intent(out) :: rc
     
     ! local variables
+    type(ESMF_Clock)     :: clock
     character(len=*),parameter  :: subname=trim(modName)//':(ModelFinalize) '
 
     !--------------------------------
@@ -675,7 +671,17 @@ module ice_comp_nuopc
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
     
-    call dice_comp_final()
+    !--------------------------------
+    ! query the Component for its clock
+    !--------------------------------
+
+    call NUOPC_ModelGet(gcomp, modelClock=clock, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=u_FILE_u)) &
+      return  ! bail out
+
+    call dead_final_mct('rof', clock, cdata, x2d, d2x)
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -685,4 +691,4 @@ module ice_comp_nuopc
 
 #endif
 
-end module ice_comp_nuopc
+end module xrof_comp_nuopc

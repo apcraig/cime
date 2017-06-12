@@ -1392,8 +1392,8 @@ module MED
       STflds=is_local%wrap%NState_RofImp, name='FBRof_l', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_a, STgeom=is_local%wrap%NState_AtmExp, &
-      STflds=is_local%wrap%NState_RofImp, name='FBRof_a', rc=rc)
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_o, STgeom=is_local%wrap%NState_OCNExp, &
+      STflds=is_local%wrap%NState_RofImp, name='FBRof_o', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_r, STgeom=is_local%wrap%NState_RofImp, &
@@ -1759,8 +1759,10 @@ module MED
     endif
 
     if (is_local%wrap%l2r_active) then
+! tcx note bilinear is set to conserv to get past initialization.  the subroutine thinks it'll
+! need bilinear mapping weights but it won't for l2r.
       call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'lnd2rof_fmapname:',fmapfile)
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'lnd2rof_smapname:',smapfile)
+!     call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'lnd2rof_smapname:',smapfile)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_r, &
         bilnrmap=is_local%wrap%RH_l2r_bilnr, &
         consfmap=is_local%wrap%RH_l2r_consf, &
@@ -1768,31 +1770,44 @@ module MED
         patchmap=is_local%wrap%RH_l2r_patch, &
         fcopymap=is_local%wrap%RH_l2r_fcopy, &
         fldlist1=FldsFrLnd, string='l2r_weights', &
-        bilnrfn=trim(smapfile), &
+        bilnrfn=trim(fmapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     endif
 
     if (is_local%wrap%r2o_active) then
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2ocn_ice_rmapname:',rimapfile)
       call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2ocn_liq_rmapname:',rlmapfile)
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_a, &
-        bilnrmap=is_local%wrap%RH_r2o_bilnr, &
-        consfmap=is_local%wrap%RH_r2o_consf, &
-        consdmap=is_local%wrap%RH_r2o_consd, &
-        patchmap=is_local%wrap%RH_r2o_patch, &
-        fcopymap=is_local%wrap%RH_r2o_fcopy, &
-        fldlist1=FldsFrRof, string='r2o_weights', &
-        bilnrfn=trim(rimapfile), &
+      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_o, &
+!       bilnrmap=is_local%wrap%RH_r2o_bilnr, &
+        consfmap=is_local%wrap%RH_r2ol_consf, &
+!       consdmap=is_local%wrap%RH_r2o_consd, &
+!       patchmap=is_local%wrap%RH_r2o_patch, &
+!       fcopymap=is_local%wrap%RH_r2o_fcopy, &
+        fldlist1=FldsFrRof, string='r2ol_weights', &
+!       bilnrfn=trim(rimapfile), &
         consffn=trim(rlmapfile), &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2ocn_ice_rmapname:',rimapfile)
+      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_o, &
+!       bilnrmap=is_local%wrap%RH_r2o_bilnr, &
+        consfmap=is_local%wrap%RH_r2oi_consf, &
+!       consdmap=is_local%wrap%RH_r2o_consd, &
+!       patchmap=is_local%wrap%RH_r2o_patch, &
+!       fcopymap=is_local%wrap%RH_r2o_fcopy, &
+        fldlist1=FldsFrRof, string='r2oi_weights', &
+!       bilnrfn=trim(rimapfile), &
+        consffn=trim(rimapfile), &
+        rc=rc)
     endif
 
     if (is_local%wrap%r2l_active) then
+! tcx note bilinear is set to conserv to get past initialization.  the subroutine thinks it'll
+! need bilinear mapping weights but it won't for l2r.
       call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2lnd_fmapname:',fmapfile)
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2lnd_smapname:',smapfile)
+!     call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2lnd_smapname:',smapfile)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_l, &
         bilnrmap=is_local%wrap%RH_r2l_bilnr, &
         consfmap=is_local%wrap%RH_r2l_consf, &
@@ -1800,7 +1815,7 @@ module MED
         patchmap=is_local%wrap%RH_r2l_patch, &
         fcopymap=is_local%wrap%RH_r2l_fcopy, &
         fldlist1=FldsFrRof, string='r2l_weights', &
-        bilnrfn=trim(smapfile), &
+        bilnrfn=trim(fmapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 

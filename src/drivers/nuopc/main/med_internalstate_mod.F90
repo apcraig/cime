@@ -70,7 +70,7 @@ module med_internalstate_mod
     type(ESMF_FieldBundle):: FBLnd_r     ! Lnd export data mapped to rof grid
     type(ESMF_FieldBundle):: FBLnd_g     ! Lnd export data mapped to glc grid
     type(ESMF_FieldBundle):: FBRof_l     ! Rof export data mapped to lnd grid
-    type(ESMF_FieldBundle):: FBRof_a     ! Rof export data mapped to atm grid
+    type(ESMF_FieldBundle):: FBRof_o     ! Rof export data mapped to ocn grid
     type(ESMF_FieldBundle):: FBRof_r     ! Rof export on rof grid
     type(ESMF_FieldBundle):: FBWav_w     ! Wav export on wav grid
     type(ESMF_FieldBundle):: FBWav_o     ! Wav export data mapped to ocn grid
@@ -96,7 +96,8 @@ module med_internalstate_mod
     type(ESMF_RouteHandle):: RH_i2o_bilnr  ! ice to ocn
     type(ESMF_RouteHandle):: RH_l2r_bilnr  ! lnd to rof
     type(ESMF_RouteHandle):: RH_r2l_bilnr  ! rof to lnd
-    type(ESMF_RouteHandle):: RH_r2o_bilnr  ! rof to atm
+!   type(ESMF_RouteHandle):: RH_r2o_bilnr  ! rof to ocn
+
     type(ESMF_RouteHandle):: RH_a2o_consf  ! atm to ocn conservative fracarea
     type(ESMF_RouteHandle):: RH_o2a_consf  ! ocn to atm
     type(ESMF_RouteHandle):: RH_a2i_consf  ! atm to ice
@@ -107,7 +108,9 @@ module med_internalstate_mod
     type(ESMF_RouteHandle):: RH_i2o_consf  ! ice to ocn
     type(ESMF_RouteHandle):: RH_l2r_consf  ! lnd to rof
     type(ESMF_RouteHandle):: RH_r2l_consf  ! rof to lnd
-    type(ESMF_RouteHandle):: RH_r2o_consf  ! rof to atm
+    type(ESMF_RouteHandle):: RH_r2ol_consf ! rof to ocn liquid
+    type(ESMF_RouteHandle):: RH_r2oi_consf ! rof to ocn frozen
+
     type(ESMF_RouteHandle):: RH_a2o_consd  ! atm to ocn conservative dstarea
     type(ESMF_RouteHandle):: RH_o2a_consd  ! ocn to atm
     type(ESMF_RouteHandle):: RH_a2i_consd  ! atm to ice
@@ -118,7 +121,8 @@ module med_internalstate_mod
     type(ESMF_RouteHandle):: RH_i2o_consd  ! ice to ocn
     type(ESMF_RouteHandle):: RH_l2r_consd  ! lnd to rof
     type(ESMF_RouteHandle):: RH_r2l_consd  ! rof to lnd
-    type(ESMF_RouteHandle):: RH_r2o_consd  ! rof to atm
+!   type(ESMF_RouteHandle):: RH_r2o_consd  ! rof to ocn
+
     type(ESMF_RouteHandle):: RH_a2o_patch  ! atm to ocn patch
     type(ESMF_RouteHandle):: RH_o2a_patch  ! ocn to atm
     type(ESMF_RouteHandle):: RH_a2i_patch  ! atm to ice
@@ -129,7 +133,8 @@ module med_internalstate_mod
     type(ESMF_RouteHandle):: RH_i2o_patch  ! ice to ocn
     type(ESMF_RouteHandle):: RH_l2r_patch  ! lnd to rof
     type(ESMF_RouteHandle):: RH_r2l_patch  ! rof to lnd
-    type(ESMF_RouteHandle):: RH_r2o_patch  ! rof to atm
+!   type(ESMF_RouteHandle):: RH_r2o_patch  ! rof to ocn
+
     type(ESMF_RouteHandle):: RH_a2o_fcopy  ! atm to ocn fcopy
     type(ESMF_RouteHandle):: RH_o2a_fcopy  ! ocn to atm
     type(ESMF_RouteHandle):: RH_a2i_fcopy  ! atm to ice
@@ -140,7 +145,7 @@ module med_internalstate_mod
     type(ESMF_RouteHandle):: RH_i2o_fcopy  ! ice to ocn
     type(ESMF_RouteHandle):: RH_l2r_fcopy  ! lnd to rof
     type(ESMF_RouteHandle):: RH_r2l_fcopy  ! rof to lnd
-    type(ESMF_RouteHandle):: RH_r2o_fcopy  ! rof to atm
+!   type(ESMF_RouteHandle):: RH_r2o_fcopy  ! rof to ocn
 
     logical               :: a2o_active
     logical               :: o2a_active

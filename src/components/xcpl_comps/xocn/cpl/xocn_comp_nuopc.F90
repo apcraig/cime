@@ -1,4 +1,4 @@
-module ocn_comp_nuopc
+module xocn_comp_nuopc
 
 !----------------------------------------------------------------------------
 ! This is the NUOPC cap
@@ -33,8 +33,8 @@ module ocn_comp_nuopc
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Finalize  => label_Finalize
 
-  use docn_comp_mod, only: docn_comp_init, docn_comp_run, docn_comp_final
-  use docn_comp_mod, only: logunit
+  use dead_mct_mod, only : dead_init_mct, dead_run_mct, dead_final_mct
+  use dead_mct_mod, only : dead_get_logunit
   use perf_mod
   use mct_mod
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
@@ -56,12 +56,13 @@ module ocn_comp_nuopc
   type(mct_aVect)         :: d2x
   integer                 :: mpicom, iam
   integer                 :: dbrc
+  integer                 :: logunit
   character(len=1024)     :: tmpstr
   character(len=*),parameter :: grid_option = "mesh"  ! grid_de, grid_arb, grid_reg, mesh
   integer, parameter      :: dbug = 10
 
   !----- formats -----
-  character(*),parameter :: modName =  "(ocn_comp_nuopc)"
+  character(*),parameter :: modName =  "(xocn_comp_nuopc)"
   character(*),parameter :: u_FILE_u = &
     __FILE__
 
@@ -317,11 +318,11 @@ module ocn_comp_nuopc
     ! call init routine
     !--------------------------------
 
-    call docn_comp_init(clock, cdata, x2d, d2x, NLFilename)
+    call dead_init_mct('ocn', seq_flds_o2x_fields, seq_flds_x2o_fields, clock, cdata, x2d, d2x, NLFilename )
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
-    call shr_file_setLogUnit (logunit)
+    logunit = dead_get_logunit(MCTID)
 
     !--------------------------------
     ! generate the grid or mesh from the gsmap and ggrid
@@ -393,25 +394,16 @@ module ocn_comp_nuopc
     call ESMF_AttributeAdd(comp,  &
          convention=convCIM, purpose=purpComp, rc=rc)
 
-    call ESMF_AttributeSet(comp, "ShortName", "DOCN", &
+    call ESMF_AttributeSet(comp, "ShortName", "XOCN", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "LongName", &
-         "Climatological Ocean Data Model", &
+         "Ocean Dead Model", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "Description", &
-         "The CESM data models perform the basic function of " // &
-         "reading external data, modifying that data, and then " // &
-         "sending it to the driver via standard CESM coupling " // &
-         "interfaces. The driver and other models have no " // &
-         "fundamental knowledge of whether another component " // &
-         "is fully active or just a data model.  In some cases, " // &
-         "data models are prognostic and also receive and use " // &
-         "some data sent by the driver to the data model.  But " // &
-         "in most cases, the data models are not running " // &
-         "prognostically and have no need to receive any data " // &
-         "from the driver.", &
+         "The CESM dead models stand in as test model for active " // &
+         "components.  Coupling data is artificially generated ", &
          convention=convCIM, purpose=purpComp, rc=rc)
-    call ESMF_AttributeSet(comp, "ReleaseDate", "2010", &
+    call ESMF_AttributeSet(comp, "ReleaseDate", "2017", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "ModelType", "Ocean", &
          convention=convCIM, purpose=purpComp, rc=rc)
@@ -532,13 +524,16 @@ module ocn_comp_nuopc
     ! Run model
     !--------------------------------
 
-    call docn_comp_run(clock, cdata, x2d, d2x)
+    call dead_run_mct('ocn',clock, cdata, x2d, d2x)
 
     !--------------------------------
     ! Pack export state
     !--------------------------------
 
     call shr_nuopc_dmodel_AvectToState(d2x, exportState, grid_option, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    call seq_infodata_GetData(infodata, nextsw_cday=nextsw_cday)
+    call shr_nuopc_methods_State_SetScalar(nextsw_cday,    seq_flds_scalar_index_nextsw_cday, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
@@ -666,6 +661,7 @@ module ocn_comp_nuopc
     integer, intent(out) :: rc
     
     ! local variables
+    type(ESMF_Clock)     :: clock
     character(len=*),parameter  :: subname=trim(modName)//':(ModelFinalize) '
 
     !--------------------------------
@@ -675,7 +671,17 @@ module ocn_comp_nuopc
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
     
-    call docn_comp_final()
+    !--------------------------------
+    ! query the Component for its clock
+    !--------------------------------
+
+    call NUOPC_ModelGet(gcomp, modelClock=clock, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=u_FILE_u)) &
+      return  ! bail out
+
+    call dead_final_mct('ocn', clock, cdata, x2d, d2x)
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -685,4 +691,4 @@ module ocn_comp_nuopc
 
 #endif
 
-end module ocn_comp_nuopc
+end module xocn_comp_nuopc

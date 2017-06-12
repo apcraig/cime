@@ -1,4 +1,4 @@
-module lnd_comp_nuopc
+module docn_comp_nuopc
 
 !----------------------------------------------------------------------------
 ! This is the NUOPC cap
@@ -33,8 +33,8 @@ module lnd_comp_nuopc
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Finalize  => label_Finalize
 
-  use dlnd_comp_mod, only: dlnd_comp_init, dlnd_comp_run, dlnd_comp_final
-  use dlnd_comp_mod, only: logunit
+  use docn_comp_mod, only: docn_comp_init, docn_comp_run, docn_comp_final
+  use docn_comp_mod, only: logunit
   use perf_mod
   use mct_mod
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
@@ -45,8 +45,8 @@ module lnd_comp_nuopc
 
   private ! except
 
-  type (shr_nuopc_fldList_Type) :: fldsToLnd
-  type (shr_nuopc_fldList_Type) :: fldsFrLnd
+  type (shr_nuopc_fldList_Type) :: fldsToOcn
+  type (shr_nuopc_fldList_Type) :: fldsFrOcn
 
   type(seq_cdata)         :: cdata
   type(seq_infodata_type),target :: infodata
@@ -61,7 +61,7 @@ module lnd_comp_nuopc
   integer, parameter      :: dbug = 10
 
   !----- formats -----
-  character(*),parameter :: modName =  "(lnd_comp_nuopc)"
+  character(*),parameter :: modName =  "(docn_comp_nuopc)"
   character(*),parameter :: u_FILE_u = &
     __FILE__
 
@@ -202,35 +202,35 @@ module lnd_comp_nuopc
     ! create import fields list
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsToLnd, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsToOcn, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToLnd, seq_flds_x2l_states, "will provide", subname//":seq_flds_x2l_states", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_states, "will provide", subname//":seq_flds_x2o_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToLnd, seq_flds_x2l_fluxes, "will provide", subname//":seq_flds_x2l_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_fluxes, "will provide", subname//":seq_flds_x2o_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Add(fldsToLnd, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsToOcn, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! create export fields list
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsFrLnd, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsFrOcn, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsFrLnd, seq_flds_l2x_states, "will provide", subname//":seq_flds_l2x_states", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_states, "will provide", subname//":seq_flds_o2x_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsFrLnd, seq_flds_l2x_fluxes, "will provide", subname//":seq_flds_l2x_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_fluxes, "will provide", subname//":seq_flds_o2x_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Add(fldsFrLnd, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFrOcn, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    call shr_nuopc_fldList_Advertise(importState, fldsToLnd, subname//':dlndImport', rc)
+    call shr_nuopc_fldList_Advertise(importState, fldsToOcn, subname//':docnImport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Advertise(exportState, fldsFrLnd, subname//':dlndExport', rc)
+    call shr_nuopc_fldList_Advertise(exportState, fldsFrOcn, subname//':docnExport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
@@ -295,9 +295,9 @@ module lnd_comp_nuopc
        ! initialize cleanly on data model side
        ! don't use seq_cdata_init as it grabs stuff from seq_comm
        !--------------------------------
-!       call seq_cdata_init(cdata,MCTID,ggrid,gsmap,infodata,'dlnd')
+!       call seq_cdata_init(cdata,MCTID,ggrid,gsmap,infodata,'docn')
 !       call seq_cdata_setptrs(cdata,mpicom=mpicom)
-       cdata%name     =  'dlnd'
+       cdata%name     =  'docn'
        cdata%ID       =  MCTID
        cdata%mpicom   =  mpicom
        cdata%dom      => ggrid
@@ -307,7 +307,7 @@ module lnd_comp_nuopc
        call MPI_COMM_RANK(mpicom, iam, rc)
        call shr_nuopc_dmodel_AttrCopyToInfodata(gcomp, infodata, rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-       call seq_infodata_PutData(infodata,lnd_phase=phase)
+       call seq_infodata_PutData(infodata,ocn_phase=phase)
     else
        call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -317,7 +317,7 @@ module lnd_comp_nuopc
     ! call init routine
     !--------------------------------
 
-    call dlnd_comp_init(clock, cdata, x2d, d2x, NLFilename)
+    call docn_comp_init(clock, cdata, x2d, d2x, NLFilename)
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
@@ -328,7 +328,7 @@ module lnd_comp_nuopc
     ! grid_option specifies grid or mesh
     !--------------------------------
 
-    call seq_infodata_GetData(infodata, lnd_nx=nx_global, lnd_ny=ny_global)
+    call seq_infodata_GetData(infodata, ocn_nx=nx_global, ocn_ny=ny_global)
     call shr_nuopc_dmodel_gridinit(nx_global,ny_global,mpicom,gsMap,ggrid,grid_option,EGrid,Emesh,rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -338,16 +338,16 @@ module lnd_comp_nuopc
 
     if (grid_option == 'mesh') then
 
-      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToLnd, tag=subname//':dlndImport', rc=rc)
+      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrLnd, tag=subname//':dlndExport', rc=rc)
+      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     else
 
-      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToLnd, tag=subname//':dlndImport', rc=rc)
+      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrLnd, tag=subname//':dlndExport', rc=rc)
+      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     endif
@@ -393,7 +393,7 @@ module lnd_comp_nuopc
     call ESMF_AttributeAdd(comp,  &
          convention=convCIM, purpose=purpComp, rc=rc)
 
-    call ESMF_AttributeSet(comp, "ShortName", "DLND", &
+    call ESMF_AttributeSet(comp, "ShortName", "DOCN", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "LongName", &
          "Climatological Ocean Data Model", &
@@ -532,7 +532,7 @@ module lnd_comp_nuopc
     ! Run model
     !--------------------------------
 
-    call dlnd_comp_run(clock, cdata, x2d, d2x)
+    call docn_comp_run(clock, cdata, x2d, d2x)
 
     !--------------------------------
     ! Pack export state
@@ -552,7 +552,7 @@ module lnd_comp_nuopc
     endif
 
     call ESMF_ClockPrint(clock, options="currTime", &
-      preString="------>Advancing LND from: ", rc=rc)
+      preString="------>Advancing OCN from: ", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=u_FILE_u)) &
@@ -675,7 +675,7 @@ module lnd_comp_nuopc
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
     
-    call dlnd_comp_final()
+    call docn_comp_final()
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -685,4 +685,4 @@ module lnd_comp_nuopc
 
 #endif
 
-end module lnd_comp_nuopc
+end module docn_comp_nuopc

@@ -2,8 +2,8 @@
 # CESM run sequence and config file
 #########
 
-#CESM_component_list: ATM OCN ICE LND ROF MED
-CESM_component_list: ATM OCN ICE ROF MED
+CESM_component_list: ATM OCN ICE LND ROF MED
+#CESM_component_list: ATM OCN ICE ROF MED
 #CESM_component_list: ATM OCN MED
 
 # MED #
@@ -42,7 +42,7 @@ ROF_attributes::
 ::
 
 # LND #
-LND_model:                      dlnd
+LND_model:                      slnd
 #LND_petlist_bounds:             _lnd_petlist_bounds_
 LND_attributes::
   Verbosity = 0
@@ -65,19 +65,19 @@ runSeq::
          MED med_phases_prep_ice
          MED med_connectors_prep_med2ice
          MED -> ICE :remapMethod=redist
-#         MED med_phases_prep_lnd
-#         MED med_connectors_prep_med2lnd
-#         MED -> LND :remapMethod=redist
+         MED med_phases_prep_lnd
+         MED med_connectors_prep_med2lnd
+         MED -> LND :remapMethod=redist
          MED med_phases_prep_rof
          MED med_connectors_prep_med2rof
          MED -> ROF :remapMethod=redist
          ICE
-#         LND
+         LND
          ROF
          ROF -> MED :remapMethod=redist
          MED med_connectors_post_rof2med
-#         LND -> MED :remapMethod=redist
-#         MED med_connectors_post_lnd2med
+         LND -> MED :remapMethod=redist
+         MED med_connectors_post_lnd2med
          ICE -> MED :remapMethod=redist
          MED med_connectors_post_ice2med
          MED med_phases_prep_atm
