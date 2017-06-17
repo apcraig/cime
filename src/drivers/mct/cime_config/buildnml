@@ -345,6 +345,11 @@ def buildnml(case, caseroot, component):
     # create the files drv_in, drv_flds_in and seq_maps.rc
     _create_drv_namelists(case, infile, confdir, nmlgen, files)
 
+    # create nuopc cesm.runconfig
+    dirname = os.path.dirname(definition_file[0])
+    nuopc_definition_file = os.path.join(dirname,"namelist_definition_nuopc.xml")
+    _create_nuopc_namelists(case, nuopc_definition_file)
+
     # create the files comp_modelio.nml where comp = [atm, lnd...]
     _create_component_modelio_namelists(case, files)
 
@@ -361,6 +366,17 @@ def buildnml(case, caseroot, component):
 
     for filename in glob.glob(os.path.join(confdir, "*modelio*")):
         shutil.copy(filename, rundir)
+
+###############################################################################
+def _create_nuopc_namelists(case, definition_file):
+###############################################################################
+    config = {}
+    with NamelistGenerator(case, [definition_file]) as nmlgen:
+        infiles = []
+        nmlgen.init_defaults(infiles, config)
+        caseroot = case.get_value("CASEROOT")
+        debug_out = os.path.join(caseroot,"debug")
+        nmlgen.write_nuopc_config_file(debug_out)
 
 ###############################################################################
 def _main_func():

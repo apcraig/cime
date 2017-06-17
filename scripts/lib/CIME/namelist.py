@@ -114,7 +114,7 @@ logger = logging.getLogger(__name__)
 # Fortran syntax regular expressions.
 # Variable names.
 #FORTRAN_NAME_REGEX = re.compile(r"(^[a-z][a-z0-9_]{0,62})(\([+-]?\d*:?[+-]?\d*:?[+-]?\d*\))?$", re.IGNORECASE)
-FORTRAN_NAME_REGEX = re.compile(r"""(^[a-z][a-z0-9_]{0,62})                             #  The variable name
+FORTRAN_NAME_REGEX = re.compile(r"""(^[a-z][a-z0-9_@]{0,62})                             #  The variable name
                                   (\(                                                   # begin optional index expression
                                   (([+-]?\d+)                                           # Single valued index
                                   |                                                     # or
@@ -1124,7 +1124,7 @@ class Namelist(object):
         specifies the file format. Formats other than 'nml' may not support all
         possible output values.
         """
-        expect(format_ in ('nml', 'rc', 'nmlcontents'),
+        expect(format_ in ('nml', 'rc', 'nmlcontents', 'nuopc'),
                "Namelist.write: unexpected output format {!r}".format(str(format_)))
         if isinstance(out_file, str) or isinstance(out_file, unicode):
             logger.debug("Writing namelist to: {}".format(out_file))
@@ -1139,18 +1139,30 @@ class Namelist(object):
         """Unwrapped version of `write` assuming that a file object is input."""
         if groups is None:
             groups = self._groups.keys()
+        print "groups are ",groups
+
         if format_ == 'nml' or format_ == 'nmlcontents':
             equals = ' ='
         elif format_ == 'rc':
             equals = ':'
+
         if (sorted_groups):
             group_names = sorted(group.lower() for group in groups)
         else:
             group_names = groups
+
         for group_name in group_names:
             if format_ == 'nml':
                 out_file.write("&{}\n".format(group_name))
+
             group = self._groups[group_name]
+
+            if format_ == 'nuopc':
+                if group_name == 'med_attributes':
+                    out_file.write("{}::\n".format(group_name))
+                elif group_name == 'atm_attributes':
+                    out_file.write("{}::\n".format(group_name))
+
             for name in sorted(group.keys()):
                 values = group[name]
 
@@ -1160,10 +1172,21 @@ class Namelist(object):
                 if "@" in name:
                     name = re.sub('@.+$', "", name)
 
+                if format_ == 'nuopc':
+                    if group_name == 'nuopc_runseq':
+                        equals = '::\n       '
+                    elif group_name == 'nuopc_var':
+                        equals = ':'
+                    elif group_name == 'med_attributes':
+                        equals = " = "
+                    elif group_name == 'atm_attributes':
+                        equals = " = "
+
                 # To prettify things for long lists of values, build strings
                 # line-by-line.
                 if values[0] == "True" or values[0] == "False":
                     values[0] = values[0].replace("True",".true.").replace("False",".false.")
+
                 lines = ["  {}{} {}".format(name, equals, values[0])]
                 for value in values[1:]:
                     if value == "True" or value == "False":
@@ -1175,11 +1198,18 @@ class Namelist(object):
                         lines.append("      " + value)
                 lines[-1] += "\n"
                 for line in lines:
+                    if format_ == 'nuopc':
+                        line = line.replace('"','')
                     out_file.write(line)
+
             if format_ == 'nml':
                 out_file.write("/\n")
             if format_ == 'nmlcontents':
                 out_file.write("\n")
+            if format_ == 'nuopc':
+                if group_name != 'nuopc_var':
+                    out_file.write("::\n")
+                
 
 
 class _NamelistEOF(Exception):

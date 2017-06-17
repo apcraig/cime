@@ -49,9 +49,9 @@ class NamelistDefinition(EntryID):
         expect(os.path.isfile(infile), "File {} does not exist".format(infile))
         super(NamelistDefinition, self).__init__(infile, schema=schema)
 
-        self._attributes = {}
         self._entry_nodes = []
         self._entry_ids = []
+        self._attributes = {}
         self._valid_values = {}
         self._entry_types = {}
         self._group_names = {}
