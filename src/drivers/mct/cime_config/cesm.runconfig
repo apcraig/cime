@@ -3,47 +3,39 @@
 #########
 
 CESM_component_list: ATM OCN ICE LND ROF MED
-#CESM_component_list: ATM OCN ICE ROF MED
-#CESM_component_list: ATM OCN MED
 
 # MED #
 MED_model:                      cesm
-#MED_petlist_bounds:             _med_petlist_bounds_
 MED_attributes::
   Verbosity = 0
 ::
 
 # ATM #
 ATM_model:                      datm
-#ATM_petlist_bounds:             _atm_petlist_bounds_
 ATM_attributes::
   Verbosity = 0
 ::
 
 # OCN #
 OCN_model:                      docn
-#OCN_petlist_bounds:             _ocn_petlist_bounds_
 OCN_attributes::
   Verbosity = 0
 ::
 
 # ICE #
 ICE_model:                      dice
-#ICE_petlist_bounds:             _ice_petlist_bounds_
 ICE_attributes::
   Verbosity = 0
 ::
 
 # ROF #
 ROF_model:                      drof
-#ROF_petlist_bounds:             _rof_petlist_bounds_
 ROF_attributes::
   Verbosity = 0
 ::
 
 # LND #
 LND_model:                      slnd
-#LND_petlist_bounds:             _lnd_petlist_bounds_
 LND_attributes::
   Verbosity = 0
 ::

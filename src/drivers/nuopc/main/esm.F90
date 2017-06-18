@@ -251,15 +251,15 @@ module ESM
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! determine the generic component labels
-    componentCount = ESMF_ConfigGetLen(config,label="CESM_component_list:", rc=rc)
+    componentCount = ESMF_ConfigGetLen(config,label="cesm_component_list:", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     allocate(compLabels(componentCount), stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, msg="Allocation of compLabels failed.", &
           line=__LINE__, file=u_FILE_u, rcToReturn=rc)) return
-    call ESMF_ConfigGetAttribute(config, valueList=compLabels, label="CESM_component_list:", count=componentCount, rc=rc)
+    call ESMF_ConfigGetAttribute(config, valueList=compLabels, label="cesm_component_list:", count=componentCount, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    attrFF = NUOPC_FreeFormatCreate(config, label="driverAttributes::", rc=rc)
+    attrFF = NUOPC_FreeFormatCreate(config, label="driver_attributes::", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompAttributeIngest(driver, attrFF, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -311,7 +311,7 @@ module ESM
       ! ATM
       !--------
 
-      if (trim(prefix) == "ATM") then
+      if (trim(prefix) == "atm") then
 
         call seq_comm_petlist(ATMID(1),petList)
         if (trim(model) == "datm") then
@@ -360,14 +360,14 @@ module ESM
             line=__LINE__, file=u_FILE_u, rcToReturn=rc)
           return  ! bail out
         endif
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
+        call NUOPC_CompAttributeSet(child, name="verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call esm_AddAttributes(child, ATMID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read ATM attributes from config file into FreeFormat
-        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", &
-          relaxedflag=.true., rc=rc)
+        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_attributes::", &
+             relaxedflag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -378,7 +378,7 @@ module ESM
       ! OCN
       !--------
 
-      elseif (trim(prefix) == "OCN") then
+      elseif (trim(prefix) == "ocn") then
 
         call seq_comm_petlist(OCNID(1),petList)
         if (trim(model) == "docn") then
@@ -437,13 +437,13 @@ module ESM
             line=__LINE__, file=u_FILE_u, rcToReturn=rc)
           return  ! bail out
         endif
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
+        call NUOPC_CompAttributeSet(child, name="verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call esm_AddAttributes(child, OCNID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read OCN attributes from config file into FreeFormat
-        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", &
+        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_attributes::", &
           relaxedflag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
@@ -455,7 +455,7 @@ module ESM
       ! ICE
       !--------
 
-      elseif (trim(prefix) == "ICE") then
+      elseif (trim(prefix) == "ice") then
 
         call seq_comm_petlist(ICEID(1),petList)
         if (trim(model) == "dice") then
@@ -504,13 +504,13 @@ module ESM
             line=__LINE__, file=u_FILE_u, rcToReturn=rc)
           return  ! bail out
         endif
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
+        call NUOPC_CompAttributeSet(child, name="verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call esm_AddAttributes(child, ICEID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read ICE attributes from config file into FreeFormat
-        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", &
+        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_attributes::", &
           relaxedflag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
@@ -522,7 +522,7 @@ module ESM
       ! LND
       !--------
 
-      elseif (trim(prefix) == "LND") then
+      elseif (trim(prefix) == "lnd") then
 
         call seq_comm_petlist(LNDID(1),petList)
         if (trim(model) == "dlnd") then
@@ -571,13 +571,13 @@ module ESM
             line=__LINE__, file=u_FILE_u, rcToReturn=rc)
           return  ! bail out
         endif
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
+        call NUOPC_CompAttributeSet(child, name="verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call esm_AddAttributes(child, LNDID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read LND attributes from config file into FreeFormat
-        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", &
+        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_attributes::", &
           relaxedflag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
@@ -589,7 +589,7 @@ module ESM
       ! ROF
       !--------
 
-      elseif (trim(prefix) == "ROF") then
+      elseif (trim(prefix) == "rof") then
 
         call seq_comm_petlist(ROFID(1),petList)
         if (trim(model) == "drof") then
@@ -648,13 +648,13 @@ module ESM
             line=__LINE__, file=u_FILE_u, rcToReturn=rc)
           return  ! bail out
         endif
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
+        call NUOPC_CompAttributeSet(child, name="verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call esm_AddAttributes(child, ROFID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read ROF attributes from config file into FreeFormat
-        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", &
+        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_attributes::", &
           relaxedflag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
@@ -666,7 +666,7 @@ module ESM
       ! MED
       !--------
 
-      elseif (trim(prefix) == "MED") then
+      elseif (trim(prefix) == "med") then
 
         call seq_comm_petlist(CPLID,petList)
         if (trim(model) == "cesm") then
@@ -678,13 +678,13 @@ module ESM
             line=__LINE__, file=u_FILE_u, rcToReturn=rc)
           return  ! bail out
         endif
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
+        call NUOPC_CompAttributeSet(child, name="verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call esm_AddAttributes(child, CPLID, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read MED attributes from config file into FreeFormat
-        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", &
+        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_attributes::", &
           relaxedflag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)

@@ -375,8 +375,8 @@ def _create_nuopc_namelists(case, definition_file):
         infiles = []
         nmlgen.init_defaults(infiles, config)
         caseroot = case.get_value("CASEROOT")
-        debug_out = os.path.join(caseroot,"debug")
-        nmlgen.write_nuopc_config_file(debug_out)
+        config_file = os.path.join(caseroot,"cesm.runconfig")
+        nmlgen.write_nuopc_config_file(config_file)
 
 ###############################################################################
 def _main_func():

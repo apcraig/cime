@@ -1166,7 +1166,7 @@ class Namelist(object):
                 if "@" in name:
                     name = re.sub('@.+$', "", name)
 
-                equals = " = "
+                equals = " ="
                 if group_name == 'nuopc_runseq':
                     equals = '::\n       '
                 elif "_var" in group_name:
