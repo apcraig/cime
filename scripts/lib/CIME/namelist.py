@@ -1130,16 +1130,80 @@ class Namelist(object):
             logger.debug("Writing namelist to: {}".format(out_file))
             flag = 'a' if append else 'w'
             with open(out_file, flag) as file_obj:
-                self._write(file_obj, groups, format_, sorted_groups=sorted_groups)
+                if format_ == 'nuopc':
+                    self._write_nuopc(file_obj, groups, sorted_groups=sorted_groups)
+                else:
+                    self._write(file_obj, groups, format_, sorted_groups=sorted_groups)
         else:
             logger.debug("Writing namelist to file object")
-            self._write(out_file, groups, format_, sorted_groups=sorted_groups)
+            if format_ == 'nuopc':
+                self._write_noupc(out_file, groups, sorted_groups=sorted_groups)
+            else:
+                self._write(out_file, groups, format_, sorted_groups=sorted_groups)
 
+    def _write_nuopc(self, out_file, groups, sorted_groups):
+        """Unwrapped version of `write` assuming that a file object is input."""
+        if groups is None:
+            groups = self._groups.keys()
+
+        if (sorted_groups):
+            group_names = sorted(group.lower() for group in groups)
+        else:
+            group_names = groups
+
+        for group_name in group_names:
+            group = self._groups[group_name]
+
+            if "_attributes" in group_name:
+                out_file.write("{}::\n".format(group_name))
+
+            for name in sorted(group.keys()):
+                values = group[name]
+
+                # @ is used in a namelist to put the same namelist variable in multiple groups
+                # in the write phase, all characters in the namelist variable name after
+                # the @ and including the @ should be removed
+                if "@" in name:
+                    name = re.sub('@.+$', "", name)
+
+                equals = " = "
+                if group_name == 'nuopc_runseq':
+                    equals = '::\n       '
+                elif "_var" in group_name:
+                    equals = ':'
+
+                # To prettify things for long lists of values, build strings
+                # line-by-line.
+                if values[0] == "True" or values[0] == "False":
+                    values[0] = values[0].replace("True",".true.").replace("False",".false.")
+
+                if "_attribute" in group_name:
+                    lines = ["     {}{} {}".format(name, equals, values[0])]
+                else:
+                    lines = ["{}{} {}".format(name, equals, values[0])]
+
+
+
+                for value in values[1:]:
+                    if value == "True" or value == "False":
+                        value = value.replace("True",".true.").replace("False",".false.")
+                    if len(lines[-1]) + len(value) <= 77:
+                        lines[-1] += ", " + value
+                    else:
+                        lines[-1] += ",\n"
+                        lines.append("      " + value)
+                lines[-1] += "\n"
+                for line in lines:
+                    line = line.replace('"','')
+                    out_file.write(line)
+
+            if "_attribute" in group_name or "runseq" in group_name:
+                out_file.write("::\n\n")
+                
     def _write(self, out_file, groups, format_, sorted_groups):
         """Unwrapped version of `write` assuming that a file object is input."""
         if groups is None:
             groups = self._groups.keys()
-        print "groups are ",groups
 
         if format_ == 'nml' or format_ == 'nmlcontents':
             equals = ' ='
@@ -1156,13 +1220,6 @@ class Namelist(object):
                 out_file.write("&{}\n".format(group_name))
 
             group = self._groups[group_name]
-
-            if format_ == 'nuopc':
-                if group_name == 'med_attributes':
-                    out_file.write("{}::\n".format(group_name))
-                elif group_name == 'atm_attributes':
-                    out_file.write("{}::\n".format(group_name))
-
             for name in sorted(group.keys()):
                 values = group[name]
 
@@ -1171,16 +1228,6 @@ class Namelist(object):
                 # the @ and including the @ should be removed
                 if "@" in name:
                     name = re.sub('@.+$', "", name)
-
-                if format_ == 'nuopc':
-                    if group_name == 'nuopc_runseq':
-                        equals = '::\n       '
-                    elif group_name == 'nuopc_var':
-                        equals = ':'
-                    elif group_name == 'med_attributes':
-                        equals = " = "
-                    elif group_name == 'atm_attributes':
-                        equals = " = "
 
                 # To prettify things for long lists of values, build strings
                 # line-by-line.
@@ -1198,19 +1245,11 @@ class Namelist(object):
                         lines.append("      " + value)
                 lines[-1] += "\n"
                 for line in lines:
-                    if format_ == 'nuopc':
-                        line = line.replace('"','')
                     out_file.write(line)
-
             if format_ == 'nml':
                 out_file.write("/\n")
             if format_ == 'nmlcontents':
                 out_file.write("\n")
-            if format_ == 'nuopc':
-                if group_name != 'nuopc_var':
-                    out_file.write("::\n")
-                
-
 
 class _NamelistEOF(Exception):
 

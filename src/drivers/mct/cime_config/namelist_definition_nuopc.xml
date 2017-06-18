@@ -7,7 +7,7 @@
   <entry id="cesm_component_list">
     <type>char</type>
     <category>nuopc</category>
-    <group>nuopc_var</group>
+    <group>nuopc_components_var</group>
     <values>
       <value>ATM OCN ICE LND ROF MED</value>
     </values>
@@ -22,12 +22,30 @@
     </values>
   </entry>
 
+  <entry id="verbosity@med_attributes">
+    <type>char</type>
+    <category>nuopc</category>
+    <group>med_attributes</group>
+    <values>
+      <value>0</value>
+    </values>
+  </entry>
+
   <entry id="atm_model" modify_via_xml="COMP_ATM">
     <type>char</type>
     <category>nuopc</category>
     <group>nuopc_var</group>
     <values>
       <value>$COMP_ATM</value>
+    </values>
+  </entry>
+
+  <entry id="verbosity@atm_attributes">
+    <type>char</type>
+    <category>nuopc</category>
+    <group>atm_attributes</group>
+    <values>
+      <value>0</value>
     </values>
   </entry>
 
@@ -40,6 +58,15 @@
     </values>
   </entry>
 
+  <entry id="verbosity@ocn_attributes">
+    <type>char</type>
+    <category>nuopc</category>
+    <group>ocn_attributes</group>
+    <values>
+      <value>0</value>
+    </values>
+  </entry>
+
   <entry id="ice_model" modify_via_xml="COMP_ICE">
     <type>char</type>
     <category>nuopc</category>
@@ -49,12 +76,12 @@
     </values>
   </entry>
 
-  <entry id="lnd_model" modify_via_xml="COMP_LND">
+  <entry id="verbosity@ice_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>nuopc_var</group>
+    <group>ice_attributes</group>
     <values>
-      <value>$COMP_LND</value>
+      <value>0</value>
     </values>
   </entry>
 
@@ -67,41 +94,41 @@
     </values>
   </entry>
 
-  <entry id="verbosity@med_attributes">
+  <entry id="verbosity@rof_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>med_attributes</group>
+    <group>rof_attributes</group>
     <values>
       <value>0</value>
     </values>
   </entry>
 
-  <entry id="verbositya@ttributes">
+  <entry id="lnd_model" modify_via_xml="COMP_LND">
     <type>char</type>
     <category>nuopc</category>
-    <group>atm_attributes</group>
+    <group>nuopc_var</group>
+    <values>
+      <value>$COMP_LND</value>
+    </values>
+  </entry>
+
+  <entry id="verbosity@lnd_attributes">
+    <type>char</type>
+    <category>nuopc</category>
+    <group>lnd_attributes</group>
     <values>
       <value>0</value>
     </values>
   </entry>
 
-  <entry id="verbosity@ocn_attributes">
+  <entry id="verbosity@lnd_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>ocn_attributes</group>
+    <group>lnd_attributes</group>
     <values>
       <value>0</value>
     </values>
   </entry>
-
-  <!-- <entry id="verbosity@ice_attributes"> -->
-  <!--   <type>char</type> -->
-  <!--   <category>nuopc</category> -->
-  <!--   <group>ice_attributes</group> -->
-  <!--   <values> -->
-  <!--     <value>Verbosity=0</value> -->
-  <!--   </values> -->
-  <!-- </entry> -->
 
   <entry id="runseq">
     <type>char</type>
@@ -109,8 +136,8 @@
     <group>nuopc_runseq</group>
     <values>
       <value>
-        @$OCN_NCPL             # 1 day time step
-  	  MED med_phases_prep_ocn
+      @$OCN_NCPL             # 1 day time step
+	  MED med_phases_prep_ocn
 	  MED med_connectors_prep_med2ocn
 	  MED -> OCN :remapMethod=redist
 	  OCN
@@ -143,7 +170,7 @@
 	  @
   	  OCN -> MED :remapMethod=redist
 	  MED med_connectors_post_ocn2med
-	@
+      @
       </value>
     </values>
   </entry>
