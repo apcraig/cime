@@ -4,19 +4,19 @@
 
 <entry_id version="2.0">
 
-  <entry id="cesm_component_list">
+  <entry id="CESM_component_list">
     <type>char</type>
     <category>nuopc</category>
     <group>nuopc_components_var</group>
     <values>
-      <value>atm ocn ice lnd rof med</value>
+      <value>ATM OCN ICE LND ROF MED</value>
     </values>
   </entry>
 
-  <entry id="verbosity@driver_attributes">
+  <entry id="Verbosity@DRIVER_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <values>
       <value>0</value>
     </values>
@@ -25,7 +25,7 @@
   <entry id="cime_model" modify_via_xml="CIME_MODEL">
     <type>char</type>
     <category>expdef</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <valid_values>cesm</valid_values>
     <desc>cime model</desc>
     <values>
@@ -36,7 +36,7 @@
   <entry id="case_name" modify_via_xml="CASE">
     <type>char</type>
     <category>expdef</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>case name.</desc>
     <values>
       <value>$CASE</value>
@@ -46,7 +46,7 @@
   <entry id="case_desc" modify_via_xml="CASESTR">
     <type>char</type>
     <category>expdef</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>case description.</desc>
     <values>
     <value>$CASESTR</value>
@@ -56,7 +56,7 @@
   <entry id="username" modify_via_xml="USER">
     <type>char</type>
     <category>expdef</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>username documentation</desc>
     <values>
       <value>$USER</value>
@@ -66,7 +66,7 @@
   <entry id="hostname" modify_via_xml="MACH">
     <type>char</type>
     <category>expdef</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>hostname information</desc>
     <values>
       <value>$MACH</value>
@@ -76,7 +76,7 @@
   <entry id="timing_dir">
     <type>char</type>
     <category>expdef</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>
       location of timing output.
     </desc>
@@ -88,7 +88,7 @@
   <entry id="tchkpt_dir">
     <type>char</type>
     <category>expdef</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>
       location of timing checkpoint output.
     </desc>
@@ -100,7 +100,7 @@
   <entry id="start_type" modify_via_xml="RUN_TYPE">
     <type>char</type>
     <category>expdef</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <valid_values>startup,branch,continue</valid_values>
     <desc>
       mode to start the run up, [startup,branch,continue],
@@ -119,7 +119,7 @@
   <entry id="brnch_retain_casename" modify_via_xml="RUN_REFCASE">
     <type>logical</type>
     <category>expdef</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>
       Allow same branch casename as reference casename. If $CASE and $REFCASE are the same and the start_type is
       not startup, then the value of brnch_retain_casename is set to .true.
@@ -132,7 +132,7 @@
   <entry id="info_debug" modify_via_xml="INFO_DBUG">
     <type>integer</type>
     <category>expdef</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>
       Level of debug output, 0=minimum, 1=normal, 2=more, 3=too much (default: 1)
     </desc>
@@ -144,7 +144,7 @@
   <entry id="bfbflag" modify_via_xml="BFBFLAG">
     <type>logical</type>
     <category>expdef</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>
       turns on bfb option in coupler which produce bfb results in the
       coupler on different processor counts.  (default: .false.)
@@ -157,7 +157,7 @@
   <entry id="orb_mode">
     <type>char</type>
     <category>orbital</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <valid_values>fixed_year,variable_year,fixed_parameters</valid_values>
     <desc>
       orbital model setting.  this sets how the orbital mode will be
@@ -179,7 +179,7 @@
   <entry id="orb_iyear_align">
     <type>integer</type>
     <category>orbital</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>
       model year associated with orb_iyear when orb_mode is variable_year. (default: 1990)
     </desc>
@@ -191,7 +191,7 @@
   <entry id="orb_iyear">
     <type>integer</type>
     <category>orbital</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>
       year of orbit, used when orb_mode is fixed_year or variable_year. (default: 1990)
     </desc>
@@ -203,7 +203,7 @@
   <entry id="orb_eccen">
     <type>real</type>
     <category>orbital</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>
       eccentricity of orbit, used when orb_mode is fixed_parameters.
       default: SHR_ORB_UNDEF_REAL (1.e36) (Not currently used in build-namelist)
@@ -216,7 +216,7 @@
   <entry id="orb_mvelp">
     <type>real</type>
     <category>orbital</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>
       location of vernal equinox in longitude degrees, used when orb_mode is fixed_parameters.
       default: SHR_ORB_UNDEF_REAL (1.e36)(Not currently used in build-namelist)
@@ -229,7 +229,7 @@
   <entry id="orb_obliq">
     <type>real</type>
     <category>orbital</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <desc>
       obliquity of orbit in degrees, used when orb_mode is fixed_parameters.
       default: SHR_ORB_UNDEF_REAL (1.e36) (Not currently used in build-namelist)
@@ -242,7 +242,7 @@
   <entry id="wv_sat_scheme">
     <type>char</type>
     <category>wv_sat</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <valid_values>GoffGratch,MurphyKoop,Bolton,Flatau</valid_values>
     <desc>
       Type of water vapor saturation vapor pressure scheme employed. 'GoffGratch' for
@@ -255,16 +255,16 @@
     </values>
   </entry>
 
-  <entry id="profiling@driver_attributes">
+  <entry id="profiling@DRIVER_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>driver_attributes</group>
+    <group>DRIVER_attributes</group>
     <values>
       <value>0</value>
     </values>
   </entry>
 
-  <entry id="med_model">
+  <entry id="MED_model">
     <type>char</type>
     <category>nuopc</category>
     <group>nuopc_var</group>
@@ -273,10 +273,10 @@
     </values>
   </entry>
 
-  <entry id="verbosity@med_attributes">
+  <entry id="Verbosity@MED_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>med_attributes</group>
+    <group>MED_attributes</group>
     <values>
       <value>0</value>
     </values>
@@ -291,16 +291,16 @@
     </values>
   </entry>
 
-  <entry id="verbosity@atm_attributes">
+  <entry id="Verbosity@ATM_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>atm_attributes</group>
+    <group>ATM_attributes</group>
     <values>
       <value>0</value>
     </values>
   </entry>
 
-  <entry id="ocn_model" modify_via_xml="COMP_OCN">
+  <entry id="OCN_model" modify_via_xml="COMP_OCN">
     <type>char</type>
     <category>nuopc</category>
     <group>nuopc_var</group>
@@ -309,16 +309,16 @@
     </values>
   </entry>
 
-  <entry id="verbosity@ocn_attributes">
+  <entry id="Verbosity@OCN_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>ocn_attributes</group>
+    <group>OCN_attributes</group>
     <values>
       <value>0</value>
     </values>
   </entry>
 
-  <entry id="ice_model" modify_via_xml="COMP_ICE">
+  <entry id="ICE_model" modify_via_xml="COMP_ICE">
     <type>char</type>
     <category>nuopc</category>
     <group>nuopc_var</group>
@@ -327,16 +327,16 @@
     </values>
   </entry>
 
-  <entry id="verbosity@ice_attributes">
+  <entry id="Verbosity@ICE_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>ice_attributes</group>
+    <group>ICE_attributes</group>
     <values>
       <value>0</value>
     </values>
   </entry>
 
-  <entry id="rof_model" modify_via_xml="COMP_ROF">
+  <entry id="ROF_model" modify_via_xml="COMP_ROF">
     <type>char</type>
     <category>nuopc</category>
     <group>nuopc_var</group>
@@ -345,16 +345,16 @@
     </values>
   </entry>
 
-  <entry id="verbosity@rof_attributes">
+  <entry id="Verbosity@ROF_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>rof_attributes</group>
+    <group>ROF_attributes</group>
     <values>
       <value>0</value>
     </values>
   </entry>
 
-  <entry id="lnd_model" modify_via_xml="COMP_LND">
+  <entry id="LND_model" modify_via_xml="COMP_LND">
     <type>char</type>
     <category>nuopc</category>
     <group>nuopc_var</group>
@@ -363,25 +363,25 @@
     </values>
   </entry>
 
-  <entry id="verbosity@lnd_attributes">
+  <entry id="Verbosity@LND_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>lnd_attributes</group>
+    <group>LND_attributes</group>
     <values>
       <value>0</value>
     </values>
   </entry>
 
-  <entry id="verbosity@lnd_attributes">
+  <entry id="Verbosity@LND_attributes">
     <type>char</type>
     <category>nuopc</category>
-    <group>lnd_attributes</group>
+    <group>LND_attributes</group>
     <values>
       <value>0</value>
     </values>
   </entry>
 
-  <entry id="runseq">
+  <entry id="Runseq">
     <type>char</type>
     <category>nuopc_attribute</category>
     <group>nuopc_runseq</group>

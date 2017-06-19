@@ -883,7 +883,8 @@ class Namelist(object):
         if groups is not None:
             for group_name in groups:
                 expect(group_name is not None, " Got None in groups {}".format(groups))
-                group_lc = group_name.lower()
+                #group_lc = group_name.lower()
+                group_lc = group_name
                 self._groups[group_lc] = collections.OrderedDict()
                 for variable_name in groups[group_name]:
                     variable_lc = variable_name.lower()
@@ -920,7 +921,7 @@ class Namelist(object):
         >>> sorted(x.get_variable_names('fOo'))
         [u'bar(::)', u'bazz', u'bazz(2)', u'bazz(:2:)']
         """
-        group_name = group_name.lower()
+        #group_name = group_name.lower()
         if group_name not in self._groups:
             return []
         return self._groups[group_name].keys()
@@ -939,8 +940,8 @@ class Namelist(object):
         >>> parse(text='&foo bar=1,2 /').get_variable_value('foO', 'Bar')
         [u'1', u'2']
         """
-        group_name = group_name.lower()
-        variable_name = variable_name.lower()
+        #group_name = group_name.lower()
+        #variable_name = variable_name.lower()
         if group_name not in self._groups or \
            variable_name not in self._groups[group_name]:
             return [u'']
@@ -965,7 +966,7 @@ class Namelist(object):
         >>> parse(text='&foo / &bazz /').get_value('bar')
         [u'']
         """
-        variable_name = variable_name.lower()
+        #variable_name = variable_name.lower()
         possible_groups = [group_name for group_name in self._groups
                            if variable_name in self._groups[group_name]]
         expect(len(possible_groups) <= 1,
@@ -1001,10 +1002,11 @@ class Namelist(object):
         >>> x.get_variable_value('foo', 'red')
         ['', u'2', '', u'4', '', u'6']
         """
-        group_name = group_name.lower()
+        #group_name = group_name.lower()
 
         minindex, maxindex, step = get_fortran_variable_indices(variable_name, var_size)
-        variable_name = get_fortran_name_only(variable_name.lower())
+        #variable_name = get_fortran_name_only(variable_name.lower())
+        variable_name = get_fortran_name_only(variable_name)
 
         expect(minindex > 0, "Indices < 1 not supported in CIME interface to fortran namelists... lower bound={}".format(minindex))
 
@@ -1042,8 +1044,8 @@ class Namelist(object):
         >>> x.get_variable_names('brack')
         []
         """
-        group_name = group_name.lower()
-        variable_name = variable_name.lower()
+        #group_name = group_name.lower()
+        #variable_name = variable_name.lower()
         if group_name in self._groups and \
            variable_name in self._groups[group_name]:
             del self._groups[group_name][variable_name]
@@ -1147,7 +1149,8 @@ class Namelist(object):
             groups = self._groups.keys()
 
         if (sorted_groups):
-            group_names = sorted(group.lower() for group in groups)
+            #group_names = sorted(group.lower() for group in groups)
+            group_names = sorted(group for group in groups)
         else:
             group_names = groups
 
