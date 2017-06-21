@@ -261,7 +261,9 @@ module ESM
 
     attrFF = NUOPC_FreeFormatCreate(config, label="DRIVER_attributes::", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_CompAttributeIngest(driver, attrFF, rc=rc)
+    call NUOPC_FreeFormatPrint(attrFF, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call NUOPC_CompAttributeIngest(driver, attrFF, addFlag=.true., rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return

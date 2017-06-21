@@ -40,7 +40,7 @@ LND_attributes::
   Verbosity = 0
 ::
 
-driverAttributes::
+DRIVER_attributes::
   Verbosity = 0
   Profiling = 0
 ::
