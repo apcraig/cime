@@ -1159,6 +1159,9 @@ class Namelist(object):
 
             if "_attributes" in group_name:
                 out_file.write("{}::\n".format(group_name))
+            else:
+                if group_name == "seq_cplflds_inparm":
+                    out_file.write("driver_input::\n")
 
             for name in sorted(group.keys()):
                 values = group[name]
@@ -1185,8 +1188,6 @@ class Namelist(object):
                 else:
                     lines = ["{}{} {}".format(name, equals, values[0])]
 
-
-
                 for value in values[1:]:
                     if value == "True" or value == "False":
                         value = value.replace("True",".true.").replace("False",".false.")
@@ -1203,6 +1204,9 @@ class Namelist(object):
             if "_attribute" in group_name or "runseq" in group_name:
                 out_file.write("::\n\n")
                 
+        if group_name == "seq_maps":
+            out_file.write("::\n\n")
+
     def _write(self, out_file, groups, format_, sorted_groups):
         """Unwrapped version of `write` assuming that a file object is input."""
         if groups is None:

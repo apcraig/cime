@@ -40,9 +40,10 @@ def _main_func():
     with open('Filepath', 'w') as out:
         comp_interface = case.get_value("COMP_INTERFACE")
         out.write(os.path.join(caseroot, "SourceMods", "src.drv") + "\n")
-        out.write(os.path.join(cimeroot, "src", "drivers", "mct", "main") + "\n")
         if (comp_interface == "NUOPC"):
-          out.write(os.path.join(cimeroot, "src", "drivers", "nuopc", "main") + "\n")
+            out.write(os.path.join(cimeroot, "src", "drivers", "nuopc", "main") + "\n")
+        else:
+            out.write(os.path.join(cimeroot, "src", "drivers", "mct", "main") + "\n")
 
     # build model executable
 

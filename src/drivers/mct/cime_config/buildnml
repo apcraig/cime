@@ -173,7 +173,13 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     if os.path.exists(data_list_path):
         os.remove(data_list_path)
     namelist_file = os.path.join(confdir, "drv_in")
+
     nmlgen.write_output_file(namelist_file, data_list_path )
+
+    # nuopc
+    caseroot = case.get_value('CASEROOT')
+    nuopc_config_file = os.path.join(caseroot, "drv.config")
+    nmlgen.write_nuopc_config_file(nuopc_config_file)
 
     #--------------------------------
     # (2) Write out seq_map.rc file
@@ -341,8 +347,8 @@ def buildnml(case, caseroot, component):
 
     # create nuopc cesm.runconfig
     dirname = os.path.dirname(definition_file[0])
-    nuopc_definition_file = os.path.join(dirname,"namelist_definition_nuopc.xml")
-    _create_nuopc_namelists(case, nuopc_definition_file)
+    nuopc_definition_file = os.path.join(dirname, "namelist_definition_nuopc.xml")
+    _create_nuopc_runconfig(case, nuopc_definition_file)
 
     # create the files comp_modelio.nml where comp = [atm, lnd...]
     _create_component_modelio_namelists(case, files)
@@ -352,7 +358,13 @@ def buildnml(case, caseroot, component):
 
     shutil.copy(os.path.join(confdir,"seq_maps.rc"), rundir)
 
-    shutil.copy(os.path.join(caseroot,"cesm.runconfig"), rundir)
+    file1 = os.path.join(caseroot,"cesm.runconfig")
+    file2 = os.path.join(caseroot,"drv.config")
+    filenames = [file1, file2]
+    with open(os.path.join(rundir,"cesm.runconfig"), 'w') as outfile:
+        for fname in filenames:
+            with open(fname) as infile:
+                outfile.write(infile.read())
 
     shutil.copy(os.path.join(confdir,"drv_in"), rundir)
     drv_flds_in = os.path.join(caseroot, "CaseDocs", "drv_flds_in")
@@ -363,7 +375,7 @@ def buildnml(case, caseroot, component):
         shutil.copy(filename, rundir)
 
 ###############################################################################
-def _create_nuopc_namelists(case, definition_file):
+def _create_nuopc_runconfig(case, definition_file):
 ###############################################################################
     config = {}
     with NamelistGenerator(case, [definition_file]) as nmlgen:

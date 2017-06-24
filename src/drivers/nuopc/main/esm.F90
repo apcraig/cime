@@ -113,28 +113,28 @@ module ESM
 #endif
 
 
-  use MED            , only:  med_SS => SetServices
-  use NUOPC_Connector, only:  cpl_SS => SetServices
+  use MED                   , only: med_SS => SetServices
+  use NUOPC_Connector       , only: cpl_SS => SetServices
 
-  use shr_kind_mod,only : r8 => SHR_KIND_R8
-  use shr_kind_mod,only : CL => SHR_KIND_CL
+  use shr_kind_mod          , only: r8 => SHR_KIND_R8
+  use shr_kind_mod          , only: CL => SHR_KIND_CL
 
-  use seq_comm_mct , only: CPLID, GLOID, logunit, loglevel
-  use seq_comm_mct , only: ATMID, LNDID, OCNID, ICEID, GLCID, ROFID, WAVID, ESPID
+  use seq_comm_mct          , only: CPLID, GLOID, logunit, loglevel
+  use seq_comm_mct          , only: ATMID, LNDID, OCNID, ICEID, GLCID, ROFID, WAVID, ESPID
 #if (1 == 0)
-  use seq_comm_mct , only: num_inst_atm, num_inst_lnd, num_inst_rof
-  use seq_comm_mct , only: num_inst_ocn, num_inst_ice, num_inst_glc
-  use seq_comm_mct , only: num_inst_wav, num_inst_esp, num_inst_total
-  use seq_comm_mct , only: seq_comm_init
+  use seq_comm_mct          , only: num_inst_atm, num_inst_lnd, num_inst_rof
+  use seq_comm_mct          , only: num_inst_ocn, num_inst_ice, num_inst_glc
+  use seq_comm_mct          , only: num_inst_wav, num_inst_esp, num_inst_total
+  use seq_comm_mct          , only: seq_comm_init
 #endif
-  use seq_comm_mct , only: seq_comm_petlist 
-  use seq_infodata_mod, only: infodata=>seq_infodata_infodata
-  use seq_infodata_mod, only: seq_infodata_putData, seq_infodata_GetData
-  use cesm_comp_mod, only: cesm_pre_init1, cesm_pre_init2
-  use seq_timemgr_mod, only: seq_timemgr_EClock_d, seq_timemgr_EClock_a, seq_timemgr_EClock_o
-  use shr_nuopc_fldList_mod, only: shr_nuopc_fldList_setDict_fromseqflds
-  use shr_nuopc_methods_mod, only: shr_nuopc_methods_Clock_TimePrint
-  use shr_nuopc_methods_mod, only: shr_nuopc_methods_ChkErr
+  use seq_comm_mct          , only: seq_comm_petlist 
+  use seq_infodata_mod      , only: infodata=>seq_infodata_infodata
+  use seq_infodata_mod      , only: seq_infodata_putData, seq_infodata_GetData
+  use cesm_init_mod         , only: cesm_init
+  use seq_timemgr_mod       , only: seq_timemgr_EClock_d, seq_timemgr_EClock_a, seq_timemgr_EClock_o
+  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_setDict_fromseqflds
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
 
   implicit none
 
@@ -142,10 +142,8 @@ module ESM
   integer, parameter :: dbug_flag = 10
   character(len=512) :: msgstr    
   integer :: dbrc
-  character(*), parameter :: NLFileName = "drv_in"  ! input namelist filename
   character(*), parameter :: runseq_filename = "cesm.runconfig"
-  character(*), parameter :: u_FILE_u = &
-    __FILE__
+  character(*), parameter :: u_FILE_u = __FILE__
 
   private
 
@@ -228,20 +226,12 @@ module ESM
     integer                     :: componentCount
     type(NUOPC_FreeFormat)      :: attrFF
     character(len=*), parameter :: subname = "(esm.F90:SetModelServices)"
+    !-------------------------------------------    
 
     rc = ESMF_SUCCESS
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
-
-    !-------------------------------------------    
-    ! Initialize mct and pets and cesm stuff
-    !-------------------------------------------    
-
-    call cesm_pre_init1()
-    call cesm_pre_init2()
-    call shr_nuopc_fldList_setDict_fromseqflds(rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !-------------------------------------------    
     ! Read components from config file
@@ -268,6 +258,24 @@ module ESM
     call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+    attrFF = NUOPC_FreeFormatCreate(config, label="driver_input::", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call NUOPC_FreeFormatPrint(attrFF, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call NUOPC_CompAttributeIngest(driver, attrFF, addFlag=.true., rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !-------------------------------------------    
+    ! Initialize mct and pets and cesm stuff
+    !-------------------------------------------    
+
+    call cesm_init(driver)
+
+    call shr_nuopc_fldList_setDict_fromseqflds(rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !--------
     ! determine information for each component and add to the driver
     !--------
@@ -278,8 +286,7 @@ module ESM
       prefix=trim(compLabels(n))
 
       !--- read in model instance name
-      call ESMF_ConfigGetAttribute(config, model, &
-        label=trim(prefix)//"_model:", default="none", rc=rc)
+      call ESMF_ConfigGetAttribute(config, model, label=trim(prefix)//"_model:", default="none", rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--- check that there was a model instance specified
@@ -368,8 +375,7 @@ module ESM
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read ATM attributes from config file into FreeFormat
-        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", &
-          relaxedflag=.true., rc=rc)
+        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", relaxedflag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
