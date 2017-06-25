@@ -298,15 +298,11 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     call NUOPC_CompAttributeGet(driver, name="case_name", value=infodata%case_name, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    infodata%model_version  = 'unknown'  ! TODO: add this to input config
-    ! call NUOPC_CompAttributeSet(driver, name="model_version", value=infodata%model_version, rc=rc)
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    call NUOPC_CompAttributeGet(driver, name="model_version", value=infodata%model_version, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
     call NUOPC_CompAttributeGet(driver, name="username", value=infodata%username, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-
-    write(6,*)'DEBUG username is ',infodata%username
-    call shr_sys_flush(6)
 
     call NUOPC_CompAttributeGet(driver, name="hostname", value=infodata%hostname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
@@ -336,9 +332,8 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
     read (char_input,*) infodata%brnch_retain_casename
 
-    infodata%restart_pfile = 'rpointer.drv'  !TODO: add this to input config
-    ! call NUOPC_CompAttributeSet(driver, name="restart_pfile", value=infodata%restart_pfile, rc=rc)
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    call NUOPC_CompAttributeGet(driver, name="restart_pfile", value=infodata%restart_pfile, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
     call NUOPC_CompAttributeGet(driver, name="restart_file", value=infodata%restart_file, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
@@ -355,21 +350,19 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
     read(char_input,*) infodata%scmlon 
 
-    infodata%logFilePostFix = '.log'  ! TODO: add this to input config
-    ! call NUOPC_CompAttributeSet(driver, name="logFilePostFix", value=infodata%logFilePostFix, rc=rc)
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    call NUOPC_CompAttributeGet(driver, name="logFilePostFix", value=infodata%logFilePostFix, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    infodata%outPathRoot    = './'   ! TODO: add this to input config
-    ! call NUOPC_CompAttributeSet(driver, name="outPathRoot", value=infodata%outPathRoot, rc=rc)
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    call NUOPC_CompAttributeGet(driver, name="outPathRoot", value=infodata%outPathRoot, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    infodata%perpetual = .false.  ! TODO: add this to input config
-    ! call NUOPC_CompAttributeSet(driver, name="perpetual", value=".false", rc=rc)
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    call NUOPC_CompAttributeGet(driver, name="perpetual", value=char_input, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(char_input,*) infodata%perpetual
 
-    infodata%perpetual_ymd  = -999 ! TODO: add this to input config
-    ! call NUOPC_CompAttributeSet(driver, name="perpetual_ymd", value=infodata%perpetual_ymd, rc=rc)
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    call NUOPC_CompAttributeGet(driver, name="perpetual_ymd", value=char_input, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(char_input,*) infodata%perpetual_ymd
 
     call NUOPC_CompAttributeGet(driver, name="wv_sat_scheme", value=infodata%wv_sat_scheme, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
@@ -451,9 +444,6 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
 
     call NUOPC_CompAttributeGet(driver, name="cpl_seq_option", value=infodata%cpl_seq_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-
-    write(6,*) 'DEBUG: cpl_seq_option is ',infodata%cpl_seq_option
-    call shr_sys_flush(6)
 
     call NUOPC_CompAttributeGet(driver, name="cpl_cdf64", value=char_input, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
@@ -623,6 +613,14 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
     read(char_input,*) infodata%max_cplstep_time 
 
+    call NUOPC_CompAttributeGet(driver, name="orb_iyear", value=char_input, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(char_input,*) infodata%orb_iyear
+
+    call NUOPC_CompAttributeGet(driver, name="orb_iyear_align", value=char_input, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(char_input,*) infodata%orb_iyear_align
+
     call NUOPC_CompAttributeGet(driver, name="orb_mode", value=char_input, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
     read(char_input,*) infodata%orb_mode 
@@ -638,18 +636,6 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     call NUOPC_CompAttributeGet(driver, name="orb_mvelp", value=char_input, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
     read(char_input,*) infodata%orb_mvelp 
-
-    call NUOPC_CompAttributeGet(driver, name="orb_obliqr", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_obliqr 
-
-    call NUOPC_CompAttributeGet(driver, name="orb_lambm0", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_lambm0 
-
-    call NUOPC_CompAttributeGet(driver, name="orb_mvelpp", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_mvelpp 
 
     !---------------------------------------------------------------
     ! Set via components at initialization and held fixed 
@@ -714,13 +700,19 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     infodata%glc_phase     = 1
     infodata%rof_phase     = 1
     infodata%wav_phase     = 1
-    infodata%atm_aero      = .false.
     infodata%glc_g2lupdate = .false.
     infodata%glc_valid_input = .true.
     if (associated(infodata%pause_resume)) then
        deallocate(infodata%pause_resume)
     end if
     nullify(infodata%pause_resume)
+
+    infodata%atm_aero = .false.
+    call NUOPC_CompAttributeAdd(driver, attrList=(/'atm_aero'/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    write(char_input,*) infodata%atm_aero
+    call NUOPC_CompAttributeSet(driver, name='atm_aero', value=trim(char_input), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
     !---------------------------------------------------------------
     ! Finalize orbital settings
@@ -764,16 +756,45 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
        call shr_sys_abort(subname//' ERROR: invalid orb_mode '//trim(infodata%orb_mode))
     endif
 
+    ! Determine orbital parameters and add output to driver attributes
     call shr_orb_params(infodata%orb_iyear, infodata%orb_eccen, infodata%orb_obliq, infodata%orb_mvelp, &
          infodata%orb_obliqr, infodata%orb_lambm0, infodata%orb_mvelpp, .true.)
 
-    !--- Derive a few things ---
+    call NUOPC_CompAttributeAdd(driver, attrList=(/'orb_obliqr', 'orb_lambm0', 'orb_mvelpp'/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+
+    write(char_input,*) infodata%orb_obliqr
+    call NUOPC_CompAttributeSet(driver, name="orb_obliqr", value=char_input, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(char_input,*) infodata%orb_obliqr 
+
+    write(char_input,*) infodata%orb_lambm0
+    call NUOPC_CompAttributeSet(driver, name="orb_lambm0", value=char_input, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(char_input,*) infodata%orb_lambm0 
+
+    write(char_input,*) infodata%orb_mvelpp
+    call NUOPC_CompAttributeSet(driver, name="orb_mvelpp", value=char_input, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(char_input,*) infodata%orb_mvelpp 
+
+    !-----------------------------------------------------
+    ! Determine if restart is read
+    !-----------------------------------------------------
+
     infodata%rest_case_name = ' '
     infodata%read_restart = .false.
     if (trim(infodata%start_type) == trim(seq_infodata_start_type_cont) .or. &
         trim(infodata%start_type) == trim(seq_infodata_start_type_brnch)) then
        infodata%read_restart = .true.
     endif
+
+    ! Add restart flag to driver attributes
+    call NUOPC_CompAttributeAdd(driver, attrList=(/'read_restart'/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+
+    call NUOPC_CompAttributeSet(driver, name='read_restart', value=trim(char_input), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
     !-----------------------------------------------------
     ! Read Restart (seq_io_read must be called on all pes)

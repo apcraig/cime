@@ -450,7 +450,10 @@ contains
 !-----------------------------------------------------------------------------
 
   subroutine shr_nuopc_dmodel_AttrCopyToInfodata(gcomp, infodata, rc)
+
     ! Get specific set of attributes from gcomp and copy to infodata
+
+    ! input/output parameters
     type(ESMF_GridComp)    ,intent(in)    :: gcomp
     type(seq_infodata_type),intent(inout) :: infodata
     integer                ,intent(inout) :: rc
@@ -461,14 +464,14 @@ contains
     real(r8) :: rvalue
     logical  :: lvalue
     integer, parameter :: nattrlist = 20
-    character(len=*), parameter, dimension(nattrlist) :: attrList = &
-      (/ "case_name     ", "single_column ", "scmlat        ", "scmlon         ", &
-         "orb_eccen     ", "orb_obliqr    ", "orb_lambm0    ", "orb_mvelpp     ", &
-         "read_restart  ", "start_type    ", "tfreeze_option", "model_version  ", &
-         "info_debug    ", "atm_aero      ", &
-         "aqua_planet   ", "brnch_rcase   ", "perpetual     ", "perpetual_ymd  ", &
-         "hostname      ", "username      " /)
+    character(len=*), parameter :: attrList(nattrlist) = &
+      (/ "case_name"    ,"single_column","scmlat"        ,"scmlon"               , &
+         "orb_eccen"    ,"orb_obliqr"   ,"orb_lambm0"    ,"orb_mvelpp"           , &
+         "read_restart" ,"start_type"   ,"tfreeze_option","model_version"        , &
+         "info_debug"   ,"atm_aero"     ,"aqua_planet"   ,"brnch_retain_casename", &
+         "perpetual"    ,"perpetual_ymd","hostname"      ,"username"/)
     character(len=*), parameter :: subname = "(shr_nuopc_dmodel_AttrCopyToInfodata)"
+    !-------------------------------------------    
 
     rc = ESMF_Success
 
@@ -538,7 +541,7 @@ contains
         lvalue = (trim(cvalue) == "true")
         call seq_infodata_PutData(infodata, aqua_planet=lvalue)
 
-      case("brnch_rcase")
+      case("brnch_retain_casename")
         lvalue = (trim(cvalue) == "true")
         call seq_infodata_PutData(infodata, brnch_retain_casename=lvalue)
 
@@ -567,7 +570,6 @@ contains
       end select
 
     enddo
-
 
   end subroutine shr_nuopc_dmodel_AttrCopyToInfodata
 

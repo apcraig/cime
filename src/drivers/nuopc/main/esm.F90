@@ -128,8 +128,6 @@ module ESM
   use seq_comm_mct          , only: seq_comm_init
 #endif
   use seq_comm_mct          , only: seq_comm_petlist 
-  use seq_infodata_mod      , only: infodata=>seq_infodata_infodata
-  use seq_infodata_mod      , only: seq_infodata_putData, seq_infodata_GetData
   use cesm_init_mod         , only: cesm_init
   use seq_timemgr_mod       , only: seq_timemgr_EClock_d, seq_timemgr_EClock_a, seq_timemgr_EClock_o
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_setDict_fromseqflds
@@ -139,9 +137,9 @@ module ESM
   implicit none
 
   include 'mpif.h'          
-  integer, parameter :: dbug_flag = 10
-  character(len=512) :: msgstr    
-  integer :: dbrc
+  integer, parameter      :: dbug_flag = 10
+  character(len=512)      :: msgstr    
+  integer                 :: dbrc
   character(*), parameter :: runseq_filename = "cesm.runconfig"
   character(*), parameter :: u_FILE_u = __FILE__
 
@@ -371,7 +369,7 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call esm_AddAttributes(child, ATMID(1), rc=rc)
+        call esm_AddAttributes(child, driver, ATMID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read ATM attributes from config file into FreeFormat
@@ -447,7 +445,7 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call esm_AddAttributes(child, OCNID(1), rc=rc)
+        call esm_AddAttributes(child, driver, OCNID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read OCN attributes from config file into FreeFormat
@@ -514,7 +512,7 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call esm_AddAttributes(child, ICEID(1), rc=rc)
+        call esm_AddAttributes(child, driver, ICEID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read ICE attributes from config file into FreeFormat
@@ -581,7 +579,7 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call esm_AddAttributes(child, LNDID(1), rc=rc)
+        call esm_AddAttributes(child, driver, LNDID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read LND attributes from config file into FreeFormat
@@ -658,7 +656,7 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call esm_AddAttributes(child, ROFID(1), rc=rc)
+        call esm_AddAttributes(child, driver, ROFID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read ROF attributes from config file into FreeFormat
@@ -688,7 +686,7 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call esm_AddAttributes(child, CPLID, rc=rc)
+        call esm_AddAttributes(child, driver, CPLID, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read MED attributes from config file into FreeFormat
@@ -840,8 +838,8 @@ module ESM
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         ! go through all of the entries in the cplList and add options
         do j=1, cplListSize
-!          tempString = trim(cplList(j))//":REMAPMETHOD=bilinear"//&
-!         ":SrcTermProcessing=1:DUMPWEIGHTS=true:TermOrder=SrcSeq"
+           !tempString = trim(cplList(j))//":REMAPMETHOD=bilinear"//&
+           !":SrcTermProcessing=1:DUMPWEIGHTS=true:TermOrder=SrcSeq"
           tempString = trim(cplList(j))//":remapmethod=redist"
           cplList(j) = trim(tempString)
         enddo
@@ -863,132 +861,52 @@ module ESM
 
   !-----------------------------------------------------------------------------
 
-  subroutine esm_AddAttributes(gcomp, MCTID, rc)
+  subroutine esm_AddAttributes(gcomp, driver, MCTID, rc)
+
     ! Add specific set of attributes to gcomp from infodata
+    use shr_sys_mod
+
+    ! input/output parameters
     type(ESMF_GridComp),intent(inout) :: gcomp
     integer            ,intent(in)    :: MCTID
+    type(ESMF_GridComp),intent(in)    :: driver
     integer            ,intent(inout) :: rc
 
     ! locals
-    character(len=CL) :: cvalue
-    integer  :: ivalue, n
-    real(r8) :: rvalue
-    logical  :: lvalue
-    integer, parameter :: nattrlist = 21
-    character(len=*), parameter, dimension(nattrlist) :: attrList = &
-      (/ "case_name     ", "single_column ", "scmlat        ", "scmlon         ", &
-         "orb_eccen     ", "orb_obliqr    ", "orb_lambm0    ", "orb_mvelpp     ", &
-         "read_restart  ", "start_type    ", "tfreeze_option", "model_version  ", &
-         "info_debug    ", "atm_aero      ", &
-         "aqua_planet   ", "brnch_rcase   ", "perpetual     ", "perpetual_ymd  ", &
-         "hostname      ", "username      ", "MCTID         " /)
+    character(len=CL)  :: cvalue
+    integer            :: n
+    integer, parameter :: nattrlist = 20
+    character(len=*), parameter :: attrList(nattrlist) = &
+      (/ "case_name"    ,"single_column","scmlat"        ,"scmlon"               , &
+         "orb_eccen"    ,"orb_obliqr"   ,"orb_lambm0"    ,"orb_mvelpp"           , &
+         "read_restart" ,"start_type"   ,"tfreeze_option","model_version"        , &
+         "info_debug"   ,"atm_aero"     ,"aqua_planet"   ,"brnch_retain_casename", &
+         "perpetual"    ,"perpetual_ymd","hostname"      ,"username"/)
     character(len=*), parameter :: subname = "(esm.F90:esm_AddAttributes)"
+    !-------------------------------------------    
 
     rc = ESMF_Success
 
+    ! Add MCTID to gcomp attributes
+    write(cvalue,*) MCTID
+    call NUOPC_CompAttributeAdd(gcomp, attrList=(/'MCTID'/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    call NUOPC_CompAttributeSet(gcomp, name='MCTID', value=trim(cvalue), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+
+    ! Now add all the other attributes in AttrList (which have already been added to driver attributes)
     call NUOPC_CompAttributeAdd(gcomp, attrList=attrList, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     do n = 1,nattrlist
-
-      select case(trim(attrList(n)))
-
-      case("case_name")
-        call seq_infodata_GetData(infodata, case_name=cvalue)
-
-      case("single_column")
-        call seq_infodata_GetData(infodata, single_column=lvalue)
-        cvalue = "false"
-        if (lvalue) cvalue = "true"
-
-      case ("scmlat")
-        call seq_infodata_GetData(infodata, scmlat=rvalue)
-        write(cvalue,'(g26.17)') rvalue
-
-      case ("scmlon")
-        call seq_infodata_GetData(infodata, scmlon=rvalue)
-        write(cvalue,'(g26.17)') rvalue
-
-      case("orb_eccen")
-        call seq_infodata_GetData(infodata, orb_eccen=rvalue)
-        write(cvalue,'(g26.17)') rvalue
-
-      case("orb_obliqr")
-        call seq_infodata_GetData(infodata, orb_obliqr=rvalue)
-        write(cvalue,'(g26.17)') rvalue
-
-      case("orb_lambm0")
-        call seq_infodata_GetData(infodata, orb_lambm0=rvalue)
-        write(cvalue,'(g26.17)') rvalue
-
-      case("orb_mvelpp")
-        call seq_infodata_GetData(infodata, orb_mvelpp=rvalue)
-        write(cvalue,'(g26.17)') rvalue
-
-      case("read_restart")
-        call seq_infodata_GetData(infodata, read_restart=lvalue)
-        cvalue = "false"
-        if (lvalue) cvalue = "true"
-
-      case("start_type")
-        call seq_infodata_GetData(infodata, start_type=cvalue)
-
-      case("tfreeze_option")
-        call seq_infodata_GetData(infodata, tfreeze_option=cvalue)
-
-      case("model_version")
-        call seq_infodata_GetData(infodata, model_version=cvalue)
-
-      case("info_debug")
-        call seq_infodata_GetData(infodata, info_debug=ivalue)
-        write(cvalue,'(i16)') ivalue
-
-      case("atm_aero")
-        call seq_infodata_GetData(infodata, atm_aero=lvalue)
-        cvalue = "false"
-        if (lvalue) cvalue = "true"
-
-      case("aqua_planet")
-        call seq_infodata_GetData(infodata, aqua_planet=lvalue)
-        cvalue = "false"
-        if (lvalue) cvalue = "true"
-
-      case("brnch_rcase")
-        call seq_infodata_GetData(infodata, brnch_retain_casename=lvalue)
-        cvalue = "false"
-        if (lvalue) cvalue = "true"
-
-      case("perpetual")
-        call seq_infodata_GetData(infodata, perpetual=lvalue)
-        cvalue = "false"
-        if (lvalue) cvalue = "true"
-
-      case("perpetual_ymd")
-        call seq_infodata_GetData(infodata, perpetual_ymd=ivalue)
-        write(cvalue,'(i16)') ivalue
-
-      case("hostname")
-        call seq_infodata_GetData(infodata, hostname=cvalue)
-
-      case("username")
-        call seq_infodata_GetData(infodata, username=cvalue)
-
-      case("MCTID")
-        write(cvalue,'(i16)') MCTID
- 
-      case default
-        rc = ESMF_Failure
-        call ESMF_LogWrite(trim(subname)//": unknown attrlist = "//trim(attrList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-      end select
-
-      call NUOPC_CompAttributeSet(gcomp, name=trim(attrList(n)), value=trim(cvalue), rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
+       call NUOPC_CompAttributeGet(driver, name=trim(attrList(n)), value=cvalue, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call NUOPC_CompAttributeSet(gcomp, name=trim(attrList(n)), value=trim(cvalue), rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     enddo
 
   end subroutine esm_AddAttributes
 
   !-----------------------------------------------------------------------------
+
 end module ESM
