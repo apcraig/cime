@@ -281,7 +281,7 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     integer :: ierr               ! I/O error code
     integer :: unitn              ! Namelist unit number to read
     integer :: rc
-    character(len=32) :: char_input  !??? TODO : what if this is not long enough?
+    character(SHR_KIND_CL) :: cvalue  
     character(*), parameter :: u_FILE_u =  __FILE__
     !-------------------------------------------------------------------------------
 
@@ -316,21 +316,21 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     call NUOPC_CompAttributeGet(driver, name="tchkpt_dir", value=infodata%tchkpt_dir, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    call NUOPC_CompAttributeGet(driver, name="aqua_planet", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="aqua_planet", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read (char_input,*) infodata%aqua_planet
+    read (cvalue,*) infodata%aqua_planet
 
-    call NUOPC_CompAttributeGet(driver, name="aqua_planet_sst", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="aqua_planet_sst", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read (char_input,*) infodata%aqua_planet_sst
+    read (cvalue,*) infodata%aqua_planet_sst
 
-    call NUOPC_CompAttributeGet(driver, name="run_barriers", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="run_barriers", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read (char_input,*) infodata%run_barriers
+    read (cvalue,*) infodata%run_barriers
 
-    call NUOPC_CompAttributeGet(driver, name="brnch_retain_casename", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="brnch_retain_casename", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read (char_input,*) infodata%brnch_retain_casename
+    read (cvalue,*) infodata%brnch_retain_casename
 
     call NUOPC_CompAttributeGet(driver, name="restart_pfile", value=infodata%restart_pfile, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
@@ -338,17 +338,17 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     call NUOPC_CompAttributeGet(driver, name="restart_file", value=infodata%restart_file, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    call NUOPC_CompAttributeGet(driver, name="single_column", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="single_column", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read (char_input,*) infodata%single_column
+    read (cvalue,*) infodata%single_column
 
-    call NUOPC_CompAttributeGet(driver, name="scmlat", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="scmlat", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%scmlat 
+    read(cvalue,*) infodata%scmlat 
 
-    call NUOPC_CompAttributeGet(driver, name="scmlon", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="scmlon", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%scmlon 
+    read(cvalue,*) infodata%scmlon 
 
     call NUOPC_CompAttributeGet(driver, name="logFilePostFix", value=infodata%logFilePostFix, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
@@ -356,28 +356,28 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     call NUOPC_CompAttributeGet(driver, name="outPathRoot", value=infodata%outPathRoot, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    call NUOPC_CompAttributeGet(driver, name="perpetual", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="perpetual", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%perpetual
+    read(cvalue,*) infodata%perpetual
 
-    call NUOPC_CompAttributeGet(driver, name="perpetual_ymd", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="perpetual_ymd", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%perpetual_ymd
+    read(cvalue,*) infodata%perpetual_ymd
 
     call NUOPC_CompAttributeGet(driver, name="wv_sat_scheme", value=infodata%wv_sat_scheme, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    call NUOPC_CompAttributeGet(driver, name="wv_sat_transition_start", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="wv_sat_transition_start", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%wv_sat_transition_start 
+    read(cvalue,*) infodata%wv_sat_transition_start 
 
-    call NUOPC_CompAttributeGet(driver, name="wv_sat_use_tables", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="wv_sat_use_tables", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%wv_sat_use_tables 
+    read(cvalue,*) infodata%wv_sat_use_tables 
 
-    call NUOPC_CompAttributeGet(driver, name="wv_sat_table_spacing", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="wv_sat_table_spacing", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%wv_sat_table_spacing
+    read(cvalue,*) infodata%wv_sat_table_spacing
 
     call NUOPC_CompAttributeGet(driver, name="tfreeze_option", value=infodata%tfreeze_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
@@ -385,24 +385,24 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     call NUOPC_CompAttributeGet(driver, name="flux_epbal", value=infodata%flux_epbal, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    call NUOPC_CompAttributeGet(driver, name="flux_albav", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="flux_albav", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%flux_albav 
+    read(cvalue,*) infodata%flux_albav 
 
-    call NUOPC_CompAttributeGet(driver, name="flux_diurnal", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="flux_diurnal", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%flux_diurnal 
+    read(cvalue,*) infodata%flux_diurnal 
 
-    call NUOPC_CompAttributeGet(driver, name="gust_fac", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="gust_fac", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%gust_fac 
+    read(cvalue,*) infodata%gust_fac 
 
     call NUOPC_CompAttributeGet(driver, name="glc_renormalize_smb", value=infodata%glc_renormalize_smb, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    call NUOPC_CompAttributeGet(driver, name="wall_time_limit", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="wall_time_limit", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%wall_time_limit 
+    read(cvalue,*) infodata%wall_time_limit 
 
     call NUOPC_CompAttributeGet(driver, name="force_stop_at", value=infodata%force_stop_at, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
@@ -428,9 +428,9 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     call NUOPC_CompAttributeGet(driver, name="wav_gnam", value=infodata%wav_gnam, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    call NUOPC_CompAttributeGet(driver, name="shr_map_dopole", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="shr_map_dopole", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%shr_map_dopole 
+    read(cvalue,*) infodata%shr_map_dopole 
 
     call NUOPC_CompAttributeGet(driver, name="vect_map", value=infodata%vect_map, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
@@ -438,204 +438,204 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     call NUOPC_CompAttributeGet(driver, name="aoflux_grid", value=infodata%aoflux_grid, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    call NUOPC_CompAttributeGet(driver, name="cpl_decomp", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="cpl_decomp", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%cpl_decomp
+    read(cvalue,*) infodata%cpl_decomp
 
     call NUOPC_CompAttributeGet(driver, name="cpl_seq_option", value=infodata%cpl_seq_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    call NUOPC_CompAttributeGet(driver, name="cpl_cdf64", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="cpl_cdf64", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%cpl_cdf64 
+    read(cvalue,*) infodata%cpl_cdf64 
 
-    call NUOPC_CompAttributeGet(driver, name="do_budgets", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="do_budgets", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%do_budgets 
+    read(cvalue,*) infodata%do_budgets 
 
-    call NUOPC_CompAttributeGet(driver, name="do_histinit", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="do_histinit", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%do_histinit 
+    read(cvalue,*) infodata%do_histinit 
 
-    call NUOPC_CompAttributeGet(driver, name="budget_inst", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="budget_inst", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%budget_inst 
+    read(cvalue,*) infodata%budget_inst 
 
-    call NUOPC_CompAttributeGet(driver, name="budget_daily", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="budget_daily", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%budget_daily 
+    read(cvalue,*) infodata%budget_daily 
 
-    call NUOPC_CompAttributeGet(driver, name="budget_month", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="budget_month", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%budget_month 
+    read(cvalue,*) infodata%budget_month 
 
-    call NUOPC_CompAttributeGet(driver, name="budget_ann", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="budget_ann", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%budget_ann 
+    read(cvalue,*) infodata%budget_ann 
 
-    call NUOPC_CompAttributeGet(driver, name="budget_ltann", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="budget_ltann", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%budget_ltann 
+    read(cvalue,*) infodata%budget_ltann 
 
-    call NUOPC_CompAttributeGet(driver, name="budget_ltend", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="budget_ltend", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%budget_ltend 
+    read(cvalue,*) infodata%budget_ltend 
 
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histaux_a2x", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histaux_a2x 
+    read(cvalue,*) infodata%histaux_a2x 
 
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x1hri", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histaux_a2x1hri", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histaux_a2x1hri 
+    read(cvalue,*) infodata%histaux_a2x1hri 
 
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x1hr", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histaux_a2x1hr", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histaux_a2x1hr 
+    read(cvalue,*) infodata%histaux_a2x1hr 
 
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x3hr", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histaux_a2x3hr", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histaux_a2x3hr 
+    read(cvalue,*) infodata%histaux_a2x3hr 
 
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x3hrp", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histaux_a2x3hrp", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histaux_a2x3hrp 
+    read(cvalue,*) infodata%histaux_a2x3hrp 
 
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x24hr", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histaux_a2x24hr", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histaux_a2x24hr 
+    read(cvalue,*) infodata%histaux_a2x24hr 
 
-    call NUOPC_CompAttributeGet(driver, name="histaux_l2x1yr", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histaux_l2x1yr", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histaux_l2x1yr 
+    read(cvalue,*) infodata%histaux_l2x1yr 
 
-    call NUOPC_CompAttributeGet(driver, name="histaux_l2x", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histaux_l2x", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histaux_l2x 
+    read(cvalue,*) infodata%histaux_l2x 
 
-    call NUOPC_CompAttributeGet(driver, name="histaux_r2x", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histaux_r2x", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histaux_r2x 
+    read(cvalue,*) infodata%histaux_r2x 
 
-    call NUOPC_CompAttributeGet(driver, name="histavg_atm", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histavg_atm", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histavg_atm 
+    read(cvalue,*) infodata%histavg_atm 
 
-    call NUOPC_CompAttributeGet(driver, name="histavg_lnd", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histavg_lnd", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histavg_lnd 
+    read(cvalue,*) infodata%histavg_lnd 
 
-    call NUOPC_CompAttributeGet(driver, name="histavg_ocn", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histavg_ocn", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histavg_ocn 
+    read(cvalue,*) infodata%histavg_ocn 
 
-    call NUOPC_CompAttributeGet(driver, name="histavg_ice", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histavg_ice", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histavg_ice 
+    read(cvalue,*) infodata%histavg_ice 
 
-    call NUOPC_CompAttributeGet(driver, name="histavg_rof", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histavg_rof", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histavg_rof 
+    read(cvalue,*) infodata%histavg_rof 
 
-    call NUOPC_CompAttributeGet(driver, name="histavg_glc", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histavg_glc", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histavg_glc 
+    read(cvalue,*) infodata%histavg_glc 
 
-    call NUOPC_CompAttributeGet(driver, name="histavg_wav", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histavg_wav", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histavg_wav 
+    read(cvalue,*) infodata%histavg_wav 
 
-    call NUOPC_CompAttributeGet(driver, name="histavg_xao", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="histavg_xao", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%histavg_xao 
+    read(cvalue,*) infodata%histavg_xao 
 
-    call NUOPC_CompAttributeGet(driver, name="drv_threading", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="drv_threading", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%drv_threading 
+    read(cvalue,*) infodata%drv_threading 
 
-    call NUOPC_CompAttributeGet(driver, name="eps_frac", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="eps_frac", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%eps_frac 
+    read(cvalue,*) infodata%eps_frac 
 
-    call NUOPC_CompAttributeGet(driver, name="eps_amask", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="eps_amask", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%eps_amask 
+    read(cvalue,*) infodata%eps_amask 
 
-    call NUOPC_CompAttributeGet(driver, name="eps_agrid", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="eps_agrid", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%eps_agrid 
+    read(cvalue,*) infodata%eps_agrid 
 
-    call NUOPC_CompAttributeGet(driver, name="eps_aarea", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="eps_aarea", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%eps_aarea 
+    read(cvalue,*) infodata%eps_aarea 
 
-    call NUOPC_CompAttributeGet(driver, name="eps_omask", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="eps_omask", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%eps_omask 
+    read(cvalue,*) infodata%eps_omask 
 
-    call NUOPC_CompAttributeGet(driver, name="eps_ogrid", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="eps_ogrid", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%eps_ogrid 
+    read(cvalue,*) infodata%eps_ogrid 
 
-    call NUOPC_CompAttributeGet(driver, name="eps_oarea", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="eps_oarea", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%eps_oarea 
+    read(cvalue,*) infodata%eps_oarea 
 
-    call NUOPC_CompAttributeGet(driver, name="reprosum_use_ddpdd", value=char_input, rc=rc)
+    ! call NUOPC_CompAttributeGet(driver, name="reprosum_use_ddpdd", value=cvalue, rc=rc)
+    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    ! read(cvalue,*) infodata%reprosum_use_ddpdd 
+
+    ! call NUOPC_CompAttributeGet(driver, name="reprosum_diffmax", value=cvalue, rc=rc)
+    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    ! read(cvalue,*) infodata%reprosum_diffmax 
+
+    ! call NUOPC_CompAttributeGet(driver, name="reprosum_recompute", value=cvalue, rc=rc)
+    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    ! read(cvalue,*) infodata%reprosum_recompute 
+
+    call NUOPC_CompAttributeGet(driver, name="mct_usealltoall", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%reprosum_use_ddpdd 
+    read(cvalue,*) infodata%mct_usealltoall 
 
-    call NUOPC_CompAttributeGet(driver, name="reprosum_diffmax", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="mct_usevector", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%reprosum_diffmax 
+    read(cvalue,*) infodata%mct_usevector 
 
-    call NUOPC_CompAttributeGet(driver, name="reprosum_recompute", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%reprosum_recompute 
-
-    call NUOPC_CompAttributeGet(driver, name="mct_usealltoall", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%mct_usealltoall 
-
-    call NUOPC_CompAttributeGet(driver, name="mct_usevector", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%mct_usevector 
-
-    call NUOPC_CompAttributeGet(driver, name="info_debug", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="info_debug", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return 
-     read(char_input,*) infodata%info_debug 
+     read(cvalue,*) infodata%info_debug 
 
-    call NUOPC_CompAttributeGet(driver, name="bfbflag", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="bfbflag", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%bfbflag 
+    read(cvalue,*) infodata%bfbflag 
 
-    call NUOPC_CompAttributeGet(driver, name="max_cplstep_time", value=char_input, rc=rc)
+    call NUOPC_CompAttributeGet(driver, name="max_cplstep_time", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%max_cplstep_time 
+    read(cvalue,*) infodata%max_cplstep_time 
 
-    call NUOPC_CompAttributeGet(driver, name="orb_iyear", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_iyear
+    ! call NUOPC_CompAttributeGet(driver, name="orb_iyear", value=cvalue, rc=rc)
+    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    ! read(cvalue,*) infodata%orb_iyear
 
-    call NUOPC_CompAttributeGet(driver, name="orb_iyear_align", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_iyear_align
+    ! call NUOPC_CompAttributeGet(driver, name="orb_iyear_align", value=cvalue, rc=rc)
+    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    ! read(cvalue,*) infodata%orb_iyear_align
 
-    call NUOPC_CompAttributeGet(driver, name="orb_mode", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_mode 
+    ! call NUOPC_CompAttributeGet(driver, name="orb_mode", value=cvalue, rc=rc)
+    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    ! read(cvalue,*) infodata%orb_mode 
 
-    call NUOPC_CompAttributeGet(driver, name="orb_obliq", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_obliq 
+    ! call NUOPC_CompAttributeGet(driver, name="orb_obliq", value=cvalue, rc=rc)
+    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    ! read(cvalue,*) infodata%orb_obliq 
 
-    call NUOPC_CompAttributeGet(driver, name="orb_eccen", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_eccen 
+    ! call NUOPC_CompAttributeGet(driver, name="orb_eccen", value=cvalue, rc=rc)
+    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    ! read(cvalue,*) infodata%orb_eccen 
 
-    call NUOPC_CompAttributeGet(driver, name="orb_mvelp", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_mvelp 
+    ! call NUOPC_CompAttributeGet(driver, name="orb_mvelp", value=cvalue, rc=rc)
+    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    ! read(cvalue,*) infodata%orb_mvelp 
 
     !---------------------------------------------------------------
     ! Set via components at initialization and held fixed 
@@ -710,73 +710,14 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     infodata%atm_aero = .false.
     call NUOPC_CompAttributeAdd(driver, attrList=(/'atm_aero'/), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    write(char_input,*) infodata%atm_aero
-    call NUOPC_CompAttributeSet(driver, name='atm_aero', value=trim(char_input), rc=rc)
+    write(cvalue,*) infodata%atm_aero
+    call NUOPC_CompAttributeSet(driver, name='atm_aero', value=trim(cvalue), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
     !---------------------------------------------------------------
     ! Finalize orbital settings
     ! Check orbital mode, reset unused parameters, validate settings
     !---------------------------------------------------------------
-
-    if (trim(infodata%orb_mode) == trim(seq_infodata_orb_fixed_year)) then
-       infodata%orb_obliq = SHR_ORB_UNDEF_REAL
-       infodata%orb_eccen = SHR_ORB_UNDEF_REAL
-       infodata%orb_mvelp = SHR_ORB_UNDEF_REAL
-       if (infodata%orb_iyear == SHR_ORB_UNDEF_INT) then
-          write(logunit,*) trim(subname),' ERROR: invalid settings orb_mode =',trim(infodata%orb_mode)
-          write(logunit,*) trim(subname),' ERROR: fixed_year settings = ',infodata%orb_iyear
-          call shr_sys_abort(subname//' ERROR: invalid settings for orb_mode '//trim(infodata%orb_mode))
-       endif
-
-    elseif (trim(infodata%orb_mode) == trim(seq_infodata_orb_variable_year)) then
-       infodata%orb_obliq = SHR_ORB_UNDEF_REAL
-       infodata%orb_eccen = SHR_ORB_UNDEF_REAL
-       infodata%orb_mvelp = SHR_ORB_UNDEF_REAL
-       if (infodata%orb_iyear == SHR_ORB_UNDEF_INT .or. infodata%orb_iyear_align == SHR_ORB_UNDEF_INT) then
-          write(logunit,*) trim(subname),' ERROR: invalid settings orb_mode =',trim(infodata%orb_mode)
-          write(logunit,*) trim(subname),' ERROR: variable_year settings = ',infodata%orb_iyear, infodata%orb_iyear_align
-          call shr_sys_abort(subname//' ERROR: invalid settings for orb_mode '//trim(infodata%orb_mode))
-       endif
-
-    elseif (trim(infodata%orb_mode) == trim(seq_infodata_orb_fixed_parameters)) then
-       !-- force orb_iyear to undef to make sure shr_orb_params works properly
-       infodata%orb_iyear = SHR_ORB_UNDEF_INT
-       infodata%orb_iyear_align = SHR_ORB_UNDEF_INT
-       if (infodata%orb_eccen == SHR_ORB_UNDEF_REAL .or. &
-           infodata%orb_obliq == SHR_ORB_UNDEF_REAL .or. &
-           infodata%orb_mvelp == SHR_ORB_UNDEF_REAL) then
-          write(logunit,*) trim(subname),' ERROR: invalid settings orb_mode =',trim(infodata%orb_mode)
-          write(logunit,*) trim(subname),' ERROR: orb_eccen = ',infodata%orb_eccen
-          write(logunit,*) trim(subname),' ERROR: orb_obliq = ',infodata%orb_obliq
-          write(logunit,*) trim(subname),' ERROR: orb_mvelp = ',infodata%orb_mvelp
-          call shr_sys_abort(subname//' ERROR: invalid settings for orb_mode '//trim(infodata%orb_mode))
-       endif
-    else
-       call shr_sys_abort(subname//' ERROR: invalid orb_mode '//trim(infodata%orb_mode))
-    endif
-
-    ! Determine orbital parameters and add output to driver attributes
-    call shr_orb_params(infodata%orb_iyear, infodata%orb_eccen, infodata%orb_obliq, infodata%orb_mvelp, &
-         infodata%orb_obliqr, infodata%orb_lambm0, infodata%orb_mvelpp, .true.)
-
-    call NUOPC_CompAttributeAdd(driver, attrList=(/'orb_obliqr', 'orb_lambm0', 'orb_mvelpp'/), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-
-    write(char_input,*) infodata%orb_obliqr
-    call NUOPC_CompAttributeSet(driver, name="orb_obliqr", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_obliqr 
-
-    write(char_input,*) infodata%orb_lambm0
-    call NUOPC_CompAttributeSet(driver, name="orb_lambm0", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_lambm0 
-
-    write(char_input,*) infodata%orb_mvelpp
-    call NUOPC_CompAttributeSet(driver, name="orb_mvelpp", value=char_input, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(char_input,*) infodata%orb_mvelpp 
 
     !-----------------------------------------------------
     ! Determine if restart is read
@@ -793,7 +734,8 @@ SUBROUTINE seq_infodata_Init1(infodata, driver, ID, pioid)
     call NUOPC_CompAttributeAdd(driver, attrList=(/'read_restart'/), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
-    call NUOPC_CompAttributeSet(driver, name='read_restart', value=trim(char_input), rc=rc)
+    write(cvalue,*) infodata%read_restart
+    call NUOPC_CompAttributeSet(driver, name='read_restart', value=trim(cvalue), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
     !-----------------------------------------------------

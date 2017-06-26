@@ -3,6 +3,8 @@ module cesm_init_mod
   !----------------------------------------------------------------------------
   ! share code & libs
   !----------------------------------------------------------------------------
+  use ESMF
+  use NUOPC
   use shr_kind_mod,      only: r8 => SHR_KIND_R8
   use shr_kind_mod,      only: cs => SHR_KIND_CS
   use shr_kind_mod,      only: cl => SHR_KIND_CL
@@ -20,7 +22,6 @@ module cesm_init_mod
   use shr_reprosum_mod,  only: shr_reprosum_setopts
   use mct_mod            ! mct_ wrappers for mct lib
   use perf_mod
-  use ESMF
 
   !----------------------------------------------------------------------------
   ! cpl7 modules
@@ -65,7 +66,10 @@ module cesm_init_mod
   use seq_infodata_mod, only: seq_infodata_type 
   use seq_infodata_mod, only: seq_infodata_putData, seq_infodata_GetData
   use seq_infodata_mod, only: seq_infodata_init1, seq_infodata_init2
-  use seq_infodata_mod, only: seq_infodata_orb_variable_year, seq_infodata_print 
+  use seq_infodata_mod, only: seq_infodata_orb_variable_year
+  use seq_infodata_mod, only: seq_infodata_orb_fixed_year
+  use seq_infodata_mod, only: seq_infodata_orb_fixed_parameters
+  use seq_infodata_mod, only: seq_infodata_print 
   use seq_infodata_mod, only: infodata=>seq_infodata_infodata
 
   ! i/o subroutines
@@ -182,16 +186,8 @@ module cesm_init_mod
   character(CS) :: aoflux_grid       ! grid for a/o flux calc: atm xor ocn
   character(CS) :: vect_map          ! vector mapping type
 
-  character(CL) :: atm_gnam          ! atm grid
-  character(CL) :: lnd_gnam          ! lnd grid
-  character(CL) :: ocn_gnam          ! ocn grid
-  character(CL) :: ice_gnam          ! ice grid
-  character(CL) :: rof_gnam          ! rof grid
-  character(CL) :: glc_gnam          ! glc grid
-  character(CL) :: wav_gnam          ! wav grid
-
   logical       :: read_restart      ! local read restart flag
-  character(CL) :: rest_file         ! restart file path + filename
+  character(CL) :: restart_file      ! restart file path + filename
 
   logical  :: shr_map_dopole         ! logical for dopole in shr_map_mod
   logical  :: domain_check           ! .true.  => check consistency of domains
@@ -213,12 +209,6 @@ module cesm_init_mod
   logical :: do_hist_a2x3hr          ! create aux files: a2x 3hr states
   logical :: do_hist_a2x1hri         ! create aux files: a2x 1hr instantaneous
   logical :: do_hist_a2x1hr          ! create aux files: a2x 1hr
-  integer :: budget_inst             ! instantaneous budget flag
-  integer :: budget_daily            ! daily budget flag
-  integer :: budget_month            ! monthly budget flag
-  integer :: budget_ann              ! annual budget flag
-  integer :: budget_ltann            ! long term budget flag for end of year writing
-  integer :: budget_ltend            ! long term budget flag for end of run writing
 
   character(CL) :: hist_a2x_flds     = &
        'Faxa_swndr:Faxa_swvdr:Faxa_swndf:Faxa_swvdf'
@@ -351,13 +341,10 @@ module cesm_init_mod
   character(*), parameter :: FormatD = '(A,": =============== ", A20,2I8,5x,   " ===============")'
   character(*), parameter :: FormatR = '(A,": =============== ", A31,F9.3,1x,  " ===============")'
   character(*), parameter :: FormatQ = '(A,": =============== ", A20,2F10.2,1x," ===============")'
-  !===============================================================================
-contains
-  !===============================================================================
 
-  !===============================================================================
-  !*******************************************************************************
-  !===============================================================================
+!===============================================================================
+contains
+!===============================================================================
 
   subroutine cesm_init(driver)
 
@@ -368,30 +355,33 @@ contains
     use shr_const_mod  , only: shr_const_mwwv, shr_const_mwdair
     use shr_wv_sat_mod , only: shr_wv_sat_set_default, shr_wv_sat_init 
     use shr_wv_sat_mod , only: ShrWVSatTableSpec, shr_wv_sat_make_tables
+    use shr_orb_mod    , only: SHR_ORB_UNDEF_INT, SHR_ORB_UNDEF_REAL, shr_orb_params
 
     ! INPUT/OUTPUT PARAMETERS:
     type(ESMF_GridComp), intent(inout)  :: driver
 
     ! LOCAL
-    type(file_desc_t) :: pioid
-    integer           :: maxthreads
-    character(CS)     :: wv_sat_scheme
-    real(r8)          :: wv_sat_transition_start
-    logical           :: wv_sat_use_tables
-    real(r8)          :: wv_sat_table_spacing
-    character(CL)     :: errstring
-    type(ShrWVSatTableSpec) :: liquid_spec, ice_spec, mixed_spec
-    real(r8), parameter :: epsilo = shr_const_mwwv/shr_const_mwdair
+    type(file_desc_t)                  :: pioid
+    integer                            :: maxthreads
+    character(CS)                      :: wv_sat_scheme
+    real(r8)                           :: wv_sat_transition_start
+    logical                            :: wv_sat_use_tables
+    real(r8)                           :: wv_sat_table_spacing
+    character(CL)                      :: errstring
+    character(CL)                      :: cvalue  
+    type(ShrWVSatTableSpec)            :: liquid_spec, ice_spec, mixed_spec
+    real(r8), parameter                :: epsilo = shr_const_mwwv/shr_const_mwdair
+    integer, dimension(num_inst_total) :: comp_id, comp_comm, comp_comm_iam
+    logical                            :: comp_iamin(num_inst_total)
+    logical                            :: flag
+    character(len=seq_comm_namelen)    :: comp_name(num_inst_total)
+    integer                            :: i, it
+    character(*), parameter            :: u_FILE_u =  __FILE__
 
     !----------------------------------------------------------
     !| Initialize MCT and MPI communicators and IO
     !----------------------------------------------------------
 
-    integer, dimension(num_inst_total) :: comp_id, comp_comm, comp_comm_iam
-    logical :: comp_iamin(num_inst_total)
-    logical :: flag
-    character(len=seq_comm_namelen) :: comp_name(num_inst_total)
-    integer :: i, it
 
     call mpi_initialized(flag,ierr)
     call shr_mpi_chkerr(ierr,subname//' mpi_initialized')
@@ -624,87 +614,42 @@ contains
     call seq_flds_set(nlfilename, GLOID, infodata)
 
     !----------------------------------------------------------
-    !| Obtain infodata info
+    ! pole corrections in shr_map_mod
     !----------------------------------------------------------
 
-    call seq_infodata_GetData(infodata, &
-         info_debug=info_debug)
-
-    !if (info_debug > 1 .and. iamroot_CPLID) then
-       write(logunit,*) ' '
-       write(logunit,'(2A)') 'Status of infodata after seq_infodata_init'
-       call seq_infodata_print( infodata )
-       write(logunit,*) ' '
-    !endif
-
-    call seq_infodata_GetData(infodata             , &
-         read_restart=read_restart                 , &
-         restart_file=rest_file                    , &
-         timing_dir=timing_dir                     , &
-         tchkpt_dir=tchkpt_dir                     , &
-         info_debug=info_debug                     , &
-         atm_present=atm_present                   , &
-         lnd_present=lnd_present                   , &
-         ice_present=ice_present                   , &
-         ocn_present=ocn_present                   , &
-         glc_present=glc_present                   , &
-         rof_present=rof_present                   , &
-         wav_present=wav_present                   , &
-         esp_present=esp_present                   , &
-         single_column=single_column               , &
-         aqua_planet=aqua_planet                   , &
-         cpl_seq_option=cpl_seq_option             , &
-         drv_threading=drv_threading               , &
-         do_histinit=do_histinit                   , &
-         do_budgets=do_budgets                     , &
-         budget_inst=budget_inst                   , &
-         budget_daily=budget_daily                 , &
-         budget_month=budget_month                 , &
-         budget_ann=budget_ann                     , &
-         budget_ltann=budget_ltann                 , &
-         budget_ltend=budget_ltend                 , &
-         histaux_a2x=do_hist_a2x                   , &
-         histaux_a2x1hri=do_hist_a2x1hri           , &
-         histaux_a2x1hr=do_hist_a2x1hr             , &
-         histaux_a2x3hr =do_hist_a2x3hr            , &
-         histaux_a2x3hrp=do_hist_a2x3hrp           , &
-         histaux_a2x24hr=do_hist_a2x24hr           , &
-         histaux_l2x=do_hist_l2x                   , &
-         histaux_l2x1yr=do_hist_l2x1yr             , &
-         histaux_r2x=do_hist_r2x                   , &
-         run_barriers=run_barriers                 , &
-         mct_usealltoall=mct_usealltoall           , &
-         mct_usevector=mct_usevector               , &
-         aoflux_grid=aoflux_grid                   , &
-         vect_map=vect_map                         , &
-         atm_gnam=atm_gnam                         , &
-         lnd_gnam=lnd_gnam                         , &
-         ocn_gnam=ocn_gnam                         , &
-         ice_gnam=ice_gnam                         , &
-         rof_gnam=rof_gnam                         , &
-         glc_gnam=glc_gnam                         , &
-         wav_gnam=wav_gnam                         , &
-         tfreeze_option = tfreeze_option           , &
-        !cpl_decomp=seq_mctext_decomp              , &
-         shr_map_dopole=shr_map_dopole             , &
-         wall_time_limit=wall_time_limit           , &
-         force_stop_at=force_stop_at               , &
-         reprosum_use_ddpdd=reprosum_use_ddpdd     , &
-         reprosum_diffmax=reprosum_diffmax         , &
-         reprosum_recompute=reprosum_recompute, &
-         max_cplstep_time=max_cplstep_time)
-
-    ! above - cpl_decomp is set to pass the cpl_decomp value to seq_mctext_decomp
-    ! (via a use statement)
+    call NUOPC_CompAttributeGet(driver, name="shr_map_dopole", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) shr_map_dopole 
 
     call shr_map_setDopole(shr_map_dopole)
+
+    !----------------------------------------------------------
+    ! Initialize options for reproducible sums
+    !----------------------------------------------------------
+
+    call NUOPC_CompAttributeGet(driver, name="reprosum_use_ddpdd", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) reprosum_use_ddpdd 
+
+    call NUOPC_CompAttributeGet(driver, name="reprosum_diffmax", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) reprosum_diffmax 
+
+    call NUOPC_CompAttributeGet(driver, name="reprosum_recompute", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) reprosum_recompute 
 
     call shr_reprosum_setopts(&
          repro_sum_use_ddpdd_in    = reprosum_use_ddpdd, &
          repro_sum_rel_diff_max_in = reprosum_diffmax, &
          repro_sum_recompute_in    = reprosum_recompute)
 
+    !----------------------------------------------------------
     ! Check cpl_seq_option
+    !----------------------------------------------------------
+
+    call NUOPC_CompAttributeGet(driver, name="cpl_seq_option", value=cpl_seq_option, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
 
     if (trim(cpl_seq_option) /= 'CESM1_ORIG' .and. &
         trim(cpl_seq_option) /= 'CESM1_ORIG_TIGHT' .and. &
@@ -716,9 +661,12 @@ contains
     endif
 
     !----------------------------------------------------------
-    !| Test Threading Setup in driver
-    !  happens to be valid on all pes for all IDs
+    ! Test Threading Setup in driver happens to be valid on all pes for all IDs
     !----------------------------------------------------------
+
+    call NUOPC_CompAttributeGet(driver, name="drv_threading", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) drv_threading 
 
     if (drv_threading) then
        if (iamroot_GLOID) write(logunit,*) ' '
@@ -748,11 +696,18 @@ contains
     endif
 
     !----------------------------------------------------------
-    !| Initialize time manager
+    ! Initialize time manager
     !----------------------------------------------------------
 
+    call NUOPC_CompAttributeGet(driver, name='read_restart', value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) read_restart
+
+    call NUOPC_CompAttributeGet(driver, name="restart_file", value=restart_file, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+
     call seq_timemgr_clockInit(seq_SyncClock, nlfilename, &
-         read_restart, rest_file, pioid, mpicom_gloid,           &
+         read_restart, restart_file, pioid, mpicom_gloid, &
          EClock_d, EClock_a, EClock_l, EClock_o,          &
          EClock_i, Eclock_g, Eclock_r, Eclock_w, Eclock_e)
 
@@ -761,50 +716,143 @@ contains
     endif
 
     !----------------------------------------------------------
-    !| Initialize infodata items which need the clocks
+    ! Initialize infodata items which need the clocks
     !----------------------------------------------------------
-    call seq_infodata_init2(infodata, GLOID)
 
-    call seq_infodata_getData(infodata,   &
-         orb_iyear=orb_iyear,             &
-         orb_iyear_align=orb_iyear_align, &
-         orb_mode=orb_mode)
+    call seq_infodata_init2(infodata, GLOID)
 
     !----------------------------------------------------------
     ! Initialize freezing point calculation for all components
     !----------------------------------------------------------
 
+    call NUOPC_CompAttributeGet(driver, name="tfreeze_option", value=tfreeze_option, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+
     call shr_frz_freezetemp_init(tfreeze_option)
+
+    !----------------------------------------------------------
+    ! Initialize orbital related values 
+    !----------------------------------------------------------
+
+    call NUOPC_CompAttributeGet(driver, name="orb_mode", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) orb_mode 
+
+    call NUOPC_CompAttributeGet(driver, name="orb_iyear", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) orb_iyear
+
+    call NUOPC_CompAttributeGet(driver, name="orb_iyear_align", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) orb_iyear_align
+
+    call NUOPC_CompAttributeGet(driver, name="orb_obliq", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) orb_obliq 
+
+    call NUOPC_CompAttributeGet(driver, name="orb_eccen", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) orb_eccen 
+
+    call NUOPC_CompAttributeGet(driver, name="orb_mvelp", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) orb_mvelp 
+
+    if (trim(orb_mode) == trim(seq_infodata_orb_fixed_year)) then
+       orb_obliq = SHR_ORB_UNDEF_REAL
+       orb_eccen = SHR_ORB_UNDEF_REAL
+       orb_mvelp = SHR_ORB_UNDEF_REAL
+       if (orb_iyear == SHR_ORB_UNDEF_INT) then
+          write(logunit,*) trim(subname),' ERROR: invalid settings orb_mode =',trim(orb_mode)
+          write(logunit,*) trim(subname),' ERROR: fixed_year settings = ',orb_iyear
+          call shr_sys_abort(subname//' ERROR: invalid settings for orb_mode '//trim(orb_mode))
+       endif
+
+    elseif (trim(orb_mode) == trim(seq_infodata_orb_variable_year)) then
+       orb_obliq = SHR_ORB_UNDEF_REAL
+       orb_eccen = SHR_ORB_UNDEF_REAL
+       orb_mvelp = SHR_ORB_UNDEF_REAL
+       if (orb_iyear == SHR_ORB_UNDEF_INT .or. orb_iyear_align == SHR_ORB_UNDEF_INT) then
+          write(logunit,*) trim(subname),' ERROR: invalid settings orb_mode =',trim(orb_mode)
+          write(logunit,*) trim(subname),' ERROR: variable_year settings = ',orb_iyear, orb_iyear_align
+          call shr_sys_abort(subname//' ERROR: invalid settings for orb_mode '//trim(orb_mode))
+       endif
+
+    elseif (trim(orb_mode) == trim(seq_infodata_orb_fixed_parameters)) then
+       !-- force orb_iyear to undef to make sure shr_orb_params works properly
+       orb_iyear = SHR_ORB_UNDEF_INT
+       orb_iyear_align = SHR_ORB_UNDEF_INT
+       if (orb_eccen == SHR_ORB_UNDEF_REAL .or. &
+           orb_obliq == SHR_ORB_UNDEF_REAL .or. &
+           orb_mvelp == SHR_ORB_UNDEF_REAL) then
+          write(logunit,*) trim(subname),' ERROR: invalid settings orb_mode =',trim(orb_mode)
+          write(logunit,*) trim(subname),' ERROR: orb_eccen = ',orb_eccen
+          write(logunit,*) trim(subname),' ERROR: orb_obliq = ',orb_obliq
+          write(logunit,*) trim(subname),' ERROR: orb_mvelp = ',orb_mvelp
+          call shr_sys_abort(subname//' ERROR: invalid settings for orb_mode '//trim(orb_mode))
+       endif
+    else
+       call shr_sys_abort(subname//' ERROR: invalid orb_mode '//trim(orb_mode))
+    endif
+
+    ! Determine orbital params
 
     if (trim(orb_mode) == trim(seq_infodata_orb_variable_year)) then
        call seq_timemgr_EClockGetData( EClock_d, curr_ymd=ymd)
-
        call shr_cal_date2ymd(ymd,year,month,day)
        orb_cyear = orb_iyear + (year - orb_iyear_align)
-
        call shr_orb_params(orb_cyear, orb_eccen, orb_obliq, orb_mvelp, &
-            orb_obliqr, orb_lambm0, orb_mvelpp, iamroot_CPLID)
+                           orb_obliqr, orb_lambm0, orb_mvelpp, iamroot_CPLID)
+    else
+       call shr_orb_params(orb_iyear, orb_eccen, orb_obliq, orb_mvelp, &
+                           orb_obliqr, orb_lambm0, orb_mvelpp, iamroot_CPLID)
+    end if
 
-       call seq_infodata_putData(infodata, &
-            orb_eccen=orb_eccen,           &
-            orb_obliqr=orb_obliqr,         &
-            orb_lambm0=orb_lambm0,         &
-            orb_mvelpp=orb_mvelpp)
-    endif
+    ! Add updated orbital params to driver attributes 
 
-    call seq_infodata_getData(infodata,                   &
-         wv_sat_scheme=wv_sat_scheme,                     &
-         wv_sat_transition_start=wv_sat_transition_start, &
-         wv_sat_use_tables=wv_sat_use_tables,             &
-         wv_sat_table_spacing=wv_sat_table_spacing)
+    call NUOPC_CompAttributeAdd(driver, attrList=(/'orb_obliqr', 'orb_lambm0', 'orb_mvelpp'/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+
+    write(cvalue,*) orb_eccen
+    call NUOPC_CompAttributeSet(driver, name="orb_eccen", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+
+    write(cvalue,*) orb_obliqr
+    call NUOPC_CompAttributeSet(driver, name="orb_obliqr", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+
+    write(cvalue,*) orb_lambm0
+    call NUOPC_CompAttributeSet(driver, name="orb_lambm0", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+
+    write(cvalue,*) orb_mvelpp
+    call NUOPC_CompAttributeSet(driver, name="orb_mvelpp", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+
+    !----------------------------------------------------------
+    ! Initialize water vapor info
+    !----------------------------------------------------------
+
+    call NUOPC_CompAttributeGet(driver, name="wv_sat_scheme", value=wv_sat_scheme, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+
+    call NUOPC_CompAttributeGet(driver, name="wv_sat_transition_start", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) wv_sat_transition_start 
+
+    call NUOPC_CompAttributeGet(driver, name="wv_sat_use_tables", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) wv_sat_use_tables 
+
+    call NUOPC_CompAttributeGet(driver, name="wv_sat_table_spacing", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    read(cvalue,*) wv_sat_table_spacing
 
     if (.not. shr_wv_sat_set_default(wv_sat_scheme)) then
        call shr_sys_abort('Invalid wv_sat_scheme.')
     end if
 
-    call shr_wv_sat_init(shr_const_tkfrz, shr_const_tktrip, &
-         wv_sat_transition_start, epsilo, errstring)
-
+    call shr_wv_sat_init(shr_const_tkfrz, shr_const_tktrip, wv_sat_transition_start, epsilo, errstring)
     if (errstring /= "") then
        call shr_sys_abort('shr_wv_sat_init: '//trim(errstring))
     end if
@@ -817,30 +865,43 @@ contains
     ! is why only the spacing is in the namelist.
 
     if (wv_sat_use_tables) then
-       liquid_spec = ShrWVSatTableSpec(ceiling(200._r8/wv_sat_table_spacing), &
-            175._r8, wv_sat_table_spacing)
-       ice_spec = ShrWVSatTableSpec(ceiling(150._r8/wv_sat_table_spacing), &
-            125._r8, wv_sat_table_spacing)
-       mixed_spec = ShrWVSatTableSpec(ceiling(250._r8/wv_sat_table_spacing), &
-            125._r8, wv_sat_table_spacing)
+       liquid_spec = ShrWVSatTableSpec(ceiling(200._r8/wv_sat_table_spacing), 175._r8, wv_sat_table_spacing)
+       ice_spec    = ShrWVSatTableSpec(ceiling(150._r8/wv_sat_table_spacing), 125._r8, wv_sat_table_spacing)
+       mixed_spec  = ShrWVSatTableSpec(ceiling(250._r8/wv_sat_table_spacing), 125._r8, wv_sat_table_spacing)
        call shr_wv_sat_make_tables(liquid_spec, ice_spec, mixed_spec)
     end if
 
+    !----------------------------------------------------------
+    ! Initialize phases
+    !----------------------------------------------------------
+
     call seq_infodata_putData(infodata, &
-         atm_phase=1,                   &
-         lnd_phase=1,                   &
-         ocn_phase=1,                   &
-         ice_phase=1,                   &
-         glc_phase=1,                   &
-         wav_phase=1,                   &
+         atm_phase=1, &
+         lnd_phase=1, &
+         ocn_phase=1, &
+         ice_phase=1, &
+         glc_phase=1, &
+         wav_phase=1, &
          esp_phase=1)
 
     !----------------------------------------------------------
-    !| Set aqua_planet and single_column flags
-    !  If in single column mode, overwrite flags according to focndomain file
-    !  in ocn_in namelist. SCAM can reset the "present" flags for lnd,
-    !  ocn, ice, rof, and flood.
+    ! Set single_column flags
+    ! If in single column mode, overwrite flags according to focndomain file
+    ! in ocn_in namelist. SCAM can reset the "present" flags for lnd,
+    ! ocn, ice, rof, and flood.
     !----------------------------------------------------------
+
+    call seq_infodata_GetData(infodata, &
+         atm_present=atm_present     , &
+         lnd_present=lnd_present     , &
+         ice_present=ice_present     , &
+         ocn_present=ocn_present     , &
+         glc_present=glc_present     , &
+         rof_present=rof_present     , &
+         wav_present=wav_present     , &
+         esp_present=esp_present     , &
+         single_column=single_column , &
+         aqua_planet=aqua_planet)
 
     if (.not.aqua_planet .and. single_column) then
        call seq_infodata_getData( infodata, &
@@ -865,6 +926,10 @@ contains
             flood_present=flood_present,    &
             rofice_present=rofice_present)
     endif
+
+    !----------------------------------------------------------
+    ! Finalize initialization
+    !----------------------------------------------------------
 
     if(PIO_FILE_IS_OPEN(pioid)) then
        call pio_closefile(pioid)
