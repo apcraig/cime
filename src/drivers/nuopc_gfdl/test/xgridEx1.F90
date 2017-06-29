@@ -19,25 +19,25 @@ program xgridEx1
     logkindflag=ESMF_LOGKIND_MULTI, rc=rc)
   if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!  ! 2D test case to show the use of XGrid with Mesh and Mesh
-!  call ESMF_XGridTest1(rc)
-!  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-!
-!  !! 2D test case to show the use of XGrid with Mosaic Grid and Mesh
-!  call ESMF_XGridTest2(rc)
-!  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-!
-!  !! 3D test case to show the use of XGrid to transform from 2D+1 lnd to 2D atm
-!  call ESMF_XGridTest3(rc)
-!  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-!
-!  !! 2D test case to show the use of XGrid with Mosaic Grid and tripolar Grid with realistic SST and masking
+  ! 2D test case to show the use of XGrid with Mesh and Mesh
+  call ESMF_XGridTest1(rc)
+  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  !! 2D test case to show the use of XGrid with Mosaic Grid and Mesh
+  call ESMF_XGridTest2(rc)
+  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  !! 3D test case to show the use of XGrid to transform from 2D+1 lnd to 2D atm
+  call ESMF_XGridTest3(rc)
+  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  !! 2D test case to show the use of XGrid with Mosaic Grid and tripolar Grid with realistic SST and masking
   call ESMF_XGridTest4(rc)
   if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   !! 2D test case to show the use of XGrid with Mosaic Grid and regular lat-lon Grid with realistic SST and masking
-!  call ESMF_XGridTest5(rc)
-!  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+  call ESMF_XGridTest5(rc)
+  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   call ESMF_Finalize()
   stop
@@ -977,13 +977,13 @@ program xgridEx1
       file=__FILE__)) &
       return  ! bail out
 
-    call ESMF_FieldWrite(ocnField, filename='ocnField_regridded',  &
-      overwrite=.true., &
-      variableName="sea_surface_temperature", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=__FILE__)) &
-      return  ! bail out
+    !call ESMF_FieldWrite(ocnField, filename='ocnField_regridded.nc',  &
+    !  overwrite=.true., &
+    !  variableName="sea_surface_temperature", rc=rc)
+    !if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+    !  line=__LINE__, &
+    !  file=__FILE__)) &
+    !  return  ! bail out
 
     !chksum = checksum2D(ocnPtr, rc)
     !if(I_AM_PET(0, rc)) print *, 'global checksum = ', chksum
