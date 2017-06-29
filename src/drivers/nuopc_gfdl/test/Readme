@@ -6,7 +6,11 @@ export ESMFMKFILE=/home/feiliu/ESMF/esmf/DEFAULTINSTALLDIR/lib/libg/Linux.gfortr
 2. gmake
 
 Run:
-1. Retrieve grid description files 
+1. Retrieve grid description and data files 
+wget --no-check-certificate https://raw.githubusercontent.com/feiliuesmf/esmftest/master/xgrid/test2/corner_lat_0.5.nc
+wget --no-check-certificate https://raw.githubusercontent.com/feiliuesmf/esmftest/master/xgrid/test2/corner_lon_0.5.nc
+wget --no-check-certificate https://raw.githubusercontent.com/feiliuesmf/esmftest/master/xgrid/test2/mask_0.5.nc
+wget --no-check-certificate https://raw.githubusercontent.com/feiliuesmf/esmftest/master/xgrid/test2/sst_0.5.nc
 mkdir data
 cd data
 wget --no-check-certificate https://raw.githubusercontent.com/feiliuesmf/esmftest/master/xgrid/test1/ll1deg_grid.nc
