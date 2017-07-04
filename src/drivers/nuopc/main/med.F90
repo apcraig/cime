@@ -17,15 +17,70 @@ module MED
     mediator_label_TimestampExport  => label_TimestampExport, &
     mediator_label_SetRunClock      => label_SetRunClock, &
     NUOPC_MediatorGet
-  use shr_nuopc_fldList_mod
-  use shr_nuopc_methods_mod
+
+  use shr_mct_mod           , only: shr_mct_queryConfigFile
   use seq_flds_mod
-  use seq_infodata_mod, only: infodata=>seq_infodata_infodata
-  use shr_mct_mod, only: shr_mct_queryConfigFile
-  use med_constants_mod
-  use med_internalstate_mod
-  use med_connectors_mod
-  use med_phases_mod
+  use seq_infodata_mod      , only: infodata=>seq_infodata_infodata
+
+  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Zero 
+  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_fromseqflds
+  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Add
+  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Realize
+  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Advertise
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_RH_Init
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_Init
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_Reset
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Field_GeomPrint
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_GeomPrint
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_GeomWrite
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_reset
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_CopyStateToInfodata
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_clock_timeprint
+  use med_internalstate_mod , only: InternalState
+  use med_internalstate_mod , only: fldsToAtm
+  use med_internalstate_mod , only: fldsFrAtm
+  use med_internalstate_mod , only: fldsToOcn
+  use med_internalstate_mod , only: fldsFrOcn
+  use med_internalstate_mod , only: fldsToIce
+  use med_internalstate_mod , only: fldsFrIce
+  use med_internalstate_mod , only: fldsToLnd
+  use med_internalstate_mod , only: fldsFrLnd
+  use med_internalstate_mod , only: fldsToRof
+  use med_internalstate_mod , only: fldsFrRof
+  use med_internalstate_mod , only: fldsToWav
+  use med_internalstate_mod , only: fldsFrWav
+  use med_internalstate_mod , only: fldsToGlc
+  use med_internalstate_mod , only: fldsFrGlc
+  use med_internalstate_mod , only: fldsAtmOcn
+  use med_connectors_mod    , only: med_connectors_prep_med2atm
+  use med_connectors_mod    , only: med_connectors_prep_med2ocn
+  use med_connectors_mod    , only: med_connectors_prep_med2ice
+  use med_connectors_mod    , only: med_connectors_prep_med2lnd
+  use med_connectors_mod    , only: med_connectors_prep_med2rof
+  use med_connectors_mod    , only: med_connectors_prep_med2wav
+  use med_connectors_mod    , only: med_connectors_prep_med2glc
+  use med_connectors_mod    , only: med_connectors_post_atm2med
+  use med_connectors_mod    , only: med_connectors_post_ocn2med
+  use med_connectors_mod    , only: med_connectors_post_ice2med
+  use med_connectors_mod    , only: med_connectors_post_lnd2med
+  use med_connectors_mod    , only: med_connectors_post_rof2med
+  use med_connectors_mod    , only: med_connectors_post_wav2med
+  use med_connectors_mod    , only: med_connectors_post_glc2med
+  use med_phases_mod        , only: med_phases_prep_atm
+  use med_phases_mod        , only: med_phases_prep_ocn
+  use med_phases_mod        , only: med_phases_prep_ice
+  use med_phases_mod        , only: med_phases_prep_lnd
+  use med_phases_mod        , only: med_phases_prep_rof
+  use med_phases_mod        , only: med_phases_prep_wav
+  use med_phases_mod        , only: med_phases_prep_glc
+  use med_phases_mod        , only: med_phases_accum_fast
+  use med_constants_mod     , only: med_constants_dbug_flag 
+  use med_constants_mod     , only: med_constants_statewrite_flag 
+  use med_constants_mod     , only: med_constants_spval_init 
+  use med_constants_mod     , only: med_constants_spval 
+  use med_constants_mod     , only: med_constants_czero 
+  use med_constants_mod     , only: med_constants_ispval_mask 
 
   implicit none
   
@@ -57,7 +112,7 @@ module MED
     rc = ESMF_SUCCESS
     
     !------------------
-    ! the NUOPC model component will register the generic methods
+    ! the NUOPC model component mediator_routine_SS will register the generic methods
     !------------------
 
     call NUOPC_CompDerive(gcomp, mediator_routine_SS, rc=rc)
@@ -75,6 +130,11 @@ module MED
     !------------------
     ! IPDv03p1: advertise Fields
     !------------------
+
+    ! Mediator advertises its import and export Fields and sets the TransferOfferGeomObject Attribute.
+    ! The TransferOfferGeomObject is a String value indicating a component’s
+    ! intention to transfer the underlying Grid or Mesh on which an advertised Field object is defined.
+    ! The valid values are: [will provide, can provide, cannot provide]
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv03p1"/), userRoutine=InitializeIPDv03p1, rc=rc)
@@ -365,6 +425,10 @@ module MED
   !-----------------------------------------------------------------------
 
   subroutine InitializeIPDv03p1(gcomp, importState, exportState, clock, rc)
+
+    ! Mediator advertises its import and export Fields and sets the
+    ! TransferOfferGeomObject Attribute.
+
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
@@ -380,7 +444,10 @@ module MED
     endif
     rc = ESMF_SUCCESS
     
+    !------------------
     ! Allocate memory for the internal state and set it in the Component.
+    !------------------
+
     allocate(is_local%wrap, stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
       msg="Allocation of the internal state memory failed.", &
@@ -391,8 +458,12 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
       
     !------------------
-    ! add a namespace
+    ! add a namespace (i.e. nested state)  for each import and export component state in the mediator's InternalState
     !------------------
+
+    ! Namespaces are implemented via nested states. This creates a nested state inside of
+    ! state. The nested state is returned as nestedState. nestedStateName will be used to name the
+    ! newly created nested state. 
 
     call NUOPC_AddNamespace(importState, namespace="ATM", nestedStateName="NestedState-AtmImp", nestedState=is_local%wrap%NState_AtmImp, rc=rc)
     call NUOPC_AddNamespace(importState, namespace="OCN", nestedStateName="NestedState-OcnImp", nestedState=is_local%wrap%NState_OcnImp, rc=rc)
@@ -408,6 +479,13 @@ module MED
     call NUOPC_AddNamespace(exportState, namespace="ROF", nestedStateName="NestedState-RofExp", nestedState=is_local%wrap%NState_RofExp, rc=rc)
     call NUOPC_AddNamespace(exportState, namespace="WAV", nestedStateName="NestedState-WavExp", nestedState=is_local%wrap%NState_WavExp, rc=rc)
     call NUOPC_AddNamespace(exportState, namespace="GLC", nestedStateName="NestedState-GlcExp", nestedState=is_local%wrap%NState_GlcExp, rc=rc)
+
+    !------------------
+    ! Zero out list of field information in for shr_nuopc_fldList_Type entries in the InternalState
+    ! Note that this simply deallocates any existing allocated arrays in the shr_nuopc_fldslist_Type entries
+    ! below and then allocate character arrays in the shr_nuopc_fldList_Type but does not
+    ! actually set them to anything
+    !------------------
 
     call shr_nuopc_fldList_Zero(fldsFrAtm, rc=rc)
     call shr_nuopc_fldList_Zero(fldsToAtm, rc=rc)
@@ -426,20 +504,19 @@ module MED
     call shr_nuopc_fldList_Zero(fldsAtmOcn, rc=rc)
 
     !------------------
-    ! fldsToAtm
+    ! Create fldsToAtm
     !------------------
-
     call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_states, "cannot provide", subname//":seq_flds_x2a_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-!    call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_fluxes, "cannot provide", subname//":seq_flds_x2a_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    !    call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_fluxes, "cannot provide", subname//":seq_flds_x2a_fluxes", "conservefrac", rc=rc)
+    !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_fluxes, "cannot provide", subname//":seq_flds_x2a_fluxes", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
     call shr_nuopc_fldList_Add(fldsToAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsFrAtm
+    ! Create fldsFrAtm
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_states, "cannot provide", subname//":seq_flds_a2x_states", "bilinear", rc=rc)
@@ -452,7 +529,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsToOcn
+    ! Create fldsToOcn
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_states, "cannot provide", subname//":seq_flds_x2o_states", "bilinear", rc=rc)
@@ -465,7 +542,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsFrOcn
+    ! Create fldsFrOcn
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_states, "cannot provide", subname//":seq_flds_o2x_states", "bilinear", rc=rc)
@@ -478,7 +555,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsToIce
+    ! Create fldsToIce
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_states, "cannot provide", subname//":seq_flds_x2i_states", "bilinear", rc=rc)
@@ -491,7 +568,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsFrIce
+    ! Create fldsFrIce
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_states, "cannot provide", subname//":seq_flds_i2x_states", "bilinear", rc=rc)
@@ -504,7 +581,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsToLnd
+    ! Create fldsToLnd
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToLnd, seq_flds_x2l_states, "cannot provide", subname//":seq_flds_x2l_states", "bilinear", rc=rc)
@@ -517,7 +594,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsFrLnd
+    ! Create fldsFrLnd
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrLnd, seq_flds_l2x_states, "cannot provide", subname//":seq_flds_l2x_states", "bilinear", rc=rc)
@@ -530,7 +607,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsToRof
+    ! Create fldsToRof
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_states, "cannot provide", subname//":seq_flds_x2r_states", "bilinear", rc=rc)
@@ -543,7 +620,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsFrRof
+    ! Create fldsFrRof
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_states, "cannot provide", subname//":seq_flds_r2x_states", "bilinear", rc=rc)
@@ -556,7 +633,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsToWav
+    ! Create fldsToWav
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2r_states, "cannot provide", subname//":seq_flds_x2r_states", "bilinear", rc=rc)
@@ -569,7 +646,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsFrWav
+    ! Create fldsFrWav
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_r2x_states, "cannot provide", subname//":seq_flds_r2x_states", "bilinear", rc=rc)
@@ -582,7 +659,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsToGlc
+    ! Create fldsToGlc
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2r_states, "cannot provide", subname//":seq_flds_x2r_states", "bilinear", rc=rc)
@@ -595,7 +672,7 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! fldsFrGlc
+    ! Create fldsFrGlc
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_r2x_states, "cannot provide", subname//":seq_flds_r2x_states", "bilinear", rc=rc)
@@ -608,8 +685,10 @@ module MED
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
     !------------------
-    ! Advertise
+    ! Mediator advertisement
     !------------------
+
+    ! Call NUOPC_Advertise from the mediator for each entry in the flds[Fr,To]XXX 
 
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_AtmImp, fldsFrAtm, subname//':FrAtm', rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
@@ -650,6 +729,9 @@ module MED
   !-----------------------------------------------------------------------------
 
   subroutine InitializeIPDv03p3(gcomp, importState, exportState, clock, rc)
+
+    ! Realize connected Fields with transfer action "provide"
+
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
@@ -768,6 +850,9 @@ module MED
   !-----------------------------------------------------------------------------
 
   subroutine InitializeIPDv03p4(gcomp, importState, exportState, clock, rc)
+
+    ! Otionally modify the decomp/distr of transferred Grid/Mesh
+
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
@@ -794,10 +879,11 @@ module MED
     
     rc = ESMF_SUCCESS
 
-    ! Get the internal state from Component.
+    ! Get the internal state from the mediator gridded component.
     nullify(is_local%wrap)
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
 
     call realizeConnectedGrid(is_local%wrap%NState_atmImp, 'AtmImp', rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
