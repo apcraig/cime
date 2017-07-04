@@ -195,4 +195,1309 @@
     </values>
   </entry>
 
+  <!-- =========================== -->
+  <!--  driver attributes  -->
+  <!-- =========================== -->
+
+  <entry id="cime_model" modify_via_xml="CIME_MODEL">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>acme,cesm</valid_values>
+    <desc>cime model</desc>
+    <values>
+      <value cime_model='cesm'>cesm</value>
+      <value cime_model='acme'>acme</value>
+    </values>
+  </entry>
+
+  <entry id="aqua_planet">
+    <type>logical</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      true => turn on aquaplanet mode in cam
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="aqua_planet_sst">
+    <type>integer</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      1 => default sst mode for aquaplanet in cam
+    </desc>
+    <values>
+      <value>1</value>
+    </values>
+  </entry>
+
+  <entry id="case_name" modify_via_xml="CASE">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      case name.
+    </desc>
+    <values>
+      <value>$CASE</value>
+    </values>
+  </entry>
+
+  <entry id="case_desc" modify_via_xml="CASESTR">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      case description.
+    </desc>
+    <values>
+    <value>$CASESTR</value>
+    </values>
+  </entry>
+
+<!--      CURRENTLY DOES NOT EXIST
+  <entry id="model_version" modify_via_xml="CCSM_REPOTAG">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      model version documentation,
+    </desc>
+    <values>
+      <value>unset</value>
+    </values>
+  </entry>
+-->
+
+  <entry id="username" modify_via_xml="USER">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      username documentation
+    </desc>
+    <values>
+      <value>$USER</value>
+    </values>
+  </entry>
+
+  <entry id="hostname" modify_via_xml="MACH">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      hostname information,
+    </desc>
+    <values>
+      <value>$MACH</value>
+    </values>
+  </entry>
+
+  <entry id="timing_dir">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      location of timing output.
+    </desc>
+    <values>
+      <value>./timing</value>
+    </values>
+  </entry>
+
+  <entry id="tchkpt_dir">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      location of timing checkpoint output.
+    </desc>
+    <values>
+      <value>./timing/checkpoints</value>
+    </values>
+  </entry>
+
+  <entry id="start_type" modify_via_xml="RUN_TYPE">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>startup,branch,continue</valid_values>
+    <desc>
+      mode to start the run up, [startup,branch,continue],
+      automatically derived from RUN_TYPE in env_run.xml
+    </desc>
+    <values>
+      <value run_type="startup" continue_run=".false.">startup</value>
+      <value run_type="hybrid"  continue_run=".false.">startup</value>
+      <value run_type="branch"  continue_run=".false.">branch</value>
+      <value run_type="startup" continue_run=".true.">continue</value>
+      <value run_type="hybrid"  continue_run=".true.">continue</value>
+      <value run_type="branch"  continue_run=".true.">continue</value>
+    </values>
+  </entry>
+
+  <entry id="brnch_retain_casename" modify_via_xml="RUN_REFCASE">
+    <type>logical</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Allow same branch casename as reference casename. If $CASE and $REFCASE are the same and the start_type is
+      not startup, then the value of brnch_retain_casename is set to .true.
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="info_debug" modify_via_xml="INFO_DBUG">
+    <type>integer</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Level of debug output, 0=minimum, 1=normal, 2=more, 3=too much (default: 1)
+    </desc>
+    <values>
+      <value>$INFO_DBUG</value>
+    </values>
+  </entry>
+
+  <entry id="bfbflag" modify_via_xml="BFBFLAG">
+    <type>logical</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turns on bfb option in coupler which produce bfb results in the
+      coupler on different processor counts.  (default: .false.)
+    </desc>
+    <values>
+      <value>$BFBFLAG</value>
+    </values>
+  </entry>
+
+  <entry id="orb_mode">
+    <type>char</type>
+    <category>orbital</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>fixed_year,variable_year,fixed_parameters</valid_values>
+    <desc>
+      orbital model setting.  this sets how the orbital mode will be
+      configured.
+      "fixed_year" uses the orb_iyear and other orb inputs are ignored.  In
+      this mode, the orbital parameters are constant and based on the year.
+      "variable_year" uses the orb_iyear and orb_iyear_align.  In this mode,
+      the orbital parameters vary as the model year advances and the model
+      year orb_iyear_align has the equivalent orbital year of orb_iyear.
+      "fixed_parameters" uses the orb_eccen, orb_mvelp, and orb_obliq to set
+      the orbital parameters which then remain constant through the model
+      integration. [fixed_year, variable_year, fixed_parameters]  (default: 'fixed_year'.)
+    </desc>
+    <values>
+      <value>fixed_year</value>
+    </values>
+  </entry>
+
+  <entry id="orb_iyear_align">
+    <type>integer</type>
+    <category>orbital</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      model year associated with orb_iyear when orb_mode is variable_year. (default: 1990)
+    </desc>
+    <values>
+      <value>1990</value>
+    </values>
+  </entry>
+
+  <entry id="orb_iyear">
+    <type>integer</type>
+    <category>orbital</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      year of orbit, used when orb_mode is fixed_year or variable_year. (default: 1990)
+    </desc>
+    <values>
+      <value>1990</value>
+    </values>
+  </entry>
+
+  <entry id="orb_eccen">
+    <type>real</type>
+    <category>orbital</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      eccentricity of orbit, used when orb_mode is fixed_parameters.
+      default: SHR_ORB_UNDEF_REAL (1.e36) (Not currently used in build-namelist)
+    </desc>
+    <values>
+      <value>1.e36</value>
+    </values>
+  </entry>
+
+  <entry id="orb_mvelp">
+    <type>real</type>
+    <category>orbital</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      location of vernal equinox in longitude degrees, used when orb_mode is fixed_parameters.
+      default: SHR_ORB_UNDEF_REAL (1.e36)(Not currently used in build-namelist)
+    </desc>
+    <values>
+      <value>1.e36</value>
+    </values>
+  </entry>
+
+  <entry id="orb_obliq">
+    <type>real</type>
+    <category>orbital</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      obliquity of orbit in degrees, used when orb_mode is fixed_parameters.
+      default: SHR_ORB_UNDEF_REAL (1.e36) (Not currently used in build-namelist)
+    </desc>
+    <values>
+      <value>1.e36</value>
+    </values>
+  </entry>
+
+  <entry id="wv_sat_scheme">
+    <type>char</type>
+    <category>wv_sat</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>GoffGratch,MurphyKoop,Bolton,Flatau</valid_values>
+    <desc>
+      Type of water vapor saturation vapor pressure scheme employed. 'GoffGratch' for
+      Goff and Gratch (1946); 'MurphyKoop' for Murphy and Koop (2005); 'Bolton' for
+      Bolton (1980); 'Flatau' for Flatau, Walko, and Cotton (1992).
+      Default: GoffGratch
+    </desc>
+    <values>
+      <value>GoffGratch</value>
+    </values>
+  </entry>
+
+  <entry id="wv_sat_transition_start">
+    <type>real</type>
+    <category>wv_sat</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Width of the liquid-ice transition range in mixed-phase water saturation vapor
+      pressure calculations. The range always ends at 0 degrees Celsius, so this
+      variable only affects the start of the transition.
+      Default: 20K
+      WARNING: CAM is tuned to the default value of this variable. Because it affects
+      so many different parameterizations, changes to this variable may require a
+      significant retuning of CAM's cloud physics to give reasonable results.
+    </desc>
+    <values>
+      <value>20.0D0</value>
+    </values>
+  </entry>
+
+  <entry id="wv_sat_use_tables">
+    <type>logical</type>
+    <category>wv_sat</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Whether or not to produce lookup tables at init time to use as a cache for
+      saturation vapor pressure.
+      Default: .false.
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="wv_sat_table_spacing">
+    <type>real</type>
+    <category>wv_sat</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Temperature resolution of saturation vapor pressure lookup tables in Kelvin.
+      (This is only used if wv_sat_use_tables is .true.)
+      Default: 1.0
+    </desc>
+    <values>
+      <value>1.0D0</value>
+    </values>
+  </entry>
+
+  <entry id="tfreeze_option" modify_via_xml="TFREEZE_SALTWATER_OPTION">
+    <type>char</type>
+    <category>control</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>Freezing point calculation for salt water.</desc>
+    <values>
+      <value>$TFREEZE_SALTWATER_OPTION</value>
+    </values>
+  </entry>
+
+  <entry id="flux_epbal" modify_via_xml="CPL_EPBAL">
+    <type>char</type>
+    <category>control</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>off,ocn</valid_values>
+    <desc>
+      Only used for C,G compsets: if ocn, ocn provides EP balance factor for precip
+    </desc>
+    <values>
+      <value>$CPL_EPBAL</value>
+    </values>
+  </entry>
+
+  <entry id="flux_albav" modify_via_xml="CPL_ALBAV">
+    <type>logical</type>
+    <category>control</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Only used for C,G compsets: if true, compute albedos to work with daily avg SW down
+    </desc>
+    <values>
+      <value>$CPL_ALBAV</value>
+    </values>
+  </entry>
+
+  <entry id="glc_renormalize_smb">
+    <type>char</type>
+    <category>control</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>on,off,on_if_glc_coupled_fluxes</valid_values>
+    <desc>
+      Whether to renormalize the surface mass balance (smb) sent from lnd to glc so that the
+      global integral on the glc grid agrees with the global integral on the lnd grid.
+
+      Unlike most fluxes, smb is remapped with bilinear rather than conservative mapping weights,
+      so this option is needed for conservation. However, conservation is not required in many
+      cases, since we often run glc as a diagnostic (one-way-coupled) component.
+
+      Allowable values are:
+      'on': always do this renormalization
+      'off': never do this renormalization (see WARNING below)
+      'on_if_glc_coupled_fluxes': Determine at runtime whether to do this renormalization.
+         Does the renormalization if we're running a two-way-coupled glc that sends fluxes
+         to other components (which is the case where we need conservation).
+         Does NOT do the renormalization if we're running a one-way-coupled glc, or if
+         we're running a glc-only compset (T compsets).
+         (In these cases, conservation is not important.)
+
+      Only used if running with a prognostic GLC component.
+
+      WARNING: Setting this to 'off' will break conservation when running with an
+      evolving, two-way-coupled glc.
+    </desc>
+    <values>
+      <value>on_if_glc_coupled_fluxes</value>
+    </values>
+  </entry>
+
+  <entry id="wall_time_limit">
+    <type>real</type>
+    <category>control</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Wall time limit for run
+      default: -1.0
+    </desc>
+    <values>
+      <value>-1.0</value>
+    </values>
+  </entry>
+
+  <entry id="force_stop_at">
+    <type>char</type>
+    <category>control</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>day,month,year</valid_values>
+    <desc>
+      Force stop at the next month, day, etc when wall_time_limit is hit
+      default: month
+    </desc>
+    <values>
+      <value>month</value>
+    </values>
+  </entry>
+
+  <entry id="flux_diurnal">
+    <type>logical</type>
+    <category>control</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      If true, turn on diurnal cycle in computing atm/ocn fluxes
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="gust_fac">
+    <type>real</type>
+    <category>control</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      wind gustiness factor
+    </desc>
+    <values>
+      <value>0.0D0</value>
+    </values>
+  </entry>
+
+  <entry id="atm_gnam" modify_via_xml="ATM_GRID">
+    <type>char</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      ATM_GRID values passed into driver.
+    </desc>
+    <values>
+      <value>$ATM_GRID</value>
+    </values>
+  </entry>
+
+  <entry id="lnd_gnam" modify_via_xml="LND_GRID">
+    <type>char</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      LND_GRID values passed into driver.
+    </desc>
+    <values>
+      <value>$LND_GRID</value>
+    </values>
+  </entry>
+
+  <entry id="ocn_gnam" modify_via_xml="OCN_GRID">
+    <type>char</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      OCN_GRID values passed into driver.
+    </desc>
+    <values>
+      <value>$OCN_GRID</value>
+    </values>
+  </entry>
+
+  <entry id="ice_gnam" modify_via_xml="ICE_GRID">
+    <type>char</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      ICE_GRID values passed into driver.
+    </desc>
+    <values>
+      <value>$ICE_GRID</value>
+    </values>
+  </entry>
+
+  <entry id="rof_gnam" modify_via_xml="ROF_GRID">
+    <type>char</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      ROF_GRID values passed into driver.
+    </desc>
+    <values>
+      <value>$ROF_GRID</value>
+    </values>
+  </entry>
+
+  <entry id="glc_gnam" modify_via_xml="GLC_GRID">
+    <type>char</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      GLC_GRID values passed into driver.
+    </desc>
+    <values>
+      <value>$GLC_GRID</value>
+    </values>
+  </entry>
+
+  <entry id="wav_gnam" modify_via_xml="WAV_GRID">
+    <type>char</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      WAV_GRID values passed into driver.
+    </desc>
+    <values>
+      <value>$WAV_GRID</value>
+    </values>
+  </entry>
+
+  <entry id="shr_map_dopole">
+    <type>logical</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      invoke pole averaging corrections in shr_map_mod weights generation (default: true)
+    </desc>
+    <values>
+      <value>.true.</value>
+    </values>
+  </entry>
+
+  <entry id="vect_map" modify_via_xml="VECT_MAP">
+    <type>char</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>none,npfix,cart3d,cart3d_diag,cart3d_uvw,cart3d_uvw_diag</valid_values>
+    <desc>
+      vect_map
+      turns on the vector mapping option for u and v vector mapping between
+      atm and ocean grids in the coupler.  the options are none, npfix,
+      cart3d, cart3d_diag, cart3d_uvw, and cart3d_uvw_diag.  the none option
+      results in scalar mapping independently for the u and v field which
+      tends to generate large errors near the poles.  npfix is the
+      traditional option where the vectors are corrected on the ocean grid
+      north of the last latitude line of the atmosphere grid.  the cart3d
+      options convert the east (u) and north (v) vectors to 3d (x,y,z)
+      triplets, and maps those fields before converting back to the east (u)
+      and north (v) directions.  the cart3d ignores the resuling "w"
+      velocity.  the cart3d_uvw calculates the resulting u and v vectors by
+      preserving the total "u,v,w" speed and the angle of the (u,v) vector.
+      the _diag options just add diagnotics to the log file about the vector
+      mapping.
+    </desc>
+    <values>
+      <value>$VECT_MAP</value>
+    </values>
+  </entry>
+
+  <entry id="aoflux_grid">
+    <type>char</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>ocn,atm,exch</valid_values>
+    <desc>
+      Grid for atm ocn flux calc (untested)
+      default: ocn
+    </desc>
+    <values>
+      <value>ocn</value>
+    </values>
+  </entry>
+
+  <entry id="mct_usealltoall">
+    <type>logical</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      mct alltoall mapping flag
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="mct_usevector">
+    <type>logical</type>
+    <category>mapping</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      mct vector flag
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="cpl_decomp" modify_via_xml="CPL_DECOMP">
+    <type>integer</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>0,1,2,3,4,5,6</valid_values>
+    <desc>
+      cpl decomp option (0=default, 1=comp decomp, 2=rearr comp decomp, 3=new single 1d seg
+      default: 0
+    </desc>
+    <values>
+      <value>$CPL_DECOMP</value>
+    </values>
+  </entry>
+
+  <entry id="cpl_seq_option" modify_via_xml="CPL_SEQ_OPTION">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>CESM1_ORIG,CESM1_MOD,CESM1_ORIG_TIGHT,CESM1_MOD_TIGHT,RASM_OPTION1,RASM_OPTION2</valid_values>
+    <desc>
+      Set the coupler sequencing.
+    </desc>
+    <values>
+      <value>$CPL_SEQ_OPTION</value>
+    </values>
+  </entry>
+
+  <entry id="cpl_cdf64">
+    <type>logical</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      default: true
+    </desc>
+    <values>
+      <value>.true.</value>
+    </values>
+  </entry>
+
+  <entry id="do_budgets" modify_via_xml="BUDGETS">
+    <type>logical</type>
+    <category>budget</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      logical that turns on diagnostic budgets, false means budgets will never be written
+    </desc>
+    <values>
+      <value>$BUDGETS</value>
+    </values>
+  </entry>
+
+  <entry id="do_histinit">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      logical to write an extra initial coupler history file
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="budget_inst">
+    <type>integer</type>
+    <category>budget</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>0,1,2,3</valid_values>
+    <desc>
+      sets the diagnotics level of the instantaneous budgets. [0,1,2,3],
+      written only if BUDGETS variable is true
+      0=none,
+      1=+net summary budgets,
+      2=+detailed lnd/ocn/ice component budgets,
+      3=+detailed atm budgets
+      default: 0
+    </desc>
+    <values>
+      <value>0</value>
+    </values>
+  </entry>
+
+  <entry id="budget_daily">
+    <type>integer</type>
+    <category>budget</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>0,1,2,3</valid_values>
+    <desc>
+      sets the diagnotics level of the daily budgets. [0,1,2,3],
+      written only if do_budgets variable is .true.,
+      0=none,
+      1=+net summary budgets,
+      2=+detailed lnd/ocn/ice component budgets,
+      3=+detailed atm budgets
+      default: 0
+    </desc>
+    <values>
+      <value>0</value>
+    </values>
+  </entry>
+
+  <entry id="budget_month">
+    <type>integer</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>0,1,2,3</valid_values>
+    <desc>
+      sets the diagnotics level of the monthy budgets. [0,1,2,3],
+      written only if do_budgets variable is .true.,
+      0=none,
+      1=+net summary budgets,
+      2=+detailed lnd/ocn/ice component budgets,
+      3=+detailed atm budgets
+      default: 1
+    </desc>
+    <values>
+      <value>1</value>
+    </values>
+  </entry>
+
+  <entry id="budget_ann">
+    <type>integer</type>
+    <category>budget</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>0,1,2,3</valid_values>
+    <desc>
+      sets the diagnotics level of the annual budgets. [0,1,2,3],
+      written only if do_budgets variable is .true.,
+      0=none,
+      1=+net summary budgets,
+      2=+detailed lnd/ocn/ice component budgets,
+      3=+detailed atm budgets
+      default: 1
+    </desc>
+    <values>
+      <value>1</value>
+    </values>
+  </entry>
+
+  <entry id="budget_ltann">
+    <type>integer</type>
+    <category>budget</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>0,1,2,3</valid_values>
+    <desc>
+      sets the diagnotics level of the longterm budgets written at the end
+      of the year. [0,1,2,3],
+      written only if do_budgets variable is .true.,
+      0=none,
+      1=+net summary budgets,
+      2=+detailed lnd/ocn/ice component budgets,
+      3=+detailed atm budgets,
+      default: 1
+    </desc>
+    <values>
+      <value>1</value>
+    </values>
+  </entry>
+
+  <entry id="budget_ltend">
+    <type>integer</type>
+    <category>budget</category>
+    <group>DRIVER_info_attributes</group>
+    <valid_values>0,1,2,3</valid_values>
+    <desc>
+      sets the diagnotics level of the longterm budgets written at the end
+      of each run. [0,1,2,3],
+      written only if do_budgets variable is .true.,
+      0=none,
+      1=+net summary budgets,
+      2=+detailed lnd/ocn/ice component budgets,
+      3=+detailed atm budgets,
+      default: 0
+    </desc>
+    <values>
+      <value>0</value>
+    </values>
+  </entry>
+
+  <entry id="histaux_a2x">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turns on coupler history stream for instantaneous atm to coupler fields.
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="histaux_a2x1hr">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turns on coupler history stream for 1-hour average atm to coupler fields.
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="histaux_a2x1hri">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turns on coupler history stream for 1-hour instantaneous atm to coupler fields.
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="histaux_a2x3hr">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turns on coupler history stream for 3-hour average atm to coupler fields.
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="histaux_a2x3hrp">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turns on coupler history stream for 3-hour average atm to coupler precip fields.
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="histaux_a2x24hr">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turns on coupler history stream for daily average atm to coupler fields.
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="histaux_l2x">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turns on coupler history stream for instantaneous land to coupler fields.
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="histaux_r2x">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turns on coupler history stream for instantaneous runoff to coupler fields.
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="histaux_l2x1yr">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turns on coupler history stream for annual sno to coupler fields.
+      default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="histavg_atm">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      writes atm fields in coupler average history files.
+      default: true
+    </desc>
+    <values>
+	<value>.true.</value>
+    </values>
+  </entry>
+
+  <entry id="histavg_lnd">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      writes lnd fields in coupler average history files.
+      default: true
+    </desc>
+    <values>
+      <value>.true.</value>
+    </values>
+  </entry>
+
+  <entry id="histavg_ocn">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      writes ocn fields in coupler average history files.
+      default: true
+    </desc>
+    <values>
+      <value>.true.</value>
+    </values>
+  </entry>
+
+  <entry id="histavg_ice">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      writes ice fields in coupler average history files.
+      default: true
+    </desc>
+    <values>
+      <value>.true.</value>
+    </values>
+  </entry>
+
+  <entry id="histavg_rof">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      writes rof fields in coupler average history files.
+      default: true
+    </desc>
+    <values>
+      <value>.true.</value>
+    </values>
+  </entry>
+
+  <entry id="histavg_glc">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      writes glc fields in coupler average history files.
+      default: true
+    </desc>
+    <values>
+      <value>.true.</value>
+    </values>
+  </entry>
+
+  <entry id="histavg_wav">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      writes wav fields in coupler average history files.
+      default: true
+    </desc>
+    <values>
+      <value>.true.</value>
+    </values>
+  </entry>
+
+  <entry id="histavg_xao">
+    <type>logical</type>
+    <category>history</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      writes xao fields in coupler average history files.
+      default: true
+    </desc>
+    <values>
+      <value>.true.</value>
+    </values>
+  </entry>
+
+  <entry id="drv_threading" modify_via_xml="DRV_THREADING">
+    <type>logical</type>
+    <category>performance</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turn on run time control of threading per pe per component by the driver
+      default: false
+    </desc>
+    <values>
+      <value>$DRV_THREADING</value>
+    </values>
+  </entry>
+
+  <entry id="run_barriers" modify_via_xml="COMP_RUN_BARRIERS">
+    <type>logical</type>
+    <category>performance</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      default: .false.
+    </desc>
+    <values>
+      <value>$COMP_RUN_BARRIERS</value>
+    </values>
+  </entry>
+
+  <entry id="eps_frac" modify_via_xml="EPS_FRAC">
+    <type>real</type>
+    <category>domain_check</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Error tolerance for differences in fractions in domain checking
+      default: 1.0e-02
+    </desc>
+    <values>
+      <value>$EPS_FRAC</value>
+    </values>
+  </entry>
+
+  <entry id="eps_amask" modify_via_xml="EPS_AMASK">
+    <type>real</type>
+    <category>domain_check</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Error tolerance for differences in atm/land masks in domain checking
+      default: 1.0e-13
+    </desc>
+    <values>
+      <value>$EPS_AMASK</value>
+    </values>
+  </entry>
+
+  <entry id="eps_agrid" modify_via_xml="EPS_AGRID">
+    <type>real</type>
+    <category>domain_check</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Error tolerance for differences in atm/land lat/lon in domain checking
+      default: 1.0e-12
+    </desc>
+    <values>
+      <value>$EPS_AGRID</value>
+    </values>
+  </entry>
+
+  <entry id="eps_aarea" modify_via_xml="EPS_AAREA">
+    <type>real</type>
+    <category>domain_check</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Error tolerance for differences in atm/land areas in domain checking
+      default: 1.0e-07
+    </desc>
+    <values>
+      <value>$EPS_AAREA</value>
+    </values>
+  </entry>
+
+  <entry id="eps_omask" modify_via_xml="EPS_OMASK">
+    <type>real</type>
+    <category>domain_check</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Error tolerance for differences in ocean/ice masks in domain checking
+      default: 1.0e-06
+    </desc>
+    <values>
+      <value>$EPS_OMASK</value>
+    </values>
+  </entry>
+
+  <entry id="eps_ogrid" modify_via_xml="EPS_OGRID">
+    <type>real</type>
+    <category>domain_check</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Error tolerance for differences in ocean/ice lon/lat in domain checking
+      default: 1.0e-2
+    </desc>
+    <values>
+      <value>$EPS_OGRID</value>
+    </values>
+  </entry>
+
+  <entry id="eps_oarea" modify_via_xml="EPS_OAREA">
+    <type>real</type>
+    <category>domain_check</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Error tolerance for differences in ocean/ice lon/lat in domain checking
+      default: 1.0e-1
+    </desc>
+    <values>
+      <value>$EPS_OAREA</value>
+    </values>
+  </entry>
+
+  <entry id="single_column" modify_via_xml="PTS_MODE">
+    <type>logical</type>
+    <category>DRIVER_info_attributes</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      turns on single column mode. set by PTS_MODE in env_case.xml, default: false
+    </desc>
+    <values>
+      <value>.false.</value>
+      <value single_column="true">.true.</value>
+    </values>
+  </entry>
+
+  <entry id="scmlat" modify_via_xml="PTS_LAT">
+    <type>real</type>
+    <category>DRIVER_info_attributes</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      grid point latitude associated with single column mode.
+      if set to -999, ignore this value
+    </desc>
+    <values>
+      <value>-999.</value>
+      <value single_column="true">$PTS_LAT</value>
+    </values>
+  </entry>
+
+  <entry id="scmlon" modify_via_xml="PTS_LON">
+    <type>real</type>
+    <category>DRIVER_info_attributes</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      grid point longitude associated with single column mode.
+      set by PTS_LON in env_run.xml.
+    </desc>
+    <values>
+      <value>-999.</value>
+      <value single_column="true">$PTS_LON</value>
+    </values>
+  </entry>
+
+  <entry id="reprosum_use_ddpdd">
+    <type>logical</type>
+    <category>reprosum</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Use faster method for reprosum, but one where reproducibility is not always guaranteed.
+      default: .false.
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="reprosum_diffmax">
+    <type>real</type>
+    <category>reprosum</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Tolerance for relative error
+      default: -1.0e-8
+    </desc>
+    <values>
+      <value>-1.0e-8</value>
+    </values>
+  </entry>
+
+  <entry id="reprosum_recompute">
+    <type>logical</type>
+    <category>reprosum</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Recompute with non-scalable algorithm if reprosum_diffmax is exceeded.
+      default: .false.
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="model_version">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Model version
+    </desc>
+    <values>
+      <value>unknown</value>
+    </values>
+  </entry>
+
+  <entry id="restart_pfile">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Driver restart pointer file.
+    </desc>
+    <values>
+      <value>rpointer.drv</value>
+    </values>
+  </entry>
+
+  <entry id="restart_file">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Full archive path to restart file
+    </desc>
+    <values>
+      <value>str_undefined</value>
+    </values>
+  </entry>
+
+  <entry id="logFilePostFix">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Ending suffix "postfix" for output log files.
+    </desc>
+    <values>
+      <value>.log</value>
+    </values>
+  </entry>
+
+  <entry id="outPathRoot">
+    <type>char</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Root for output log files.
+    </desc>
+    <values>
+      <value>./</value>
+    </values>
+  </entry>
+
+  <entry id="perpetual">
+    <type>logical</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Perpetual flag
+    </desc>
+    <values>
+      <value>.false.</value>
+    </values>
+  </entry>
+
+  <entry id="perpetual_ymd">
+    <type>integer</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Perpetual date
+    </desc>
+    <values>
+      <value>-999</value>
+    </values>
+  </entry>
+
+  <entry id="max_cplstep_time">
+    <type>real</type>
+    <category>expdef</category>
+    <group>DRIVER_info_attributes</group>
+    <desc>
+      Abort if cplstep time exceeds this value
+    </desc>
+    <values>
+      <value>0.</value>
+    </values>
+  </entry>
+
 </entry_id>
