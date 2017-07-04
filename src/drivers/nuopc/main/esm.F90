@@ -265,6 +265,15 @@ module ESM
     call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+    attrFF = NUOPC_FreeFormatCreate(config, label="DRIVER_maps_attributes::", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call NUOPC_FreeFormatPrint(attrFF, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call NUOPC_CompAttributeIngest(driver, attrFF, addFlag=.true., rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !-------------------------------------------    
     ! Initialize mct and pets and cesm stuff
     !-------------------------------------------    
@@ -699,6 +708,14 @@ module ESM
 
         ! for now read DRIVER_info_attributes from config file into FreeFormat
         attrFF = NUOPC_FreeFormatCreate(config, label="DRIVER_info_attributes::", relaxedflag=.true., rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+        ! for now read DRIVER_info_attributes from config file into FreeFormat
+        attrFF = NUOPC_FreeFormatCreate(config, label="DRIVER_maps_attributes::", relaxedflag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return

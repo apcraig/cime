@@ -24,10 +24,8 @@ module cesm_init_mod
   use perf_mod
 
   !----------------------------------------------------------------------------
-  ! cpl7 modules
-  !----------------------------------------------------------------------------
-
   ! mpi comm data & routines, plus logunit and loglevel
+  !----------------------------------------------------------------------------
   use seq_comm_mct, only: CPLID, GLOID, logunit, loglevel
   use seq_comm_mct, only: ATMID, LNDID, OCNID, ICEID, GLCID, ROFID, WAVID, ESPID
   use seq_comm_mct, only: ALLATMID,ALLLNDID,ALLOCNID,ALLICEID,ALLGLCID,ALLROFID,ALLWAVID,ALLESPID
@@ -41,10 +39,13 @@ module cesm_init_mod
   use seq_comm_mct, only: num_inst_total, num_inst_max
   use seq_comm_mct, only: seq_comm_iamin, seq_comm_name, seq_comm_namelen, seq_comm_iamroot
   use seq_comm_mct, only: seq_comm_init, seq_comm_setnthreads, seq_comm_getnthreads
+  use seq_comm_mct, only: seq_comm_gloroot
   use seq_comm_mct, only: seq_comm_getinfo => seq_comm_setptrs
   use seq_comm_mct, only: seq_comm_petlist
 
+  !----------------------------------------------------------------------------
   ! clock & alarm routines and variables
+  !----------------------------------------------------------------------------
   use seq_timemgr_mod, only: seq_timemgr_type
   use seq_timemgr_mod, only: seq_timemgr_clockInit
   use seq_timemgr_mod, only: seq_timemgr_clockPrint
@@ -62,27 +63,30 @@ module cesm_init_mod
   use seq_timemgr_mod, only: EClock_w => seq_timemgr_Eclock_w
   use seq_timemgr_mod, only: EClock_e => seq_timemgr_Eclock_e
 
+  !----------------------------------------------------------------------------
   ! "infodata" gathers various control flags into one datatype
+  !----------------------------------------------------------------------------
   use seq_infodata_mod, only: seq_infodata_type 
   use seq_infodata_mod, only: seq_infodata_putData, seq_infodata_GetData
   use seq_infodata_mod, only: seq_infodata_init1, seq_infodata_init2
   use seq_infodata_mod, only: seq_infodata_orb_variable_year
   use seq_infodata_mod, only: seq_infodata_orb_fixed_year
   use seq_infodata_mod, only: seq_infodata_orb_fixed_parameters
-  use seq_infodata_mod, only: seq_infodata_print 
   use seq_infodata_mod, only: infodata=>seq_infodata_infodata
 
-  ! i/o subroutines
-  ! MV: use seq_io_mod, only : seq_io_cpl_init
-
-  ! rearrange type routines
-  ! MV: use cplcomp_exchange_mod, only: seq_mctext_decomp
-
+  !----------------------------------------------------------------------------
   ! list of fields transferred between components
+  !----------------------------------------------------------------------------
   use seq_flds_mod, only : seq_flds_set
 
-  ! --- timing routines ---
+  !----------------------------------------------------------------------------
+  ! timing routines 
+  !----------------------------------------------------------------------------
   use t_drv_timers_mod
+
+  ! MV: use seq_io_mod, only : seq_io_cpl_init
+  ! MV: use seq_io_mod, only : seq_io_cpl_init
+  ! MV: use cplcomp_exchange_mod, only: seq_mctext_decomp
 
   implicit none
 
@@ -186,6 +190,7 @@ module cesm_init_mod
   character(CS) :: aoflux_grid       ! grid for a/o flux calc: atm xor ocn
   character(CS) :: vect_map          ! vector mapping type
 
+
   logical       :: read_restart      ! local read restart flag
   character(CL) :: restart_file      ! restart file path + filename
 
@@ -196,27 +201,6 @@ module cesm_init_mod
   logical  :: reprosum_recompute     ! setup reprosum, recompute if tolerance exceeded
 
   logical  :: output_perf = .false.  ! require timing data output for this pe
-
-  !--- history ---
-  logical :: do_histinit             ! initial hist file
-  logical :: do_hist_r2x             ! create aux files: r2x
-  logical :: do_hist_l2x             ! create aux files: l2x
-  logical :: do_hist_a2x24hr         ! create aux files: a2x
-  logical :: do_hist_l2x1yr          ! create aux files: l2x
-  logical :: do_hist_a2x             ! create aux files: a2x
-  logical :: do_hist_a2x3hrp         ! create aux files: a2x 3hr precip
-  logical :: do_hist_a2x3hr          ! create aux files: a2x 3hr states
-  logical :: do_hist_a2x1hri         ! create aux files: a2x 1hr instantaneous
-  logical :: do_hist_a2x1hr          ! create aux files: a2x 1hr
-
-  !--- budgets ---
-  logical :: do_budgets              ! heat/water budgets on
-  integer :: budget_inst             ! instantaneous budget flag
-  integer :: budget_daily            ! daily budget flag
-  integer :: budget_month            ! monthly budget flag
-  integer :: budget_ann              ! annual budget flag
-  integer :: budget_ltann            ! long term budget flag for end of year writing
-  integer :: budget_ltend            ! long term budget flag for end of run writing
 
   character(CL) :: hist_a2x_flds     = &
        'Faxa_swndr:Faxa_swvdr:Faxa_swndf:Faxa_swvdf'
@@ -364,32 +348,67 @@ contains
     use shr_wv_sat_mod , only: shr_wv_sat_set_default, shr_wv_sat_init 
     use shr_wv_sat_mod , only: ShrWVSatTableSpec, shr_wv_sat_make_tables
     use shr_orb_mod    , only: SHR_ORB_UNDEF_INT, SHR_ORB_UNDEF_REAL, shr_orb_params
+    use shr_file_mod,    only: shr_file_getUnit, shr_file_freeUnit
+    use seq_io_read_mod, only: seq_io_read
 
     ! INPUT/OUTPUT PARAMETERS:
     type(ESMF_GridComp), intent(inout)  :: driver
 
     ! LOCAL
-    type(file_desc_t)                  :: pioid
-    integer                            :: maxthreads
-    character(CS)                      :: wv_sat_scheme
-    real(r8)                           :: wv_sat_transition_start
-    logical                            :: wv_sat_use_tables
-    real(r8)                           :: wv_sat_table_spacing
-    character(CL)                      :: errstring
-    character(CL)                      :: cvalue  
-    type(ShrWVSatTableSpec)            :: liquid_spec, ice_spec, mixed_spec
-    real(r8), parameter                :: epsilo = shr_const_mwwv/shr_const_mwdair
-    integer, dimension(num_inst_total) :: comp_id, comp_comm, comp_comm_iam
-    logical                            :: comp_iamin(num_inst_total)
-    logical                            :: flag
-    character(len=seq_comm_namelen)    :: comp_name(num_inst_total)
-    integer                            :: i, it
-    character(*), parameter            :: u_FILE_u =  __FILE__
+    character(CL)                   :: atm_gnam     ! atm grid
+    character(CL)                   :: lnd_gnam     ! lnd grid
+    character(CL)                   :: ocn_gnam     ! ocn grid
+    character(CL)                   :: ice_gnam     ! ice grid
+    character(CL)                   :: rof_gnam     ! rof grid
+    character(CL)                   :: glc_gnam     ! glc grid
+    character(CL)                   :: wav_gnam     ! wav grid
+    character(CL)                   :: samegrid_ao  ! samegrid atm and ocean
+    character(CL)                   :: samegrid_al  ! samegrid atm and land
+    character(CL)                   :: samegrid_lr  ! samegrid land and rof
+    character(CL)                   :: samegrid_oi  ! samegrid ocean and ice
+    character(CL)                   :: samegrid_ro  ! samegrid runoff and ocean
+    character(CL)                   :: samegrid_aw  ! samegrid atm and wave
+    character(CL)                   :: samegrid_ow  ! samegrid ocean and wave
+    character(CL)                   :: samegrid_lg  ! samegrid glc and land
+    character(CL)                   :: samegrid_og  ! samegrid glc and ocean
+    character(CL)                   :: samegrid_ig  ! samegrid glc and ice
+    character(CL)                   :: samegrid_alo ! samegrid atm, lnd, ocean
+    type(file_desc_t)               :: pioid
+    integer                         :: maxthreads
+    character(CS)                   :: wv_sat_scheme
+    real(SHR_KIND_R8)               :: wv_sat_transition_start
+    logical                         :: wv_sat_use_tables
+    real(SHR_KIND_R8)               :: wv_sat_table_spacing
+    character(CL)                   :: errstring
+    character(CL)                   :: cvalue  
+    type(ShrWVSatTableSpec)         :: liquid_spec
+    type(ShrWVSatTableSpec)         :: ice_spec
+    type(ShrWVSatTableSpec)         :: mixed_spec
+    integer                         :: comp_id(num_inst_total) 
+    integer                         :: comp_comm(num_inst_total)
+    integer                         :: comp_comm_iam(num_inst_total)
+    logical                         :: comp_iamin(num_inst_total)
+    character(len=seq_comm_namelen) :: comp_name(num_inst_total)
+    logical                         :: flag
+    integer                         :: i, it
+    character(SHR_KIND_CL)          :: start_type                     ! Type of startup
+    logical                         :: read_restart                   ! read the restart file, based on start_type
+    character(SHR_KIND_CL)          :: restart_file                   ! Full archive path to restart file
+    character(SHR_KIND_CL)          :: restart_pfile                  ! Restart pointer file
+    real(SHR_KIND_R8)               :: nextsw_cday = -1.0_SHR_KIND_R8 ! calendar of next atm shortwave
+    real(SHR_KIND_R8)               :: precip_fact = 1.0_SHR_KIND_R8  ! precip factor
+    character(SHR_KIND_CL)          :: rest_case_name                 ! Short case identification
+    integer                         :: unitn                          ! Namelist unit number to read
+    real(SHR_KIND_R8), parameter    :: epsilo = shr_const_mwwv/shr_const_mwdair
+    character(len=*) , parameter    :: u_FILE_u =  __FILE__
+    character(len=*) , parameter    :: sp_str = 'str_undefined'
+    character(len=*) , parameter    :: seq_infodata_start_type_start = "startup"
+    character(len=*) , parameter    :: seq_infodata_start_type_cont  = "continue"
+    character(len=*) , parameter    :: seq_infodata_start_type_brnch = "branch"
 
     !----------------------------------------------------------
     !| Initialize MCT and MPI communicators and IO
     !----------------------------------------------------------
-
 
     call mpi_initialized(flag,ierr)
     call shr_mpi_chkerr(ierr,subname//' mpi_initialized')
@@ -613,7 +632,110 @@ contains
     ! Initialize infodata
     !----------------------------------------------------------
 
-    call seq_infodata_init1(infodata, driver, GLOID, pioid)
+    call seq_infodata_init1(infodata, driver, GLOID)
+
+    !----------------------------------------------------------
+    ! Add atm_aero to driver attributes 
+    !----------------------------------------------------------
+
+    call NUOPC_CompAttributeAdd(driver, attrList=(/'atm_aero'/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    ! set initial value to .false.
+    ! Note currently this is a duplicate setting of what is done in infodata
+    call NUOPC_CompAttributeSet(driver, name='atm_aero', value='.false.', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    !----------------------------------------------------------
+    ! Deterine same grid attributes
+    !----------------------------------------------------------
+
+    call NUOPC_CompAttributeGet(driver, name="atm_gnam", value=atm_gnam, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeGet(driver, name="lnd_gnam", value=lnd_gnam, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeGet(driver, name="rof_gnam", value=rof_gnam, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeGet(driver, name="ice_gnam", value=ice_gnam, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeGet(driver, name="ocn_gnam", value=ocn_gnam, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeGet(driver, name="wav_gnam", value=wav_gnam, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    samegrid_ao  = '.true.'
+    samegrid_al  = '.true.'
+    samegrid_lr  = '.true.'
+    samegrid_oi  = '.true.'
+    samegrid_ro  = '.true.'
+    samegrid_aw  = '.true.'
+    samegrid_ow  = '.true.'
+    samegrid_lg  = '.true.'
+    samegrid_og  = '.true.'
+    samegrid_ig  = '.true.'
+    samegrid_alo = '.true.'
+
+    ! set samegrid to true for single column
+    if (.not. single_column) then
+       if (trim(atm_gnam) /= trim(ocn_gnam)) samegrid_ao = '.false.'
+       if (trim(atm_gnam) /= trim(lnd_gnam)) samegrid_al = '.false.'
+       if (trim(lnd_gnam) /= trim(rof_gnam)) samegrid_lr = '.false.'
+       if (trim(rof_gnam) /= trim(ocn_gnam)) samegrid_ro = '.false.'
+       if (trim(ocn_gnam) /= trim(ice_gnam)) samegrid_oi = '.false.'
+       if (trim(atm_gnam) /= trim(wav_gnam)) samegrid_aw = '.false.'
+       if (trim(ocn_gnam) /= trim(wav_gnam)) samegrid_ow = '.false.'
+       if (trim(lnd_gnam) /= trim(glc_gnam)) samegrid_lg = '.false.'
+       if (trim(ocn_gnam) /= trim(glc_gnam)) samegrid_og = '.false.'
+       if (trim(ice_gnam) /= trim(glc_gnam)) samegrid_ig = '.false.'
+       if (samegrid_al == '.true.' .and. samegrid_ao == '.true.') then
+          samegrid_alo = '.true.'
+       else
+          samegrid_alo = '.false.'
+       end if
+    endif
+
+    call NUOPC_CompAttributeAdd(driver, attrList=(/'samegrid_ao', 'samegrid_al', 'samegrid_lr', &
+         'samegrid_oi', 'samegrid_ro', 'samegrid_aw', 'samegrid_ow', 'samegrid_lg', &
+         'samegrid_og', 'samegrid_ig', 'samegrid_alo'/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeSet(driver, name="samegrid_ao", value=samegrid_ao, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeSet(driver, name="samegrid_al", value=samegrid_al, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeSet(driver, name="samegrid_lr", value=samegrid_lr, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeSet(driver, name="samegrid_oi", value=samegrid_oi, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeSet(driver, name="samegrid_ro", value=samegrid_ro, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeSet(driver, name="samegrid_aw", value=samegrid_aw, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeSet(driver, name="samegrid_ow", value=samegrid_ow, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeSet(driver, name="samegrid_lg", value=samegrid_lg, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeSet(driver, name="samegrid_og", value=samegrid_og, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeSet(driver, name="samegrid_ig", value=samegrid_ig, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeSet(driver, name="samegrid_alo", value=samegrid_alo, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
 
     !----------------------------------------------------------
     ! Check consistency of driver attributes 
@@ -626,90 +748,6 @@ contains
     !----------------------------------------------------------
 
     call seq_flds_set(nlfilename, GLOID, infodata)
-
-    !----------------------------------------------------------
-    ! history 
-    !----------------------------------------------------------
-
-    call NUOPC_CompAttributeGet(driver, name="do_histinit", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) do_histinit 
-
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) do_hist_a2x
-
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x1hri", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) do_hist_a2x1hri 
-
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x1hr", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) do_hist_a2x1hr 
-
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x3hr", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) do_hist_a2x3hr 
-
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x3hrp", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) do_hist_a2x3hrp 
-
-    call NUOPC_CompAttributeGet(driver, name="histaux_a2x24hr", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) do_hist_a2x24hr 
-
-    call NUOPC_CompAttributeGet(driver, name="histaux_l2x1yr", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) do_hist_l2x1yr 
-
-    call NUOPC_CompAttributeGet(driver, name="histaux_l2x", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) do_hist_l2x 
-
-    call NUOPC_CompAttributeGet(driver, name="histaux_r2x", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) do_hist_r2x 
-
-    !----------------------------------------------------------
-    ! budgets
-    !----------------------------------------------------------
-
-    call NUOPC_CompAttributeGet(driver, name="do_budgets", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) do_budgets 
-
-    call NUOPC_CompAttributeGet(driver, name="budget_inst", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) budget_inst 
-
-    call NUOPC_CompAttributeGet(driver, name="budget_daily", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) budget_daily 
-
-    call NUOPC_CompAttributeGet(driver, name="budget_month", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) budget_month 
-
-    call NUOPC_CompAttributeGet(driver, name="budget_ann", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) budget_ann 
-
-    call NUOPC_CompAttributeGet(driver, name="budget_ltann", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) budget_ltann 
-
-    call NUOPC_CompAttributeGet(driver, name="budget_ltend", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
-    read(cvalue,*) budget_ltend 
-
-    !----------------------------------------------------------
-    ! pole corrections in shr_map_mod
-    !----------------------------------------------------------
-
-    call NUOPC_CompAttributeGet(driver, name="shr_map_dopole", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-    read(cvalue,*) shr_map_dopole 
 
     call shr_map_setDopole(shr_map_dopole)
 
@@ -785,6 +823,86 @@ contains
        call seq_comm_setnthreads(nthreads_GLOID)
     endif
 
+    !-----------------------------------------------------
+    ! Determine if restart is read
+    !-----------------------------------------------------
+
+    call NUOPC_CompAttributeGet(driver, name='start_type', value=start_type, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    read_restart = .false.
+    if (trim(start_type) == trim(seq_infodata_start_type_cont) .or. &
+        trim(start_type) == trim(seq_infodata_start_type_brnch)) then
+       read_restart = .true.
+    endif
+
+    ! Add rest_case_name and read_restart to driver attributes
+    call NUOPC_CompAttributeAdd(driver, attrList=(/'rest_case_name','read_restart'/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    rest_case_name = ' ' 
+    call NUOPC_CompAttributeSet(driver, name='rest_case_name', value=rest_case_name, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    write(cvalue,*) read_restart
+    call NUOPC_CompAttributeSet(driver, name='read_restart', value=trim(cvalue), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    !-----------------------------------------------------
+    ! Read Restart (seq_io_read must be called on all pes)
+    !-----------------------------------------------------
+
+    if (read_restart) then
+       !--- read rpointer if restart_file is set to sp_str ---
+       if (seq_comm_iamroot(GLOID)) then
+
+          call NUOPC_CompAttributeGet(driver, name='restart_file', value=restart_file, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+          if (trim(restart_file) == trim(sp_str)) then
+             ! Read pointer file
+
+             call NUOPC_CompAttributeGet(driver, name='restart_pfile', value=restart_file, rc=rc)
+             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+             unitn = shr_file_getUnit()
+             if (loglevel > 0) write(logunit,"(3A)") subname," read rpointer file ", trim(restart_pfile)
+             open(unitn, file=restart_pfile, form='FORMATTED', status='old',iostat=ierr)
+             if (ierr < 0) then
+                call shr_sys_abort( subname//':: rpointer file open returns an'// ' error condition' )
+             end if
+             read(unitn,'(a)', iostat=ierr) restart_file
+             if (ierr < 0) then
+                call shr_sys_abort( subname//':: rpointer file read returns an'// ' error condition' )
+             end if
+             close(unitn)
+             call shr_file_freeUnit( unitn )
+             write(logunit,"(3A)") subname,' restart file from rpointer= ', trim(restart_file)
+          endif
+       endif
+       call shr_mpi_bcast(restart_file,mpicom_GLOID)
+
+       call NUOPC_CompAttributeSet(driver, name='restart_pfile', value=restart_file, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+       !--- NOTE: use CPLID here because seq_io is only value on CPLID
+       if (seq_comm_iamin(CPLID)) then
+          call seq_io_read(restart_file, pioid, nextsw_cday   , 'seq_infodata_nextsw_cday')
+          call seq_io_read(restart_file, pioid, precip_fact   , 'seq_infodata_precip_fact')
+          call seq_io_read(restart_file ,pioid ,rest_case_name, 'seq_infodata_case_name'  )
+       endif
+
+       !--- Send from CPLID ROOT to GLOBALID ROOT, use bcast as surrogate
+       call shr_mpi_bcast(nextsw_cday    ,mpicom_GLOID, pebcast=seq_comm_gloroot(CPLID))
+       call shr_mpi_bcast(precip_fact    ,mpicom_GLOID, pebcast=seq_comm_gloroot(CPLID))
+       call shr_mpi_bcast(rest_case_name ,mpicom_GLOID, pebcast=seq_comm_gloroot(CPLID))
+
+       call seq_infodata_putData(infodata, &
+            nextsw_cday=nextsw_cday, &
+            precip_fact=precip_fact, &
+            rest_case_name=rest_case_name)
+    endif
+
     !----------------------------------------------------------
     ! Initialize time manager
     !----------------------------------------------------------
@@ -809,7 +927,7 @@ contains
     ! Initialize infodata items which need the clocks
     !----------------------------------------------------------
 
-    call seq_infodata_init2(infodata, GLOID)
+    call seq_infodata_init2(infodata)
 
     !----------------------------------------------------------
     ! Initialize freezing point calculation for all components
@@ -972,14 +1090,14 @@ contains
     ! Initialize phases
     !----------------------------------------------------------
 
-    call seq_infodata_putData(infodata, &
-         atm_phase=1, &
-         lnd_phase=1, &
-         ocn_phase=1, &
-         ice_phase=1, &
-         glc_phase=1, &
-         wav_phase=1, &
-         esp_phase=1)
+    ! call seq_infodata_putData(infodata, &
+    !      atm_phase=1, &
+    !      lnd_phase=1, &
+    !      ocn_phase=1, &
+    !      ice_phase=1, &
+    !      glc_phase=1, &
+    !      wav_phase=1, &
+    !      esp_phase=1)
 
     !----------------------------------------------------------
     ! Set single_column flags
@@ -988,17 +1106,17 @@ contains
     ! ocn, ice, rof, and flood.
     !----------------------------------------------------------
 
-    call seq_infodata_GetData(infodata, &
-         atm_present=atm_present     , &
-         lnd_present=lnd_present     , &
-         ice_present=ice_present     , &
-         ocn_present=ocn_present     , &
-         glc_present=glc_present     , &
-         rof_present=rof_present     , &
-         wav_present=wav_present     , &
-         esp_present=esp_present     , &
-         single_column=single_column , &
-         aqua_planet=aqua_planet)
+    ! call seq_infodata_GetData(infodata, &
+    !      atm_present=atm_present     , &
+    !      lnd_present=lnd_present     , &
+    !      ice_present=ice_present     , &
+    !      ocn_present=ocn_present     , &
+    !      glc_present=glc_present     , &
+    !      rof_present=rof_present     , &
+    !      wav_present=wav_present     , &
+    !      esp_present=esp_present     , &
+    !      single_column=single_column , &
+    !      aqua_planet=aqua_planet)
 
     if (.not.aqua_planet .and. single_column) then
        call seq_infodata_getData( infodata, &

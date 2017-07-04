@@ -18,7 +18,6 @@ module MED
     mediator_label_SetRunClock      => label_SetRunClock, &
     NUOPC_MediatorGet
 
-  use shr_mct_mod           , only: shr_mct_queryConfigFile
   use seq_flds_mod
   use seq_infodata_mod      , only: infodata=>seq_infodata_infodata
 
@@ -1705,10 +1704,12 @@ module MED
     endif
 
     if (is_local%wrap%a2o_active) then
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2ocn_fmapname:',fmapfile)
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2ocn_smapname:',smapfile)
-      call ESMF_LogWrite(" fmapname "//trim(fmapfile), ESMF_LOGMSG_INFO)
-      call ESMF_LogWrite(" smapname "//trim(smapfile), ESMF_LOGMSG_INFO)
+      call NUOPC_CompAttributeGet(gcomp, name="atm2ocn_fmapname", value=fmapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call NUOPC_CompAttributeGet(gcomp, name="atm2ocn_smapname", value=smapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_LogWrite(" fmapname a2o "//trim(fmapfile), ESMF_LOGMSG_INFO)
+      call ESMF_LogWrite(" smapname a2o "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_o, &
         bilnrmap=is_local%wrap%RH_a2o_bilnr, &
         consfmap=is_local%wrap%RH_a2o_consf, &
@@ -1724,8 +1725,12 @@ module MED
     endif
 
     if (is_local%wrap%a2i_active) then
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2ice_fmapname:',fmapfile)
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2ice_smapname:',smapfile)
+      call NUOPC_CompAttributeGet(gcomp, name="atm2ice_fmapname", value=fmapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call NUOPC_CompAttributeGet(gcomp, name="atm2ice_smapname", value=smapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_LogWrite(" fmapname a2i "//trim(fmapfile), ESMF_LOGMSG_INFO)
+      call ESMF_LogWrite(" smapname a2i "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_i, &
         bilnrmap=is_local%wrap%RH_a2i_bilnr, &
         consfmap=is_local%wrap%RH_a2i_consf, &
@@ -1741,8 +1746,12 @@ module MED
     endif
 
     if (is_local%wrap%a2l_active) then
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2lnd_fmapname:',fmapfile)
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'atm2lnd_smapname:',smapfile)
+      call NUOPC_CompAttributeGet(gcomp, name="atm2lnd_fmapname", value=fmapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call NUOPC_CompAttributeGet(gcomp, name="atm2lnd_smapname", value=smapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_LogWrite(" fmapname a2l "//trim(fmapfile), ESMF_LOGMSG_INFO)
+      call ESMF_LogWrite(" smapname a2l "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_l, &
         bilnrmap=is_local%wrap%RH_a2l_bilnr, &
         consfmap=is_local%wrap%RH_a2l_consf, &
@@ -1757,8 +1766,12 @@ module MED
     endif
 
     if (is_local%wrap%o2a_active) then
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ocn2atm_fmapname:',fmapfile)
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ocn2atm_smapname:',smapfile)
+      call NUOPC_CompAttributeGet(gcomp, name="ocn2atm_fmapname", value=fmapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call NUOPC_CompAttributeGet(gcomp, name="ocn2atm_smapname", value=smapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_LogWrite(" fmapname o2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
+      call ESMF_LogWrite(" smapname o2a "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBOcn_o, FBdst=is_local%wrap%FBOcn_a, &
         bilnrmap=is_local%wrap%RH_o2a_bilnr, &
         consfmap=is_local%wrap%RH_o2a_consf, &
@@ -1774,8 +1787,6 @@ module MED
     endif
 
     if (is_local%wrap%o2i_active) then
-!      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ocn2ice_fmapname:',fmapfile)
-!      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ocn2ice_smapname:',smapfile)
       fmapfile = "idmap"
       smapfile = "idmap"
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBOcn_o, FBdst=is_local%wrap%FBOcn_i, &
@@ -1793,8 +1804,12 @@ module MED
     endif
 
     if (is_local%wrap%i2a_active) then
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ice2atm_fmapname:',fmapfile)
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ice2atm_smapname:',smapfile)
+      call NUOPC_CompAttributeGet(gcomp, name="ice2atm_fmapname", value=fmapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call NUOPC_CompAttributeGet(gcomp, name="ice2atm_smapname", value=smapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_LogWrite(" fmapname i2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
+      call ESMF_LogWrite(" smapname i2a "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBIce_i, FBdst=is_local%wrap%FBIce_a, &
         bilnrmap=is_local%wrap%RH_i2a_bilnr, &
         consfmap=is_local%wrap%RH_i2a_consf, &
@@ -1810,8 +1825,6 @@ module MED
     endif
 
     if (is_local%wrap%i2o_active) then
-!      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ice2ocn_fmapname:',fmapfile)
-!      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'ice2ocn_smapname:',smapfile)
       fmapfile = "idmap"
       smapfile = "idmap"
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBIce_i, FBdst=is_local%wrap%FBIce_o, &
@@ -1829,8 +1842,12 @@ module MED
     endif
 
     if (is_local%wrap%l2a_active) then
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'lnd2atm_fmapname:',fmapfile)
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'lnd2atm_smapname:',smapfile)
+      call NUOPC_CompAttributeGet(gcomp, name="lnd2atm_fmapname", value=fmapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call NUOPC_CompAttributeGet(gcomp, name="lnd2atm_smapname", value=smapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_LogWrite(" fmapname l2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
+      call ESMF_LogWrite(" smapname l2a "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_a, &
         bilnrmap=is_local%wrap%RH_l2a_bilnr, &
         consfmap=is_local%wrap%RH_l2a_consf, &
@@ -1847,8 +1864,12 @@ module MED
     if (is_local%wrap%l2r_active) then
 ! tcx note bilinear is set to conserv to get past initialization.  the subroutine thinks it'll
 ! need bilinear mapping weights but it won't for l2r.
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'lnd2rof_fmapname:',fmapfile)
-!     call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'lnd2rof_smapname:',smapfile)
+      call NUOPC_CompAttributeGet(gcomp, name="lnd2rof_fmapname", value=fmapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_LogWrite(" fmapname l2r "//trim(fmapfile), ESMF_LOGMSG_INFO)
+      !call NUOPC_CompAttributeGet(gcomp, name="lnd2rof_smapname", value=smapfile, rc=rc)
+      !if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      !call ESMF_LogWrite(" smapname l2a "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_r, &
         bilnrmap=is_local%wrap%RH_l2r_bilnr, &
         consfmap=is_local%wrap%RH_l2r_consf, &
@@ -1863,7 +1884,9 @@ module MED
     endif
 
     if (is_local%wrap%r2o_active) then
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2ocn_liq_rmapname:',rlmapfile)
+      call NUOPC_CompAttributeGet(gcomp, name="rof2ocn_liq_rmapname", value=rlmapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_LogWrite(" rlmapname  r2o"//trim(rlmapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_o, &
 !       bilnrmap=is_local%wrap%RH_r2o_bilnr, &
         consfmap=is_local%wrap%RH_r2ol_consf, &
@@ -1876,7 +1899,9 @@ module MED
         rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2ocn_ice_rmapname:',rimapfile)
+      call NUOPC_CompAttributeGet(gcomp, name="rof2ocn_ice_rmapname", value=rimapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_LogWrite(" rimapname  r2o"//trim(rlmapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_o, &
 !       bilnrmap=is_local%wrap%RH_r2o_bilnr, &
         consfmap=is_local%wrap%RH_r2oi_consf, &
@@ -1892,8 +1917,9 @@ module MED
     if (is_local%wrap%r2l_active) then
 ! tcx note bilinear is set to conserv to get past initialization.  the subroutine thinks it'll
 ! need bilinear mapping weights but it won't for l2r.
-      call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2lnd_fmapname:',fmapfile)
-!     call shr_mct_queryConfigFile(is_local%wrap%mpicom,maprcfile,'rof2lnd_smapname:',smapfile)
+      call NUOPC_CompAttributeGet(gcomp, name="rof2lnd_fmapname", value=fmapfile, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      call ESMF_LogWrite(" fmapname r2l "//trim(fmapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_l, &
         bilnrmap=is_local%wrap%RH_r2l_bilnr, &
         consfmap=is_local%wrap%RH_r2l_consf, &
