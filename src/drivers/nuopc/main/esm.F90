@@ -256,7 +256,7 @@ module ESM
     call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    attrFF = NUOPC_FreeFormatCreate(config, label="driver_input::", rc=rc)
+    attrFF = NUOPC_FreeFormatCreate(config, label="DRIVER_info_attributes::", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_FreeFormatPrint(attrFF, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -690,8 +690,15 @@ module ESM
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read MED attributes from config file into FreeFormat
-        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", &
-          relaxedflag=.true., rc=rc)
+        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", relaxedflag=.true., rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+        ! for now read DRIVER_info_attributes from config file into FreeFormat
+        attrFF = NUOPC_FreeFormatCreate(config, label="DRIVER_info_attributes::", relaxedflag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -863,7 +870,7 @@ module ESM
 
   subroutine esm_AddAttributes(gcomp, driver, MCTID, rc)
 
-    ! Add specific set of attributes to gcomp from infodata
+    ! Add specific set of attributes to gcomp from driver attributes
     use shr_sys_mod
 
     ! input/output parameters
@@ -878,8 +885,8 @@ module ESM
     integer, parameter :: nattrlist = 20
     character(len=*), parameter :: attrList(nattrlist) = &
       (/ "case_name"    ,"single_column","scmlat"        ,"scmlon"               , &
-         "orb_eccen"    ,"orb_obliqr"   ,"orb_lambm0"    ,"orb_mvelpp"           , &
          "read_restart" ,"start_type"   ,"tfreeze_option","model_version"        , &
+         "orb_eccen"    ,"orb_obliqr"   ,"orb_lambm0"    ,"orb_mvelpp"           , &
          "info_debug"   ,"atm_aero"     ,"aqua_planet"   ,"brnch_retain_casename", &
          "perpetual"    ,"perpetual_ymd","hostname"      ,"username"/)
     character(len=*), parameter :: subname = "(esm.F90:esm_AddAttributes)"
@@ -887,7 +894,7 @@ module ESM
 
     rc = ESMF_Success
 
-    ! Add MCTID to gcomp attributes
+    ! First add MCTID to gcomp attributes
     write(cvalue,*) MCTID
     call NUOPC_CompAttributeAdd(gcomp, attrList=(/'MCTID'/), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
