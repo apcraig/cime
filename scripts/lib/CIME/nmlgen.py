@@ -657,7 +657,11 @@ class NamelistGenerator(object):
         """ Write  component modelio files"""
         self._namelist.write(filename, groups=["modelio", "pio_inparm"], format_="nml")
 
-    def write_nuopc_config_file(self, filename):
+    def write_nuopc_config_file(self, filename, data_list_path=None):
         self._definition.validate(self._namelist)
         groups = self._namelist.get_group_names()
         self._namelist.write(filename, groups=groups, format_='nuopc', sorted_groups=False)
+        if data_list_path is not None:
+            # append to input_data_list file
+            with open(data_list_path, "a") as input_data_list:
+                self._write_input_files(input_data_list)

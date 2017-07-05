@@ -69,8 +69,8 @@ MODULE seq_infodata_mod
      character(SHR_KIND_CS)  :: hostname                ! Current machine
      character(SHR_KIND_CL)  :: timing_dir              ! Dir for timing files
      character(SHR_KIND_CL)  :: tchkpt_dir              ! Dir for timing checkpoint files
-     logical                 :: aqua_planet             ! No ice/lnd, analytic ocn, perpetual time
-     integer(SHR_KIND_IN)    :: aqua_planet_sst = 1     ! aqua planet analytic sst type (cam aquaplanet model only)
+     logical                 :: aqua_planet             ! No ice/lnd, analytic ocn, perpetual time (cam aquaplanet testing mode only)
+     integer(SHR_KIND_IN)    :: aqua_planet_sst = 1     ! aqua planet analytic sst type (cam aquaplanet testing mode only)
      logical                 :: run_barriers            ! barrier component run calls
      logical                 :: brnch_retain_casename   ! If branch and can use same casename
      logical                 :: read_restart            ! read the restart file, based on start_type (only for data models)
@@ -97,26 +97,14 @@ MODULE seq_infodata_mod
      real(SHR_KIND_R8)       :: gust_fac                ! wind gustiness factor
      character(SHR_KIND_CL)  :: glc_renormalize_smb     ! Whether to renormalize smb sent from lnd -> glc
      real(SHR_KIND_R8)       :: wall_time_limit         ! force stop time limit (hours)
-     character(SHR_KIND_CS)  :: force_stop_at           ! when to force a stop (month, day, etc)
-     character(SHR_KIND_CL)  :: atm_gnam                ! atm grid
-     character(SHR_KIND_CL)  :: lnd_gnam                ! lnd grid
-     character(SHR_KIND_CL)  :: ocn_gnam                ! ocn grid
-     character(SHR_KIND_CL)  :: ice_gnam                ! ice grid
-     character(SHR_KIND_CL)  :: rof_gnam                ! rof grid
-     character(SHR_KIND_CL)  :: glc_gnam                ! glc grid
-     character(SHR_KIND_CL)  :: wav_gnam                ! wav grid
      logical                 :: shr_map_dopole          ! pole corrections in shr_map_mod
      character(SHR_KIND_CL)  :: vect_map                ! vector mapping option, none, cart3d, cart3d_diag, cart3d_uvw, cart3d_uvw_diag
-     character(SHR_KIND_CS)  :: aoflux_grid             ! grid for atm ocn flux calc
      integer                 :: cpl_decomp              ! coupler decomp
      character(SHR_KIND_CL)  :: cpl_seq_option          ! coupler sequencing option
      logical                 :: cpl_cdf64               ! use netcdf 64 bit offset, large file support
      logical                 :: do_budgets              ! do heat/water budgets diagnostics
      logical                 :: do_histinit             ! write out initial history file
      logical                 :: drv_threading           ! is threading control in driver turned on
-     logical                 :: reprosum_use_ddpdd      ! use ddpdd algorithm
-     real(SHR_KIND_R8)       :: reprosum_diffmax        ! maximum difference tolerance
-     logical                 :: reprosum_recompute      ! recompute reprosum with nonscalable algorithm if reprosum_diffmax is exceeded
 
      !--- set via namelist and may be time varying ---
      integer(SHR_KIND_IN)    :: info_debug              ! debug level
@@ -308,20 +296,12 @@ CONTAINS
        esp_present             , &
        esp_prognostic          , &
        bfbflag                 , &
-       lnd_gnam                , &
        cpl_decomp              , &
        cpl_seq_option          , &
-       ice_gnam                , &
-       rof_gnam                , &
-       glc_gnam                , &
-       wav_gnam                , &
-       atm_gnam                , &
-       ocn_gnam                , &
        info_debug              , &
        dead_comps              , &
        shr_map_dopole          , &
        vect_map                , &
-       aoflux_grid             , &
        flux_epbalfact          , &
        nextsw_cday             , &
        precip_fact             , &
@@ -336,7 +316,6 @@ CONTAINS
        flux_diurnal            , &
        gust_fac                , &
        wall_time_limit         , &
-       force_stop_at           , &
        cpl_cdf64               , &
        orb_iyear               , &
        orb_iyear_align         , &
@@ -371,9 +350,6 @@ CONTAINS
        ocn_ny                  , &
        glc_nx                  , &
        glc_ny                  , &
-       reprosum_use_ddpdd      , &
-       reprosum_diffmax        , &
-       reprosum_recompute      , &
        atm_resume              , &
        lnd_resume              , &
        ocn_resume              , &
@@ -430,26 +406,14 @@ CONTAINS
     real(SHR_KIND_R8),      optional, intent(OUT) :: gust_fac                ! wind gustiness factor
     character(len=*),       optional, intent(OUT) :: glc_renormalize_smb     ! Whether to renormalize smb sent from lnd -> glc
     real(SHR_KIND_R8),      optional, intent(OUT) :: wall_time_limit         ! force stop wall time (hours)
-    character(len=*),       optional, intent(OUT) :: force_stop_at           ! force stop at next (month, day, etc)
-    character(len=*),       optional, intent(OUT) :: atm_gnam                ! atm grid
-    character(len=*),       optional, intent(OUT) :: lnd_gnam                ! lnd grid
-    character(len=*),       optional, intent(OUT) :: ocn_gnam                ! ocn grid
-    character(len=*),       optional, intent(OUT) :: ice_gnam                ! ice grid
-    character(len=*),       optional, intent(OUT) :: rof_gnam                ! rof grid
-    character(len=*),       optional, intent(OUT) :: glc_gnam                ! glc grid
-    character(len=*),       optional, intent(OUT) :: wav_gnam                ! wav grid
     logical,                optional, intent(OUT) :: shr_map_dopole          ! pole corrections in shr_map_mod
     character(len=*),       optional, intent(OUT) :: vect_map                ! vector mapping option
-    character(len=*),       optional, intent(OUT) :: aoflux_grid             ! grid for atm ocn flux calc
     integer,                optional, intent(OUT) :: cpl_decomp              ! coupler decomp
     character(len=*),       optional, intent(OUT) :: cpl_seq_option          ! coupler sequencing option
     logical,                optional, intent(OUT) :: cpl_cdf64               ! netcdf large file setting
     logical,                optional, intent(OUT) :: do_budgets              ! heat/water budgets
     logical,                optional, intent(OUT) :: do_histinit             ! initial history file
     logical,                optional, intent(OUT) :: drv_threading           ! driver threading control flag
-    logical,                optional, intent(OUT) :: reprosum_use_ddpdd      ! use ddpdd algorithm
-    real(SHR_KIND_R8),      optional, intent(OUT) :: reprosum_diffmax        ! maximum difference tolerance
-    logical,                optional, intent(OUT) :: reprosum_recompute      ! recompute if tolerance exceeded
 
     integer(SHR_KIND_IN),   optional, intent(OUT) :: info_debug
     logical,                optional, intent(OUT) :: bfbflag
@@ -560,26 +524,14 @@ CONTAINS
     if ( present(gust_fac)       ) gust_fac       = infodata%gust_fac
     if ( present(glc_renormalize_smb)) glc_renormalize_smb = infodata%glc_renormalize_smb
     if ( present(wall_time_limit)) wall_time_limit= infodata%wall_time_limit
-    if ( present(force_stop_at)  ) force_stop_at  = infodata%force_stop_at
-    if ( present(atm_gnam)       ) atm_gnam       = infodata%atm_gnam
-    if ( present(lnd_gnam)       ) lnd_gnam       = infodata%lnd_gnam
-    if ( present(ocn_gnam)       ) ocn_gnam       = infodata%ocn_gnam
-    if ( present(ice_gnam)       ) ice_gnam       = infodata%ice_gnam
-    if ( present(rof_gnam)       ) rof_gnam       = infodata%rof_gnam
-    if ( present(glc_gnam)       ) glc_gnam       = infodata%glc_gnam
-    if ( present(wav_gnam)       ) wav_gnam       = infodata%wav_gnam
     if ( present(shr_map_dopole) ) shr_map_dopole = infodata%shr_map_dopole
     if ( present(vect_map)       ) vect_map       = infodata%vect_map
-    if ( present(aoflux_grid)    ) aoflux_grid    = infodata%aoflux_grid
     if ( present(cpl_decomp)     ) cpl_decomp     = infodata%cpl_decomp
     if ( present(cpl_seq_option) ) cpl_seq_option = infodata%cpl_seq_option
     if ( present(cpl_cdf64)      ) cpl_cdf64      = infodata%cpl_cdf64
     if ( present(do_budgets)     ) do_budgets     = infodata%do_budgets
     if ( present(do_histinit)    ) do_histinit    = infodata%do_histinit
     if ( present(drv_threading)  ) drv_threading  = infodata%drv_threading
-    if ( present(reprosum_use_ddpdd)) reprosum_use_ddpdd = infodata%reprosum_use_ddpdd
-    if ( present(reprosum_diffmax)  ) reprosum_diffmax   = infodata%reprosum_diffmax
-    if ( present(reprosum_recompute)) reprosum_recompute = infodata%reprosum_recompute
 
     if ( present(info_debug)     ) info_debug     = infodata%info_debug
     if ( present(bfbflag)        ) bfbflag        = infodata%bfbflag
@@ -758,20 +710,12 @@ CONTAINS
        esp_present             , &
        esp_prognostic          , &
        bfbflag                 , &
-       lnd_gnam                , &
        cpl_decomp              , &
        cpl_seq_option          , &
-       ice_gnam                , &
-       rof_gnam                , &
-       glc_gnam                , &
-       wav_gnam                , &
-       atm_gnam                , &
-       ocn_gnam                , &
        info_debug              , &
        dead_comps              , &
        shr_map_dopole          , &
        vect_map                , &
-       aoflux_grid             , &
        run_barriers            , &
        nextsw_cday             , &
        precip_fact             , &
@@ -785,7 +729,6 @@ CONTAINS
        drv_threading           , &
        flux_diurnal            , &
        gust_fac                , &
-       force_stop_at           , &
        cpl_cdf64               , &
        orb_iyear               , &
        orb_iyear_align         , &
@@ -820,9 +763,6 @@ CONTAINS
        ocn_ny                  , &
        glc_nx                  , &
        glc_ny                  , &
-       reprosum_use_ddpdd      , &
-       reprosum_diffmax        , &
-       reprosum_recompute      , &
        atm_resume              , &
        lnd_resume              , &
        ocn_resume              , &
@@ -878,26 +818,14 @@ CONTAINS
     real(SHR_KIND_R8),      optional, intent(IN)    :: gust_fac                ! wind gustiness factor
     character(len=*),       optional, intent(IN)    :: glc_renormalize_smb     ! Whether to renormalize smb sent from lnd -> glc
     real(SHR_KIND_R8),      optional, intent(IN)    :: wall_time_limit         ! force stop wall time (hours)
-    character(len=*),       optional, intent(IN)    :: force_stop_at           ! force a stop at next (month, day, etc)
-    character(len=*),       optional, intent(IN)    :: atm_gnam                ! atm grid
-    character(len=*),       optional, intent(IN)    :: lnd_gnam                ! lnd grid
-    character(len=*),       optional, intent(IN)    :: ocn_gnam                ! ocn grid
-    character(len=*),       optional, intent(IN)    :: ice_gnam                ! ice grid
-    character(len=*),       optional, intent(IN)    :: rof_gnam                ! rof grid
-    character(len=*),       optional, intent(IN)    :: glc_gnam                ! glc grid
-    character(len=*),       optional, intent(IN)    :: wav_gnam                ! wav grid
     logical,                optional, intent(IN)    :: shr_map_dopole          ! pole corrections in shr_map_mod
     character(len=*),       optional, intent(IN)    :: vect_map                ! vector mapping option
-    character(len=*),       optional, intent(IN)    :: aoflux_grid             ! grid for atm ocn flux calc
     integer,                optional, intent(IN)    :: cpl_decomp              ! coupler decomp
     character(len=*),       optional, intent(IN)    :: cpl_seq_option          ! coupler sequencing option
     logical,                optional, intent(IN)    :: cpl_cdf64               ! netcdf large file setting
     logical,                optional, intent(IN)    :: do_budgets              ! heat/water budgets
     logical,                optional, intent(IN)    :: do_histinit             ! initial history file
     logical,                optional, intent(IN)    :: drv_threading      ! driver threading control flag
-    logical,                optional, intent(IN)    :: reprosum_use_ddpdd ! use ddpdd algorithm
-    real(SHR_KIND_R8),      optional, intent(IN)    :: reprosum_diffmax   ! maximum difference tolerance
-    logical,                optional, intent(IN)    :: reprosum_recompute ! recompute if tolerance exceeded
 
     integer(SHR_KIND_IN),   optional, intent(IN)    :: info_debug
     logical,                optional, intent(IN)    :: bfbflag
@@ -1008,26 +936,14 @@ CONTAINS
     if ( present(gust_fac)       ) infodata%gust_fac       = gust_fac
     if ( present(glc_renormalize_smb)) infodata%glc_renormalize_smb = glc_renormalize_smb
     if ( present(wall_time_limit)) infodata%wall_time_limit= wall_time_limit
-    if ( present(force_stop_at)  ) infodata%force_stop_at  = force_stop_at
-    if ( present(atm_gnam)       ) infodata%atm_gnam       = atm_gnam
-    if ( present(lnd_gnam)       ) infodata%lnd_gnam       = lnd_gnam
-    if ( present(ocn_gnam)       ) infodata%ocn_gnam       = ocn_gnam
-    if ( present(ice_gnam)       ) infodata%ice_gnam       = ice_gnam
-    if ( present(rof_gnam)       ) infodata%rof_gnam       = rof_gnam
-    if ( present(glc_gnam)       ) infodata%glc_gnam       = glc_gnam
-    if ( present(wav_gnam)       ) infodata%wav_gnam       = wav_gnam
     if ( present(shr_map_dopole) ) infodata%shr_map_dopole = shr_map_dopole
     if ( present(vect_map)       ) infodata%vect_map       = vect_map
-    if ( present(aoflux_grid)    ) infodata%aoflux_grid    = aoflux_grid
     if ( present(cpl_decomp)     ) infodata%cpl_decomp     = cpl_decomp
     if ( present(cpl_seq_option) ) infodata%cpl_seq_option = cpl_seq_option
     if ( present(cpl_cdf64)      ) infodata%cpl_cdf64      = cpl_cdf64
     if ( present(do_budgets)     ) infodata%do_budgets     = do_budgets
     if ( present(do_histinit)    ) infodata%do_histinit    = do_histinit
     if ( present(drv_threading)  ) infodata%drv_threading  = drv_threading
-    if ( present(reprosum_use_ddpdd)) infodata%reprosum_use_ddpdd = reprosum_use_ddpdd
-    if ( present(reprosum_diffmax)  ) infodata%reprosum_diffmax   = reprosum_diffmax
-    if ( present(reprosum_recompute)) infodata%reprosum_recompute = reprosum_recompute
 
     if ( present(info_debug)     ) infodata%info_debug     = info_debug
     if ( present(bfbflag)        ) infodata%bfbflag        = bfbflag
@@ -1157,15 +1073,14 @@ CONTAINS
 
     use shr_mpi_mod, only : shr_mpi_bcast
 
-    ! !DESCRIPTION: Broadcast the pause_resume data from an infodata across pes
+    ! !DESCRIPTION: 
+    ! Broadcast the pause_resume data from an infodata across pes of mpicom
 
     ! !INPUT/OUTPUT PARAMETERS:
 
     type(seq_infodata_type),        intent(INOUT) :: infodata ! assume valid on root pe
     integer(SHR_KIND_IN),           intent(IN)    :: mpicom   ! MPI Communicator
     integer(SHR_KIND_IN), optional, intent(IN)    :: pebcast  ! pe sending
-
-    !EOP
 
     !----- local -----
     integer                     :: ind
@@ -1219,18 +1134,13 @@ CONTAINS
 
     implicit none
 
-    ! !DESCRIPTION:  ! Broadcast an infodata across pes
+    ! !DESCRIPTION:  
+    ! Broadcast an infodata across pes of mpicom
 
     ! !INPUT/OUTPUT PARAMETERS:
 
     type(seq_infodata_type), intent(INOUT) :: infodata    ! assume valid on root pe
     integer(SHR_KIND_IN),    intent(IN)    :: mpicom      ! mpi comm
-
-    !----- local -----
-    integer :: ind
-
-    !-------------------------------------------------------------------------------
-    ! Notes:
     !-------------------------------------------------------------------------------
 
     call shr_mpi_bcast(infodata%cime_model,              mpicom)
@@ -1270,31 +1180,17 @@ CONTAINS
     call shr_mpi_bcast(infodata%gust_fac,                mpicom)
     call shr_mpi_bcast(infodata%glc_renormalize_smb,     mpicom)
     call shr_mpi_bcast(infodata%wall_time_limit,         mpicom)
-    call shr_mpi_bcast(infodata%force_stop_at,           mpicom)
-    call shr_mpi_bcast(infodata%atm_gnam,                mpicom)
-    call shr_mpi_bcast(infodata%lnd_gnam,                mpicom)
-    call shr_mpi_bcast(infodata%ocn_gnam,                mpicom)
-    call shr_mpi_bcast(infodata%ice_gnam,                mpicom)
-    call shr_mpi_bcast(infodata%rof_gnam,                mpicom)
-    call shr_mpi_bcast(infodata%glc_gnam,                mpicom)
-    call shr_mpi_bcast(infodata%wav_gnam,                mpicom)
     call shr_mpi_bcast(infodata%shr_map_dopole,          mpicom)
     call shr_mpi_bcast(infodata%vect_map,                mpicom)
-    call shr_mpi_bcast(infodata%aoflux_grid,             mpicom)
     call shr_mpi_bcast(infodata%cpl_decomp,              mpicom)
     call shr_mpi_bcast(infodata%cpl_seq_option,          mpicom)
     call shr_mpi_bcast(infodata%cpl_cdf64,               mpicom)
     call shr_mpi_bcast(infodata%do_budgets,              mpicom)
     call shr_mpi_bcast(infodata%do_histinit,             mpicom)
     call shr_mpi_bcast(infodata%drv_threading,           mpicom)
-    call shr_mpi_bcast(infodata%reprosum_use_ddpdd,      mpicom)
-    call shr_mpi_bcast(infodata%reprosum_diffmax,        mpicom)
-    call shr_mpi_bcast(infodata%reprosum_recompute,      mpicom)
-
     call shr_mpi_bcast(infodata%info_debug,              mpicom)
     call shr_mpi_bcast(infodata%bfbflag,                 mpicom)
     call shr_mpi_bcast(infodata%dead_comps,              mpicom)
-
     call shr_mpi_bcast(infodata%atm_present,             mpicom)
     call shr_mpi_bcast(infodata%atm_prognostic,          mpicom)
     call shr_mpi_bcast(infodata%lnd_present,             mpicom)

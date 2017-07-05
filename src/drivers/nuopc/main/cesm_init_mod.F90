@@ -5,22 +5,22 @@ module cesm_init_mod
   !----------------------------------------------------------------------------
   use ESMF
   use NUOPC
-  use shr_kind_mod,      only: r8 => SHR_KIND_R8
-  use shr_kind_mod,      only: cs => SHR_KIND_CS
-  use shr_kind_mod,      only: cl => SHR_KIND_CL
+  use shr_kind_mod,      only: SHR_KIND_R8
+  use shr_kind_mod,      only: SHR_KIND_CS
+  use shr_kind_mod,      only: SHR_KIND_CL
   use shr_sys_mod,       only: shr_sys_abort, shr_sys_flush
   use shr_const_mod,     only: shr_const_cday
   use shr_file_mod,      only: shr_file_setLogLevel, shr_file_setLogUnit
   use shr_file_mod,      only: shr_file_setIO, shr_file_getUnit
   use shr_scam_mod,      only: shr_scam_checkSurface
   use shr_map_mod,       only: shr_map_setDopole
-  use shr_mpi_mod,       only: shr_mpi_min, shr_mpi_max
+  use shr_mpi_mod,       only: shr_mpi_min, shr_mpi_max, shr_mpi_bcast, shr_mpi_chkerr
   use shr_mem_mod,       only: shr_mem_init, shr_mem_getusage
   use shr_cal_mod,       only: shr_cal_date2ymd, shr_cal_ymd2date, shr_cal_advdateInt
   use shr_orb_mod,       only: shr_orb_params
   use shr_frz_mod,       only: shr_frz_freezetemp_init
   use shr_reprosum_mod,  only: shr_reprosum_setopts
-  use mct_mod            ! mct_ wrappers for mct lib
+  !use mct_mod            ! mct_ wrappers for mct lib
   use perf_mod
 
   !----------------------------------------------------------------------------
@@ -41,7 +41,6 @@ module cesm_init_mod
   use seq_comm_mct, only: seq_comm_init, seq_comm_setnthreads, seq_comm_getnthreads
   use seq_comm_mct, only: seq_comm_gloroot
   use seq_comm_mct, only: seq_comm_getinfo => seq_comm_setptrs
-  use seq_comm_mct, only: seq_comm_petlist
 
   !----------------------------------------------------------------------------
   ! clock & alarm routines and variables
@@ -66,7 +65,6 @@ module cesm_init_mod
   !----------------------------------------------------------------------------
   ! "infodata" gathers various control flags into one datatype
   !----------------------------------------------------------------------------
-  use seq_infodata_mod, only: seq_infodata_type 
   use seq_infodata_mod, only: seq_infodata_putData, seq_infodata_GetData
   use seq_infodata_mod, only: seq_infodata_init1, seq_infodata_init2
   use seq_infodata_mod, only: seq_infodata_orb_variable_year
@@ -93,173 +91,9 @@ module cesm_init_mod
   private
 
   public :: cesm_init
-  public :: timing_dir
   public :: mpicom_GLOID
 
 #include <mpif.h>
-
-  !----------------------------------------------------------------------------
-  ! time management
-  !----------------------------------------------------------------------------
-
-  real(r8) :: days_per_year = 365.0  ! days per year
-
-  integer  :: dtime                  ! dt of one coupling interval
-  integer  :: ncpl                   ! number of coupling intervals per day
-  integer  :: ymd                    ! Current date (YYYYMMDD)
-  integer  :: year                   ! Current date (YYYY)
-  integer  :: month                  ! Current date (MM)
-  integer  :: day                    ! Current date (DD)
-  integer  :: tod                    ! Current time of day (seconds)
-  integer  :: ymdtmp                 ! temporary date (YYYYMMDD)
-  integer  :: todtmp                 ! temporary time of day (seconds)
-  character(CL) :: orb_mode          ! orbital mode
-  character(CS) :: tfreeze_option    ! Freezing point calculation
-  integer  :: orb_iyear              ! orbital year
-  integer  :: orb_iyear_align        ! associated with model year
-  integer  :: orb_cyear              ! orbital year for current orbital computation
-  integer  :: orb_nyear              ! orbital year associated with currrent model year
-  real(r8) :: orb_eccen              ! orbital eccentricity
-  real(r8) :: orb_obliq              ! obliquity in degrees
-  real(r8) :: orb_mvelp              ! moving vernal equinox long
-  real(r8) :: orb_obliqr             ! Earths obliquity in rad
-  real(r8) :: orb_lambm0             ! Mean long of perihelion at vernal equinox (radians)
-  real(r8) :: orb_mvelpp             ! moving vernal equinox long
-  real(r8) :: wall_time_limit        ! wall time limit in hours
-  character(CS) :: force_stop_at     ! force stop at next (month, day, etc)
-
-  !--- for documenting speed of the model ---
-  character( 8) :: dstr              ! date string
-  character(10) :: tstr              ! time string
-  integer       :: begStep, endStep  ! Begining and ending step number
-  character(CL) :: calendar          ! calendar name
-  real(r8)      :: simDays           ! Number of simulated days
-  real(r8)      :: SYPD              ! Simulated years per day
-  real(r8)      :: Time_begin        ! Start time
-  real(r8)      :: Time_end          ! Ending time
-  real(r8)      :: Time_bstep        ! Start time
-  real(r8)      :: Time_estep        ! Ending time
-  real(r8)      :: time_erun         ! Ending time
-  real(r8)      :: max_cplstep_time
-  character(CL) :: timing_file       ! Local path to tprof filename
-  character(CL) :: timing_dir        ! timing directory
-  character(CL) :: tchkpt_dir        ! timing checkpoint directory
-
-  !----------------------------------------------------------------------------
-  ! control flags
-  !----------------------------------------------------------------------------
-
-  logical  :: atm_present            ! .true.  => atm is present
-  logical  :: lnd_present            ! .true.  => land is present
-  logical  :: ice_present            ! .true.  => ice is present
-  logical  :: ocn_present            ! .true.  => ocn is present
-  logical  :: glc_present            ! .true.  => glc is present
-  logical  :: glclnd_present         ! .true.  => glc is computing land coupling
-  logical  :: glcocn_present         ! .true.  => glc is computing ocean runoff
-  logical  :: glcice_present         ! .true.  => glc is computing icebergs
-  logical  :: rofice_present         ! .true.  => rof is computing icebergs
-  logical  :: rof_present            ! .true.  => rof is present
-  logical  :: flood_present          ! .true.  => rof is computing flood
-  logical  :: wav_present            ! .true.  => wav is present
-  logical  :: esp_present            ! .true.  => esp is present
-
-  logical  :: atm_prognostic         ! .true.  => atm comp expects input
-  logical  :: lnd_prognostic         ! .true.  => lnd comp expects input
-  logical  :: ice_prognostic         ! .true.  => ice comp expects input
-  logical  :: iceberg_prognostic     ! .true.  => ice comp can handle iceberg input
-  logical  :: ocn_prognostic         ! .true.  => ocn comp expects input
-  logical  :: ocnrof_prognostic      ! .true.  => ocn comp expects runoff input
-  logical  :: glc_prognostic         ! .true.  => glc comp expects input
-  logical  :: rof_prognostic         ! .true.  => rof comp expects input
-  logical  :: wav_prognostic         ! .true.  => wav comp expects input
-  logical  :: esp_prognostic         ! .true.  => esp comp expects input
-
-  logical  :: areafact_samegrid      ! areafact samegrid flag
-  logical  :: single_column          ! scm mode logical
-  real(r8) :: scmlon                 ! single column lon
-  real(r8) :: scmlat                 ! single column lat
-  logical  :: aqua_planet            ! aqua planet mode
-  real(r8) :: nextsw_cday            ! radiation control
-  logical  :: atm_aero               ! atm provides aerosol data
-
-  character(CL) :: cpl_seq_option    ! coupler sequencing option
-  logical  :: skip_ocean_run         ! skip the ocean model first pass
-  logical  :: cpl2ocn_first          ! use to call initial cpl2ocn timer
-  logical  :: run_barriers           ! barrier the component run calls
-
-  character(CS) :: aoflux_grid       ! grid for a/o flux calc: atm xor ocn
-  character(CS) :: vect_map          ! vector mapping type
-
-
-  logical       :: read_restart      ! local read restart flag
-  character(CL) :: restart_file      ! restart file path + filename
-
-  logical  :: shr_map_dopole         ! logical for dopole in shr_map_mod
-  logical  :: domain_check           ! .true.  => check consistency of domains
-  logical  :: reprosum_use_ddpdd     ! setup reprosum, use ddpdd
-  real(r8) :: reprosum_diffmax       ! setup reprosum, set rel_diff_max
-  logical  :: reprosum_recompute     ! setup reprosum, recompute if tolerance exceeded
-
-  logical  :: output_perf = .false.  ! require timing data output for this pe
-
-  character(CL) :: hist_a2x_flds     = &
-       'Faxa_swndr:Faxa_swvdr:Faxa_swndf:Faxa_swvdf'
-
-  character(CL) :: hist_a2x3hrp_flds = &
-       'Faxa_rainc:Faxa_rainl:Faxa_snowc:Faxa_snowl'
-
-  character(CL) :: hist_a2x24hr_flds = &
-       'Faxa_bcphiwet:Faxa_bcphodry:Faxa_bcphidry:Faxa_ocphiwet:Faxa_ocphidry:&
-       &Faxa_ocphodry:Faxa_dstwet1:Faxa_dstdry1:Faxa_dstwet2:Faxa_dstdry2:Faxa_dstwet3:&
-       &Faxa_dstdry3:Faxa_dstwet4:Faxa_dstdry4:Sa_co2prog:Sa_co2diag'
-
-  character(CL) :: hist_a2x1hri_flds = &
-       'Faxa_swndr:Faxa_swvdr:Faxa_swndf:Faxa_swvdf'
-
-  character(CL) :: hist_a2x1hr_flds  = &
-       'Sa_u:Sa_v'
-
-  character(CL) :: hist_a2x3hr_flds  = &
-       'Sa_z:Sa_topo:Sa_u:Sa_v:Sa_tbot:Sa_ptem:Sa_shum:Sa_dens:Sa_pbot:Sa_pslv:Faxa_lwdn:&
-       &Faxa_rainc:Faxa_rainl:Faxa_snowc:Faxa_snowl:&
-       &Faxa_swndr:Faxa_swvdr:Faxa_swndf:Faxa_swvdf:&
-       &Sa_co2diag:Sa_co2prog'
-
-  ! --- other ---
-  integer  :: ka,km,k1,k2,k3         ! aVect field indices
-  integer  :: ocnrun_count           ! number of times ocn run alarm went on
-  logical  :: exists                 ! true if file exists
-  integer  :: ierr                   ! MPI error return
-  integer  :: rc                     ! return code
-  logical  :: cdf64                  ! true => use 64 bit addressing in netCDF files
-
-  character(*), parameter :: NLFileName = "drv_in"  ! input namelist filename
-
-  integer  :: info_debug = 0         ! local info_debug level
-
-  !----------------------------------------------------------------------------
-  ! memory monitoring
-  !----------------------------------------------------------------------------
-  real(r8) :: msize,msize0,msize1     ! memory size (high water)
-  real(r8) :: mrss ,mrss0 ,mrss1      ! resident size (current memory use)
-
-  !----------------------------------------------------------------------------
-  ! threading control
-  !----------------------------------------------------------------------------
-  integer  :: nthreads_GLOID         ! OMP global number of threads
-  integer  :: nthreads_CPLID         ! OMP cpl number of threads
-  integer  :: nthreads_ATMID         ! OMP atm number of threads
-  integer  :: nthreads_LNDID         ! OMP lnd number of threads
-  integer  :: nthreads_ICEID         ! OMP ice number of threads
-  integer  :: nthreads_OCNID         ! OMP ocn number of threads
-  integer  :: nthreads_GLCID         ! OMP glc number of threads
-  integer  :: nthreads_ROFID         ! OMP glc number of threads
-  integer  :: nthreads_WAVID         ! OMP wav number of threads
-  integer  :: nthreads_ESPID         ! OMP esp number of threads
-
-  integer  :: pethreads_GLOID        ! OMP number of threads per task
-
-  logical  :: drv_threading          ! driver threading control
 
   !----------------------------------------------------------------------------
   ! communicator groups and related
@@ -301,26 +135,6 @@ module cesm_init_mod
   character(len=(seq_comm_namelen+1)*(num_inst_phys+1)) :: complist
 
   !----------------------------------------------------------------------------
-  ! comp_num_<comp>: unique component number for each component type
-  !----------------------------------------------------------------------------
-  integer, parameter :: comp_num_atm = 1
-  integer, parameter :: comp_num_lnd = 2
-  integer, parameter :: comp_num_ice = 3
-  integer, parameter :: comp_num_ocn = 4
-  integer, parameter :: comp_num_glc = 5
-  integer, parameter :: comp_num_rof = 6
-  integer, parameter :: comp_num_wav = 7
-  integer, parameter :: comp_num_esp = 8
-
-  !----------------------------------------------------------------------------
-  ! misc
-  !----------------------------------------------------------------------------
-
-  integer, parameter :: ens1=1         ! use first instance of ensemble only
-  integer, parameter :: fix1=1         ! temporary hard-coding to first ensemble, needs to be fixed
-  integer :: eai, eli, eoi, eii, egi, eri, ewi, eei, exi, efi  ! component instance counters
-
-  !----------------------------------------------------------------------------
   ! formats
   !----------------------------------------------------------------------------
   character(*), parameter :: subname = '(seq_mct_drv)'
@@ -341,46 +155,92 @@ contains
   subroutine cesm_init(driver)
 
     ! USES:
-    use pio            , only: file_desc_t, pio_closefile, pio_file_is_open
-    use shr_pio_mod    , only: shr_pio_init1, shr_pio_init2
-    use shr_const_mod  , only: shr_const_tkfrz, shr_const_tktrip 
-    use shr_const_mod  , only: shr_const_mwwv, shr_const_mwdair
-    use shr_wv_sat_mod , only: shr_wv_sat_set_default, shr_wv_sat_init 
-    use shr_wv_sat_mod , only: ShrWVSatTableSpec, shr_wv_sat_make_tables
-    use shr_orb_mod    , only: SHR_ORB_UNDEF_INT, SHR_ORB_UNDEF_REAL, shr_orb_params
-    use shr_file_mod,    only: shr_file_getUnit, shr_file_freeUnit
-    use seq_io_read_mod, only: seq_io_read
+    use pio             , only: file_desc_t, pio_closefile, pio_file_is_open
+    use shr_pio_mod     , only: shr_pio_init1, shr_pio_init2
+    use shr_const_mod   , only: shr_const_tkfrz, shr_const_tktrip 
+    use shr_const_mod   , only: shr_const_mwwv, shr_const_mwdair
+    use shr_wv_sat_mod  , only: shr_wv_sat_set_default, shr_wv_sat_init 
+    use shr_wv_sat_mod  , only: ShrWVSatTableSpec, shr_wv_sat_make_tables
+    use shr_wv_sat_mod,   only: shr_wv_sat_get_scheme_idx, shr_wv_sat_valid_idx
+    use shr_orb_mod     , only: SHR_ORB_UNDEF_INT, SHR_ORB_UNDEF_REAL, shr_orb_params
+    use shr_file_mod    , only: shr_file_getUnit, shr_file_freeUnit
+    use shr_assert_mod  , only: shr_assert_in_domain
+    use seq_io_read_mod , only: seq_io_read
 
     ! INPUT/OUTPUT PARAMETERS:
     type(ESMF_GridComp), intent(inout)  :: driver
 
     ! LOCAL
-    character(CL)                   :: atm_gnam     ! atm grid
-    character(CL)                   :: lnd_gnam     ! lnd grid
-    character(CL)                   :: ocn_gnam     ! ocn grid
-    character(CL)                   :: ice_gnam     ! ice grid
-    character(CL)                   :: rof_gnam     ! rof grid
-    character(CL)                   :: glc_gnam     ! glc grid
-    character(CL)                   :: wav_gnam     ! wav grid
-    character(CL)                   :: samegrid_ao  ! samegrid atm and ocean
-    character(CL)                   :: samegrid_al  ! samegrid atm and land
-    character(CL)                   :: samegrid_lr  ! samegrid land and rof
-    character(CL)                   :: samegrid_oi  ! samegrid ocean and ice
-    character(CL)                   :: samegrid_ro  ! samegrid runoff and ocean
-    character(CL)                   :: samegrid_aw  ! samegrid atm and wave
-    character(CL)                   :: samegrid_ow  ! samegrid ocean and wave
-    character(CL)                   :: samegrid_lg  ! samegrid glc and land
-    character(CL)                   :: samegrid_og  ! samegrid glc and ocean
-    character(CL)                   :: samegrid_ig  ! samegrid glc and ice
-    character(CL)                   :: samegrid_alo ! samegrid atm, lnd, ocean
+    ! threading control
+    integer                         :: nthreads_GLOID        ! OMP global number of threads
+    integer                         :: nthreads_CPLID        ! OMP cpl number of threads
+    integer                         :: nthreads_ATMID        ! OMP atm number of threads
+    integer                         :: nthreads_LNDID        ! OMP lnd number of threads
+    integer                         :: nthreads_ICEID        ! OMP ice number of threads
+    integer                         :: nthreads_OCNID        ! OMP ocn number of threads
+    integer                         :: nthreads_GLCID        ! OMP glc number of threads
+    integer                         :: nthreads_ROFID        ! OMP glc number of threads
+    integer                         :: nthreads_WAVID        ! OMP wav number of threads
+    integer                         :: nthreads_ESPID        ! OMP esp number of threads
+    integer                         :: pethreads_GLOID       ! OMP number of threads per task
+    logical                         :: drv_threading         ! driver threading control
+    character(SHR_KIND_CL)          :: cpl_seq_option        ! coupler sequencing option
+    logical                         :: reprosum_use_ddpdd    ! setup reprosum, use ddpdd
+    real(SHR_KIND_R8)               :: reprosum_diffmax      ! setup reprosum, set rel_diff_max
+    logical                         :: reprosum_recompute    ! setup reprosum, recompute if tolerance exceeded
+    logical                         :: output_perf = .false. ! require timing data output for this pe
+    integer                         :: ymd                   ! Current date (YYYYMMDD)
+    integer                         :: year                  ! Current date (YYYY)
+    integer                         :: month                 ! Current date (MM)
+    integer                         :: day                   ! Current date (DD)
+    integer                         :: tod                   ! Current time of day (seconds)
+    character(SHR_KIND_CL)          :: orb_mode              ! orbital mode
+    character(SHR_KIND_CS)          :: tfreeze_option        ! Freezing point calculation
+    integer                         :: orb_iyear             ! orbital year
+    integer                         :: orb_iyear_align       ! associated with model year
+    integer                         :: orb_cyear             ! orbital year for current orbital computation
+    integer                         :: orb_nyear             ! orbital year associated with currrent model year
+    real(SHR_KIND_R8)               :: orb_eccen             ! orbital eccentricity
+    real(SHR_KIND_R8)               :: orb_obliq             ! obliquity in degrees
+    real(SHR_KIND_R8)               :: orb_mvelp             ! moving vernal equinox long
+    real(SHR_KIND_R8)               :: orb_obliqr            ! Earths obliquity in rad
+    real(SHR_KIND_R8)               :: orb_lambm0            ! Mean long of perihelion at vernal equinox (radians)
+    real(SHR_KIND_R8)               :: orb_mvelpp            ! moving vernal equinox long
+    real(SHR_KIND_R8)               :: wall_time_limit       ! wall time limit in hours
+    character(SHR_KIND_CS)          :: force_stop_at         ! force stop at next (month, day, etc)
+    character(SHR_KIND_CS)          :: cime_model            ! currently acme or cesm
+    character(SHR_KIND_CL)          :: atm_gnam              ! atm grid
+    character(SHR_KIND_CL)          :: lnd_gnam              ! lnd grid
+    character(SHR_KIND_CL)          :: ocn_gnam              ! ocn grid
+    character(SHR_KIND_CL)          :: ice_gnam              ! ice grid
+    character(SHR_KIND_CL)          :: rof_gnam              ! rof grid
+    character(SHR_KIND_CL)          :: glc_gnam              ! glc grid
+    character(SHR_KIND_CL)          :: wav_gnam              ! wav grid
+    character(SHR_KIND_CL)          :: samegrid_ao           ! samegrid atm and ocean
+    character(SHR_KIND_CL)          :: samegrid_al           ! samegrid atm and land
+    character(SHR_KIND_CL)          :: samegrid_lr           ! samegrid land and rof
+    character(SHR_KIND_CL)          :: samegrid_oi           ! samegrid ocean and ice
+    character(SHR_KIND_CL)          :: samegrid_ro           ! samegrid runoff and ocean
+    character(SHR_KIND_CL)          :: samegrid_aw           ! samegrid atm and wave
+    character(SHR_KIND_CL)          :: samegrid_ow           ! samegrid ocean and wave
+    character(SHR_KIND_CL)          :: samegrid_lg           ! samegrid glc and land
+    character(SHR_KIND_CL)          :: samegrid_og           ! samegrid glc and ocean
+    character(SHR_KIND_CL)          :: samegrid_ig           ! samegrid glc and ice
+    character(SHR_KIND_CL)          :: samegrid_alo          ! samegrid atm, lnd, ocean
+    logical                         :: shr_map_dopole        ! pole corrections in shr_map_mod
+    logical                         :: single_column         ! scm mode logical
+    real(SHR_KIND_R8)               :: scmlon                ! single column lon
+    real(SHR_KIND_R8)               :: scmlat                ! single column lat
+    logical                         :: aqua_planet           ! aqua planet mode (cam only)
+    logical                         :: atm_aero              ! atm provides aerosol data
     type(file_desc_t)               :: pioid
     integer                         :: maxthreads
-    character(CS)                   :: wv_sat_scheme
+    character(SHR_KIND_CS)          :: wv_sat_scheme
     real(SHR_KIND_R8)               :: wv_sat_transition_start
     logical                         :: wv_sat_use_tables
     real(SHR_KIND_R8)               :: wv_sat_table_spacing
-    character(CL)                   :: errstring
-    character(CL)                   :: cvalue  
+    character(SHR_KIND_CL)          :: errstring
+    character(SHR_KIND_CL)          :: cvalue  
     type(ShrWVSatTableSpec)         :: liquid_spec
     type(ShrWVSatTableSpec)         :: ice_spec
     type(ShrWVSatTableSpec)         :: mixed_spec
@@ -391,20 +251,40 @@ contains
     character(len=seq_comm_namelen) :: comp_name(num_inst_total)
     logical                         :: flag
     integer                         :: i, it
-    character(SHR_KIND_CL)          :: start_type                     ! Type of startup
-    logical                         :: read_restart                   ! read the restart file, based on start_type
-    character(SHR_KIND_CL)          :: restart_file                   ! Full archive path to restart file
-    character(SHR_KIND_CL)          :: restart_pfile                  ! Restart pointer file
-    real(SHR_KIND_R8)               :: nextsw_cday = -1.0_SHR_KIND_R8 ! calendar of next atm shortwave
-    real(SHR_KIND_R8)               :: precip_fact = 1.0_SHR_KIND_R8  ! precip factor
-    character(SHR_KIND_CL)          :: rest_case_name                 ! Short case identification
-    integer                         :: unitn                          ! Namelist unit number to read
+    character(SHR_KIND_CL)          :: start_type     ! Type of startup
+    logical                         :: read_restart   ! read the restart file, based on start_type
+    character(SHR_KIND_CL)          :: restart_file   ! Full archive path to restart file
+    character(SHR_KIND_CL)          :: restart_pfile  ! Restart pointer file
+    real(SHR_KIND_R8)               :: nextsw_cday    ! calendar of next atm shortwave
+    real(SHR_KIND_R8)               :: precip_fact    ! precip factor
+    character(SHR_KIND_CL)          :: rest_case_name ! Short case identification
+    integer                         :: unitn          ! Namelist unit number to read
+    logical                         :: exists         ! true if file exists
+    integer                         :: ierr           ! MPI error return
+    integer                         :: rc             ! return code
+    logical                         :: atm_present    ! .true.  => atm is present
+    logical                         :: lnd_present    ! .true.  => land is present
+    logical                         :: ice_present    ! .true.  => ice is present
+    logical                         :: ocn_present    ! .true.  => ocn is present
+    logical                         :: glc_present    ! .true.  => glc is present
+    logical                         :: glclnd_present ! .true.  => glc is computing land coupling
+    logical                         :: glcocn_present ! .true.  => glc is computing ocean runoff
+    logical                         :: glcice_present ! .true.  => glc is computing icebergs
+    logical                         :: rofice_present ! .true.  => rof is computing icebergs
+    logical                         :: rof_present    ! .true.  => rof is present
+    logical                         :: flood_present  ! .true.  => rof is computing flood
+    logical                         :: wav_present    ! .true.  => wav is present
+    logical                         :: esp_present    ! .true.  => esp is present
     real(SHR_KIND_R8), parameter    :: epsilo = shr_const_mwwv/shr_const_mwdair
     character(len=*) , parameter    :: u_FILE_u =  __FILE__
     character(len=*) , parameter    :: sp_str = 'str_undefined'
-    character(len=*) , parameter    :: seq_infodata_start_type_start = "startup"
-    character(len=*) , parameter    :: seq_infodata_start_type_cont  = "continue"
-    character(len=*) , parameter    :: seq_infodata_start_type_brnch = "branch"
+    character(len=*) , parameter    :: start_type_start = "startup"
+    character(len=*) , parameter    :: start_type_cont  = "continue"
+    character(len=*) , parameter    :: start_type_brnch = "branch"
+    character(len=*) , parameter    :: NLFileName = "drv_in"  ! input namelist filename
+    integer          , parameter    :: ens1=1    ! use first instance of ensemble only
+    integer          , parameter    :: fix1=1    ! temporary hard-coding to first ensemble, needs to be fixed
+    integer                         :: eai, eli, eoi, eii, egi, eri, ewi, eei, exi, efi  ! component instance counters
 
     !----------------------------------------------------------
     !| Initialize MCT and MPI communicators and IO
@@ -747,7 +627,24 @@ contains
     ! Initialize coupled fields (depends on infodata)
     !----------------------------------------------------------
 
-    call seq_flds_set(nlfilename, GLOID, infodata)
+    call NUOPC_CompAttributeGet(driver, name="cime_model", value=cime_model, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    call NUOPC_CompAttributeGet(driver, name="cime_model", value=cime_model, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if ( trim(cime_model) /= 'acme' .and. trim(cime_model) /= 'cesm') then
+       call shr_sys_abort( subname//': cime_model must be set to acme or cesm, aborting')
+    end if
+
+    call seq_flds_set(nlfilename, GLOID, cime_model)
+
+    !----------------------------------------------------------
+    ! Initialize dopole flag (as a module variable in shr_map_mod)
+    !----------------------------------------------------------
+
+    call NUOPC_CompAttributeGet(driver, name="shr_map_dopole", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    read(cvalue,*) shr_map_dopole
 
     call shr_map_setDopole(shr_map_dopole)
 
@@ -767,10 +664,8 @@ contains
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
     read(cvalue,*) reprosum_recompute 
 
-    call shr_reprosum_setopts(&
-         repro_sum_use_ddpdd_in    = reprosum_use_ddpdd, &
-         repro_sum_rel_diff_max_in = reprosum_diffmax, &
-         repro_sum_recompute_in    = reprosum_recompute)
+    call shr_reprosum_setopts(repro_sum_use_ddpdd_in=reprosum_use_ddpdd, &
+         repro_sum_rel_diff_max_in=reprosum_diffmax, repro_sum_recompute_in=reprosum_recompute)
 
     !----------------------------------------------------------
     ! Check cpl_seq_option
@@ -830,9 +725,18 @@ contains
     call NUOPC_CompAttributeGet(driver, name='start_type', value=start_type, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
 
+    ! Check valid values of start type
+    call NUOPC_CompAttributeGet(driver, name="start_type", value=start_type, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    if ((trim(start_type) /= start_type_start) .and.  &
+        (trim(start_type) /= start_type_cont ) .and.  &
+        (trim(start_type) /= start_type_brnch)) then
+       call shr_sys_abort(subname//': start_type invalid = '//trim(start_type))
+    end if
+
     read_restart = .false.
-    if (trim(start_type) == trim(seq_infodata_start_type_cont) .or. &
-        trim(start_type) == trim(seq_infodata_start_type_brnch)) then
+    if (trim(start_type) == trim(start_type_cont) .or. trim(start_type) == trim(start_type_brnch)) then
        read_restart = .true.
     endif
 
@@ -851,6 +755,13 @@ contains
     !-----------------------------------------------------
     ! Read Restart (seq_io_read must be called on all pes)
     !-----------------------------------------------------
+
+    ! Error check on restart_pfile
+    call NUOPC_CompAttributeGet(driver, name="restart_pfile", value=restart_pfile, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if ( len_trim(restart_pfile) == 0 ) then
+       call shr_sys_abort( subname//': restart_pfile must be set' )
+    end if
 
     if (read_restart) then
        !--- read rpointer if restart_file is set to sp_str ---
@@ -898,8 +809,8 @@ contains
        call shr_mpi_bcast(rest_case_name ,mpicom_GLOID, pebcast=seq_comm_gloroot(CPLID))
 
        call seq_infodata_putData(infodata, &
-            nextsw_cday=nextsw_cday, &
-            precip_fact=precip_fact, &
+            nextsw_cday=nextsw_cday,       &
+            precip_fact=precip_fact,       &
             rest_case_name=rest_case_name)
     endif
 
@@ -1051,9 +962,20 @@ contains
     call NUOPC_CompAttributeGet(driver, name="wv_sat_scheme", value=wv_sat_scheme, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
 
+    if (.not. shr_wv_sat_valid_idx(shr_wv_sat_get_scheme_idx(trim(wv_sat_scheme)))) then
+       call shr_sys_abort(subname//': "'//trim(wv_sat_scheme)//'" is not a recognized saturation vapor pressure scheme name')
+    end if
+    if (.not. shr_wv_sat_set_default(wv_sat_scheme)) then
+       call shr_sys_abort('Invalid wv_sat_scheme.')
+    end if
+
     call NUOPC_CompAttributeGet(driver, name="wv_sat_transition_start", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
     read(cvalue,*) wv_sat_transition_start 
+
+    call shr_assert_in_domain(wv_sat_transition_start, &
+         ge=0._SHR_KIND_R8, le=40._SHR_KIND_R8, &
+         varname="wv_sat_transition_start", msg="Invalid transition temperature range.")
 
     call NUOPC_CompAttributeGet(driver, name="wv_sat_use_tables", value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
@@ -1063,9 +985,13 @@ contains
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
     read(cvalue,*) wv_sat_table_spacing
 
-    if (.not. shr_wv_sat_set_default(wv_sat_scheme)) then
-       call shr_sys_abort('Invalid wv_sat_scheme.')
-    end if
+    ! A transition range averaging method in CAM is only valid for:
+    ! -40 deg C <= T <= 0 deg C
+    ! shr_wv_sat_mod itself checks for values with the wrong sign, but we
+    ! have to check that the range is no more than 40 deg C here. Even
+    ! though this is a CAM-specific restriction, it's not really likely
+    ! that any other parameterization will be dealing with mixed-phase
+    ! water below 40 deg C anyway.
 
     call shr_wv_sat_init(shr_const_tkfrz, shr_const_tktrip, wv_sat_transition_start, epsilo, errstring)
     if (errstring /= "") then
@@ -1080,24 +1006,11 @@ contains
     ! is why only the spacing is in the namelist.
 
     if (wv_sat_use_tables) then
-       liquid_spec = ShrWVSatTableSpec(ceiling(200._r8/wv_sat_table_spacing), 175._r8, wv_sat_table_spacing)
-       ice_spec    = ShrWVSatTableSpec(ceiling(150._r8/wv_sat_table_spacing), 125._r8, wv_sat_table_spacing)
-       mixed_spec  = ShrWVSatTableSpec(ceiling(250._r8/wv_sat_table_spacing), 125._r8, wv_sat_table_spacing)
+       liquid_spec = ShrWVSatTableSpec(ceiling(200._SHR_KIND_R8/wv_sat_table_spacing), 175._SHR_KIND_R8, wv_sat_table_spacing)
+       ice_spec    = ShrWVSatTableSpec(ceiling(150._SHR_KIND_R8/wv_sat_table_spacing), 125._SHR_KIND_R8, wv_sat_table_spacing)
+       mixed_spec  = ShrWVSatTableSpec(ceiling(250._SHR_KIND_R8/wv_sat_table_spacing), 125._SHR_KIND_R8, wv_sat_table_spacing)
        call shr_wv_sat_make_tables(liquid_spec, ice_spec, mixed_spec)
     end if
-
-    !----------------------------------------------------------
-    ! Initialize phases
-    !----------------------------------------------------------
-
-    ! call seq_infodata_putData(infodata, &
-    !      atm_phase=1, &
-    !      lnd_phase=1, &
-    !      ocn_phase=1, &
-    !      ice_phase=1, &
-    !      glc_phase=1, &
-    !      wav_phase=1, &
-    !      esp_phase=1)
 
     !----------------------------------------------------------
     ! Set single_column flags
@@ -1106,21 +1019,24 @@ contains
     ! ocn, ice, rof, and flood.
     !----------------------------------------------------------
 
-    ! call seq_infodata_GetData(infodata, &
-    !      atm_present=atm_present     , &
-    !      lnd_present=lnd_present     , &
-    !      ice_present=ice_present     , &
-    !      ocn_present=ocn_present     , &
-    !      glc_present=glc_present     , &
-    !      rof_present=rof_present     , &
-    !      wav_present=wav_present     , &
-    !      esp_present=esp_present     , &
-    !      single_column=single_column , &
-    !      aqua_planet=aqua_planet)
+    ! TODO: query infodata for aqua_planet
+    ! TODO: query attributes for single_column
 
     if (.not.aqua_planet .and. single_column) then
+
+       ! TODO: query attributes for scmlon, scmlat
        call seq_infodata_getData( infodata, &
             scmlon=scmlon, scmlat=scmlat)
+
+       call seq_infodata_GetData(infodata, &
+            atm_present=atm_present     , &
+            lnd_present=lnd_present     , &
+            ice_present=ice_present     , &
+            ocn_present=ocn_present     , &
+            glc_present=glc_present     , &
+            rof_present=rof_present     , &
+            wav_present=wav_present     , &
+            esp_present=esp_present)
 
        call seq_comm_getinfo(OCNID(ens1), mpicom=mpicom_OCNID)
 
@@ -1160,15 +1076,9 @@ contains
   !===============================================================================
   subroutine driver_attributes_check( driver )
 
-    ! !DESCRIPTION: Check that input infodata object has reasonable values
+    ! !DESCRIPTION: Check that input driver config values have reasonable values
 
     ! !USES:
-    use shr_assert_mod,   only: shr_assert_in_domain
-    use shr_string_mod,   only: shr_string_listIntersect
-    use shr_wv_sat_mod,   only: shr_wv_sat_get_scheme_idx, shr_wv_sat_valid_idx
-    use seq_infodata_mod, only: seq_infodata_start_type_start
-    use seq_infodata_mod, only: seq_infodata_start_type_brnch
-    use seq_infodata_mod, only: seq_infodata_start_type_cont
 
     implicit none
 
@@ -1176,30 +1086,19 @@ contains
     type(ESMF_GridComp)    , intent(INOUT) :: driver
 
     !----- local -----
-    integer       :: lastchar                ! Last character index
-    real(R8)      :: wv_sat_transition_start ! Saturation transition range
-    character(CL) :: start_type              ! Type of startup
-    character(CL) :: rest_case_name          ! Short case identification
-    character(CL) :: case_name               ! Short case identification
-    character(CS) :: aoflux_grid             ! grid for atm ocn flux calc
-    character(CL) :: vect_map                ! vector mapping option, none, cart3d, cart3d_diag, cart3d_uvw, cart3d_uvw_diag
-    character(CS) :: wv_sat_scheme           ! Water vapor saturation pressure scheme
-    character(CS) :: cime_model              ! acme or cesm
-    character(CL) :: restart_pfile           ! Restart pointer file
-    character(CS) :: logFilePostFix          ! postfix for output log files
-    character(CL) :: outPathRoot             ! root for output log files
-    character(CL) :: cvalue                  ! temporary
+    integer                :: lastchar       ! Last character index
+    character(SHR_KIND_CL) :: start_type     ! Type of startup
+    character(SHR_KIND_CL) :: rest_case_name ! Short case identification
+    character(SHR_KIND_CL) :: case_name      ! Short case identification
+    character(SHR_KIND_CS) :: aoflux_grid    ! grid for atm ocn flux calc
+    character(SHR_KIND_CL) :: vect_map       ! vector mapping option, none, cart3d, cart3d_diag, cart3d_uvw, cart3d_uvw_diag
+    character(SHR_KIND_CS) :: logFilePostFix ! postfix for output log files
+    character(SHR_KIND_CL) :: outPathRoot    ! root for output log files
+    character(SHR_KIND_CL) :: cvalue         ! temporary
+    integer                :: rc             ! return code
     character(len=*), parameter :: u_FILE_u =  __FILE__
     character(len=*), parameter :: subname = '(driver_attributes_check) '
     !-------------------------------------------------------------------------------
-
-    ! --- CIME model ------
-    call NUOPC_CompAttributeGet(driver, name="cime_model", value=cime_model, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-
-    if ( trim(cime_model) /= 'acme' .and. trim(cime_model) /= 'cesm') then
-       call shr_sys_abort( subname//': cime_model must be set to acme or cesm, aborting')
-    end if
 
     ! --- Case name ------
     call NUOPC_CompAttributeGet(driver, name="case_name", value=case_name, rc=rc)
@@ -1210,17 +1109,8 @@ contains
        call shr_sys_abort( subname//': variable case_name must be set, aborting')
     end if
     if (case_name(lastchar:lastchar) /= ' ') then
-       write(logunit,"(A,I4,A)")'ERROR: case_name must not exceed ', len(case_name)-1, &
-                 ' characters'
+       write(logunit,"(A,I4,A)")'ERROR: case_name must not exceed ', len(case_name)-1,' characters'
        call shr_sys_abort( subname//': variable case_name must be set, aborting')
-    end if
-
-    ! --- Restart pointer file -----
-    call NUOPC_CompAttributeGet(driver, name="restart_pfile", value=restart_pfile, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-
-    if ( len_trim(restart_pfile) == 0 ) then
-       call shr_sys_abort( subname//': restart_pfile must be set' )
     end if
 
     ! --- LogFile ending name -----
@@ -1242,49 +1132,7 @@ contains
        call shr_sys_abort( subname//': outPathRoot must end with a slash' )
     end if
 
-    ! --- Start-type ------
-    call NUOPC_CompAttributeGet(driver, name="start_type", value=start_type, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-
-    if ((trim(start_type) /= seq_infodata_start_type_start) .and.  &
-        (trim(start_type) /= seq_infodata_start_type_cont ) .and.  &
-        (trim(start_type) /= seq_infodata_start_type_brnch)) then
-       call shr_sys_abort(subname//': start_type invalid = '//trim(start_type))
-    end if
-
-    ! --- Case name and restart case name ------
-    ! call NUOPC_CompAttributeGet(driver, name="rest_case_name", value=rest_case_name, rc=rc)
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-
-    ! if ((trim(start_type) == seq_infodata_start_type_cont ) .and. (trim(case_name)  /= trim(rest_case_name))) then
-    !    write(logunit,'(10a)') subname,' case_name =',trim(case_name),':',' rest_case_name =',trim(rest_case_name),':'
-    !    call shr_sys_abort(subname//': invalid continue restart case name = '//trim(rest_case_name))
-    ! endif
-
-    ! --- Water vapor saturation------
-    call NUOPC_CompAttributeGet(driver, name="wv_sat_scheme", value=wv_sat_scheme, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
-
-    if (.not. shr_wv_sat_valid_idx(shr_wv_sat_get_scheme_idx(trim(wv_sat_scheme)))) then
-       call shr_sys_abort(subname//': "'//trim(wv_sat_scheme)//'" is not a recognized saturation vapor pressure scheme name')
-    end if
-
-    ! A transition range averaging method in CAM is only valid for:
-    ! -40 deg C <= T <= 0 deg C
-    ! shr_wv_sat_mod itself checks for values with the wrong sign, but we
-    ! have to check that the range is no more than 40 deg C here. Even
-    ! though this is a CAM-specific restriction, it's not really likely
-    ! that any other parameterization will be dealing with mixed-phase
-    ! water below 40 deg C anyway.
-
-    call NUOPC_CompAttributeGet(driver, name="wv_sat_transition_start", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
-    read(cvalue,*) wv_sat_transition_start 
-
-    call shr_assert_in_domain(wv_sat_transition_start, &
-         ge=0._SHR_KIND_R8, le=40._SHR_KIND_R8, &
-         varname="wv_sat_transition_start", msg="Invalid transition temperature range.")
-
+    ! --- Grid for atm/ocean flux computations ----
     call NUOPC_CompAttributeGet(driver, name="aoflux_grid", value=aoflux_grid, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
@@ -1295,6 +1143,7 @@ contains
        call shr_sys_abort(subname//': aoflux_grid invalid = '//trim(aoflux_grid))
     endif
 
+    ! --- Vector mapping options ----
     call NUOPC_CompAttributeGet(driver, name="vect_map", value=vect_map, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
@@ -1306,6 +1155,15 @@ contains
        write(logunit,'(2a)') 'ERROR vect_map not supported = ',trim(vect_map)
        call shr_sys_abort(subname//': vect_map invalid = '//trim(vect_map))
     endif
+
+    ! --- Case name and restart case name ------
+    ! call NUOPC_CompAttributeGet(driver, name="rest_case_name", value=rest_case_name, rc=rc)
+    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+
+    ! if ((trim(start_type) == start_type_cont ) .and. (trim(case_name)  /= trim(rest_case_name))) then
+    !    write(logunit,'(10a)') subname,' case_name =',trim(case_name),':',' rest_case_name =',trim(rest_case_name),':'
+    !    call shr_sys_abort(subname//': invalid continue restart case name = '//trim(rest_case_name))
+    ! endif
 
   end subroutine driver_attributes_check
 
