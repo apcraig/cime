@@ -1148,7 +1148,6 @@ class Namelist(object):
         if groups is None:
             groups = self._groups.keys()
 
-        print "DEBUG: groups is ",groups
         if (sorted_groups):
             #group_names = sorted(group.lower() for group in groups)
             group_names = sorted(group for group in groups)
@@ -1156,11 +1155,13 @@ class Namelist(object):
             group_names = groups
 
         for group_name in group_names:
-            group = self._groups[group_name]
+            if "_attributes" not in group_name and "nuopc_" not in group_name:
+                continue
 
             if "_attributes" in group_name:
                 out_file.write("{}::\n".format(group_name))
 
+            group = self._groups[group_name]
             for name in sorted(group.keys()):
                 values = group[name]
 

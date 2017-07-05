@@ -20,7 +20,6 @@ module cesm_init_mod
   use shr_orb_mod,       only: shr_orb_params
   use shr_frz_mod,       only: shr_frz_freezetemp_init
   use shr_reprosum_mod,  only: shr_reprosum_setopts
-  !use mct_mod            ! mct_ wrappers for mct lib
   use perf_mod
 
   !----------------------------------------------------------------------------
@@ -485,6 +484,7 @@ contains
     !----------------------------------------------------------
     !| Timer initialization (has to be after mpi init)
     !----------------------------------------------------------
+
     maxthreads = max(nthreads_GLOID,nthreads_CPLID,nthreads_ATMID, &
          nthreads_LNDID,nthreads_ICEID,nthreads_OCNID,nthreads_GLCID, &
          nthreads_ROFID, nthreads_WAVID, nthreads_ESPID, pethreads_GLOID )
@@ -493,19 +493,19 @@ contains
          MasterTask=iamroot_GLOID,MaxThreads=maxthreads)
 
     if (iamin_CPLID) then
+       ! TODO: where should this be called
        ! MV: call seq_io_cpl_init()
     endif
 
     call t_startf('CPL:INIT')
     call t_adj_detailf(+1)
 
-    call t_startf('CPL:cesm_pre_init2')
+    call t_startf('CPL:cesm_init')
 
     !----------------------------------------------------------
-    !| Memory test
+    ! Memory test
     !----------------------------------------------------------
 
-    !mt   call shr_mem_init(prt=.true.)
     call shr_mem_init(prt=iamroot_CPLID)
 
     !----------------------------------------------------------
@@ -1019,14 +1019,21 @@ contains
     ! ocn, ice, rof, and flood.
     !----------------------------------------------------------
 
-    ! TODO: query infodata for aqua_planet
-    ! TODO: query attributes for single_column
+    call NUOPC_CompAttributeGet(driver, name="single_column", value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    read(cvalue,*) single_column
+
+    call seq_infodata_getData( infodata, aqua_planet=aqua_planet)
 
     if (.not.aqua_planet .and. single_column) then
 
-       ! TODO: query attributes for scmlon, scmlat
-       call seq_infodata_getData( infodata, &
-            scmlon=scmlon, scmlat=scmlat)
+       call NUOPC_CompAttributeGet(driver, name="scmlon", value=cvalue, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+       read(cvalue,*) scmlon
+
+       call NUOPC_CompAttributeGet(driver, name="scmlat", value=cvalue, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+       read(cvalue,*) scmlat
 
        call seq_infodata_GetData(infodata, &
             atm_present=atm_present     , &
@@ -1066,7 +1073,7 @@ contains
        call pio_closefile(pioid)
     endif
 
-    call t_stopf('CPL:cesm_pre_init2')
+    call t_stopf('CPL:cesm_init')
 
     call t_adj_detailf(-1)
     call t_stopf('CPL:INIT')
