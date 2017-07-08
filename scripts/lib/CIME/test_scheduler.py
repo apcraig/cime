@@ -86,7 +86,7 @@ class TestScheduler(object):
                  walltime=None, proc_pool=None,
                  use_existing=False, save_timing=False, queue=None,
                  allow_baseline_overwrite=False, output_root=None,
-                 force_procs=None, force_threads=None, mpilib=None, input_dir=None):
+                 force_procs=None, force_threads=None, mpilib=None, input_dir=None, driver=None):
     ###########################################################################
         self._cime_root       = CIME.utils.get_cime_root()
         self._cime_model      = get_model()
@@ -96,6 +96,7 @@ class TestScheduler(object):
         self._mpilib          = mpilib  # allow override of default mpilib
         self._completed_tests = 0
         self._input_dir       = input_dir
+        self._driver          = driver
 
         self._allow_baseline_overwrite = allow_baseline_overwrite
 
@@ -364,6 +365,8 @@ class TestScheduler(object):
             create_newcase_cmd += " --output-root {} ".format(self._output_root)
         if self._input_dir is not None:
             create_newcase_cmd += " --input-dir {} ".format(self._input_dir)
+        if self._driver == 'drv-nuopc':
+            create_newcase_cmd += " --driver nuopc "
 
         if test_mods is not None:
             files = Files()
@@ -484,15 +487,7 @@ class TestScheduler(object):
 
                 elif opt == 'E':
                     envtest.set_test_parameter("USE_ESMF_LIB", "TRUE")
-#                    envtest.set_test_parameter("COMP_INTERFACE", "ESMF")
                     logger.debug (" USE_ESMF_LIB set to TRUE")
-#                    logger.debug (" COMP_INTERFACE set to ESMF")
-
-                elif opt == 'EN':
-                    envtest.set_test_parameter("USE_ESMF_LIB", "TRUE")
-                    envtest.set_test_parameter("COMP_INTERFACE", "NUOPC")
-                    logger.debug (" USE_ESMF_LIB set to TRUE")
-                    logger.debug (" COMP_INTERFACE set to NUOPC")
 
                 elif opt == 'CG':
                     envtest.set_test_parameter("CALENDAR", "GREGORIAN")

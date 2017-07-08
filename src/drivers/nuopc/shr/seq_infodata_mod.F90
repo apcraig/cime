@@ -97,13 +97,9 @@ MODULE seq_infodata_mod
      real(SHR_KIND_R8)       :: gust_fac                ! wind gustiness factor
      character(SHR_KIND_CL)  :: glc_renormalize_smb     ! Whether to renormalize smb sent from lnd -> glc
      real(SHR_KIND_R8)       :: wall_time_limit         ! force stop time limit (hours)
-     logical                 :: shr_map_dopole          ! pole corrections in shr_map_mod
-     character(SHR_KIND_CL)  :: vect_map                ! vector mapping option, none, cart3d, cart3d_diag, cart3d_uvw, cart3d_uvw_diag
      integer                 :: cpl_decomp              ! coupler decomp
      character(SHR_KIND_CL)  :: cpl_seq_option          ! coupler sequencing option
      logical                 :: cpl_cdf64               ! use netcdf 64 bit offset, large file support
-     logical                 :: do_budgets              ! do heat/water budgets diagnostics
-     logical                 :: do_histinit             ! write out initial history file
      logical                 :: drv_threading           ! is threading control in driver turned on
 
      !--- set via namelist and may be time varying ---
@@ -300,8 +296,6 @@ CONTAINS
        cpl_seq_option          , &
        info_debug              , &
        dead_comps              , &
-       shr_map_dopole          , &
-       vect_map                , &
        flux_epbalfact          , &
        nextsw_cday             , &
        precip_fact             , &
@@ -310,8 +304,6 @@ CONTAINS
        glc_g2lupdate           , &
        atm_aero                , &
        run_barriers            , &
-       do_budgets              , &
-       do_histinit             , &
        drv_threading           , &
        flux_diurnal            , &
        gust_fac                , &
@@ -406,13 +398,9 @@ CONTAINS
     real(SHR_KIND_R8),      optional, intent(OUT) :: gust_fac                ! wind gustiness factor
     character(len=*),       optional, intent(OUT) :: glc_renormalize_smb     ! Whether to renormalize smb sent from lnd -> glc
     real(SHR_KIND_R8),      optional, intent(OUT) :: wall_time_limit         ! force stop wall time (hours)
-    logical,                optional, intent(OUT) :: shr_map_dopole          ! pole corrections in shr_map_mod
-    character(len=*),       optional, intent(OUT) :: vect_map                ! vector mapping option
     integer,                optional, intent(OUT) :: cpl_decomp              ! coupler decomp
     character(len=*),       optional, intent(OUT) :: cpl_seq_option          ! coupler sequencing option
     logical,                optional, intent(OUT) :: cpl_cdf64               ! netcdf large file setting
-    logical,                optional, intent(OUT) :: do_budgets              ! heat/water budgets
-    logical,                optional, intent(OUT) :: do_histinit             ! initial history file
     logical,                optional, intent(OUT) :: drv_threading           ! driver threading control flag
 
     integer(SHR_KIND_IN),   optional, intent(OUT) :: info_debug
@@ -524,13 +512,9 @@ CONTAINS
     if ( present(gust_fac)       ) gust_fac       = infodata%gust_fac
     if ( present(glc_renormalize_smb)) glc_renormalize_smb = infodata%glc_renormalize_smb
     if ( present(wall_time_limit)) wall_time_limit= infodata%wall_time_limit
-    if ( present(shr_map_dopole) ) shr_map_dopole = infodata%shr_map_dopole
-    if ( present(vect_map)       ) vect_map       = infodata%vect_map
     if ( present(cpl_decomp)     ) cpl_decomp     = infodata%cpl_decomp
     if ( present(cpl_seq_option) ) cpl_seq_option = infodata%cpl_seq_option
     if ( present(cpl_cdf64)      ) cpl_cdf64      = infodata%cpl_cdf64
-    if ( present(do_budgets)     ) do_budgets     = infodata%do_budgets
-    if ( present(do_histinit)    ) do_histinit    = infodata%do_histinit
     if ( present(drv_threading)  ) drv_threading  = infodata%drv_threading
 
     if ( present(info_debug)     ) info_debug     = infodata%info_debug
@@ -714,8 +698,6 @@ CONTAINS
        cpl_seq_option          , &
        info_debug              , &
        dead_comps              , &
-       shr_map_dopole          , &
-       vect_map                , &
        run_barriers            , &
        nextsw_cday             , &
        precip_fact             , &
@@ -724,8 +706,6 @@ CONTAINS
        glc_g2lupdate           , &
        atm_aero                , &
        wall_time_limit         , &
-       do_budgets              , &
-       do_histinit             , &
        drv_threading           , &
        flux_diurnal            , &
        gust_fac                , &
@@ -818,13 +798,9 @@ CONTAINS
     real(SHR_KIND_R8),      optional, intent(IN)    :: gust_fac                ! wind gustiness factor
     character(len=*),       optional, intent(IN)    :: glc_renormalize_smb     ! Whether to renormalize smb sent from lnd -> glc
     real(SHR_KIND_R8),      optional, intent(IN)    :: wall_time_limit         ! force stop wall time (hours)
-    logical,                optional, intent(IN)    :: shr_map_dopole          ! pole corrections in shr_map_mod
-    character(len=*),       optional, intent(IN)    :: vect_map                ! vector mapping option
     integer,                optional, intent(IN)    :: cpl_decomp              ! coupler decomp
     character(len=*),       optional, intent(IN)    :: cpl_seq_option          ! coupler sequencing option
     logical,                optional, intent(IN)    :: cpl_cdf64               ! netcdf large file setting
-    logical,                optional, intent(IN)    :: do_budgets              ! heat/water budgets
-    logical,                optional, intent(IN)    :: do_histinit             ! initial history file
     logical,                optional, intent(IN)    :: drv_threading      ! driver threading control flag
 
     integer(SHR_KIND_IN),   optional, intent(IN)    :: info_debug
@@ -891,116 +867,110 @@ CONTAINS
     character(SHR_KIND_CL), optional, intent(IN) :: wav_resume(:)         ! wav resume
     character(SHR_KIND_CL), optional, intent(IN) :: cpl_resume            ! cpl resume
 
-    !EOP
-
     !----- local -----
     character(len=*), parameter :: subname = '(seq_infodata_PutData_explicit) '
-
     !-------------------------------------------------------------------------------
 
-    if ( present(cime_model)     ) infodata%cime_model     = cime_model
-    if ( present(start_type)     ) infodata%start_type     = start_type
-    if ( present(case_name)      ) infodata%case_name      = case_name
-    if ( present(case_desc)      ) infodata%case_desc      = case_desc
-    if ( present(model_version)  ) infodata%model_version  = model_version
-    if ( present(username)       ) infodata%username       = username
-    if ( present(hostname)       ) infodata%hostname       = hostname
-    if ( present(rest_case_name) ) infodata%rest_case_name = rest_case_name
-    if ( present(timing_dir)     ) infodata%timing_dir     = timing_dir
-    if ( present(tchkpt_dir)     ) infodata%tchkpt_dir     = tchkpt_dir
-    if ( present(aqua_planet)    ) infodata%aqua_planet    = aqua_planet
-    if ( present(aqua_planet_sst)) infodata%aqua_planet_sst= aqua_planet_sst
-    if ( present(run_barriers)   ) infodata%run_barriers   = run_barriers
-    if ( present(brnch_retain_casename)) infodata%brnch_retain_casename = brnch_retain_casename
-    if ( present(read_restart)   ) infodata%read_restart   = read_restart
-    if ( present(single_column)  ) infodata%single_column  = single_column
-    if ( present(scmlat)         ) infodata%scmlat         = scmlat
-    if ( present(scmlon)         ) infodata%scmlon         = scmlon
-    if ( present(logFilePostFix) ) infodata%logFilePostFix = logFilePostFix
-    if ( present(outPathRoot)    ) infodata%outPathRoot    = outPathRoot
-    if ( present(perpetual)      ) infodata%perpetual      = perpetual
-    if ( present(perpetual_ymd)  ) infodata%perpetual_ymd  = perpetual_ymd
-    if ( present(orb_iyear)      ) infodata%orb_iyear      = orb_iyear
-    if ( present(orb_iyear_align)) infodata%orb_iyear_align= orb_iyear_align
-    if ( present(orb_mode)       ) infodata%orb_mode       = orb_mode
-    if ( present(orb_eccen)      ) infodata%orb_eccen      = orb_eccen
-    if ( present(orb_obliqr)     ) infodata%orb_obliqr     = orb_obliqr
-    if ( present(orb_obliq)      ) infodata%orb_obliq      = orb_obliq
-    if ( present(orb_lambm0)     ) infodata%orb_lambm0     = orb_lambm0
-    if ( present(orb_mvelpp)     ) infodata%orb_mvelpp     = orb_mvelpp
-    if ( present(orb_mvelp)      ) infodata%orb_mvelp      = orb_mvelp
-    if ( present(tfreeze_option)    ) infodata%tfreeze_option    = tfreeze_option
-    if ( present(flux_epbal)     ) infodata%flux_epbal     = flux_epbal
-    if ( present(flux_albav)     ) infodata%flux_albav     = flux_albav
-    if ( present(flux_diurnal)   ) infodata%flux_diurnal   = flux_diurnal
-    if ( present(gust_fac)       ) infodata%gust_fac       = gust_fac
-    if ( present(glc_renormalize_smb)) infodata%glc_renormalize_smb = glc_renormalize_smb
-    if ( present(wall_time_limit)) infodata%wall_time_limit= wall_time_limit
-    if ( present(shr_map_dopole) ) infodata%shr_map_dopole = shr_map_dopole
-    if ( present(vect_map)       ) infodata%vect_map       = vect_map
-    if ( present(cpl_decomp)     ) infodata%cpl_decomp     = cpl_decomp
-    if ( present(cpl_seq_option) ) infodata%cpl_seq_option = cpl_seq_option
-    if ( present(cpl_cdf64)      ) infodata%cpl_cdf64      = cpl_cdf64
-    if ( present(do_budgets)     ) infodata%do_budgets     = do_budgets
-    if ( present(do_histinit)    ) infodata%do_histinit    = do_histinit
-    if ( present(drv_threading)  ) infodata%drv_threading  = drv_threading
+    if ( present(cime_model)            ) infodata%cime_model     = cime_model
+    if ( present(start_type)            ) infodata%start_type     = start_type
+    if ( present(case_name)             ) infodata%case_name      = case_name
+    if ( present(case_desc)             ) infodata%case_desc      = case_desc
+    if ( present(model_version)         ) infodata%model_version  = model_version
+    if ( present(username)              ) infodata%username       = username
+    if ( present(hostname)              ) infodata%hostname       = hostname
+    if ( present(rest_case_name)        ) infodata%rest_case_name = rest_case_name
+    if ( present(timing_dir)            ) infodata%timing_dir     = timing_dir
+    if ( present(tchkpt_dir)            ) infodata%tchkpt_dir     = tchkpt_dir
+    if ( present(aqua_planet)           ) infodata%aqua_planet    = aqua_planet
+    if ( present(aqua_planet_sst)       ) infodata%aqua_planet_sst= aqua_planet_sst
+    if ( present(run_barriers)          ) infodata%run_barriers   = run_barriers
+    if ( present(brnch_retain_casename) ) infodata%brnch_retain_casename = brnch_retain_casename
+    if ( present(read_restart)          ) infodata%read_restart   = read_restart
+    if ( present(single_column)         ) infodata%single_column  = single_column
+    if ( present(scmlat)                ) infodata%scmlat         = scmlat
+    if ( present(scmlon)                ) infodata%scmlon         = scmlon
+    if ( present(logFilePostFix)        ) infodata%logFilePostFix = logFilePostFix
+    if ( present(outPathRoot)           ) infodata%outPathRoot    = outPathRoot
+    if ( present(perpetual)             ) infodata%perpetual      = perpetual
+    if ( present(perpetual_ymd)         ) infodata%perpetual_ymd  = perpetual_ymd
+    if ( present(orb_iyear)             ) infodata%orb_iyear      = orb_iyear
+    if ( present(orb_iyear_align)       ) infodata%orb_iyear_align= orb_iyear_align
+    if ( present(orb_mode)              ) infodata%orb_mode       = orb_mode
+    if ( present(orb_eccen)             ) infodata%orb_eccen      = orb_eccen
+    if ( present(orb_obliqr)            ) infodata%orb_obliqr     = orb_obliqr
+    if ( present(orb_obliq)             ) infodata%orb_obliq      = orb_obliq
+    if ( present(orb_lambm0)            ) infodata%orb_lambm0     = orb_lambm0
+    if ( present(orb_mvelpp)            ) infodata%orb_mvelpp     = orb_mvelpp
+    if ( present(orb_mvelp)             ) infodata%orb_mvelp      = orb_mvelp
+    if ( present(tfreeze_option)        ) infodata%tfreeze_option    = tfreeze_option
+    if ( present(flux_epbal)            ) infodata%flux_epbal     = flux_epbal
+    if ( present(flux_albav)            ) infodata%flux_albav     = flux_albav
+    if ( present(flux_diurnal)          ) infodata%flux_diurnal   = flux_diurnal
+    if ( present(gust_fac)              ) infodata%gust_fac       = gust_fac
+    if ( present(glc_renormalize_smb)   ) infodata%glc_renormalize_smb = glc_renormalize_smb
+    if ( present(wall_time_limit)       ) infodata%wall_time_limit= wall_time_limit
+    if ( present(cpl_decomp)            ) infodata%cpl_decomp     = cpl_decomp
+    if ( present(cpl_seq_option)        ) infodata%cpl_seq_option = cpl_seq_option
+    if ( present(cpl_cdf64)             ) infodata%cpl_cdf64      = cpl_cdf64
+    if ( present(drv_threading)         ) infodata%drv_threading  = drv_threading
 
-    if ( present(info_debug)     ) infodata%info_debug     = info_debug
-    if ( present(bfbflag)        ) infodata%bfbflag        = bfbflag
-    if ( present(dead_comps)     ) infodata%dead_comps     = dead_comps
+    if ( present(info_debug)            ) infodata%info_debug     = info_debug
+    if ( present(bfbflag)               ) infodata%bfbflag        = bfbflag
+    if ( present(dead_comps)            ) infodata%dead_comps     = dead_comps
 
-    if ( present(atm_present)    ) infodata%atm_present    = atm_present
-    if ( present(atm_prognostic) ) infodata%atm_prognostic = atm_prognostic
-    if ( present(lnd_present)    ) infodata%lnd_present    = lnd_present
-    if ( present(lnd_prognostic) ) infodata%lnd_prognostic = lnd_prognostic
-    if ( present(rof_present)    ) infodata%rof_present    = rof_present
-    if ( present(rofice_present) ) infodata%rofice_present = rofice_present
-    if ( present(rof_prognostic) ) infodata%rof_prognostic = rof_prognostic
-    if ( present(flood_present)  ) infodata%flood_present  = flood_present
-    if ( present(ocn_present)    ) infodata%ocn_present    = ocn_present
-    if ( present(ocn_prognostic) ) infodata%ocn_prognostic = ocn_prognostic
-    if ( present(ocnrof_prognostic)) infodata%ocnrof_prognostic = ocnrof_prognostic
-    if ( present(ice_present)    ) infodata%ice_present    = ice_present
-    if ( present(ice_prognostic) ) infodata%ice_prognostic = ice_prognostic
-    if ( present(iceberg_prognostic)) infodata%iceberg_prognostic = iceberg_prognostic
-    if ( present(glc_present)    ) infodata%glc_present    = glc_present
-    if ( present(glclnd_present) ) infodata%glclnd_present = glclnd_present
-    if ( present(glcocn_present) ) infodata%glcocn_present = glcocn_present
-    if ( present(glcice_present) ) infodata%glcice_present = glcice_present
-    if ( present(glc_prognostic) ) infodata%glc_prognostic = glc_prognostic
-    if ( present(glc_coupled_fluxes)) infodata%glc_coupled_fluxes = glc_coupled_fluxes
-    if ( present(wav_present)    ) infodata%wav_present    = wav_present
-    if ( present(wav_prognostic) ) infodata%wav_prognostic = wav_prognostic
-    if ( present(esp_present)    ) infodata%esp_present    = esp_present
-    if ( present(esp_prognostic) ) infodata%esp_prognostic = esp_prognostic
-    if ( present(atm_nx)         ) infodata%atm_nx         = atm_nx
-    if ( present(atm_ny)         ) infodata%atm_ny         = atm_ny
-    if ( present(lnd_nx)         ) infodata%lnd_nx         = lnd_nx
-    if ( present(lnd_ny)         ) infodata%lnd_ny         = lnd_ny
-    if ( present(rof_nx)         ) infodata%rof_nx         = rof_nx
-    if ( present(rof_ny)         ) infodata%rof_ny         = rof_ny
-    if ( present(ice_nx)         ) infodata%ice_nx         = ice_nx
-    if ( present(ice_ny)         ) infodata%ice_ny         = ice_ny
-    if ( present(ocn_nx)         ) infodata%ocn_nx         = ocn_nx
-    if ( present(ocn_ny)         ) infodata%ocn_ny         = ocn_ny
-    if ( present(glc_nx)         ) infodata%glc_nx         = glc_nx
-    if ( present(glc_ny)         ) infodata%glc_ny         = glc_ny
-    if ( present(wav_nx)         ) infodata%wav_nx         = wav_nx
-    if ( present(wav_ny)         ) infodata%wav_ny         = wav_ny
+    if ( present(atm_present)           ) infodata%atm_present    = atm_present
+    if ( present(atm_prognostic)        ) infodata%atm_prognostic = atm_prognostic
+    if ( present(lnd_present)           ) infodata%lnd_present    = lnd_present
+    if ( present(lnd_prognostic)        ) infodata%lnd_prognostic = lnd_prognostic
+    if ( present(rof_present)           ) infodata%rof_present    = rof_present
+    if ( present(rofice_present)        ) infodata%rofice_present = rofice_present
+    if ( present(rof_prognostic)        ) infodata%rof_prognostic = rof_prognostic
+    if ( present(flood_present)         ) infodata%flood_present  = flood_present
+    if ( present(ocn_present)           ) infodata%ocn_present    = ocn_present
+    if ( present(ocn_prognostic)        ) infodata%ocn_prognostic = ocn_prognostic
+    if ( present(ocnrof_prognostic)     ) infodata%ocnrof_prognostic = ocnrof_prognostic
+    if ( present(ice_present)           ) infodata%ice_present    = ice_present
+    if ( present(ice_prognostic)        ) infodata%ice_prognostic = ice_prognostic
+    if ( present(iceberg_prognostic)    ) infodata%iceberg_prognostic = iceberg_prognostic
+    if ( present(glc_present)           ) infodata%glc_present    = glc_present
+    if ( present(glclnd_present)        ) infodata%glclnd_present = glclnd_present
+    if ( present(glcocn_present)        ) infodata%glcocn_present = glcocn_present
+    if ( present(glcice_present)        ) infodata%glcice_present = glcice_present
+    if ( present(glc_prognostic)        ) infodata%glc_prognostic = glc_prognostic
+    if ( present(glc_coupled_fluxes)    ) infodata%glc_coupled_fluxes = glc_coupled_fluxes
+    if ( present(wav_present)           ) infodata%wav_present    = wav_present
+    if ( present(wav_prognostic)        ) infodata%wav_prognostic = wav_prognostic
+    if ( present(esp_present)           ) infodata%esp_present    = esp_present
+    if ( present(esp_prognostic)        ) infodata%esp_prognostic = esp_prognostic
+    if ( present(atm_nx)                ) infodata%atm_nx         = atm_nx
+    if ( present(atm_ny)                ) infodata%atm_ny         = atm_ny
+    if ( present(lnd_nx)                ) infodata%lnd_nx         = lnd_nx
+    if ( present(lnd_ny)                ) infodata%lnd_ny         = lnd_ny
+    if ( present(rof_nx)                ) infodata%rof_nx         = rof_nx
+    if ( present(rof_ny)                ) infodata%rof_ny         = rof_ny
+    if ( present(ice_nx)                ) infodata%ice_nx         = ice_nx
+    if ( present(ice_ny)                ) infodata%ice_ny         = ice_ny
+    if ( present(ocn_nx)                ) infodata%ocn_nx         = ocn_nx
+    if ( present(ocn_ny)                ) infodata%ocn_ny         = ocn_ny
+    if ( present(glc_nx)                ) infodata%glc_nx         = glc_nx
+    if ( present(glc_ny)                ) infodata%glc_ny         = glc_ny
+    if ( present(wav_nx)                ) infodata%wav_nx         = wav_nx
+    if ( present(wav_ny)                ) infodata%wav_ny         = wav_ny
 
-    if ( present(nextsw_cday)    ) infodata%nextsw_cday    = nextsw_cday
-    if ( present(precip_fact)    ) infodata%precip_fact    = precip_fact
-    if ( present(atm_phase)      ) infodata%atm_phase      = atm_phase
-    if ( present(lnd_phase)      ) infodata%lnd_phase      = lnd_phase
-    if ( present(ice_phase)      ) infodata%ice_phase      = ice_phase
-    if ( present(ocn_phase)      ) infodata%ocn_phase      = ocn_phase
-    if ( present(glc_phase)      ) infodata%glc_phase      = glc_phase
-    if ( present(rof_phase)      ) infodata%rof_phase      = rof_phase
-    if ( present(wav_phase)      ) infodata%wav_phase      = wav_phase
-    if ( present(esp_phase)      ) infodata%esp_phase      = esp_phase
-    if ( present(atm_aero)       ) infodata%atm_aero       = atm_aero
-    if ( present(glc_g2lupdate)  ) infodata%glc_g2lupdate  = glc_g2lupdate
-    if ( present(glc_valid_input) ) infodata%glc_valid_input = glc_valid_input
+    if ( present(nextsw_cday)           ) infodata%nextsw_cday    = nextsw_cday
+    if ( present(precip_fact)           ) infodata%precip_fact    = precip_fact
+    if ( present(atm_phase)             ) infodata%atm_phase      = atm_phase
+    if ( present(lnd_phase)             ) infodata%lnd_phase      = lnd_phase
+    if ( present(ice_phase)             ) infodata%ice_phase      = ice_phase
+    if ( present(ocn_phase)             ) infodata%ocn_phase      = ocn_phase
+    if ( present(glc_phase)             ) infodata%glc_phase      = glc_phase
+    if ( present(rof_phase)             ) infodata%rof_phase      = rof_phase
+    if ( present(wav_phase)             ) infodata%wav_phase      = wav_phase
+    if ( present(esp_phase)             ) infodata%esp_phase      = esp_phase
+    if ( present(atm_aero)              ) infodata%atm_aero       = atm_aero
+    if ( present(glc_g2lupdate)         ) infodata%glc_g2lupdate  = glc_g2lupdate
+    if ( present(glc_valid_input)       ) infodata%glc_valid_input = glc_valid_input
+
     if ( present(atm_resume) ) then
        if (associated(infodata%pause_resume)) then
           infodata%pause_resume%atm_resume(:) = atm_resume(:)
@@ -1180,17 +1150,14 @@ CONTAINS
     call shr_mpi_bcast(infodata%gust_fac,                mpicom)
     call shr_mpi_bcast(infodata%glc_renormalize_smb,     mpicom)
     call shr_mpi_bcast(infodata%wall_time_limit,         mpicom)
-    call shr_mpi_bcast(infodata%shr_map_dopole,          mpicom)
-    call shr_mpi_bcast(infodata%vect_map,                mpicom)
     call shr_mpi_bcast(infodata%cpl_decomp,              mpicom)
     call shr_mpi_bcast(infodata%cpl_seq_option,          mpicom)
     call shr_mpi_bcast(infodata%cpl_cdf64,               mpicom)
-    call shr_mpi_bcast(infodata%do_budgets,              mpicom)
-    call shr_mpi_bcast(infodata%do_histinit,             mpicom)
     call shr_mpi_bcast(infodata%drv_threading,           mpicom)
     call shr_mpi_bcast(infodata%info_debug,              mpicom)
     call shr_mpi_bcast(infodata%bfbflag,                 mpicom)
     call shr_mpi_bcast(infodata%dead_comps,              mpicom)
+
     call shr_mpi_bcast(infodata%atm_present,             mpicom)
     call shr_mpi_bcast(infodata%atm_prognostic,          mpicom)
     call shr_mpi_bcast(infodata%lnd_present,             mpicom)
@@ -1200,6 +1167,7 @@ CONTAINS
     call shr_mpi_bcast(infodata%rof_prognostic,          mpicom)
     call shr_mpi_bcast(infodata%flood_present,           mpicom)
     call shr_mpi_bcast(infodata%ocn_present,             mpicom)
+
     call shr_mpi_bcast(infodata%ocn_prognostic,          mpicom)
     call shr_mpi_bcast(infodata%ocnrof_prognostic,       mpicom)
     call shr_mpi_bcast(infodata%ice_present,             mpicom)
@@ -1233,6 +1201,7 @@ CONTAINS
 
     call shr_mpi_bcast(infodata%nextsw_cday,             mpicom)
     call shr_mpi_bcast(infodata%precip_fact,             mpicom)
+
     call shr_mpi_bcast(infodata%atm_phase,               mpicom)
     call shr_mpi_bcast(infodata%lnd_phase,               mpicom)
     call shr_mpi_bcast(infodata%ice_phase,               mpicom)
@@ -1240,6 +1209,7 @@ CONTAINS
     call shr_mpi_bcast(infodata%glc_phase,               mpicom)
     call shr_mpi_bcast(infodata%rof_phase,               mpicom)
     call shr_mpi_bcast(infodata%wav_phase,               mpicom)
+
     call shr_mpi_bcast(infodata%atm_aero,                mpicom)
     call shr_mpi_bcast(infodata%glc_g2lupdate,           mpicom)
     call shr_mpi_bcast(infodata%glc_valid_input,         mpicom)

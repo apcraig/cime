@@ -123,7 +123,7 @@ module seq_flds_mod
 
    use shr_kind_mod      , only : CX => shr_kind_CX, CXX => shr_kind_CXX
    use shr_sys_mod       , only : shr_sys_abort
-   use seq_comm_mct      , only : seq_comm_iamroot, seq_comm_setptrs, llogunit => logunit
+   use seq_comm_mct      , only : seq_comm_iamroot, seq_comm_setptrs, logunit
    use seq_drydep_mod    , only : seq_drydep_init, seq_drydep_readnl, lnd_drydep
    use shr_megan_mod     , only : shr_megan_readnl, shr_megan_mechcomps_n
    use shr_fire_emis_mod , only : shr_fire_emis_readnl, shr_fire_emis_mechcomps_n, shr_fire_emis_ztop_token
@@ -157,23 +157,6 @@ module seq_flds_mod
    integer         ,parameter :: nmax      = 1000        ! maximum number of entries in lookup_entry
    integer                    :: n_entries = 0           ! actual number of entries in lookup_entry
    character(len=CSS), dimension(nmax, 4) :: lookup_entry = undef
-
-   !----------------------------------------------------------------------------
-   ! for the scalars
-   !----------------------------------------------------------------------------
-
-   character(len=*) ,parameter :: seq_flds_scalar_name = "cpl_scalars"
-   integer          ,parameter :: seq_flds_scalar_num = 10
-   integer          ,parameter :: seq_flds_scalar_index_present       =  1, &
-                                  seq_flds_scalar_index_prognostic    =  2, &
-                                  seq_flds_scalar_index_nx            =  3, &
-                                  seq_flds_scalar_index_ny            =  4, &
-                                  seq_flds_scalar_index_atm_aero      =  5, &
-                                  seq_flds_scalar_index_precip_fact   =  6, &
-                                  seq_flds_scalar_index_nextsw_cday   =  7, &
-                                  seq_flds_scalar_index_g2lupdate     =  8, &
-                                  seq_flds_scalar_index_dead_comps    =  9, &
-                                  seq_flds_scalar_index_phase         = 10
 
    !----------------------------------------------------------------------------
    ! for the domain
@@ -400,7 +383,7 @@ module seq_flds_mod
         seq_flds_i2o_per_cat = .false.
 
         unitn = shr_file_getUnit()
-        write(llogunit,"(A)") subname//': read seq_cplflds_inparm namelist from: '&
+        write(logunit,"(A)") subname//': read seq_cplflds_inparm namelist from: '&
              //trim(nmlfile)
         open( unitn, file=trim(nmlfile), status='old' )
         ierr = 1
@@ -437,7 +420,7 @@ module seq_flds_mod
         cplflds_custom(:) = ' '
 
         unitn = shr_file_getUnit()
-        write(llogunit,"(A)") subname//': read seq_cplflds_userspec namelist from: '&
+        write(logunit,"(A)") subname//': read seq_cplflds_userspec namelist from: '&
              //trim(nmlfile)
         open( unitn, file=trim(nmlfile), status='old' )
         ierr = 1
@@ -473,7 +456,7 @@ module seq_flds_mod
               is_state = .false.
               is_flux  = .true.
            else
-              write(llogunit,*) subname//'ERROR: fldname must start with S,F,P, not ',trim(fldname)
+              write(logunit,*) subname//'ERROR: fldname must start with S,F,P, not ',trim(fldname)
               call shr_sys_abort(subname//"ERROR: fldname must start with S, F, or P")
            end if
 
@@ -515,7 +498,7 @@ module seq_flds_mod
               if (is_state) call seq_flds_add(x2g_states,trim(fldname))
               if (is_flux ) call seq_flds_add(x2g_fluxes,trim(fldname))
            case default
-              write(llogunit,*) subname//'ERROR: ',trim(cplflds_custom(n)),&
+              write(logunit,*) subname//'ERROR: ',trim(cplflds_custom(n)),&
                    ' not a recognized value'
               call shr_sys_abort()
            end select
@@ -523,16 +506,6 @@ module seq_flds_mod
            exit
         end if
      end do
-
-     !----------------------------------------------------------
-     ! scalar information
-     !----------------------------------------------------------
-
-     longname = trim(seq_flds_scalar_name)
-     stdname  = trim(seq_flds_scalar_name)
-     units    = 'unitless'
-     attname  = trim(seq_flds_scalar_name)
-     call metadata_set(attname, longname, stdname, units)
 
      !----------------------------------------------------------
      ! domain coordinates
@@ -1090,13 +1063,10 @@ module seq_flds_mod
      call metadata_set(attname, longname, stdname, units)
 
      ! Surface temperature
-     call seq_flds_add(o2x_states,"So_t")
      call seq_flds_add(l2x_states,"Sl_t")
      call seq_flds_add(i2x_states,"Si_t")
-     call seq_flds_add(x2a_states,"Sx_t")
      call seq_flds_add(x2a_states,"So_t")
-     call seq_flds_add(x2i_states,"So_t")
-     call seq_flds_add(x2w_states,"So_t")
+     call seq_flds_add(x2a_states,"Sx_t")
      longname = 'Surface temperature'
      stdname  = 'surface_temperature'
      units    = 'K'
@@ -1122,9 +1092,9 @@ module seq_flds_mod
      call seq_flds_add(l2x_states,"Sl_ram1")
      call seq_flds_add(x2a_states,"Sl_ram1")
      longname = 'aerodynamic resistance'
-     stdname  = 'aerodynamic_resistance'
-     attname  = 'Sl_ram1'
-     units    = 's/m'
+     stdname = 'aerodynamic_resistance'
+     attname = 'SI_ram1'
+     units = 's/m'
      call metadata_set(attname, longname, stdname, units)
 
 
@@ -1159,8 +1129,8 @@ module seq_flds_mod
      call seq_flds_add(xao_states,"So_re")
      call seq_flds_add(x2a_states,"So_re")
      longname = 'Square of exch. coeff (tracers)'
-     stdname  = 'square_of_exch_coeff'
-     units    = '1'
+     stdname  = ''
+     units    = ''
      attname  = 'So_re'
      call metadata_set(attname, longname, stdname, units)
 
@@ -1172,13 +1142,7 @@ module seq_flds_mod
      longname = '10m wind'
      stdname  = '10m_wind'
      units    = 'm'
-     attname  = 'Si_u10'
-     call metadata_set(attname, longname, stdname, units)
-     attname  = 'So_u10'
-     call metadata_set(attname, longname, stdname, units)
-     attname  = 'Sl_u10'
-     call metadata_set(attname, longname, stdname, units)
-     attname  = 'Sx_u10'
+     attname  = 'u10'
      call metadata_set(attname, longname, stdname, units)
 
      ! Zonal surface stress"
@@ -1303,8 +1267,6 @@ module seq_flds_mod
      attname  = 'Faii_evap'
      call metadata_set(attname, longname, stdname, units)
      attname  = 'Faxx_evap'
-     call metadata_set(attname, longname, stdname, units)
-     attname  = 'Foxx_evap'
      call metadata_set(attname, longname, stdname, units)
 
      ! Dust flux (particle bin number 1)
@@ -1484,6 +1446,11 @@ module seq_flds_mod
      attname  = 'Fioi_flxdst'
      call metadata_set(attname, longname, stdname, units)
 
+     ! Sea surface temperature
+     call seq_flds_add(o2x_states,"So_t")
+     call seq_flds_add(x2i_states,"So_t")
+     call seq_flds_add(x2w_states,"So_t")
+
      ! Sea surface  salinity
      call seq_flds_add(o2x_states,"So_s")
      call seq_flds_add(x2i_states,"So_s")
@@ -1511,7 +1478,6 @@ module seq_flds_mod
      stdname  = 'northward_sea_water_velocity'
      units    = 'm s-1'
      attname  = 'So_v'
-     call metadata_set(attname, longname, stdname, units)
 
      ! Zonal sea surface slope
      call seq_flds_add(o2x_states,"So_dhdx")
@@ -2085,7 +2051,7 @@ module seq_flds_mod
      call seq_flds_add(x2o_states,'Sw_lamult')
      longname = 'Langmuir multiplier'
      stdname  = 'wave_model_langmuir_multiplier'
-     units    = '1'
+     units    = ''
      attname  = 'Sw_lamult'
      call metadata_set(attname, longname, stdname, units)
 
@@ -2408,7 +2374,7 @@ module seq_flds_mod
         call seq_flds_add(x2l_states, "Sa_co2prog")
         call seq_flds_add(x2o_states, "Sa_co2prog")
         longname = 'Prognostic CO2 at the lowest model level'
-        stdname  = 'prognostic_CO2_lowest_level'
+        stdname  = ''
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2prog'
         call metadata_set(attname, longname, stdname, units)
@@ -2417,7 +2383,7 @@ module seq_flds_mod
         call seq_flds_add(x2l_states, "Sa_co2diag")
         call seq_flds_add(x2o_states, "Sa_co2diag")
         longname = 'Diagnostic CO2 at the lowest model level'
-        stdname  = 'diagnostic_CO2_lowest_level'
+        stdname  = ''
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2diag'
         call metadata_set(attname, longname, stdname, units)
@@ -2427,7 +2393,7 @@ module seq_flds_mod
         call seq_flds_add(a2x_states,  "Sa_co2prog")
         call seq_flds_add(x2l_states,  "Sa_co2prog")
         longname = 'Prognostic CO2 at the lowest model level'
-        stdname  = 'prognostic_CO2_lowest_level'
+        stdname  = ''
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2prog'
         call metadata_set(attname, longname, stdname, units)
@@ -2435,7 +2401,7 @@ module seq_flds_mod
         call seq_flds_add(a2x_states,  "Sa_co2diag")
         call seq_flds_add(x2l_states,  "Sa_co2diag")
         longname = 'Diagnostic CO2 at the lowest model level'
-        stdname  = 'diagnostic_CO2_lowest_level'
+        stdname  = ''
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2diag'
         call metadata_set(attname, longname, stdname, units)
@@ -2454,7 +2420,7 @@ module seq_flds_mod
         call seq_flds_add(x2l_states, "Sa_co2prog")
         call seq_flds_add(x2o_states, "Sa_co2prog")
         longname = 'Prognostic CO2 at the lowest model level'
-        stdname  = 'prognostic_CO2_lowest_level'
+        stdname  = ''
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2prog'
         call metadata_set(attname, longname, stdname, units)
@@ -2463,7 +2429,7 @@ module seq_flds_mod
         call seq_flds_add(x2l_states, "Sa_co2diag")
         call seq_flds_add(x2o_states, "Sa_co2diag")
         longname = 'Diagnostic CO2 at the lowest model level'
-        stdname  = 'diagnostic_CO2_lowest_level'
+        stdname  = ''
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2diag'
         call metadata_set(attname, longname, stdname, units)
@@ -2489,7 +2455,7 @@ module seq_flds_mod
         call seq_flds_add(a2x_states, "Sa_co2prog")
         call seq_flds_add(x2l_states, "Sa_co2prog")
         longname = 'Prognostic CO2 at the lowest model level'
-        stdname  = 'prognostic_CO2_lowest_level'
+        stdname  = ''
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2prog'
         call metadata_set(attname, longname, stdname, units)
@@ -2497,7 +2463,7 @@ module seq_flds_mod
         call seq_flds_add(a2x_states, "Sa_co2diag")
         call seq_flds_add(x2l_states, "Sa_co2diag")
         longname = 'Diagnostic CO2 at the lowest model level'
-        stdname  = 'diagnostic_CO2_lowest_level'
+        stdname  = ''
         units    = '1e-6 mol/mol'
         attname  = 'Sa_co2diag'
         call metadata_set(attname, longname, stdname, units)
@@ -2532,8 +2498,8 @@ module seq_flds_mod
         call seq_flds_add(o2x_states, "So_roce_16O")
         call seq_flds_add(x2i_states, "So_roce_16O")
         longname = 'Ratio of ocean surface level abund. H2_16O/H2O/Rstd'
-        stdname  = 'ratio_ocean_surface_16O_abund'
-        units    = '1'
+        stdname  = ''
+        units    = ' '
         attname  = 'So_roce_16O'
         call metadata_set(attname, longname, stdname, units)
 
@@ -3256,38 +3222,38 @@ module seq_flds_mod
      seq_flds_r2o_ice_fluxes = trim(r2o_ice_fluxes)
 
      if (seq_comm_iamroot(ID)) then
-        write(llogunit,"(A)") subname//': seq_flds_a2x_states= ',trim(seq_flds_a2x_states)
-        write(llogunit,"(A)") subname//': seq_flds_a2x_fluxes= ',trim(seq_flds_a2x_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_x2a_states= ',trim(seq_flds_x2a_states)
-        write(llogunit,"(A)") subname//': seq_flds_x2a_fluxes= ',trim(seq_flds_x2a_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_l2x_states= ',trim(seq_flds_l2x_states)
-        write(llogunit,"(A)") subname//': seq_flds_l2x_fluxes= ',trim(seq_flds_l2x_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_x2l_states= ',trim(seq_flds_x2l_states)
-        write(llogunit,"(A)") subname//': seq_flds_x2l_fluxes= ',trim(seq_flds_x2l_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_i2x_states= ',trim(seq_flds_i2x_states)
-        write(llogunit,"(A)") subname//': seq_flds_i2x_fluxes= ',trim(seq_flds_i2x_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_x2i_states= ',trim(seq_flds_x2i_states)
-        write(llogunit,"(A)") subname//': seq_flds_x2i_fluxes= ',trim(seq_flds_x2i_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_o2x_states= ',trim(seq_flds_o2x_states)
-        write(llogunit,"(A)") subname//': seq_flds_o2x_fluxes= ',trim(seq_flds_o2x_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_x2o_states= ',trim(seq_flds_x2o_states)
-        write(llogunit,"(A)") subname//': seq_flds_x2o_fluxes= ',trim(seq_flds_x2o_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_g2x_states= ',trim(seq_flds_g2x_states)
-        write(llogunit,"(A)") subname//': seq_flds_g2x_fluxes= ',trim(seq_flds_g2x_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_x2g_states= ',trim(seq_flds_x2g_states)
-        write(llogunit,"(A)") subname//': seq_flds_x2g_fluxes= ',trim(seq_flds_x2g_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_xao_states= ',trim(seq_flds_xao_states)
-        write(llogunit,"(A)") subname//': seq_flds_xao_fluxes= ',trim(seq_flds_xao_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_xao_albedo= ',trim(seq_flds_xao_albedo)
-        write(llogunit,"(A)") subname//': seq_flds_xao_diurnl= ',trim(seq_flds_xao_diurnl)
-        write(llogunit,"(A)") subname//': seq_flds_r2x_states= ',trim(seq_flds_r2x_states)
-        write(llogunit,"(A)") subname//': seq_flds_r2x_fluxes= ',trim(seq_flds_r2x_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_x2r_states= ',trim(seq_flds_x2r_states)
-        write(llogunit,"(A)") subname//': seq_flds_x2r_fluxes= ',trim(seq_flds_x2r_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_w2x_states= ',trim(seq_flds_w2x_states)
-        write(llogunit,"(A)") subname//': seq_flds_w2x_fluxes= ',trim(seq_flds_w2x_fluxes)
-        write(llogunit,"(A)") subname//': seq_flds_x2w_states= ',trim(seq_flds_x2w_states)
-        write(llogunit,"(A)") subname//': seq_flds_x2w_fluxes= ',trim(seq_flds_x2w_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_a2x_states= ',trim(seq_flds_a2x_states)
+        write(logunit,"(A)") subname//': seq_flds_a2x_fluxes= ',trim(seq_flds_a2x_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_x2a_states= ',trim(seq_flds_x2a_states)
+        write(logunit,"(A)") subname//': seq_flds_x2a_fluxes= ',trim(seq_flds_x2a_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_l2x_states= ',trim(seq_flds_l2x_states)
+        write(logunit,"(A)") subname//': seq_flds_l2x_fluxes= ',trim(seq_flds_l2x_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_x2l_states= ',trim(seq_flds_x2l_states)
+        write(logunit,"(A)") subname//': seq_flds_x2l_fluxes= ',trim(seq_flds_x2l_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_i2x_states= ',trim(seq_flds_i2x_states)
+        write(logunit,"(A)") subname//': seq_flds_i2x_fluxes= ',trim(seq_flds_i2x_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_x2i_states= ',trim(seq_flds_x2i_states)
+        write(logunit,"(A)") subname//': seq_flds_x2i_fluxes= ',trim(seq_flds_x2i_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_o2x_states= ',trim(seq_flds_o2x_states)
+        write(logunit,"(A)") subname//': seq_flds_o2x_fluxes= ',trim(seq_flds_o2x_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_x2o_states= ',trim(seq_flds_x2o_states)
+        write(logunit,"(A)") subname//': seq_flds_x2o_fluxes= ',trim(seq_flds_x2o_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_g2x_states= ',trim(seq_flds_g2x_states)
+        write(logunit,"(A)") subname//': seq_flds_g2x_fluxes= ',trim(seq_flds_g2x_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_x2g_states= ',trim(seq_flds_x2g_states)
+        write(logunit,"(A)") subname//': seq_flds_x2g_fluxes= ',trim(seq_flds_x2g_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_xao_states= ',trim(seq_flds_xao_states)
+        write(logunit,"(A)") subname//': seq_flds_xao_fluxes= ',trim(seq_flds_xao_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_xao_albedo= ',trim(seq_flds_xao_albedo)
+        write(logunit,"(A)") subname//': seq_flds_xao_diurnl= ',trim(seq_flds_xao_diurnl)
+        write(logunit,"(A)") subname//': seq_flds_r2x_states= ',trim(seq_flds_r2x_states)
+        write(logunit,"(A)") subname//': seq_flds_r2x_fluxes= ',trim(seq_flds_r2x_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_x2r_states= ',trim(seq_flds_x2r_states)
+        write(logunit,"(A)") subname//': seq_flds_x2r_fluxes= ',trim(seq_flds_x2r_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_w2x_states= ',trim(seq_flds_w2x_states)
+        write(logunit,"(A)") subname//': seq_flds_w2x_fluxes= ',trim(seq_flds_w2x_fluxes)
+        write(logunit,"(A)") subname//': seq_flds_x2w_states= ',trim(seq_flds_x2w_states)
+        write(logunit,"(A)") subname//': seq_flds_x2w_fluxes= ',trim(seq_flds_x2w_fluxes)
      end if
 
      call catFields(seq_flds_dom_fields, seq_flds_dom_coord , seq_flds_dom_other )
@@ -3350,8 +3316,8 @@ module seq_flds_mod
         outfld = trim(outfld)//':'//trim(str)
      end if
      if (len_trim(outfld) >= CXX) then
-        write(llogunit,*)'fields are = ',trim(outfld)
-        write(llogunit,*)'fields length = ',len_trim(outfld)
+        write(logunit,*)'fields are = ',trim(outfld)
+        write(logunit,*)'fields length = ',len_trim(outfld)
         call shr_sys_abort(subname//'ERROR: maximum length of xxx_states or xxx_fluxes has been exceeded')
      end if
 
@@ -3497,7 +3463,7 @@ module seq_flds_mod
 
 
      if (n_entries .ge. nmax) then
-        write(llogunit,*)'n_entries= ',n_entries,' nmax = ',nmax,' attname= ',trim(attname)
+        write(logunit,*)'n_entries= ',n_entries,' nmax = ',nmax,' attname= ',trim(attname)
         call shr_sys_abort(subname//'ERROR: nmax fields in lookup_entry table exceeded')
      end if
 
@@ -3564,55 +3530,6 @@ module seq_flds_mod
         end do
      end if
    end subroutine set_glc_elevclass_field
-
-
-   subroutine seq_flds_get_num_entries(num_entries)
-
-     ! !USES:
-     implicit none
-
-     ! !INPUT/OUTPUT PARAMETERS:
-     integer, intent(out)  :: num_entries
-
-     character(len=*),parameter :: subname = '(seq_flds_get_num_entries) '
-
-     num_entries = n_entries
-
-   end subroutine seq_flds_get_num_entries
-
-   !===============================================================================
-
-   subroutine seq_flds_get_entry(nentry, shortname, longname, stdname, units)
-
-     ! !USES:
-     implicit none
-
-     ! !INPUT/OUTPUT PARAMETERS:
-     integer, intent(in)  :: nentry
-     character(len=*),optional, intent(out) :: shortname 
-     character(len=*),optional, intent(out) :: longname
-     character(len=*),optional, intent(out) :: stdname  
-     character(len=*),optional, intent(out) :: units    
-
-     character(len=*),parameter :: subname = '(seq_flds_get_entry) '
-
-     if (present(shortname)) then
-        shortname = trim(lookup_entry(nentry,1))
-     endif
-
-     if (present(longname)) then
-        longname = trim(lookup_entry(nentry,2))
-     endif
-
-     if (present(stdname)) then
-        stdname = trim(lookup_entry(nentry,3))
-     endif
-
-     if (present(units)) then
-        units = trim(lookup_entry(nentry,4))
-     endif
-
-   end subroutine seq_flds_get_entry
 
    !===============================================================================
 
@@ -3687,8 +3604,6 @@ module seq_flds_mod
      endif
 
    end subroutine seq_flds_esmf_metadata_get
-
-   !===============================================================================
 
  end module seq_flds_mod
 

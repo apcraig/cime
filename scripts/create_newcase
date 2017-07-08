@@ -38,6 +38,10 @@ OR
                         help="(required) Specify a model grid resolution. "
                         "To see list of current compsets, use the utility query_config in this directory")
 
+    parser.add_argument("--driver", "-driver", default="mct", choices=('mct','nuopc'),
+                        help="Specify the cime driver "
+                        "Allowed values are ('mct','nuopc') ")
+
     parser.add_argument("--machine", "-mach",
                         help="Specify a machine. default: match NODENAME_REGEX in config_machines.xml "
                         "To see list of current  machines, use the utility query_config in this directory"
@@ -154,12 +158,17 @@ OR
     if args.input_dir is not None:
         args.input_dir = os.path.abspath(args.input_dir)
 
+    if args.driver == 'mct':
+        args.driver = 'drv'
+    if args.driver == 'nuopc':
+        args.driver = 'drv-nuopc'
+
     return args.case, args.compset, args.res, args.machine, args.compiler,\
         args.mpilib, args.project, args.pecount, \
         args.user_mods_dir, args.user_compset, args.pesfile, \
         args.user_grid, args.gridfile, args.srcroot, args.test, args.ninst, \
         args.walltime, args.queue, args.output_root, args.script_root, \
-        run_unsupported, args.answer, args.input_dir
+        run_unsupported, args.answer, args.input_dir, args.driver
 
 ###############################################################################
 def _main_func(description):
@@ -171,7 +180,7 @@ def _main_func(description):
         user_mods_dir, user_compset, pesfile, \
         user_grid, gridfile, srcroot, test, ninst, walltime, queue, \
         output_root, script_root, run_unsupported, \
-        answer, input_dir = parse_command_line(sys.argv, cimeroot, description)
+        answer, input_dir, driver = parse_command_line(sys.argv, cimeroot, description)
 
     if script_root is None:
         caseroot = os.path.abspath(casename)
@@ -196,7 +205,7 @@ def _main_func(description):
                        user_grid=user_grid, gridfile=gridfile, ninst=ninst, test=test,
                        walltime=walltime, queue=queue, output_root=output_root,
                        run_unsupported=run_unsupported, answer=answer,
-                       input_dir=input_dir)
+                       input_dir=input_dir, driver=driver)
 
         case.create_caseroot()
 
