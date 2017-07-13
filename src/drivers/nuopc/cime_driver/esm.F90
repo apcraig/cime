@@ -87,32 +87,6 @@ module ESM
   use xesp_comp_nuopc, only: xesp_SS => SetServices
 #endif
 
-#ifdef ESMFUSE_satm
-  use satm_comp_nuopc, only: satm_SS => SetServices
-#endif
-#ifdef ESMFUSE_socn
-  use socn_comp_nuopc, only: socn_SS => SetServices
-#endif
-#ifdef ESMFUSE_sice
-  use sice_comp_nuopc, only: sice_SS => SetServices
-#endif
-#ifdef ESMFUSE_slnd
-  use slnd_comp_nuopc, only: slnd_SS => SetServices
-#endif
-#ifdef ESMFUSE_srof
-  use srof_comp_nuopc, only: srof_SS => SetServices
-#endif
-#ifdef ESMFUSE_swav
-  use swav_comp_nuopc, only: swav_SS => SetServices
-#endif
-#ifdef ESMFUSE_sglc
-  use sglc_comp_nuopc, only: sglc_SS => SetServices
-#endif
-#ifdef ESMFUSE_sesp
-  use sesp_comp_nuopc, only: sesp_SS => SetServices
-#endif
-
-
   use MED                   , only: med_SS => SetServices
   use NUOPC_Connector       , only: cpl_SS => SetServices
 
@@ -369,16 +343,6 @@ module ESM
             line=__LINE__, file=u_FILE_u, rcToReturn=rc)
           return  ! bail out
 #endif
-        elseif (trim(model) == "satm") then
-#ifdef ESMFUSE_satm
-          call NUOPC_DriverAddComp(driver, "ATM",  satm_SS, petList=petList, comp=child, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-#else
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' model unavailable = '//trim(prefix)//':'//trim(model), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-#endif
         else
           call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
             msg=subname//' invalid model = '//trim(prefix)//':'//trim(model), &
@@ -445,16 +409,6 @@ module ESM
             line=__LINE__, file=u_FILE_u, rcToReturn=rc)
           return  ! bail out
 #endif
-        elseif (trim(model) == "socn") then
-#ifdef ESMFUSE_socn
-          call NUOPC_DriverAddComp(driver, "OCN", socn_SS, petList=petList, comp=child, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-#else
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' model unavailable = '//trim(prefix)//':'//trim(model), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-#endif
         else
           call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
             msg=subname//' invalid model = '//trim(prefix)//':'//trim(model), &
@@ -512,16 +466,6 @@ module ESM
             line=__LINE__, file=u_FILE_u, rcToReturn=rc)
           return  ! bail out
 #endif
-        elseif (trim(model) == "sice") then
-#ifdef ESMFUSE_sice
-          call NUOPC_DriverAddComp(driver, "ICE", sice_SS, petList=petList, comp=child, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-#else
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' model unavailable = '//trim(prefix)//':'//trim(model), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-#endif
         else
           call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
             msg=subname//' invalid model = '//trim(prefix)//':'//trim(model), &
@@ -572,16 +516,6 @@ module ESM
         elseif (trim(model) == "xlnd") then
 #ifdef ESMFUSE_xlnd
           call NUOPC_DriverAddComp(driver, "LND", xlnd_SS, petList=petList, comp=child, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-#else
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' model unavailable = '//trim(prefix)//':'//trim(model), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-#endif
-        elseif (trim(model) == "slnd") then
-#ifdef ESMFUSE_slnd
-          call NUOPC_DriverAddComp(driver, "LND", slnd_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 #else
           call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
@@ -649,16 +583,6 @@ module ESM
         elseif (trim(model) == "xrof") then
 #ifdef ESMFUSE_xrof
           call NUOPC_DriverAddComp(driver, "ROF", xrof_SS, petList=petList, comp=child, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-#else
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' model unavailable = '//trim(prefix)//':'//trim(model), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-#endif
-        elseif (trim(model) == "srof") then
-#ifdef ESMFUSE_srof
-          call NUOPC_DriverAddComp(driver, "ROF", srof_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 #else
           call ESMF_LogSetError(ESMF_RC_NOT_VALID, &

@@ -191,12 +191,12 @@
     <group>nuopc_runseq</group>
     <values>
       <value>
-      @86400             # 1 day time step
+      @ocn_cpl_dt   #ocean coupling step
 	  MED med_phases_prep_ocn
 	  MED med_connectors_prep_med2ocn
 	  MED -> OCN :remapMethod=redist
 	  OCN
-	  @48          # 30min time step
+	  @atm_cpl_dt   # atmosphere coupling step
             MED med_phases_prep_ice
             MED med_connectors_prep_med2ice
             MED -> ICE :remapMethod=redist

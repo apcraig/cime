@@ -1111,7 +1111,9 @@ class Namelist(object):
                 self.set_variable_value(group_name, variable_name, merged_val,
                                         var_size=len(merged_val))
 
-    def write(self, out_file, groups=None, append=False, format_='nml', sorted_groups=True):
+    def write(self, out_file, groups=None, append=False, format_='nml', sorted_groups=True, 
+              skip_comps=None, prognostic_comps=None, atm_cpl_dt=None, ocn_cpl_dt=None):
+        
         """Write a Fortran namelist to a file.
 
         As with `parse`, the `out_file` argument can be either a file name, or a
@@ -1133,18 +1135,24 @@ class Namelist(object):
             flag = 'a' if append else 'w'
             with open(out_file, flag) as file_obj:
                 if format_ == 'nuopc':
-                    self._write_nuopc(file_obj, groups, sorted_groups=sorted_groups)
+                    self._write_nuopc(file_obj, groups, sorted_groups=sorted_groups,
+                                      skip_comps=skip_comps, prognostic_comps=prognostic_comps, 
+                                      atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
                 else:
                     self._write(file_obj, groups, format_, sorted_groups=sorted_groups)
         else:
             logger.debug("Writing namelist to file object")
             if format_ == 'nuopc':
-                self._write_noupc(out_file, groups, sorted_groups=sorted_groups)
+                self._write_noupc(out_file, groups, sorted_groups=sorted_groups,
+                                  skip_comps=skip_comps, prognostic_comps=prognostic_comps,
+                                  atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
             else:
                 self._write(out_file, groups, format_, sorted_groups=sorted_groups)
 
-    def _write_nuopc(self, out_file, groups, sorted_groups):
+    def _write_nuopc(self, out_file, groups, sorted_groups, skip_comps, prognostic_comps,
+                     atm_cpl_dt, ocn_cpl_dt):
         """Unwrapped version of `write` assuming that a file object is input."""
+
         if groups is None:
             groups = self._groups.keys()
 
@@ -1164,6 +1172,11 @@ class Namelist(object):
             group = self._groups[group_name]
             for name in sorted(group.keys()):
                 values = group[name]
+                if "component_list" in name:
+                    for skip_comp in skip_comps:
+                        if skip_comp in values[0]:
+                            values[0] = values[0].replace(skip_comp,"")
+                components = values[0]
 
                 # @ is used in a namelist to put the same namelist variable in multiple groups
                 # in the write phase, all characters in the namelist variable name after
@@ -1198,7 +1211,45 @@ class Namelist(object):
                 lines[-1] += "\n"
                 for line in lines:
                     line = line.replace('"','')
-                    out_file.write(line)
+                    # remove un-needed entries from the nuopc_runseq based
+                    # on the prognostic_comps and skip_comps lists
+                    if group_name == 'nuopc_runseq':
+                        run_entries = line.splitlines()
+                        newline = ""
+                        for run_entry in run_entries:
+                            print_entry = True
+                            for skip_comp in skip_comps:
+                                if skip_comp in run_entry:
+                                    print_entry = False
+                                    logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
+                                if skip_comp.lower().strip() in run_entry:
+                                    print_entry = False
+                                    logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
+                            if print_entry:
+                                med_to_comp_regex = re.compile(r"MED.*-\> *([A-Z]+)")
+                                match = med_to_comp_regex.search(run_entry)
+                                if match:
+                                    target_comp = match.group(1)
+                                    for prognostic_comp in prognostic_comps:
+                                        if not prognostic_comp in target_comp:
+                                            print_entry = False
+                                            logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
+                                med_to_comp_regex = re.compile(r"MED.*prep.+")
+                                match = med_to_comp_regex.search(run_entry)
+                                if match:
+                                    for prognostic_comp in prognostic_comps:
+                                        if not prognostic_comp.lower().strip() in run_entry:
+                                            print_entry = False
+                                            logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
+                            if print_entry:
+                                if "@atm_cpl_dt" in run_entry:
+                                    run_entry = run_entry.replace("atm_cpl_dt",atm_cpl_dt)
+                                if "@ocn_cpl_dt" in run_entry:
+                                    run_entry = run_entry.replace("ocn_cpl_dt",ocn_cpl_dt)
+                                newline += run_entry + "\n"
+                        out_file.write(newline)
+                    else:
+                        out_file.write(line)
 
             if "_attribute" in group_name or "runseq" in group_name:
                 out_file.write("::\n\n")
