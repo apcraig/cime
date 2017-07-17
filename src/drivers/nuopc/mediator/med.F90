@@ -18,6 +18,7 @@ module MED
     mediator_label_SetRunClock      => label_SetRunClock, &
     NUOPC_MediatorGet
 
+  use shr_kind_mod          , only: SHR_KIND_CL
   use seq_flds_mod
   use seq_infodata_mod      , only: infodata=>seq_infodata_infodata
 
@@ -52,6 +53,13 @@ module MED
   use med_internalstate_mod , only: fldsToGlc
   use med_internalstate_mod , only: fldsFrGlc
   use med_internalstate_mod , only: fldsAtmOcn
+  use med_internalstate_mod , only: medToAtm
+  use med_internalstate_mod , only: medToOcn
+  use med_internalstate_mod , only: medToIce
+  use med_internalstate_mod , only: medToLnd
+  use med_internalstate_mod , only: medToRof
+  use med_internalstate_mod , only: medToWav
+  use med_internalstate_mod , only: medToGlc
   use med_connectors_mod    , only: med_connectors_prep_med2atm
   use med_connectors_mod    , only: med_connectors_prep_med2ocn
   use med_connectors_mod    , only: med_connectors_prep_med2ice
@@ -737,17 +745,20 @@ module MED
     integer, intent(out) :: rc
     
     ! local variables    
-    integer                    :: i, j
+    integer                         :: i, j
     real(kind=ESMF_KIND_R8),pointer :: lonPtr(:), latPtr(:)
-    type(ESMF_VM)              :: vm
-    type(InternalState)        :: is_local
-    integer                    :: lmpicom
-    real(ESMF_KIND_R8)         :: intervalSec
-    type(ESMF_TimeInterval)    :: timeStep
+    type(ESMF_VM)                   :: vm
+    type(InternalState)             :: is_local
+    integer                         :: lmpicom
+    real(ESMF_KIND_R8)              :: intervalSec
+    type(ESMF_TimeInterval)         :: timeStep
 ! tcx XGrid
-!    type(ESMF_Field)            :: fieldX, fieldA, fieldO
-!    type(ESMF_XGrid)            :: xgrid
-    character(len=*),parameter :: subname='(module_MEDIATOR:InitializeIPDv03p3)'
+!    type(ESMF_Field)               :: fieldX, fieldA, fieldO
+!    type(ESMF_XGrid)               :: xgrid
+    integer                         :: n
+    character(SHR_KIND_CL)          :: cvalue  
+    logical                         :: connected
+    character(len=*),parameter      :: subname='(module_MEDIATOR:InitializeIPDv03p3)'
     
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -774,7 +785,61 @@ module MED
     is_local%wrap%wavcntr = 0
     is_local%wrap%glccntr = 0
 
+    is_local%wrap%atmcntr_post = 0
+    is_local%wrap%ocncntr_post = 0
+    is_local%wrap%icecntr_post = 0
+    is_local%wrap%lndcntr_post = 0
+    is_local%wrap%rofcntr_post = 0
+    is_local%wrap%wavcntr_post = 0
+    is_local%wrap%glccntr_post = 0
+
 ! tcraig hardwire 1 degree grid as backup option
+    ! Determine if mediator will send to each component 
+    medToAtm = .false.
+    do n = 1,fldsToAtm%num
+       connected = NUOPC_IsConnected(is_local%wrap%NState_AtmExp, fieldName=fldsToAtm%shortname(n))
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       if (connected) medToAtm = .true.
+    end do
+    write(cvalue,*) medToAtm
+    call ESMF_LogWrite(trim(subname)//": medToAtm is "//cvalue, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    medToOcn = .false.
+    do n = 1,fldsToOcn%num
+       connected = NUOPC_IsConnected(is_local%wrap%NState_OcnExp, fieldName=fldsToOcn%shortname(n))
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       if (connected) medToOcn = .true.
+    end do
+    write(cvalue,*) medToOcn
+    call ESMF_LogWrite(trim(subname)//": medToOcn is " // cvalue, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    medToIce = .false.
+    do n = 1,fldsToIce%num
+       connected = NUOPC_IsConnected(is_local%wrap%NState_IceExp, fieldName=fldsToIce%shortname(n))
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       if (connected) medToIce = .true.
+    end do
+    write(cvalue,*) medToIce
+    call ESMF_LogWrite(trim(subname)//": medToIce is " // cvalue, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    medToLnd = .false.
+    do n = 1,fldsToLnd%num
+       connected = NUOPC_IsConnected(is_local%wrap%NState_LndExp, fieldName=fldsToLnd%shortname(n))
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       if (connected) medToLnd = .true.
+    end do
+    write(cvalue,*) medToLnd
+    call ESMF_LogWrite(trim(subname)//": medToLnd is " // cvalue, ESMF_LOGMSG_INFO, rc=dbrc)
+
+    medToRof = .false.
+    do n = 1,fldsToRof%num
+       connected = NUOPC_IsConnected(is_local%wrap%NState_RofExp, fieldName=fldsToRof%shortname(n))
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       if (connected) medToRof = .true.
+    end do
+    write(cvalue,*) medToRof
+    call ESMF_LogWrite(trim(subname)//": medToRof is " // cvalue, ESMF_LOGMSG_INFO, rc=dbrc)
+
 !    gridMed = ESMF_GridCreate1PeriDimUfrm(maxIndex=(/360,180/), &
 !      minCornerCoord=(/0._ESMF_KIND_R8, -90._ESMF_KIND_R8/), &
 !      maxCornerCoord=(/360._ESMF_KIND_R8, 90._ESMF_KIND_R8/), &
@@ -2005,8 +2070,8 @@ module MED
     type(ESMF_StateItem_Flag)   :: itemType
     logical                     :: atCorrectTime, allDone, connected
     type(InternalState)         :: is_local
-    character(len=*), parameter :: subname='(module_MEDIATOR:DataInitialize)'
     integer                     :: n
+    character(len=*), parameter :: subname='(module_MEDIATOR:DataInitialize)'
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
