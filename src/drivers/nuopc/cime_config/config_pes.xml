@@ -85,7 +85,7 @@
   </grid>
 
   <grid name="a%T31">
-    <mach name="yellowstone|cheyenne">
+    <mach name="yellowstone|cheyenne|hobart">
       <pes pesize="any" compset="DATM">
 	<comment>none</comment>
 	<ntasks>
