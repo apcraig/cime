@@ -200,7 +200,7 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
         # xcpl_comps
         if case.get_value("COMP_" + item.upper()) == 'x' + item:
             if item != 'esp': #no esp xcpl component
-                if case.get_value(item.upper + "_NX") == 0 and case.get_value(item.upper + "_NY") == 0:
+                if case.get_value(item.upper() + "_NX") == "0" and case.get_value(item.upper() + "_NY") == "0":
                     skip_comps.append(item.upper)
 
     # Determine if prognostic components
