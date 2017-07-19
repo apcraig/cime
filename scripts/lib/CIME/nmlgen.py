@@ -658,12 +658,11 @@ class NamelistGenerator(object):
         self._namelist.write(filename, groups=["modelio", "pio_inparm"], format_="nml")
 
     def write_nuopc_config_file(self, filename, data_list_path=None, 
-                                skip_comps=None, prognostic_comps=None, atm_cpl_dt=None, ocn_cpl_dt=None):
+                                skip_comps=None, atm_cpl_dt=None, ocn_cpl_dt=None):
         self._definition.validate(self._namelist)
         groups = self._namelist.get_group_names()
         self._namelist.write(filename, groups=groups, format_='nuopc', sorted_groups=False, 
-                             skip_comps=skip_comps, prognostic_comps=prognostic_comps, 
-                             atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
+                             skip_comps=skip_comps, atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
         if data_list_path is not None:
             # append to input_data_list file
             with open(data_list_path, "a") as input_data_list:

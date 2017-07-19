@@ -182,10 +182,6 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     xcpl_types = [ 'x' + x for x in comp_types]
     data_types = [ 'd' + x for x in comp_types]
 
-    prognostic_types = {"cam":"COMP_ATM", "clm":"COMP_LND", "cice":"COMP_ICE",
-                       "pop":"COMP_OCN", "mom":"COMP_OCN", "rtm":"COMP_ROF",
-                       "mosart":"COMP_ROF", "cism":"COMP_GLC", "ww":"COMP_WAV"}
-
     # Determine components that are not present
     skip_comps = []
     for item in comp_types:
@@ -203,24 +199,7 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
                 if case.get_value(item.upper() + "_NX") == "0" and case.get_value(item.upper() + "_NY") == "0":
                     skip_comps.append(item.upper)
 
-    # Determine if prognostic components
-    prognostic_comps = []
-    for key,value in prognostic_types.iteritems():
-        if case.get_value(value) == key:
-            prognostic_comps.append(value)
-
-    # Determine prognostic data component configurations
-    if case.get_value("COMP_ICE") == "dice":
-        if case.get_value("DICE_MODE") != "null":
-            prognostic_comps.append("ICE")
-    if case.get_value("COMP_OCN") == "docn":
-        if case.get_value("DOCN_MODE") == "interannual":
-            prognostic_comps.append("OCN")
-        if case.get_value("DOCN_MODE") == "som" or case.get_value("DOCN_MODE") == "som_aquap":
-            prognostic_comps.append("OCN")
-
     logger.info("Writing nuopc_runseq will skip components {}".format(skip_comps))
-    logger.info("Writing nuopc_runseq will only use prognostic components {}".format(prognostic_comps))
 
     #TODO: how would the current data model namelist force_prognostic_true be used - and actually how is it unsed now?
     #TODO: how are we going to handle ocnrof_prognostic setting?
@@ -229,8 +208,7 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     ocn_cpl_dt = nmlgen.get_value('ocn_cpl_dt')
     nuopc_config_file = os.path.join(confdir, "cesm.runconfig")
     nmlgen.write_nuopc_config_file(nuopc_config_file, data_list_path=data_list_path, 
-                                   skip_comps=skip_comps, prognostic_comps=prognostic_comps, 
-                                   atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
+                                   skip_comps=skip_comps, atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
 
     #--------------------------------
     # (4) Write drv_flds_in

@@ -1136,21 +1136,18 @@ class Namelist(object):
             with open(out_file, flag) as file_obj:
                 if format_ == 'nuopc':
                     self._write_nuopc(file_obj, groups, sorted_groups=sorted_groups,
-                                      skip_comps=skip_comps, prognostic_comps=prognostic_comps, 
-                                      atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
+                                      skip_comps=skip_comps, atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
                 else:
                     self._write(file_obj, groups, format_, sorted_groups=sorted_groups)
         else:
             logger.debug("Writing namelist to file object")
             if format_ == 'nuopc':
                 self._write_noupc(out_file, groups, sorted_groups=sorted_groups,
-                                  skip_comps=skip_comps, prognostic_comps=prognostic_comps,
-                                  atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
+                                  skip_comps=skip_comps, atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
             else:
                 self._write(out_file, groups, format_, sorted_groups=sorted_groups)
 
-    def _write_nuopc(self, out_file, groups, sorted_groups, skip_comps, prognostic_comps,
-                     atm_cpl_dt, ocn_cpl_dt):
+    def _write_nuopc(self, out_file, groups, sorted_groups, skip_comps, atm_cpl_dt, ocn_cpl_dt):
         """Unwrapped version of `write` assuming that a file object is input."""
 
         if groups is None:
@@ -1225,22 +1222,6 @@ class Namelist(object):
                                 if skip_comp.lower().strip() in run_entry:
                                     print_entry = False
                                     logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
-                            if print_entry:
-                                med_to_comp_regex = re.compile(r"MED.*-\> *([A-Z]+)")
-                                match = med_to_comp_regex.search(run_entry)
-                                if match:
-                                    target_comp = match.group(1)
-                                    for prognostic_comp in prognostic_comps:
-                                        if not prognostic_comp in target_comp:
-                                            print_entry = False
-                                            logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
-                                med_to_comp_regex = re.compile(r"MED.*prep.+")
-                                match = med_to_comp_regex.search(run_entry)
-                                if match:
-                                    for prognostic_comp in prognostic_comps:
-                                        if not prognostic_comp.lower().strip() in run_entry:
-                                            print_entry = False
-                                            logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
                             if print_entry:
                                 if "@atm_cpl_dt" in run_entry:
                                     run_entry = run_entry.replace("atm_cpl_dt",atm_cpl_dt)
