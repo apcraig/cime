@@ -19,9 +19,9 @@ program xgridEx1
     logkindflag=ESMF_LOGKIND_MULTI, rc=rc)
   if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-!  ! 2D test case to show the use of XGrid with Mesh and Mesh
-  call ESMF_XGridTest1(rc)
-  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+!  !! 2D test case to show the use of XGrid with Mesh and Mesh
+!  call ESMF_XGridTest1(rc)
+!  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 !
 !  !! 2D test case to show the use of XGrid with Mosaic Grid and Mesh
 !  call ESMF_XGridTest2(rc)
@@ -39,8 +39,13 @@ program xgridEx1
 !  call ESMF_XGridTest5(rc)
 !  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 !
+!  !! 2D test case to show the use of XGrid with Mosaic Grid and tripolar Grid with realistic SST and masking
+!  call ESMF_XGridTest6(rc)
+!  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
   !! 2D test case to show the use of XGrid with Mosaic Grid and tripolar Grid with realistic SST and masking
-  call ESMF_XGridTest6(rc)
+  !! Both land and atmosphere are running on the same Mosaic Grid
+  call ESMF_XGridTest7(rc)
   if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   call ESMF_Finalize()
@@ -188,6 +193,7 @@ program xgridEx1
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
+    if(I_AM_PET(0)) print *, 'TEST1 is successful'
   end subroutine
 
   subroutine ESMF_XGridTest2(rc)
@@ -347,6 +353,7 @@ program xgridEx1
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
+    if(I_AM_PET(0)) print *, 'TEST2 is successful'
   end subroutine
 
   subroutine ESMF_XGridTest3(rc)
@@ -519,6 +526,7 @@ program xgridEx1
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
+    if(I_AM_PET(0)) print *, 'TEST3 is successful'
   end subroutine
 
   function checksum(fptr, rc)
@@ -1089,6 +1097,179 @@ program xgridEx1
 
   end function
 
+  ! Generate Land Grid masked from Tripolar Ocean Grid
+  subroutine land_grid_mask(ocnGrid, lndGrid, rc)
+
+    type(ESMF_Grid)        :: ocnGrid
+    type(ESMF_Grid)        :: lndGrid
+    integer, intent(out)   :: rc
+    type(ESMF_Grid)        :: land_grid
+
+    type(ESMF_Array)       :: array_plon, array_plat, array_qlon, array_qlat, array_msk, array_area
+    integer                :: minIdx(2,1), maxIdx(2,1), i, j
+    type(ESMF_Field)       :: ocnMaskField, lndMaskField, lndMaskFieldI, lndFracField
+    type(ESMF_Array)       :: lnd_mask, land_frac
+    real(ESMF_KIND_R8), pointer :: mask_fptr(:,:), fptr(:,:)
+    integer(ESMF_KIND_I4), pointer :: mask_aptr(:,:)
+    real(ESMF_KIND_R8)     :: maskCritValue=0.1
+    type(ESMF_Routehandle) :: o2l_rh
+
+    call ESMF_GridGetItem(ocnGrid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
+      itemflag=ESMF_GRIDITEM_MASK, array=array_msk, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ocnMaskField = ESMF_FieldCreate(ocnGrid, array=array_msk, &
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    lndMaskField = ESMF_FieldCreate(lndGrid, typekind=ESMF_TYPEKIND_R8, &
+      indexflag=ESMF_INDEX_GLOBAL, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    lndFracField = ESMF_FieldCreate(lndGrid, typekind=ESMF_TYPEKIND_R8, &
+      indexflag=ESMF_INDEX_GLOBAL, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_FieldGet(lndFracField, array=land_frac, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_FieldRegridStore(ocnMaskField, lndMaskField, &
+      regridMethod=ESMF_REGRIDMETHOD_CONSERVE, &
+      unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, &
+      routehandle=o2l_rh, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! initialize land mask values to 0.
+    call ESMF_FieldGet(lndMaskField, farrayPtr=mask_fptr, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    mask_fptr = 0.0
+
+    ! Regrid ocn mask values to land grid conservatively
+    call ESMF_FieldRegrid(ocnMaskField, lndMaskField, &
+      routehandle=o2l_rh, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! Reset land grid mask
+    lndMaskFieldI = ESMF_FieldCreate(lndGrid, typekind=ESMF_TYPEKIND_I4, &
+      indexflag=ESMF_INDEX_GLOBAL, &
+      staggerloc=ESMF_STAGGERLOC_CENTER, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_FieldGet(lndMaskFieldI, array=array_msk, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_ArrayGet(array_msk, farrayPtr=mask_aptr, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! Initialize land mask values according to ocn Grid definition
+    ! On the land side, if the mask values interpolated from ocn is 
+    ! less than critValue, then consider the cell a land cell. The fraction
+    ! of the cell considered to be land is 1.-ocn_mask
+    !print *, size(mask_fptr)
+    !print *, size(mask_aptr)
+    call ESMF_ArrayGet(land_frac, farrayPtr=fptr, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    mask_aptr = 0
+    fptr = 0.
+    do j = lbound(mask_fptr, 2), ubound(mask_fptr, 2)
+      do i = lbound(mask_fptr, 1), ubound(mask_fptr, 1)
+        if(mask_fptr(i,j) .lt. maskCritValue) then
+          mask_aptr(i,j) = 1
+          fptr(i,j) = 1. - mask_fptr(i,j)
+        endif 
+      enddo
+    enddo
+
+    call ESMF_GridSetItem(lndGrid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
+      itemflag=ESMF_GRIDITEM_MASK, array=array_msk, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_GridWriteVTK(lndGrid, staggerloc=ESMF_STAGGERLOC_CORNER, filename="lndMosaicGrid", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+#ifdef TEST_MOSAIC_FIELDWRITE
+    ! Set up the coordinates
+    call ESMF_GridGetCoord(lndGrid, coordDim=1, staggerloc=ESMF_STAGGERLOC_CORNER, &
+      array=array_qlon, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_ArrayWrite(array_qlon, filename="land_corner_lon.nc", &
+      variablename="lon_corner", overwrite=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_GridGetCoord(lndGrid, coordDim=2, staggerloc=ESMF_STAGGERLOC_CORNER, &
+      array=array_qlat, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_ArrayWrite(array_qlat, filename="land_corner_lat.nc", &
+      variablename="lat_corner", overwrite=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! Set masking information on the ocean Grid
+    call ESMF_ArrayWrite(array_msk, filename="land_mask.nc", &
+      variablename="mask", overwrite=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_ArrayWrite(land_frac, filename="land_frac.nc", &
+      variablename="frac", overwrite=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+#endif
+
+  end subroutine
+
   ! realistic examples using SST with masking
   subroutine ESMF_XGridTest4(rc)
 
@@ -1284,6 +1465,7 @@ program xgridEx1
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
+    if(I_AM_PET(0)) print *, 'TEST4 is successful'
   end subroutine
 
   ! Regrid from tripolar grid to regular lat-lon grid
@@ -1450,6 +1632,7 @@ program xgridEx1
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
+    if(I_AM_PET(0)) print *, 'TEST5 is successful'
   end subroutine
 
   ! realistic examples using SST with masking
@@ -1683,6 +1866,251 @@ program xgridEx1
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
+    if(I_AM_PET(0)) print *, 'TEST6 is successful'
+  end subroutine
+
+
+  ! realistic examples using SST with masking
+  ! atm, ocn, lnd (ocn and lnd has complimentary mask)
+  subroutine ESMF_XGridTest7(rc)
+
+    integer, intent(out)   :: rc
+
+    type(ESMF_Grid)        :: atmGrid
+    type(ESMF_Grid)        :: ocnGrid
+    type(ESMF_Grid)        :: lndGrid
+    type(ESMF_XGrid)       :: xgrid
+    type(ESMF_Field)       :: atmField, ocnField, xgridField, lndField
+    type(ESMF_Routehandle) :: ocn2x, x2atm, atm2x, x2ocn
+    real(RKIND), pointer   :: ocnPtr(:,:), xPtr(:), fptr(:,:)
+    character(len=128)     :: tmpstr
+    integer                :: i,n_iter=100
+    integer(IKIND)         :: chksum
+    real(RKIND)            :: i_time, f_time, delta_time
+    integer                :: decomptile(2,6)
+    type(ESMF_Mesh)        :: xmesh
+
+    i_time = MPI_WTime()
+    ! Create Src Grid
+    ! Set up decomposition for src Grid, this is optional but can be used to 
+    ! map to the model internal data representation.
+    decomptile(:,1)=(/2,2/)
+    decomptile(:,2)=(/2,2/)
+    decomptile(:,3)=(/2,2/)
+    decomptile(:,4)=(/2,2/)
+    decomptile(:,5)=(/2,2/)
+    decomptile(:,6)=(/2,2/)
+
+    atmGrid=ESMF_GridCreateMosaic(filename=trim("data/C48_mosaic.nc"), &
+         tileFilePath="./data/", regDecompPTile=decomptile, &
+         indexflag=ESMF_INDEX_GLOBAL, &
+         rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ocnGrid = tripolar_grid(rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    lndGrid=ESMF_GridCreateMosaic(filename=trim("data/C48_mosaic.nc"), &
+         tileFilePath="./data/", regDecompPTile=decomptile, &
+         indexflag=ESMF_INDEX_GLOBAL, &
+         rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! Calculate land grid mask based on ocn Mask
+    call land_grid_mask(ocnGrid, lndGrid, rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    xgrid = ESMF_XGridCreate(sideAGrid=(/atmGrid/), sideBGrid=(/ocnGrid, lndGrid/), &
+      sideBMaskValues=(/0/), storeOverlay=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    f_time = MPI_WTime()
+    call time_analysis(f_time-i_time, 'Constructing mesh and xgrid', rc)
+
+    call ESMF_XGridGet(xgrid, mesh=xmesh, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_MeshWrite(xmesh, "xmesh7", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    atmField = ESMF_FieldCreate(atmGrid, typekind=RTKIND, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    lndField = ESMF_FieldCreate(atmGrid, typekind=RTKIND, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_FieldGet(lndField, farrayPtr=fptr, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    fptr = 280.
+
+    ocnField = ESMF_FieldCreate(ocnGrid, typekind=RTKIND, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_FieldRead(ocnField, filename="sst_0.5.nc", &
+      variablename="sea_surface_temperature", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    xgridField = ESMF_FieldCreate(xgrid, typekind=RTKIND, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_FieldRegridStore(xgrid, ocnField, xgridField, &
+      routehandle=ocn2x, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_FieldRegridStore(xgrid, xgridField, atmField, &
+      routehandle=x2atm, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_FieldRegridStore(xgrid, atmField, xgridField, &
+      routehandle=atm2x, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_FieldRegridStore(xgrid, xgridField, ocnField, &
+      routehandle=x2ocn, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    i_time = MPI_Wtime()
+
+    do i = 1, n_iter
+      call ESMF_FieldRegrid(ocnField, xgridField, routehandle=ocn2x, &
+        termorderflag=ESMF_TERMORDER_SRCSEQ, &
+        rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__, &
+        file=__FILE__)) &
+        return  ! bail out
+
+      call ESMF_FieldGet(xgridField, farrayPtr=xPtr, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__, &
+        file=__FILE__)) &
+        return  ! bail out
+
+      call ESMF_FieldRegrid(xgridField, atmField, routehandle=x2atm, &
+        termorderflag=ESMF_TERMORDER_SRCSEQ, &
+        rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__, &
+        file=__FILE__)) &
+        return  ! bail out
+    enddo
+
+    f_time = MPI_WTime()
+
+    call time_analysis(f_time-i_time, 'Regridding 100 times', rc)
+
+    ! regrid back to ocn grid and dump out result
+    call ESMF_FieldRegrid(atmField, xgridField, routehandle=atm2x, &
+        termorderflag=ESMF_TERMORDER_SRCSEQ, &
+        rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_FieldRegrid(xgridField, ocnField, routehandle=x2ocn, &
+        termorderflag=ESMF_TERMORDER_SRCSEQ, &
+        rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_FieldWrite(ocnField, filename='ocnField_regridded.nc',  &
+      overwrite=.true., &
+      variableName="sea_surface_temperature", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    !chksum = checksum2D(ocnPtr, rc)
+    !if(I_AM_PET(0, rc)) print *, 'global checksum = ', chksum
+
+#ifdef TEST_MOSAIC_FIELDWRITE
+    call ESMF_FieldWrite(atmField, filename="atmField.nc", &
+      overwrite=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+#endif
+
+    call ESMF_FieldWrite(ocnField, filename="ocnField.nc", &
+      overwrite=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+  ! clean up
+    call ESMF_FieldDestroy(atmField, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_FieldDestroy(ocnField, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_FieldDestroy(xgridField, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    if(I_AM_PET(0)) print *, 'TEST7 is successful'
   end subroutine
 
 end program
