@@ -89,6 +89,7 @@ class Case(object):
         self.set_lookup_value('CIMEROOT',os.path.abspath(get_cime_root()))
         self._cime_model = get_model()
         self.set_lookup_value('MODEL', self._cime_model)
+        self._driver = None
         self._compsetname = None
         self._gridname = None
         self._compsetsfile = None
@@ -410,7 +411,7 @@ class Case(object):
             if result is not None:
                 del self.lookups[key]
 
-    def _set_compset_and_pesfile(self, compset_name, files, user_compset=False, pesfile=None):
+    def _set_compset_and_pesfile(self, compset_name, files, user_compset=False, pesfile=None, driver=None):
         """
         Loop through all the compset files and find the compset
         specifation file that matches either the input 'compset_name'.
@@ -426,9 +427,17 @@ class Case(object):
         if pesfile is not None:
             self._pesfile = pesfile
 
+        self._driver = driver
+
         # Loop through all of the files listed in COMPSETS_SPEC_FILE and find the file
         # that has a match for either the alias or the longname in that order
         for component in components:
+
+            # Pick only continue for the correct driver/component combination
+            if driver == 'drv' and component == 'driver-nuopc':
+                continue
+            if driver == 'drv-nuopc' and component == 'drv':
+                continue
 
             # Determine the compsets file for this component
             compsets_filename = files.get_value("COMPSETS_SPEC_FILE", {"component":component})
@@ -517,10 +526,9 @@ class Case(object):
             primary_component = spec["GLC"]
         else:
             # This is "A", "X" or "S"
-            primary_component = "drv"
+            primary_component = self._driver
 
         return primary_component
-
 
     def get_compset_components(self):
         #If are doing a create_clone then, self._compsetname is not set yet
@@ -569,12 +577,14 @@ class Case(object):
         for env_file in self._env_entryid_files:
             env_file.add_elements_by_group(files, attlist)
 
-        drv_config_file = files.get_value("CONFIG_CPL_FILE")
+        drv_config_file = files.get_value("CONFIG_CPL_FILE", {"component":self._driver})
+        self.set_value("CONFIG_CPL_FILE", drv_config_file)
         drv_comp = Component(drv_config_file)
         for env_file in self._env_entryid_files:
             env_file.add_elements_by_group(drv_comp, attributes=attlist)
 
-        drv_config_file_model_specific = files.get_value("CONFIG_CPL_FILE_MODEL_SPECIFIC")
+        drv_config_file_model_specific = files.get_value("CONFIG_CPL_FILE_MODEL_SPECIFIC", {"component":self._driver})
+        self.set_value("CONFIG_CPL_FILE_MODEL_SPECIFIC", drv_config_file_model_specific)
         drv_comp_model_specific = Component(drv_config_file_model_specific)
         for env_file in self._env_entryid_files:
             env_file.add_elements_by_group(drv_comp_model_specific, attributes=attlist)
@@ -586,7 +596,6 @@ class Case(object):
 
         if len(self._component_classes) > len(self._components):
             self._components.append('sesp')
-
 
         for i in xrange(1,len(self._component_classes)):
             comp_class = self._component_classes[i]
@@ -726,13 +735,14 @@ class Case(object):
                   user_compset=False, pesfile=None,
                   user_grid=False, gridfile=None, ninst=1, test=False,
                   walltime=None, queue=None, output_root=None, run_unsupported=False, answer=None,
-                  input_dir=None):
+                  input_dir=None, driver=None):
 
         #--------------------------------------------
         # compset, pesfile, and compset components
         #--------------------------------------------
         files = Files()
-        compset_alias, science_support = self._set_compset_and_pesfile(compset_name, files, user_compset=user_compset, pesfile=pesfile)
+        compset_alias, science_support = self._set_compset_and_pesfile(compset_name, files, user_compset=user_compset, pesfile=pesfile,
+                                                                       driver=driver)
 
         self._components = self.get_compset_components()
         #--------------------------------------------
@@ -984,10 +994,6 @@ class Case(object):
                 shutil.copy(os.path.join(machines_dir, "syslog.{}".format(machine)), os.path.join(casetools, "mach_syslog"))
             else:
                 shutil.copy(os.path.join(machines_dir, "syslog.noop"), os.path.join(casetools, "mach_syslog"))
-
-        # copy cesm.runconfig file into caseroot for NUOPC
-        driverconfigdir = os.path.join(self.get_value("CIMEROOT"),"src","drivers","mct","cime_config")
-        shutil.copy(os.path.join(driverconfigdir,"cesm.runconfig"), os.path.join(self._caseroot, "cesm.runconfig"))
 
     def _create_caseroot_sourcemods(self):
         components = self.get_compset_components()

@@ -13,16 +13,17 @@ module datm_comp_nuopc
   use shr_sys_mod   ! shared system calls
 
   use seq_flds_mod
-  use seq_cdata_mod, only: seq_cdata
-  use seq_infodata_mod, only: seq_infodata_type, seq_infodata_GetData, seq_infodata_PutData
+  use seq_cdata_mod         , only: seq_cdata
+  use seq_infodata_mod      , only: seq_infodata_type, seq_infodata_GetData, seq_infodata_PutData
   use shr_nuopc_fldList_mod
-  use shr_nuopc_methods_mod, only: shr_nuopc_methods_Clock_TimePrint
-  use shr_nuopc_dmodel_mod, only: shr_nuopc_dmodel_gridinit
-  use shr_nuopc_dmodel_mod, only: shr_nuopc_dmodel_AttrCopyToInfodata
-  use shr_nuopc_dmodel_mod, only: shr_nuopc_dmodel_AvectToState
-  use shr_nuopc_dmodel_mod, only: shr_nuopc_dmodel_StateToAvect
-  use shr_file_mod,  only : shr_file_getlogunit, shr_file_setlogunit, &
-       shr_file_getloglevel, shr_file_setloglevel
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
+  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_gridinit
+  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_AttrCopyToInfodata
+  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_AvectToState
+  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_StateToAvect
+  use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
+  use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
 
   use ESMF
   use NUOPC
@@ -48,17 +49,18 @@ module datm_comp_nuopc
   type (shr_nuopc_fldList_Type) :: fldsToAtm
   type (shr_nuopc_fldList_Type) :: fldsFrAtm
 
-  type(seq_cdata)         :: cdata
+  type(seq_cdata)                :: cdata
   type(seq_infodata_type),target :: infodata
   type(mct_gsMap)        ,target :: gsmap
   type(mct_gGrid)        ,target :: ggrid
-  type(mct_aVect)         :: x2d
-  type(mct_aVect)         :: d2x
-  integer                 :: mpicom, iam
-  integer                 :: dbrc
-  character(len=1024)     :: tmpstr
-  character(len=*),parameter :: grid_option = "mesh"  ! grid_de, grid_arb, grid_reg, mesh
-  integer, parameter      :: dbug = 10
+  type(mct_aVect)                :: x2d
+  type(mct_aVect)                :: d2x
+  integer                        :: mpicom, iam
+  integer                        :: dbrc
+  character(len=1024)            :: tmpstr
+  character(len=*),parameter     :: grid_option = "mesh"  ! grid_de, grid_arb, grid_reg, mesh
+  integer, parameter             :: dbug = 10
+  logical                        :: unpack_import
 
   !----- formats -----
   character(*),parameter :: modName =  "(datm_comp_nuopc)"
@@ -257,7 +259,10 @@ module datm_comp_nuopc
     real(r8)         :: nextsw_cday
     integer          :: shrlogunit, shrloglev
     type(ESMF_VM)    :: vm
+    logical          :: connected
+    integer          :: n
     character(len=*),parameter :: subname=trim(modName)//':(InitializeRealize) '
+    logical          :: first_time = .true.
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
@@ -290,13 +295,22 @@ module datm_comp_nuopc
     phase = 1
 
     if (phase == 1) then
+       ! Note - must query NUOPC_IsConnected before the NUOPC_Realize call below
+       unpack_import = .false.
+       do n = 1,fldsToAtm%num
+          connected = NUOPC_IsConnected(importState, fieldName=fldsToAtm%shortname(n))
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) call shr_sys_abort()
+          if (connected) unpack_import = .true.
+       end do
+       if (.not. unpack_import) then
+          call ESMF_LogWrite(trim(subname)//": will not unpack import state ", ESMF_LOGMSG_INFO, rc=dbrc)
+       end if
+
        !--------------------------------
        ! setup cdata for use inside data model
        ! initialize cleanly on data model side
        ! don't use seq_cdata_init as it grabs stuff from seq_comm
        !--------------------------------
-!       call seq_cdata_init(cdata,MCTID,ggrid,gsmap,infodata,'datm')
-!       call seq_cdata_setptrs(cdata,mpicom=mpicom)
        cdata%name     =  'datm'
        cdata%ID       =  MCTID
        cdata%mpicom   =  mpicom
@@ -525,11 +539,13 @@ module datm_comp_nuopc
     endif
 
     !--------------------------------
-    ! Unpack export state
+    ! Unpack import state
     !--------------------------------
 
-    call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    if (unpack_import) then
+       call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    end if
 
     !--------------------------------
     ! Run model

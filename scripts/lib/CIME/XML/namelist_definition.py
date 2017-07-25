@@ -49,9 +49,9 @@ class NamelistDefinition(EntryID):
         expect(os.path.isfile(infile), "File {} does not exist".format(infile))
         super(NamelistDefinition, self).__init__(infile, schema=schema)
 
-        self._attributes = {}
         self._entry_nodes = []
         self._entry_ids = []
+        self._attributes = {}
         self._valid_values = {}
         self._entry_types = {}
         self._group_names = {}
@@ -158,7 +158,9 @@ class NamelistDefinition(EntryID):
 
         if entry_node is None:
             entry_node = self._nodes[vid]
-        value = super(NamelistDefinition, self).get_value_match(vid.lower(),attributes=all_attributes, exact_match=exact_match,
+        # value = super(NamelistDefinition, self).get_value_match(vid.lower(),attributes=all_attributes, exact_match=exact_match,
+        #                                                         entry_node=entry_node)
+        value = super(NamelistDefinition, self).get_value_match(vid,attributes=all_attributes, exact_match=exact_match,
                                                                 entry_node=entry_node)
         if value is None:
             value = ''
@@ -260,7 +262,7 @@ class NamelistDefinition(EntryID):
         appear in the namelist (even for scalar variables, in which case the
         length of the list is always 1).
         """
-        name = name.lower()
+        #name = name.lower()
         # Separate into a type, optional length, and optional size.
         type_, max_len, size = self.split_type_string(name)
         invalid = []
@@ -372,7 +374,8 @@ class NamelistDefinition(EntryID):
             variable_template = "Variable {!r} from file " + repr(str(filename))
         groups = {}
         for variable_name in dict_:
-            variable_lc = variable_name.lower()
+            #variable_lc = variable_name.lower()
+            variable_lc = variable_name
             qualified_varname = get_fortran_name_only(variable_lc)
             self._expect_variable_in_definition(qualified_varname, variable_template)
             group_name = self.get_group(qualified_varname)
@@ -405,5 +408,6 @@ class NamelistDefinition(EntryID):
         if attribute is not None:
             all_attributes.update(attribute)
 
-        value = self.get_value_match(item.lower(), all_attributes, True)
+        #value = self.get_value_match(item.lower(), all_attributes, True)
+        value = self.get_value_match(item, all_attributes, True)
         return self._split_defaults_text(value)

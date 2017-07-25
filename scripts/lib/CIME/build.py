@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 ###############################################################################
 def _build_model(build_threaded, exeroot, clm_config_opts, incroot, complist,
-                 lid, caseroot, cimeroot, compiler):
+                 lid, caseroot, cimeroot, compiler, comp_interface):
 ###############################################################################
     logs = []
 
@@ -88,7 +88,8 @@ def _build_model(build_threaded, exeroot, clm_config_opts, incroot, complist,
     cime_model = get_model()
     file_build = os.path.join(exeroot, "{}.bldlog.{}".format(cime_model, lid))
 
-    config_dir = os.path.join(cimeroot, "src", "drivers", "mct", "cime_config")
+    config_dir = os.path.join(cimeroot, "src", "drivers", comp_interface.lower(), "cime_config")
+
     f = open(file_build, "w")
     bldroot = os.path.join(exeroot, "cpl", "obj")
     if not os.path.isdir(bldroot):
@@ -98,6 +99,8 @@ def _build_model(build_threaded, exeroot, clm_config_opts, incroot, complist,
                    .format(config_dir, caseroot, libroot, bldroot),
                    from_dir=bldroot, verbose=False, arg_stdout=f,
                    arg_stderr=subprocess.STDOUT)[0]
+    print "DEBUG: config_dir is ",config_dir
+
     f.close()
     analyze_build_log("{} exe".format(cime_model), file_build, compiler)
     expect(stat == 0, "BUILD FAIL: buildexe failed, cat {}".format(file_build))
@@ -512,10 +515,12 @@ def _case_build_impl(caseroot, case, sharedlib_only, model_only):
         logs = _build_libraries(case, exeroot, sharedpath, caseroot,
                                cimeroot, libroot, lid, compiler)
 
+    comp_interface = case.get_value("COMP_INTERFACE")
+
     if not sharedlib_only:
         os.environ["INSTALL_SHAREDPATH"] = os.path.join(exeroot, sharedpath) # for MPAS makefile generators
         logs.extend(_build_model(build_threaded, exeroot, clm_config_opts, incroot, complist,
-                                lid, caseroot, cimeroot, compiler))
+                                 lid, caseroot, cimeroot, compiler, comp_interface))
 
     if not sharedlib_only:
         # in case component build scripts updated the xml files, update the case object

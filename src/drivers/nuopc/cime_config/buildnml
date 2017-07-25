@@ -61,14 +61,6 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     nmlgen.init_defaults(infile, config)
 
     #--------------------------------
-    # Overwrite: set brnch_retain_casename
-    #--------------------------------
-    start_type = nmlgen.get_value('start_type')
-    if start_type != 'startup':
-        if case.get_value('CASE') == case.get_value('RUN_REFCASE'):
-            nmlgen.set_value('brnch_retain_casename' , value='.true.')
-
-    #--------------------------------
     # Overwrite: set component coupling frequencies
     #--------------------------------
     ncpl_base_period  = case.get_value('NCPL_BASE_PERIOD')
@@ -167,30 +159,65 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     # End if pause is active
 
     #--------------------------------
-    # (1) Write output namelist file drv_in and  input dataset list.
+    # (1) Specify input data list file
     #--------------------------------
     data_list_path = os.path.join(case.get_case_root(), "Buildconf", "cpl.input_data_list")
     if os.path.exists(data_list_path):
         os.remove(data_list_path)
+
+    #--------------------------------
+    # (2) Write namelist file drv_in and initial input dataset list.
+    #--------------------------------
     namelist_file = os.path.join(confdir, "drv_in")
-    nmlgen.write_output_file(namelist_file, data_list_path )
+    drv_namelist_groups = ["ccsm_pes", "papi_inparm", "pio_default_inparm", "prof_inparm", 
+                           "seq_cplflds_inparm", "seq_cplflds_userspec", "seq_timemgr_inparm"]
+    nmlgen.write_output_file(namelist_file, data_list_path=data_list_path, groups=drv_namelist_groups)
 
     #--------------------------------
-    # (2) Write out seq_map.rc file
+    # (3) Write NUOPC config file and add to input dataset list.
     #--------------------------------
-    seq_maps_file = os.path.join(confdir, "seq_maps.rc")
-    nmlgen.write_seq_maps(seq_maps_file)
+
+    comp_types = ['atm','lnd','ice','ocn','rof','glc','wav','esp']
+    stub_types = [ 's' + x for x in comp_types]
+    xcpl_types = [ 'x' + x for x in comp_types]
+    data_types = [ 'd' + x for x in comp_types]
+
+    # Determine components that are not present
+    skip_comps = []
+    for item in comp_types:
+        # stub comps
+        if case.get_value("COMP_" + item.upper()) == 's' + item: 
+            skip_comps.append(item.upper())
+        # data comps
+        if case.get_value("COMP_" + item.upper()) == 'd' + item:
+            if item != 'glc': #no glc data component
+                if case.get_value("D" + item.upper()) == 'NULL' or case.get_value("D" + item.upper()) == 'null':
+                    skip_comps.append(item.upper)
+        # xcpl_comps
+        if case.get_value("COMP_" + item.upper()) == 'x' + item:
+            if item != 'esp': #no esp xcpl component
+                if case.get_value(item.upper() + "_NX") == "0" and case.get_value(item.upper() + "_NY") == "0":
+                    skip_comps.append(item.upper)
+
+    logger.info("Writing nuopc_runseq will skip components {}".format(skip_comps))
+
+    #TODO: how would the current data model namelist force_prognostic_true be used - and actually how is it unsed now?
+    #TODO: how are we going to handle ocnrof_prognostic setting?
+
+    atm_cpl_dt = nmlgen.get_value('atm_cpl_dt')
+    ocn_cpl_dt = nmlgen.get_value('ocn_cpl_dt')
+    nuopc_config_file = os.path.join(confdir, "cesm.runconfig")
+    nmlgen.write_nuopc_config_file(nuopc_config_file, data_list_path=data_list_path, 
+                                   skip_comps=skip_comps, atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
 
     #--------------------------------
-    # (3) Construct and write out drv_flds_in
+    # (4) Write drv_flds_in
     #--------------------------------
     # In thte following, all values come simply from the infiles - no default values need to be added
     # FIXME - do want to add the possibility that will use a user definition file for drv_flds_in
 
     caseroot = case.get_value('CASEROOT')
-
     namelist_file = os.path.join(confdir, "drv_flds_in")
-
     nmlgen.add_default('drv_flds_in_files')
     drvflds_files = nmlgen.get_default('drv_flds_in_files')
     infiles = []
@@ -220,7 +247,7 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
 
         # Now create drv_flds_in
         config = {}
-        definition_file = [files.get_value("NAMELIST_DEFINITION_FILE", attribute={"component":"drv_flds"})]
+        definition_file = [files.get_value("NAMELIST_DEFINITION_FILE", attribute={"component":"drv_flds-nuopc"})]
         nmlgen = NamelistGenerator(case, definition_file, files=files)
         skip_entry_loop = True
         nmlgen.init_defaults(infiles, config, skip_entry_loop=skip_entry_loop)
@@ -240,10 +267,9 @@ def compare_drv_flds_in(first, second, infile1, infile2):
 ###############################################################################
 def _create_component_modelio_namelists(case, files):
 ###############################################################################
-
     # will need to create a new namelist generator
     infiles = []
-    definition_file = [files.get_value("NAMELIST_DEFINITION_FILE", attribute={"component":"modelio"})]
+    definition_file = [files.get_value("NAMELIST_DEFINITION_FILE", attribute={"component":"modelio-nuopc"})]
 
     confdir = os.path.join(case.get_value("CASEBUILD"), "cplconf")
     lid = os.environ["LID"] if "LID" in os.environ else get_timestamp("%y%m%d-%H%M%S")
@@ -314,7 +340,7 @@ def buildnml(case, caseroot, component):
             "user_xml_dir %s does not exist " %user_xml_dir)
 
     files = Files()
-    definition_file = [files.get_value("NAMELIST_DEFINITION_FILE", {"component": "drv"})]
+    definition_file = [files.get_value("NAMELIST_DEFINITION_FILE", {"component": "drv-nuopc"})]
 
     user_definition = os.path.join(user_xml_dir, "namelist_definition_drv.xml")
     if os.path.isfile(user_definition):
@@ -331,6 +357,7 @@ def buildnml(case, caseroot, component):
         if "aquaplanet" in cam_config_opts:
             infile_text = "aqua_planet = .true. \n aqua_planet_sst = 1"
 
+    # determine infile list for nmlgen
     user_nl_file = os.path.join(caseroot, "user_nl_cpl")
     namelist_infile = os.path.join(confdir, "namelist_infile")
     create_namelist_infile(case, user_nl_file, namelist_infile, infile_text)
@@ -342,15 +369,15 @@ def buildnml(case, caseroot, component):
     # create the files comp_modelio.nml where comp = [atm, lnd...]
     _create_component_modelio_namelists(case, files)
 
-    # copy drv_in, drv_flds_in, seq_maps.rc and all *modio* fiels to rundir
+    # copy drv_in, drv_flds_in, cesm.runconfig and all *modio* fiels to rundir
     rundir = case.get_value("RUNDIR")
 
     shutil.copy(os.path.join(confdir,"drv_in"), rundir)
+    shutil.copy(os.path.join(confdir,"cesm.runconfig"), rundir)
+
     drv_flds_in = os.path.join(caseroot, "CaseDocs", "drv_flds_in")
     if os.path.isfile(drv_flds_in):
         shutil.copy(drv_flds_in, rundir)
-
-    shutil.copy(os.path.join(confdir,"seq_maps.rc"), rundir)
 
     for filename in glob.glob(os.path.join(confdir, "*modelio*")):
         shutil.copy(filename, rundir)

@@ -13,21 +13,29 @@ module med_internalstate_mod
   
   ! private internal state to keep instance data
   type InternalStateStruct
-    integer               :: atmcntr
-    integer               :: ocncntr
-    integer               :: icecntr
-    integer               :: lndcntr
-    integer               :: rofcntr
-    integer               :: wavcntr
-    integer               :: glccntr
-    integer               :: accumcntAtm ! accumulator counter
-    integer               :: accumcntOcn ! accumulator counter
-    integer               :: accumcntIce ! accumulator counter
-    integer               :: accumcntLnd ! accumulator counter
-    integer               :: accumcntRof ! accumulator counter
-    integer               :: accumcntWav ! accumulator counter
-    integer               :: accumcntGlc ! accumulator counter
+    integer               :: atmcntr        ! prep phase counter
+    integer               :: ocncntr        ! prep phase counter
+    integer               :: icecntr        ! prep phase counter
+    integer               :: lndcntr        ! prep phase counter
+    integer               :: rofcntr        ! prep phase counter
+    integer               :: wavcntr        ! prep phase counter
+    integer               :: glccntr        ! prep phase counter
+    integer               :: accumcntAtm    ! accumulator counter
+    integer               :: accumcntOcn    ! accumulator counter
+    integer               :: accumcntIce    ! accumulator counter
+    integer               :: accumcntLnd    ! accumulator counter
+    integer               :: accumcntRof    ! accumulator counter
+    integer               :: accumcntWav    ! accumulator counter
+    integer               :: accumcntGlc    ! accumulator counter
     integer               :: accumcntAtmOcn ! accumulator counter
+
+    integer               :: atmcntr_post   ! post phase counter
+    integer               :: ocncntr_post   ! post phase counter
+    integer               :: icecntr_post   ! post phase counter
+    integer               :: lndcntr_post   ! post phase counter
+    integer               :: rofcntr_post   ! post phase counter
+    integer               :: wavcntr_post   ! post phase counter
+    integer               :: glccntr_post   ! post phase counter
 
     type(ESMF_State)     :: NState_AtmImp   ! Atm Import nested state
     type(ESMF_State)     :: NState_AtmExp   ! Atm Export nested state
@@ -181,6 +189,14 @@ module med_internalstate_mod
   type (shr_nuopc_fldList_Type) :: fldsFrGlc
   type (shr_nuopc_fldList_Type) :: fldsAtmOcn
 
+  ! The following flags determine if a component is prognostic
+  logical :: medToAtm
+  logical :: medToOcn
+  logical :: medToIce
+  logical :: medToLnd
+  logical :: medToRof
+  logical :: medToWav
+  logical :: medToGlc
   !-----------------------------------------------------------------------------
 
 end module med_internalstate_mod

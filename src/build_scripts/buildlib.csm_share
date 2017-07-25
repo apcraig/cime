@@ -29,12 +29,12 @@ my $NINST_WAV		= `./xmlquery NINST_WAV		-value`;
 my $NINST_ESP		= `./xmlquery NINST_ESP		-value`;
 my $NINST_VALUE		= `./xmlquery NINST_VALUE	-value`;
 $ENV{PIO_VERSION}  	= `./xmlquery PIO_VERSION	-value`;
+
 #--------------------------------------------------------------------
 # Filepath: list of source code directories (in order of importance).
 #--------------------------------------------------------------------
 
 my $comp="mct";
-$comp = "esmf" if ($COMP_INTERFACE eq "ESMF");
 $comp = "nuopc" if ($COMP_INTERFACE eq "NUOPC");
 
 my $useesmf = "noesmf";
@@ -45,19 +45,21 @@ my $installdir = "$installroot/${COMP_INTERFACE}/$useesmf/${NINST_VALUE}";
 mkpath($libdir) unless -d $libdir;
 chdir($libdir) or die "Could not cd to $libdir: $!\n";
 
-my @filepath = ( "$CASEROOT/SourceMods/src.share",
-		 "$CIMEROOT/src/drivers/mct/shr",
-		 "$CIMEROOT/src/components/xcpl_models/xshare",
-		 "$CIMEROOT/src/share/util",
-		 "$CIMEROOT/src/share/RandNum/src",
-		 "$CIMEROOT/src/share/RandNum/src/dsfmt_f03",
-		 "$CIMEROOT/src/share/RandNum/src/kissvec",
-		 "$CIMEROOT/src/share/RandNum/src/mt19937",
-		 );
+my @filepath = ("$CASEROOT/SourceMods/src.share");
 
-if($comp eq "nuopc"){
+if($comp eq "nuopc") {
     push(@filepath,"$CIMEROOT/src/drivers/nuopc/shr");
 }
+
+my @filepath_add = ("$CIMEROOT/src/drivers/mct/shr",
+		    "$CIMEROOT/src/components/xcpl_models/xshare",
+		    "$CIMEROOT/src/share/util",
+		    "$CIMEROOT/src/share/RandNum/src",
+		    "$CIMEROOT/src/share/RandNum/src/dsfmt_f03",
+		    "$CIMEROOT/src/share/RandNum/src/kissvec",
+		    "$CIMEROOT/src/share/RandNum/src/mt19937");
+
+push (@filepath, @filepath_add);
 
 if($useesmf eq "noesmf"){
     push(@filepath,"$CIMEROOT/src/share/esmf_wrf_timemgr");

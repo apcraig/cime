@@ -8,14 +8,31 @@ module med_connectors_mod
 
   use ESMF
   use NUOPC
+  use shr_kind_mod,      only: SHR_KIND_CL
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_CopyStateToInfodata
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_CopyInfodataToState
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_State_diagnose
   use med_internalstate_mod
+  ! use med_internal_state_mode, only : fldsToAtm
+  ! use med_internal_state_mode, only : fldsFrAtm
+  ! use med_internal_state_mode, only : fldsToOcn
+  ! use med_internal_state_mode, only : fldsFrOcn
+  ! use med_internal_state_mode, only : fldsToIce
+  ! use med_internal_state_mode, only : fldsFrIce
+  ! use med_internal_state_mode, only : fldsToLnd
+  ! use med_internal_state_mode, only : fldsFrLnd
+  ! use med_internal_state_mode, only : fldsToRof
+  ! use med_internal_state_mode, only : fldsFrRof
+  ! use med_internal_state_mode, only : fldsToWav
+  ! use med_internal_state_mode, only : fldsFrWav
+  ! use med_internal_state_mode, only : fldsToGlc
+  ! use med_internal_state_mode, only : fldsFrGlc
   use med_constants_mod
   use seq_infodata_mod, only: infodata=>seq_infodata_infodata
 
+  ! DEBUG
+  use shr_sys_mod
   implicit none
   
   private
@@ -26,9 +43,9 @@ module med_connectors_mod
   character(*),parameter :: u_FILE_u = &
     __FILE__
 
-!--------------------------------------------------------------------------
-! Public interfaces
-!--------------------------------------------------------------------------
+  !--------------------------------------------------------------------------
+  ! Public interfaces
+  !--------------------------------------------------------------------------
 
   public med_connectors_prep_med2atm
   public med_connectors_prep_med2ocn
@@ -45,26 +62,29 @@ module med_connectors_mod
   public med_connectors_post_wav2med
   public med_connectors_post_glc2med
 
-!--------------------------------------------------------------------------
-! Private
-!--------------------------------------------------------------------------
+  !--------------------------------------------------------------------------
+  ! Private
+  !--------------------------------------------------------------------------
 
   private med_connectors_prep_generic
   private med_connectors_post_generic
   private med_connectors_diagnose
 
-  !-----------------------------------------------------------------------------
-  contains
-  !-----------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
+contains
+!-----------------------------------------------------------------------------
 
   subroutine med_connectors_prep_generic(gcomp, type, rc)
     type(ESMF_GridComp)  :: gcomp
     character(len=*), intent(in) :: type
     integer, intent(out) :: rc
-    
+
     ! local variables
-    type(ESMF_Clock)            :: clock
-    type(InternalState)         :: is_local
+    type(ESMF_Clock)           :: clock
+    type(InternalState)        :: is_local
+    logical                    :: diagnose
+    logical                    :: connected
+    integer                    :: n
     character(len=*),parameter :: subname='(med_connectors_prep_generic)'
     
     if (dbug_flag > 5) then
@@ -81,6 +101,7 @@ module med_connectors_mod
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+   
     !-------------------------
     ! diagnose export state
     ! update scalar data in Exp and Imp State
@@ -89,45 +110,50 @@ module med_connectors_mod
     select case (type)
 
     case('atm')
-      call med_connectors_diagnose(is_local%wrap%NState_AtmExp, is_local%wrap%atmcntr, "med_to_atm", rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_AtmExp,'cpl2atm',is_local%wrap%mpicom,rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_AtmImp,'cpl2atm',is_local%wrap%mpicom,rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
+       if (medToAtm) then
+          call med_connectors_diagnose(is_local%wrap%NState_AtmExp, is_local%wrap%atmcntr, "med_to_atm", rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_AtmExp,'cpl2atm',is_local%wrap%mpicom,rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_AtmImp,'cpl2atm',is_local%wrap%mpicom,rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
     case('ocn')
-      call med_connectors_diagnose(is_local%wrap%NState_OcnExp, is_local%wrap%ocncntr, "med_to_ocn", rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_OcnExp,'cpl2ocn',is_local%wrap%mpicom,rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_OcnImp,'cpl2ocn',is_local%wrap%mpicom,rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
+       if (medToOcn) then
+          call med_connectors_diagnose(is_local%wrap%NState_OcnExp, is_local%wrap%ocncntr, "med_to_ocn", rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_OcnExp,'cpl2ocn',is_local%wrap%mpicom,rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_OcnImp,'cpl2ocn',is_local%wrap%mpicom,rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
     case('ice')
-      call med_connectors_diagnose(is_local%wrap%NState_IceExp, is_local%wrap%icecntr, "med_to_ice", rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_IceExp,'cpl2ice',is_local%wrap%mpicom,rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_IceImp,'cpl2ice',is_local%wrap%mpicom,rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
+       if (medToIce) then
+          call med_connectors_diagnose(is_local%wrap%NState_IceExp, is_local%wrap%icecntr, "med_to_ice", rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_IceExp,'cpl2ice',is_local%wrap%mpicom,rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_IceImp,'cpl2ice',is_local%wrap%mpicom,rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
     case('lnd')
-      call med_connectors_diagnose(is_local%wrap%NState_LndExp, is_local%wrap%lndcntr, "med_to_lnd", rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_LndExp,'cpl2lnd',is_local%wrap%mpicom,rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_LndImp,'cpl2lnd',is_local%wrap%mpicom,rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
+       if (medToLnd) then
+          call med_connectors_diagnose(is_local%wrap%NState_LndExp, is_local%wrap%lndcntr, "med_to_lnd", rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_LndExp,'cpl2lnd',is_local%wrap%mpicom,rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_LndImp,'cpl2lnd',is_local%wrap%mpicom,rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
     case('rof')
-      call med_connectors_diagnose(is_local%wrap%NState_RofExp, is_local%wrap%rofcntr, "med_to_rof", rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_RofExp,'cpl2rof',is_local%wrap%mpicom,rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_RofImp,'cpl2rof',is_local%wrap%mpicom,rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
+       if (medToRof) then
+          call med_connectors_diagnose(is_local%wrap%NState_RofExp, is_local%wrap%rofcntr, "med_to_rof", rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_RofExp,'cpl2rof',is_local%wrap%mpicom,rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_RofImp,'cpl2rof',is_local%wrap%mpicom,rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
     case('default')
       rc = ESMF_Failure
       call ESMF_LogWrite(trim(subname)//trim(type)//" unsupported", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -146,11 +172,16 @@ module med_connectors_mod
     type(ESMF_GridComp)  :: gcomp
     character(len=*), intent(in) :: type
     integer, intent(out) :: rc
-    
+    !DEBUG
+    character(SHR_KIND_CL)          :: cvalue  
+   
     ! local variables
-    type(ESMF_Clock)            :: clock
-    type(InternalState)         :: is_local
+    type(ESMF_Clock)           :: clock
+    type(InternalState)        :: is_local
     character(len=*),parameter :: subname='(med_connectors_post_generic)'
+                               
+    ! Note: for information obtained by the mediator always write out the state
+    ! if statewrite_flag is .true. This behavior is obtained by setting cntr to 1.
     
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//trim(type)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -174,31 +205,44 @@ module med_connectors_mod
     select case (type)
 
     case('atm')
-      call med_connectors_diagnose(is_local%wrap%NState_AtmImp, is_local%wrap%atmcntr, "med_from_atm", rc=rc)
+      !DEBUG
+      write(cvalue,*) is_local%wrap%atmcntr_post
+      call ESMF_LogWrite(trim(subname)//trim(type)//"atmcntr_post is "// cvalue, ESMF_LOGMSG_INFO, rc=dbrc)
+      !
+      is_local%wrap%atmcntr_post = is_local%wrap%atmcntr_post + 1
+      call med_connectors_diagnose(is_local%wrap%NState_AtmImp, is_local%wrap%atmcntr_post, "med_from_atm", rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_AtmImp,infodata,'atm2cpl',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     case('ocn')
-      call med_connectors_diagnose(is_local%wrap%NState_OcnImp, is_local%wrap%ocncntr, "med_from_ocn", rc=rc)
+      is_local%wrap%ocncntr_post = is_local%wrap%ocncntr_post + 1
+      call med_connectors_diagnose(is_local%wrap%NState_OcnImp, is_local%wrap%ocncntr_post, "med_from_ocn", rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_OcnImp,infodata,'ocn2cpl',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     case('ice')
-      call med_connectors_diagnose(is_local%wrap%NState_IceImp, is_local%wrap%icecntr, "med_from_ice", rc=rc)
+      !DEBUG
+      write(cvalue,*) is_local%wrap%icecntr_post
+      call ESMF_LogWrite(trim(subname)//trim(type)//"icecntr_post is "// cvalue, ESMF_LOGMSG_INFO, rc=dbrc)
+      !
+      is_local%wrap%icecntr_post = is_local%wrap%icecntr_post + 1
+      call med_connectors_diagnose(is_local%wrap%NState_IceImp, is_local%wrap%icecntr_post, "med_from_ice", rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_IceImp,infodata,'ice2cpl',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     case('lnd')
-      call med_connectors_diagnose(is_local%wrap%NState_LndImp, is_local%wrap%lndcntr, "med_from_lnd", rc=rc)
+      is_local%wrap%lndcntr_post = is_local%wrap%lndcntr_post + 1
+      call med_connectors_diagnose(is_local%wrap%NState_LndImp, is_local%wrap%lndcntr_post, "med_from_lnd", rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_LndImp,infodata,'lnd2cpl',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     case('rof')
-      call med_connectors_diagnose(is_local%wrap%NState_RofImp, is_local%wrap%rofcntr, "med_from_rof", rc=rc)
+      is_local%wrap%rofcntr_post = is_local%wrap%rofcntr_post + 1
+      call med_connectors_diagnose(is_local%wrap%NState_RofImp, is_local%wrap%rofcntr_post, "med_from_rof", rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_RofImp,infodata,'rof2cpl',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -600,6 +644,7 @@ module med_connectors_mod
     call ESMF_StateGet(State, itemCount=fieldCount, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+    ! Obtain the field names in State - allocate memory which will be deallocated at the end
     allocate(fieldnamelist(fieldCount))
     call ESMF_StateGet(State, itemNameList=fieldnamelist, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -608,8 +653,9 @@ module med_connectors_mod
       call shr_nuopc_methods_State_diagnose(State, trim(subname)//trim(string), rc=rc)
     endif
 
+    ! Write out the fields in State to netcdf files
     if (cntr > 0 .and. statewrite_flag) then
-      ! write the fields exported to atm to file
+      call ESMF_LogWrite(trim(subname)//trim(string)//": writing out fields", ESMF_LOGMSG_INFO, rc=dbrc)
       call NUOPC_Write(State, &
         fieldnamelist(1:fieldCount), &
         "field_"//trim(string)//"_", timeslice=cntr, &
