@@ -5,19 +5,15 @@
 # Encoding a simple run sequence
 runSeq::
     @1800             # 30min time step 
-      ATM -> OCN
-      OCN -> ATM
-      ATM -> LND
-      LND -> ATM
+      MED
+      MED -> ATM
+      MED -> OCN
+      MED -> LND
       ATM
-      @1800           # 30min sub cycle driving OCN to show it is parsed ok
-        OCN
-        @300          # 5min test cycle that does not do anything
-        @
-      @
-      @1800           # 30min sub cycle driving LND to show it is parsed ok
-        LND
-      @
+      OCN
+      LND
+      ATM -> MED
+      OCN -> MED
     @
 ::
 

@@ -81,7 +81,9 @@ module OCN
 #ifdef WITHIMPORTFIELDS
     ! importable field: air_pressure_at_sea_level
     call NUOPC_Advertise(importState, &
-      StandardName="air_pressure_at_sea_level", name="pmsl", rc=rc)
+      StandardName="air_pressure_at_sea_level", name="pmsl", &
+      !TransferOfferGeomObject="will provide", &
+      rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -89,7 +91,9 @@ module OCN
     
     ! importable field: surface_net_downward_shortwave_flux
     call NUOPC_Advertise(importState, &
-      StandardName="surface_net_downward_shortwave_flux", name="rsns", rc=rc)
+      StandardName="surface_net_downward_shortwave_flux", name="rsns", &
+      !TransferOfferGeomObject="will provide", &
+      rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -98,7 +102,9 @@ module OCN
 
     ! exportable field: sea_surface_temperature
     call NUOPC_Advertise(exportState, &
-      StandardName="sea_surface_temperature", name="sst", rc=rc)
+      StandardName="sea_surface_temperature", name="sst", &
+      !TransferOfferGeomObject="will provide", &
+      rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -320,13 +326,12 @@ module OCN
       return  ! bail out
 
     ! Add the center stagger longitude coordinate Array
-    ! Don't add the center coordinates until it's needed
-    !call ESMF_GridAddCoord(ocnGrid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
-    !  rc=rc)
-    !if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-    !  line=__LINE__, &
-    !  file=__FILE__)) &
-    !  return  ! bail out
+    call ESMF_GridAddCoord(ocnGrid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
     ! Add the corner stagger longitude coordinate Array
     call ESMF_GridAddCoord(ocnGrid, staggerLoc=ESMF_STAGGERLOC_CORNER, &
       rc=rc)
@@ -359,12 +364,6 @@ module OCN
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    call ESMF_GridSetCoord(ocnGrid, coordDim=1, staggerloc=ESMF_STAGGERLOC_CORNER, &
-      array=array_qlon, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=__FILE__)) &
-      return  ! bail out
 
     call ESMF_GridGetCoord(ocnGrid, coordDim=2, staggerloc=ESMF_STAGGERLOC_CORNER, &
       array=array_qlat, rc=rc)
@@ -385,6 +384,32 @@ module OCN
     !print *, petnum(rc), 'min=', minidx, 'max=', maxidx
     call ESMF_ArrayRead(array_qlat, filename="corner_lat_0.5.nc", &
       variablename="lat_corner", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! Set up the coordinates
+    call ESMF_GridGetCoord(ocnGrid, coordDim=1, staggerloc=ESMF_STAGGERLOC_CENTER, &
+      array=array_plon, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_ArrayRead(array_plon, filename="center_lon_0.5.nc", &
+      variablename="lon_center", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_GridGetCoord(ocnGrid, coordDim=2, staggerloc=ESMF_STAGGERLOC_CENTER, &
+      array=array_plat, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_ArrayRead(array_plat, filename="center_lat_0.5.nc", &
+      variablename="lat_center", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &

@@ -74,6 +74,25 @@ module LND
     
     rc = ESMF_SUCCESS
 
+    ! importable field: air_pressure_at_sea_level
+    call NUOPC_Advertise(importState, &
+      StandardName="air_pressure_at_sea_level", name="pmsl", &
+      !TransferOfferGeomObject="will provide", &
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    
+    ! importable field: surface_net_downward_shortwave_flux
+    call NUOPC_Advertise(importState, &
+      StandardName="surface_net_downward_shortwave_flux", name="rsns", &
+      !TransferOfferGeomObject="will provide", &
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
   end subroutine
   
   !-----------------------------------------------------------------------------
@@ -83,9 +102,52 @@ module LND
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
     integer, intent(out) :: rc
+
+    ! local variables    
+    type(ESMF_Field)        :: field
+    type(ESMF_Grid)         :: gridIn
+    type(ESMF_Grid)         :: gridOut
+    integer                 :: decomptile(2,6)
     
     rc = ESMF_SUCCESS
+
+    gridIn = ESMF_GridCreate1PeriDimUfrm( &
+       maxIndex=(/180,100/), &
+       minCornerCoord=(/0.0_ESMF_KIND_R8,-90.0_ESMF_KIND_R8/), &
+       maxCornerCoord=(/360.0_ESMF_KIND_R8,90.0_ESMF_KIND_R8/), &
+       staggerLocList=(/ESMF_STAGGERLOC_CORNER, ESMF_STAGGERLOC_CENTER/), &
+       rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    gridOut = gridIn
     
+    ! exportable field: air_pressure_at_sea_level
+    field = ESMF_FieldCreate(name="pmsl", grid=gridOut, &
+      typekind=ESMF_TYPEKIND_R8, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_Realize(importState, field=field, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! exportable field: surface_net_downward_shortwave_flux
+    field = ESMF_FieldCreate(name="rsns", grid=gridOut, &
+      typekind=ESMF_TYPEKIND_R8, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_Realize(importState, field=field, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
   end subroutine
   
   !-----------------------------------------------------------------------------

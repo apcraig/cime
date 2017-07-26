@@ -74,7 +74,9 @@ module ATM
 #ifdef WITHIMPORTFIELDS
     ! importable field: sea_surface_temperature
     call NUOPC_Advertise(importState, &
-      StandardName="sea_surface_temperature", name="sst", rc=rc)
+      StandardName="sea_surface_temperature", name="sst", &
+      !TransferOfferGeomObject="will provide", &
+      rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -83,7 +85,9 @@ module ATM
     
     ! exportable field: air_pressure_at_sea_level
     call NUOPC_Advertise(exportState, &
-      StandardName="air_pressure_at_sea_level", name="pmsl", rc=rc)
+      StandardName="air_pressure_at_sea_level", name="pmsl", &
+      !TransferOfferGeomObject="will provide", &
+      rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -91,7 +95,9 @@ module ATM
     
     ! exportable field: surface_net_downward_shortwave_flux
     call NUOPC_Advertise(exportState, &
-      StandardName="surface_net_downward_shortwave_flux", name="rsns", rc=rc)
+      StandardName="surface_net_downward_shortwave_flux", name="rsns", &
+      !TransferOfferGeomObject="will provide", &
+      rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -116,22 +122,33 @@ module ATM
     rc = ESMF_SUCCESS
     
     ! create a Grid object for Fields
-    decomptile(:,1)=(/2,2/)
-    decomptile(:,2)=(/2,2/)
-    decomptile(:,3)=(/2,2/)
-    decomptile(:,4)=(/2,2/)
-    decomptile(:,5)=(/2,2/)
-    decomptile(:,6)=(/2,2/)
+    !decomptile(:,1)=(/2,2/)
+    !decomptile(:,2)=(/2,2/)
+    !decomptile(:,3)=(/2,2/)
+    !decomptile(:,4)=(/2,2/)
+    !decomptile(:,5)=(/2,2/)
+    !decomptile(:,6)=(/2,2/)
 
-    gridIn=ESMF_GridCreateMosaic(filename=trim("data/C48_mosaic.nc"), &
-         tileFilePath="./data/", regDecompPTile=decomptile, &
-         indexflag=ESMF_INDEX_GLOBAL, &
-         rc=rc)
+    !gridIn=ESMF_GridCreateMosaic(filename=trim("data/C48_mosaic.nc"), &
+    !     tileFilePath="./data/", regDecompPTile=decomptile, &
+    !     indexflag=ESMF_INDEX_GLOBAL, &
+    !     rc=rc)
+    !if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+    !  line=__LINE__, &
+    !  file=__FILE__)) &
+    !  return  ! bail out
+    !gridOut = gridIn ! for now out same as in
+    gridIn = ESMF_GridCreate1PeriDimUfrm( &
+       maxIndex=(/180,100/), &
+       minCornerCoord=(/0.0_ESMF_KIND_R8,-90.0_ESMF_KIND_R8/), &
+       maxCornerCoord=(/360.0_ESMF_KIND_R8,90.0_ESMF_KIND_R8/), &
+       staggerLocList=(/ESMF_STAGGERLOC_CORNER, ESMF_STAGGERLOC_CENTER/), &
+       rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    gridOut = gridIn ! for now out same as in
+    gridOut = gridIn
 
 #ifdef WITHIMPORTFIELDS
     ! importable field: sea_surface_temperature

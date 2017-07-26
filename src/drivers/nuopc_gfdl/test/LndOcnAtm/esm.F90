@@ -14,6 +14,7 @@ module ESM
   use ATM, only: atmSS => SetServices
   use OCN, only: ocnSS => SetServices
   use LND, only: lndSS => SetServices
+  use MED, only: medSS => SetServices
   
   use NUOPC_Connector, only: cplSS => SetServices
   
@@ -105,7 +106,7 @@ module ESM
       file=__FILE__)) &
       return  ! bail out
       
-#if 1
+#if 0
     print *, "-- start FreeFormatPrint(attrFF) of read in attributes --------"
     call NUOPC_FreeFormatPrint(attrFF, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -129,7 +130,7 @@ module ESM
       file=__FILE__)) &
       return  ! bail out
   
-#if 1
+#if 0
 
     ! pull out all the Attributes defined on the Driver in FreeFormat
     call NUOPC_CompAttributeEgest(driver, attrFF, rc=rc)
@@ -156,7 +157,8 @@ module ESM
 #endif
 
     ! SetServices for ATM
-    call NUOPC_DriverAddComp(driver, "ATM", atmSS, comp=child, rc=rc)
+    call NUOPC_DriverAddComp(driver, "ATM", atmSS, comp=child, &
+      petlist=(/0,1,2,3/), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -188,7 +190,8 @@ module ESM
       return  ! bail out
       
     ! SetServices for OCN
-    call NUOPC_DriverAddComp(driver, "OCN", ocnSS, comp=child, rc=rc)
+    call NUOPC_DriverAddComp(driver, "OCN", ocnSS, comp=child, &
+      petlist=(/4,5,6,7/), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -220,7 +223,8 @@ module ESM
       return  ! bail out
       
     ! SetServices for LND
-    call NUOPC_DriverAddComp(driver, "LND", lndSS, comp=child, rc=rc)
+    call NUOPC_DriverAddComp(driver, "LND", lndSS, comp=child, &
+      petlist=(/0,1,2,3/), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -251,6 +255,38 @@ module ESM
       file=__FILE__)) &
       return  ! bail out
 
+    ! SetServices for MED
+    call NUOPC_DriverAddComp(driver, "MED", medSS, comp=child, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    ! set default MED attributes
+    call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    ! read MED attributes from config file into FreeFormat
+    attrFF = NUOPC_FreeFormatCreate(config, label="medAttributes::", &
+      relaxedflag=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    ! ingest FreeFormat med attributes
+    call NUOPC_CompAttributeIngest(child, attrFF, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    ! clean-up
+    call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
     ! Disabling the following macro, e.g. renaming to WITHCONNECTORS_disable,
     ! will result in a driver that does not call connectors between the model
     ! components. This mode can be used if all model components are driven 
@@ -258,8 +294,64 @@ module ESM
     ! connectors can be set here, but will turn into no-ops.
 #define WITHCONNECTORS
 #ifdef WITHCONNECTORS
-    ! SetServices for atm2ocn
-    call NUOPC_DriverAddComp(driver, srcCompLabel="ATM", dstCompLabel="OCN", &
+!    ! SetServices for atm2ocn
+!    call NUOPC_DriverAddComp(driver, srcCompLabel="ATM", dstCompLabel="OCN", &
+!      compSetServicesRoutine=cplSS, comp=connector, rc=rc)
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+!    call NUOPC_CompAttributeSet(connector, name="Verbosity", value="high", &
+!      rc=rc)
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+!    
+!    ! SetServices for ocn2atm
+!    call NUOPC_DriverAddComp(driver, srcCompLabel="OCN", dstCompLabel="ATM", &
+!      compSetServicesRoutine=cplSS, comp=connector, rc=rc)
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+!    call NUOPC_CompAttributeSet(connector, name="Verbosity", value="high", &
+!      rc=rc)
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+!    
+!    ! SetServices for atm2lnd
+!    call NUOPC_DriverAddComp(driver, srcCompLabel="ATM", dstCompLabel="LND", &
+!      compSetServicesRoutine=cplSS, comp=connector, rc=rc)
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+!    call NUOPC_CompAttributeSet(connector, name="Verbosity", value="high", &
+!      rc=rc)
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+!
+!    ! SetServices for lnd2atm
+!    call NUOPC_DriverAddComp(driver, srcCompLabel="LND", dstCompLabel="ATM", &
+!      compSetServicesRoutine=cplSS, comp=connector, rc=rc)
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+!    call NUOPC_CompAttributeSet(connector, name="Verbosity", value="high", &
+!      rc=rc)
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+!
+    ! SetServices for ocn2med
+    call NUOPC_DriverAddComp(driver, srcCompLabel="OCN", dstCompLabel="MED", &
       compSetServicesRoutine=cplSS, comp=connector, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
@@ -271,9 +363,8 @@ module ESM
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    
-    ! SetServices for ocn2atm
-    call NUOPC_DriverAddComp(driver, srcCompLabel="OCN", dstCompLabel="ATM", &
+    ! SetServices for atm2med
+    call NUOPC_DriverAddComp(driver, srcCompLabel="ATM", dstCompLabel="MED", &
       compSetServicesRoutine=cplSS, comp=connector, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
@@ -285,9 +376,21 @@ module ESM
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    
-    ! SetServices for atm2lnd
-    call NUOPC_DriverAddComp(driver, srcCompLabel="ATM", dstCompLabel="LND", &
+!    ! SetServices for lnd2med
+!    call NUOPC_DriverAddComp(driver, srcCompLabel="LND", dstCompLabel="MED", &
+!      compSetServicesRoutine=cplSS, comp=connector, rc=rc)
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+!    call NUOPC_CompAttributeSet(connector, name="Verbosity", value="high", &
+!      rc=rc)
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+    ! SetServices for med2ocn
+    call NUOPC_DriverAddComp(driver, srcCompLabel="MED", dstCompLabel="OCN", &
       compSetServicesRoutine=cplSS, comp=connector, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
@@ -299,9 +402,21 @@ module ESM
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-
-    ! SetServices for lnd2atm
-    call NUOPC_DriverAddComp(driver, srcCompLabel="LND", dstCompLabel="ATM", &
+    ! SetServices for med2atm
+    call NUOPC_DriverAddComp(driver, srcCompLabel="MED", dstCompLabel="ATM", &
+      compSetServicesRoutine=cplSS, comp=connector, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompAttributeSet(connector, name="Verbosity", value="high", &
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    ! SetServices for med2lnd
+    call NUOPC_DriverAddComp(driver, srcCompLabel="MED", dstCompLabel="LND", &
       compSetServicesRoutine=cplSS, comp=connector, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
