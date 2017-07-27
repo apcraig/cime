@@ -4,10 +4,14 @@
 ###############################################
 
 # GFDL run sequence example: ICE performs some mediation functions
+# atm/lnd/ice thermaldynamics pets
+# ocn pets
+# for new ice physics, ocn and ice dynamics are on the same pets
 runSeq::
     @1800                                   # 30 min time step 
-      OCN -> ICE :remapMethod=redist        # flux_ocean_to_ice on same PETs
+      OCN -> ICE :remapMethod=redist        # flux_ocean_to_ice from atm/ice pets to ocn pets
       ICE -> MED                            # set_ice_surface_fields
+      MED generate_xgrid                    # generate xgrid
       @600                                  # 10 min time step
         MED flux_calculation                # flux_calculation run phase
         ATM atmos_down                      # atmos_down run phase
@@ -18,7 +22,7 @@ runSeq::
         ATM atmos_up                        # atmos_up run phase
       @
       ICE ice_slow                          # ice_slow run phase
-      ICE -> OCN :remapMethod=redist        # flux_ice_to_ocean on same PETS
+      ICE -> OCN :remapMethod=redist        # flux_ice_to_ocean
       OCN
     @
 ::
