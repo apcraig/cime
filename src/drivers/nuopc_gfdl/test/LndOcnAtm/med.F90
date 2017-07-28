@@ -19,6 +19,7 @@ module MED
   type(ESMF_State), save  :: frOCN, toOCN
   type(ESMF_State), save  :: frATM, toATM
   type(ESMF_State), save  :: frLND, toLND
+  type(ESMF_State), save  :: frICE, toICE
   
   public SetServices
   
@@ -234,6 +235,25 @@ module MED
       file=__FILE__)) &
       return  ! bail out
     
+    ! Fields to ICE
+    !   use namespace in the exportState
+    call NUOPC_AddNamespace(exportState, namespace="ICE", &
+      nestedState=toICE, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    !   advertise fields in the nested state
+    call NUOPC_Advertise(toICE, &
+      StandardNames=(/ &
+      "air_pressure_at_sea_level          ", &
+      "surface_net_downward_shortwave_flux"/), &
+      TransferOfferGeomObject="cannot provide", &
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
   end subroutine
   
   !-----------------------------------------------------------------------------

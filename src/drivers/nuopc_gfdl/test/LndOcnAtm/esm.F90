@@ -14,6 +14,7 @@ module ESM
   use ATM, only: atmSS => SetServices
   use OCN, only: ocnSS => SetServices
   use LND, only: lndSS => SetServices
+  use ICE, only: iceSS => SetServices
   use MED, only: medSS => SetServices
   
   use NUOPC_Connector, only: cplSS => SetServices
@@ -255,8 +256,42 @@ module ESM
       file=__FILE__)) &
       return  ! bail out
 
+    ! SetServices for ICE
+    call NUOPC_DriverAddComp(driver, "ICE", iceSS, comp=child, &
+      petlist=(/0,1,2,3/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    ! set default ICE attributes
+    call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    ! read ICE attributes from config file into FreeFormat
+    attrFF = NUOPC_FreeFormatCreate(config, label="lndAttributes::", &
+      relaxedflag=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    ! ingest FreeFormat lnd attributes
+    call NUOPC_CompAttributeIngest(child, attrFF, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    ! clean-up
+    call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
     ! SetServices for MED
-    call NUOPC_DriverAddComp(driver, "MED", medSS, comp=child, rc=rc)
+    call NUOPC_DriverAddComp(driver, "MED", medSS, comp=child, &
+      petlist=(/0,1,2,3/), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -417,6 +452,19 @@ module ESM
       return  ! bail out
     ! SetServices for med2lnd
     call NUOPC_DriverAddComp(driver, srcCompLabel="MED", dstCompLabel="LND", &
+      compSetServicesRoutine=cplSS, comp=connector, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompAttributeSet(connector, name="Verbosity", value="high", &
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    ! SetServices for med2ice
+    call NUOPC_DriverAddComp(driver, srcCompLabel="MED", dstCompLabel="ICE", &
       compSetServicesRoutine=cplSS, comp=connector, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &

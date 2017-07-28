@@ -12,6 +12,9 @@ Build:
 Execution:
   - Optionally set environment variable ESMF_RUNTIME_COMPLIANCECHECK to ON.
   - mpirun -np 8 ./esmApp
+  - Processor layout
+    ATM, LND, ICE, MED: 0-3
+    OCN               : 4-7
   
 Output:
   - PET*.Log files containing compliance checker output if turned on.
@@ -42,6 +45,7 @@ Code structure:
   - atm.F90     - The ATM component, specializing generic NUOPC_Model.
   - ocn.F90     - The OCN component, specializing generic NUOPC_Model.
   - lnd.F90     - The LND component, specializing generic NUOPC_Model.
+  - ice.F90     - The ICE component, specializing generic NUOPC_Model.
   - med.F90     - The MED component, specializing generic NUOPC_Mediator.
   - esm.F90     - The Earth System Model (ESM) component, specializing generic
                   NUOPC_Driver.
