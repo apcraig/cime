@@ -34,8 +34,8 @@ module datm_comp_nuopc
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Finalize  => label_Finalize
 
-  use datm_shr_mod , only: datm_shr_read_namelists
   use datm_shr_mod , only: presaero  !TODO - need to add this to scalar data
+  use datm_shr_mod , only: datm_shr_read_namelists
   use datm_comp_mod, only: datm_comp_init, datm_comp_run, datm_comp_final
   use perf_mod
   use mct_mod
@@ -306,10 +306,13 @@ module datm_comp_nuopc
     if (atm_prognostic) then
        call shr_nuopc_fldList_Zero(fldsToAtm, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
        call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_states, "will provide", subname//":seq_flds_x2a_states", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
        call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_fluxes, "will provide", subname//":seq_flds_x2a_fluxes", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
        call shr_nuopc_fldList_Add(fldsToAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
@@ -320,10 +323,13 @@ module datm_comp_nuopc
 
     call shr_nuopc_fldList_Zero(fldsFrAtm, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_states, "will provide", subname//":seq_flds_a2x_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_fluxes, "will provide", subname//":seq_flds_a2x_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsFrAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -380,6 +386,7 @@ module datm_comp_nuopc
     real(R8)                 :: orbLambm0                 ! orb mean long of perhelion (radians)
     real(R8)                 :: orbObliqr                 ! orb obliquity (radians)
     real(R8)                 :: nextsw_cday               ! calendar of next atm sw
+    logical                  :: connected                 ! is field connected?
     character(len=*),parameter :: subname=trim(modName)//':(InitializeRealize) '
     !-------------------------------------------------------------------------------
 
@@ -398,13 +405,20 @@ module datm_comp_nuopc
     call shr_file_setLogUnit (logunit)
 
     !----------------------------------------------------------------------------
-    ! Read input namelists and set present and prognostic flags
+    ! If prognostic, than map import state to import attribute vector
     !----------------------------------------------------------------------------
 
     phase = 1  !TODO - this is hard-wired for now and needs to be generalized
 
     if (phase .ne. 1) then
        if (atm_prognostic) then
+          do n = 1,fldsToAtm%num
+             connected = NUOPC_IsConnected(importState, fieldName=fldsToAtm%shortname(n))
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) call shr_sys_abort()
+             if (.not. connected) then
+                call shr_sys_abort("Atm prognostic .true. requires connection for " // trim(fldsToAtm%shortname(n)))
+             end if
+          end do
           call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
        end if
@@ -493,7 +507,6 @@ module datm_comp_nuopc
           call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToAtm, tag=subname//':datmImport', rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
        end if
-
        call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrAtm, tag=subname//':datmExport', rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -503,7 +516,6 @@ module datm_comp_nuopc
           call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToAtm, tag=subname//':datmImport', rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
        end if
-
        call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrAtm, tag=subname//':datmExport', rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -853,6 +865,7 @@ module datm_comp_nuopc
 
     ! local variables
     character(len=*),parameter  :: subname=trim(modName)//':(ModelFinalize) '
+    !-------------------------------------------------------------------------------
 
     !--------------------------------
     ! Finalize routine
@@ -861,7 +874,7 @@ module datm_comp_nuopc
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
 
-    call  datm_comp_final(my_task, master_task, logunit)
+    call datm_comp_final(my_task, master_task, logunit)
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 

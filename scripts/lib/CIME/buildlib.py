@@ -44,10 +44,13 @@ def build_data_lib(argv, compclass):
 
         cimeroot  = case.get_value("CIMEROOT")
 
+        driver = case.get_value("COMP_INTERFACE").lower()
+
         # Write directory list (Filepath)
         compname = "d" + compclass
         with open('Filepath', 'w') as out:
             out.write(os.path.join(caseroot, "SourceMods", "src.{}\n".format(compname)) + "\n")
+            out.write(os.path.join(cimeroot, "src", "components", "data_comps", compname, driver) + "\n")
             out.write(os.path.join(cimeroot, "src", "components", "data_comps", compname) + "\n")
 
         # Build the component

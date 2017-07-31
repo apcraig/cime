@@ -152,12 +152,6 @@ CONTAINS
     !----------------------------------------------------------------------------
 
     call shr_strdata_readnml(SDATM, trim(filename), mpicom=mpicom)
-    write(6,*)'DEBUG3: nxg = ',SDATM%nxg
-    write(6,*)'DEBUG3: nyg = ',SDATM%nyg
-    write(6,*)'DEBUG3: mpicom = ',mpicom
-    write(6,*)'DEBUG3: compid = ',compid
-
-    call shr_sys_flush(shrlogunit)
 
     ! Validate mode
 
