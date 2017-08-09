@@ -1,0 +1,58 @@
+
+###############################################
+####  esmApp Run-Time Configuration File  #####
+###############################################
+
+# GFDL run sequence example: ICE performs some mediation functions
+# atm/lnd/ice thermaldynamics pets
+# ocn pets
+# for new ice physics, ocn and ice dynamics are on the same pets
+# ICE has fast and slow PEs
+runSeq::
+    @7200                                   # 2 hours time step 
+      OCN -> ICE_SLOW :remapMethod=redist   # flux_ocean_to_ice from atm/ice pets to ocn pets
+      #MED flux_ice_to_ocean                # if use_lag_fluxes: Update Ice_ocean_boundary; first iteration is supplied by restart
+      ICE_SLOW unpack_ocean_ice_boundary
+      ICE_SLOW -> ICE_FAST                  # exchange_slow_to_fast_ice
+      ICE_FAST set_ice_surface_fields       #
+      MED generate_xgrid                    # generate xgrid
+      MED send_ice_mask_sic
+      @600                                  # 10 min time step
+        ATM atmos_tracer_driver_gather_data # if do_atmos
+        MED sfc_boundary_layer              # flux_calculation run phase
+        ATM update_atmos_model_dynamics     
+        # ATM serial radiation
+        ATM update_atmos_model_down         # atmos_down run phase
+        ATM -> MED                          # flux_down_from_atmos
+        LND update_land_model_fast          # land_fast run phase
+        LND -> MED                          # ?
+        ICE update_ice_model_fast           # ice_fast run phase
+        ICE -> MED                          # ?
+        MED -> ATM                          # flux_up_to_atmos
+        ATM update_atmos_model_up           # atmos_up run phase
+        MED flux_atmos_to_ocean
+        ATM update_atmos_model_radiation    # concurrent atmos radiation
+      @
+      MED -> LND                            # ? Some fluxes couple directly some go through mediator
+      LND update_land_model_slow
+      LND -> ICE                            # flux_land_to_ice (customized connector?)
+      ICE_FAST ice_model_fast_cleanup
+      ICE_FAST unpack_land_ice_boundary
+      ICE_FAST -> ICE_SLOW                  # exchange_fast_to_slow_ice (customized connector?)
+      ICE update_ice_model_slow                          # ice_slow run phase
+      ICE -> OCN :remapMethod=redist        # flux_ice_to_ocean
+      OCN update_ocean_model
+    @
+::
+
+# Attributes for components
+
+driverAttributes::
+  Verbosity = 0
+  Profiling = 1
+::
+
+ocnAttributes::
+  Verbosity = 0
+::
+
