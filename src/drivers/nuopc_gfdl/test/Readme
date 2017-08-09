@@ -17,11 +17,11 @@ mkdir data
 cd data
 wget --no-check-certificate https://raw.githubusercontent.com/feiliuesmf/esmftest/master/xgrid/test1/ll1deg_grid.nc
 wget --no-check-certificate https://raw.githubusercontent.com/feiliuesmf/esmftest/master/xgrid/test1/ll2.5deg_grid.nc
-wget --no-check-certificate https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/C48_mosaic.nc?format=raw -O C48_mosaic.nc
-wget --no-check-certificate https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile1.nc?format=raw -O horizontal_grid.tile1.nc
-wget --no-check-certificate https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile2.nc?format=raw -O horizontal_grid.tile2.nc
-wget --no-check-certificate https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile3.nc?format=raw -O horizontal_grid.tile3.nc
-wget --no-check-certificate https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile4.nc?format=raw -O horizontal_grid.tile4.nc
-wget --no-check-certificate https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile5.nc?format=raw -O horizontal_grid.tile5.nc
-wget --no-check-certificate https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile6.nc?format=raw -O horizontal_grid.tile6.nc
+wget --no-check-certificate 'https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/C48_mosaic.nc?format=raw' -O C48_mosaic.nc
+wget --no-check-certificate 'https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile1.nc?format=raw' -O horizontal_grid.tile1.nc
+wget --no-check-certificate 'https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile2.nc?format=raw' -O horizontal_grid.tile2.nc
+wget --no-check-certificate 'https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile3.nc?format=raw' -O horizontal_grid.tile3.nc
+wget --no-check-certificate 'https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile4.nc?format=raw' -O horizontal_grid.tile4.nc
+wget --no-check-certificate 'https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile5.nc?format=raw' -O horizontal_grid.tile5.nc
+wget --no-check-certificate 'https://sourceforge.net/p/esmf/esmf/ci/master/tree/src/Infrastructure/Field/tests/data/horizontal_grid.tile6.nc?format=raw' -O horizontal_grid.tile6.nc
 3. mpirun -np $np ./xgridEx1

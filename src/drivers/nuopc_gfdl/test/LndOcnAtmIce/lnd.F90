@@ -111,6 +111,24 @@ module LND
     
     rc = ESMF_SUCCESS
 
+    ! create a Grid object for Fields
+    !decomptile(:,1)=(/2,2/)
+    !decomptile(:,2)=(/2,2/)
+    !decomptile(:,3)=(/2,2/)
+    !decomptile(:,4)=(/2,2/)
+    !decomptile(:,5)=(/2,2/)
+    !decomptile(:,6)=(/2,2/)
+
+    !gridIn=ESMF_GridCreateMosaic(filename=trim("data/C48_mosaic.nc"), &
+    !     tileFilePath="./data/", regDecompPTile=decomptile, &
+    !     staggerLocList=(/ESMF_STAGGERLOC_CENTER, ESMF_STAGGERLOC_CORNER/), &
+    !     indexflag=ESMF_INDEX_GLOBAL, &
+    !     rc=rc)
+    !if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+    !  line=__LINE__, &
+    !  file=__FILE__)) &
+    !  return  ! bail out
+    !gridOut = gridIn ! for now out same as in
     gridIn = ESMF_GridCreate1PeriDimUfrm( &
        maxIndex=(/180,100/), &
        minCornerCoord=(/0.0_ESMF_KIND_R8,-90.0_ESMF_KIND_R8/), &

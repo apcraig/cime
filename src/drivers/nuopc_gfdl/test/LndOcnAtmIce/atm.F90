@@ -131,6 +131,7 @@ module ATM
 
     !gridIn=ESMF_GridCreateMosaic(filename=trim("data/C48_mosaic.nc"), &
     !     tileFilePath="./data/", regDecompPTile=decomptile, &
+    !     staggerLocList=(/ESMF_STAGGERLOC_CENTER, ESMF_STAGGERLOC_CORNER/), &
     !     indexflag=ESMF_INDEX_GLOBAL, &
     !     rc=rc)
     !if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &

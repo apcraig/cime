@@ -38,10 +38,10 @@ program xgridEx1
 !  !! 2D test case to show the use of XGrid with Mosaic Grid and regular lat-lon Grid with realistic SST and masking
 !  call ESMF_XGridTest5(rc)
 !  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-!
-!  !! 2D test case to show the use of XGrid with Mosaic Grid and tripolar Grid with realistic SST and masking
-!  call ESMF_XGridTest6(rc)
-!  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  !! 2D test case to show the use of XGrid with Mosaic Grid and tripolar Grid with realistic SST and masking
+  call ESMF_XGridTest6(rc)
+  if(rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   !! 2D test case to show the use of XGrid with Mosaic Grid and tripolar Grid with realistic SST and masking
   !! Both land and atmosphere are running on the same Mosaic Grid
@@ -67,6 +67,7 @@ program xgridEx1
     integer(IKIND)         :: chksum
     real(RKIND)            :: i_time, f_time, delta_time
 
+    if(I_AM_PET(0, rc)) print *, 'Entering TEST1'
     i_time = MPI_WTime()
     atmMesh = ESMF_MeshCreate("data/ll1deg_grid.nc", ESMF_FILEFORMAT_SCRIP, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -212,6 +213,7 @@ program xgridEx1
     real(RKIND)            :: i_time, f_time, delta_time
     integer                :: decomptile(2,6)
 
+    if(I_AM_PET(0, rc)) print *, 'Entering TEST2'
     i_time = MPI_WTime()
     ! Create Src Grid
     ! Set up decomposition for src Grid, this is optional but can be used to 
@@ -225,6 +227,7 @@ program xgridEx1
 
     atmGrid=ESMF_GridCreateMosaic(filename=trim("data/C48_mosaic.nc"), &
          tileFilePath="./data/", regDecompPTile=decomptile, &
+         staggerLocList=(/ESMF_STAGGERLOC_CENTER, ESMF_STAGGERLOC_CORNER/), &
          indexflag=ESMF_INDEX_GLOBAL, &
          rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -232,7 +235,7 @@ program xgridEx1
       file=__FILE__)) &
       return  ! bail out
 
-    lndMesh = ESMF_MeshCreate("ll2.5deg_grid.nc", ESMF_FILEFORMAT_SCRIP, rc=rc)
+    lndMesh = ESMF_MeshCreate("data/ll2.5deg_grid.nc", ESMF_FILEFORMAT_SCRIP, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -370,14 +373,15 @@ program xgridEx1
     integer(IKIND)         :: chksum
     real(RKIND)            :: i_time, f_time, delta_time
 
+    if(I_AM_PET(0, rc)) print *, 'Entering TEST3'
     i_time = MPI_WTime()
-    atmMesh = ESMF_MeshCreate("ll1deg_grid.nc", ESMF_FILEFORMAT_SCRIP, rc=rc)
+    atmMesh = ESMF_MeshCreate("data/ll1deg_grid.nc", ESMF_FILEFORMAT_SCRIP, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
 
-    lndMesh = ESMF_MeshCreate("ll2.5deg_grid.nc", ESMF_FILEFORMAT_SCRIP, rc=rc)
+    lndMesh = ESMF_MeshCreate("data/ll2.5deg_grid.nc", ESMF_FILEFORMAT_SCRIP, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -751,13 +755,12 @@ program xgridEx1
       return  ! bail out
 
     ! Add the center stagger longitude coordinate Array
-    ! Don't add the center coordinates until it's needed
-    !call ESMF_GridAddCoord(ocnGrid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
-    !  rc=rc)
-    !if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-    !  line=__LINE__, &
-    !  file=__FILE__)) &
-    !  return  ! bail out
+    call ESMF_GridAddCoord(ocnGrid, staggerLoc=ESMF_STAGGERLOC_CENTER, &
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
     ! Add the corner stagger longitude coordinate Array
     call ESMF_GridAddCoord(ocnGrid, staggerLoc=ESMF_STAGGERLOC_CORNER, &
       rc=rc)
@@ -790,12 +793,6 @@ program xgridEx1
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    call ESMF_GridSetCoord(ocnGrid, coordDim=1, staggerloc=ESMF_STAGGERLOC_CORNER, &
-      array=array_qlon, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=__FILE__)) &
-      return  ! bail out
 
     call ESMF_GridGetCoord(ocnGrid, coordDim=2, staggerloc=ESMF_STAGGERLOC_CORNER, &
       array=array_qlat, rc=rc)
@@ -816,6 +813,32 @@ program xgridEx1
     !print *, petnum(rc), 'min=', minidx, 'max=', maxidx
     call ESMF_ArrayRead(array_qlat, filename="corner_lat_0.5.nc", &
       variablename="lat_corner", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! Set up the coordinates
+    call ESMF_GridGetCoord(ocnGrid, coordDim=1, staggerloc=ESMF_STAGGERLOC_CENTER, &
+      array=array_plon, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_ArrayRead(array_plon, filename="center_lon_0.5.nc", &
+      variablename="lon_center", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_GridGetCoord(ocnGrid, coordDim=2, staggerloc=ESMF_STAGGERLOC_CENTER, &
+      array=array_plat, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call ESMF_ArrayRead(array_plat, filename="center_lat_0.5.nc", &
+      variablename="lat_center", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -1021,7 +1044,7 @@ program xgridEx1
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    print *, petnum(rc), 'min=', minidx, 'max=', maxidx
+    !print *, petnum(rc), 'min=', minidx, 'max=', maxidx
     !call ESMF_ArrayGet(array_qlon, farrayPtr=fptr, rc=rc)
     !if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
     !  line=__LINE__, &
@@ -1055,7 +1078,7 @@ program xgridEx1
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    print *, petnum(rc), 'min=', minidx, 'max=', maxidx
+    !print *, petnum(rc), 'min=', minidx, 'max=', maxidx
     !call ESMF_ArrayGet(array_qlat, farrayPtr=fptr, rc=rc)
     !if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
     !  line=__LINE__, &
@@ -1287,6 +1310,7 @@ program xgridEx1
     real(RKIND)            :: i_time, f_time, delta_time
     integer                :: decomptile(2,6)
 
+    if(I_AM_PET(0, rc)) print *, 'Entering TEST4'
     i_time = MPI_WTime()
     ! Create Src Grid
     ! Set up decomposition for src Grid, this is optional but can be used to 
@@ -1300,6 +1324,7 @@ program xgridEx1
 
     atmGrid=ESMF_GridCreateMosaic(filename=trim("data/C48_mosaic.nc"), &
          tileFilePath="./data/", regDecompPTile=decomptile, &
+         staggerLocList=(/ESMF_STAGGERLOC_CENTER, ESMF_STAGGERLOC_CORNER/), &
          indexflag=ESMF_INDEX_GLOBAL, &
          rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -1485,6 +1510,7 @@ program xgridEx1
     real(RKIND)            :: i_time, f_time, delta_time
     type(ESMF_Mesh)        :: xmesh
 
+    if(I_AM_PET(0, rc)) print *, 'Entering TEST5'
     i_time = MPI_WTime()
     ! Create Src Grid
 
@@ -1522,7 +1548,7 @@ program xgridEx1
       file=__FILE__)) &
       return  ! bail out
 
-    call ESMF_MeshWrite(xmesh, "xmesh", rc=rc)
+    call ESMF_MeshWrite(xmesh, "xmesh5", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -1655,6 +1681,7 @@ program xgridEx1
     integer                :: decomptile(2,6)
     type(ESMF_Mesh)        :: xmesh
 
+    if(I_AM_PET(0, rc)) print *, 'Entering TEST6'
     i_time = MPI_WTime()
     ! Create Src Grid
     ! Set up decomposition for src Grid, this is optional but can be used to 
@@ -1668,6 +1695,7 @@ program xgridEx1
 
     atmGrid=ESMF_GridCreateMosaic(filename=trim("data/C48_mosaic.nc"), &
          tileFilePath="./data/", regDecompPTile=decomptile, &
+         staggerLocList=(/ESMF_STAGGERLOC_CENTER, ESMF_STAGGERLOC_CORNER/), &
          indexflag=ESMF_INDEX_GLOBAL, &
          rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -1702,7 +1730,7 @@ program xgridEx1
       file=__FILE__)) &
       return  ! bail out
 
-    call ESMF_MeshWrite(xmesh, "xmesh", rc=rc)
+    call ESMF_MeshWrite(xmesh, "xmesh6", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -1866,7 +1894,8 @@ program xgridEx1
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    if(I_AM_PET(0)) print *, 'TEST6 is successful'
+    if(I_AM_PET(0, rc)) print *, 'TEST6 is successful'
+    print *, 'TEST6 is successful'
   end subroutine
 
 
@@ -1890,6 +1919,7 @@ program xgridEx1
     integer                :: decomptile(2,6)
     type(ESMF_Mesh)        :: xmesh
 
+    if(I_AM_PET(0, rc)) print *, 'Entering TEST7'
     i_time = MPI_WTime()
     ! Create Src Grid
     ! Set up decomposition for src Grid, this is optional but can be used to 
@@ -1903,6 +1933,7 @@ program xgridEx1
 
     atmGrid=ESMF_GridCreateMosaic(filename=trim("data/C48_mosaic.nc"), &
          tileFilePath="./data/", regDecompPTile=decomptile, &
+         staggerLocList=(/ESMF_STAGGERLOC_CENTER, ESMF_STAGGERLOC_CORNER/), &
          indexflag=ESMF_INDEX_GLOBAL, &
          rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -1918,6 +1949,7 @@ program xgridEx1
 
     lndGrid=ESMF_GridCreateMosaic(filename=trim("data/C48_mosaic.nc"), &
          tileFilePath="./data/", regDecompPTile=decomptile, &
+         staggerLocList=(/ESMF_STAGGERLOC_CENTER, ESMF_STAGGERLOC_CORNER/), &
          indexflag=ESMF_INDEX_GLOBAL, &
          rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
