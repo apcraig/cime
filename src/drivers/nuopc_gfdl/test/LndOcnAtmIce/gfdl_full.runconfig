@@ -8,6 +8,9 @@
 # ocn pets
 # for new ice physics, ocn and ice dynamics are on the same pets
 # ICE has fast and slow PEs
+# processor layout OCN: 4 5 6 7
+# processor layout ICE ATM LND MED: 0 1 2 3
+# A connector spans the union of the component processors
 runSeq::
     @7200                                   # 2 hours time step 
       OCN -> ICE_SLOW :remapMethod=redist   # flux_ocean_to_ice from atm/ice pets to ocn pets
@@ -25,15 +28,15 @@ runSeq::
         ATM update_atmos_model_down         # atmos_down run phase
         ATM -> MED                          # flux_down_from_atmos
         LND update_land_model_fast          # land_fast run phase
-        LND -> MED                          # ?
+        LND -> MED                          # 
         ICE update_ice_model_fast           # ice_fast run phase
-        ICE -> MED                          # ?
+        ICE -> MED                          # 
         MED -> ATM                          # flux_up_to_atmos
         ATM update_atmos_model_up           # atmos_up run phase
         MED flux_atmos_to_ocean
         ATM update_atmos_model_radiation    # concurrent atmos radiation
       @
-      MED -> LND                            # ? Some fluxes couple directly some go through mediator
+      MED -> LND                            # Some fluxes couple directly some go through mediator
       LND update_land_model_slow
       LND -> ICE                            # flux_land_to_ice (customized connector?)
       ICE_FAST ice_model_fast_cleanup
