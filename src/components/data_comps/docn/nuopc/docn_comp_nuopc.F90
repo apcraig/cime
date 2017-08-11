@@ -7,23 +7,23 @@ module docn_comp_nuopc
 ! datatypes and mct datatypes is implemented via share code.
 !----------------------------------------------------------------------------
 
-#ifdef NUOPC_INTERFACE 
-  use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN, &
-       CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
+  use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
+  use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod   ! shared system calls
 
   use seq_flds_mod
-  use seq_cdata_mod         , only: seq_cdata
-  use seq_infodata_mod      , only: seq_infodata_type, seq_infodata_GetData, seq_infodata_PutData
+  use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
+
   use shr_nuopc_fldList_mod
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
   use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_gridinit
-  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_AttrCopyToInfodata
   use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_AvectToState
   use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_StateToAvect
   use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
   use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
+  use shr_file_mod          , only: shr_file_setIO, shr_file_getUnit
+  use shr_strdata_mod       , only: shr_strdata_type
 
   use ESMF
   use NUOPC
@@ -34,8 +34,8 @@ module docn_comp_nuopc
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Finalize  => label_Finalize
 
+  use docn_shr_mod , only: docn_shr_read_namelists
   use docn_comp_mod, only: docn_comp_init, docn_comp_run, docn_comp_final
-  use docn_comp_mod, only: logunit
   use perf_mod
   use mct_mod
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
@@ -44,23 +44,43 @@ module docn_comp_nuopc
 
   public :: SetServices
 
+  private :: InitializeP0
+  private :: InitializeAdvertise
+  private :: InitializeRealize
+  private :: ModelAdvance
+  private :: ModelSetRunClock
+  private :: ModelFinalize
+
   private ! except
+
+  !--------------------------------------------------------------------------
+  ! Private module data
+  !--------------------------------------------------------------------------
+
+  character(CS)              :: myModelName = 'ocn'       ! user defined model name
+  type(shr_strdata_type)     :: SDOCN
+  type(mct_gsMap), target    :: gsMap_target
+  type(mct_gGrid), target    :: ggrid_target
+  type(mct_gsMap), pointer   :: gsMap
+  type(mct_gGrid), pointer   :: ggrid
+  type(mct_aVect)            :: x2d
+  type(mct_aVect)            :: d2x
+  integer(IN)                :: compid                    ! mct comp id
+  integer(IN)                :: mpicom                    ! mpi communicator
+  integer(IN)                :: my_task                   ! my task in mpi communicator mpicom
+  integer                    :: inst_index                ! number of current instance (ie. 1)
+  character(len=16)          :: inst_name                 ! fullname of current instance (ie. "lnd_0001")
+  character(len=16)          :: inst_suffix = ""          ! char string associated with instance (ie. "_0001" or "")
+  integer(IN)                :: logunit                   ! logging unit number
+  integer(IN),parameter      :: master_task=0             ! task number of master task
+  logical                    :: ocn_prognostic            ! flag
+  logical                    :: unpack_import
+  integer                    :: dbrc
+  integer, parameter         :: dbug = 10
+  character(len=*),parameter :: grid_option = "mesh"      ! grid_de, grid_arb, grid_reg, mesh
 
   type (shr_nuopc_fldList_Type) :: fldsToOcn
   type (shr_nuopc_fldList_Type) :: fldsFrOcn
-
-  type(seq_cdata)                :: cdata
-  type(seq_infodata_type),target :: infodata
-  type(mct_gsMap)        ,target :: gsmap
-  type(mct_gGrid)        ,target :: ggrid
-  type(mct_aVect)                :: x2d
-  type(mct_aVect)                :: d2x
-  integer                        :: mpicom, iam
-  integer                        :: dbrc
-  character(len=1024)            :: tmpstr
-  character(len=*),parameter     :: grid_option = "mesh"  ! grid_de, grid_arb, grid_reg, mesh
-  integer, parameter             :: dbug = 10
-  logical                        :: unpack_import
 
   !----- formats -----
   character(*),parameter :: modName =  "(docn_comp_nuopc)"
@@ -76,6 +96,7 @@ module docn_comp_nuopc
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
     character(len=*),parameter  :: subname=trim(modName)//':(SetServices) '
+    !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
@@ -126,7 +147,7 @@ module docn_comp_nuopc
       file=u_FILE_u)) &
       return  ! bail out
 
-    call ESMF_MethodRemove(gcomp, label=model_label_SetRunClock, rc=rc) 
+    call ESMF_MethodRemove(gcomp, label=model_label_SetRunClock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=u_FILE_u)) &
@@ -156,10 +177,7 @@ module docn_comp_nuopc
     type(ESMF_State)      :: importState, exportState
     type(ESMF_Clock)      :: clock
     integer, intent(out)  :: rc
-    
-    character(len=10)     :: value
-    type(ESMF_VM)         :: vm
-    integer               :: lpet
+    !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
 
@@ -171,20 +189,8 @@ module docn_comp_nuopc
       file=u_FILE_u)) &
       return  ! bail out
 
-    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
-
-    call ESMF_VMGet(vm, localPet=lpet, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
-
   end subroutine InitializeP0
-  
+
   !===============================================================================
 
   subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
@@ -194,11 +200,99 @@ module docn_comp_nuopc
     type(ESMF_Clock)     :: clock
     integer, intent(out) :: rc
 
-    ! local variables    
-    character(len=*),parameter  :: subname=trim(modName)//':(InitializeAdvertise) '
-    
+    ! local variables
+    logical       :: ocn_present       ! flag
+    logical       :: ocnrof_prognostic ! flag
+    type(ESMF_VM) :: vm
+    integer(IN)   :: lmpicom
+    character(CL) :: cvalue
+    integer(IN)   :: MCTID
+    logical       :: exists
+    integer(IN)   :: ierr       ! error code
+    integer(IN)   :: shrlogunit ! original log unit
+    integer(IN)   :: shrloglev  ! original log level
+    character(len=*),parameter :: subname=trim(modName)//':(InitializeAdvertise) '
+    !-------------------------------------------------------------------------------
+
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
+
+    !----------------------------------------------------------------------------
+    ! generate local mpi comm
+    !----------------------------------------------------------------------------
+
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=u_FILE_u)) &
+      return  ! bail out
+
+    call ESMF_VMGet(vm, mpiCommunicator=lmpicom, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=u_FILE_u)) &
+      return  ! bail out
+
+    call mpi_comm_dup(lmpicom, mpicom, ierr)
+    call mpi_comm_rank(mpicom, my_task, ierr)
+
+    !----------------------------------------------------------------------------
+    ! get MCT compid
+    !----------------------------------------------------------------------------
+
+    call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    read(cvalue,*) MCTID  ! convert from string to integer
+
+    !----------------------------------------------------------------------------
+    ! determine instance information
+    !----------------------------------------------------------------------------
+
+    compid = MCTID
+    inst_name   = seq_comm_name(compid)
+    inst_index  = seq_comm_inst(compid)
+    inst_suffix = seq_comm_suffix(compid)
+
+    !----------------------------------------------------------------------------
+    ! set logunit
+    !----------------------------------------------------------------------------
+
+    if (my_task == master_task) then
+       inquire(FILE='ocn_modelio.nml'//trim(inst_suffix), exist=exists)
+       if (exists) then
+         logUnit = shr_file_getUnit()
+         call shr_file_setIO('ocn_modelio.nml'//trim(inst_suffix),logUnit)
+       end if
+    endif
+
+    !----------------------------------------------------------------------------
+    ! Reset shr logging to my log file
+    !----------------------------------------------------------------------------
+
+    call shr_file_getLogUnit (shrlogunit)
+    call shr_file_getLogLevel(shrloglev)
+    call shr_file_setLogUnit (logunit)
+
+    !----------------------------------------------------------------------------
+    ! Read input namelists and set present and prognostic flags
+    !----------------------------------------------------------------------------
+
+    call docn_shr_read_namelists(mpicom, my_task, master_task, &
+         inst_index, inst_suffix, inst_name, &
+         logunit, shrlogunit, SDOCN, ocn_present, ocn_prognostic, ocnrof_prognostic)
+
+    ! NOTE: ocn_present flag is not needed - since the run sequence will have no call to this routine
+    ! for the ocn_present flag being set to false (i.e. null mode)
+    ! NOTE: only the ocn_prognostic flag is needed below
+
+    if (ocn_prognostic) then
+       unpack_import = .true.
+    else
+       unpack_import = .false.
+    end if
 
     !--------------------------------
     ! create import fields list
@@ -206,10 +300,15 @@ module docn_comp_nuopc
 
     call shr_nuopc_fldList_Zero(fldsToOcn, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_states, "will provide", subname//":seq_flds_x2o_states", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_fluxes, "will provide", subname//":seq_flds_x2o_fluxes", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
+    if (ocn_prognostic) then
+       call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_states, "will provide", subname//":seq_flds_x2o_states", rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
+       call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_fluxes, "will provide", subname//":seq_flds_x2o_fluxes", rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    end if
+
     call shr_nuopc_fldList_Add(fldsToOcn, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -219,10 +318,13 @@ module docn_comp_nuopc
 
     call shr_nuopc_fldList_Zero(fldsFrOcn, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_states, "will provide", subname//":seq_flds_o2x_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_fluxes, "will provide", subname//":seq_flds_o2x_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsFrOcn, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -230,15 +332,18 @@ module docn_comp_nuopc
     ! advertise import and export fields
     !--------------------------------
 
-    call shr_nuopc_fldList_Advertise(importState, fldsToOcn, subname//':docnImport', rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (ocn_prognostic) then
+       call shr_nuopc_fldList_Advertise(importState, fldsToOcn, subname//':docnImport', rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    end if
+
     call shr_nuopc_fldList_Advertise(exportState, fldsFrOcn, subname//':docnExport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine InitializeAdvertise
-  
+
   !===============================================================================
 
   subroutine InitializeRealize(gcomp, importState, exportState, clock, rc)
@@ -247,120 +352,140 @@ module docn_comp_nuopc
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
     integer, intent(out) :: rc
-    
-    ! local variables    
-    integer(IN)      :: MCTID
-    character(CL)    :: NLFilename, cvalue
-    integer(IN)      :: phase, lmpicom, ierr
-    character(ESMF_MAXSTR) :: convCIM, purpComp
-    type(ESMF_Grid)  :: Egrid
-    type(ESMF_Mesh)  :: Emesh
-    integer          :: nx_global, ny_global
-    real(r8)         :: nextsw_cday
-    integer          :: shrlogunit, shrloglev
-    type(ESMF_VM)    :: vm
-    logical          :: connected
-    integer          :: n
+
+    ! local variables
+    integer(IN)              :: phase
+    character(ESMF_MAXSTR)   :: convCIM, purpComp
+    type(ESMF_Grid)          :: Egrid
+    type(ESMF_Mesh)          :: Emesh
+    integer                  :: nx_global, ny_global
+    type(ESMF_VM)            :: vm
+    integer                  :: n
+    character(CL)            :: cvalue
+    integer(IN)              :: shrlogunit                ! original log unit
+    integer(IN)              :: shrloglev                 ! original log level
+    logical                  :: read_restart              ! start from restart
+    integer(IN)              :: ierr                      ! error code
+    logical                  :: scmMode = .false.         ! single column mode
+    real(R8)                 :: scmLat  = shr_const_SPVAL ! single column lat
+    real(R8)                 :: scmLon  = shr_const_SPVAL ! single column lon
+    logical                  :: connected                 ! is field connected?
     character(len=*),parameter :: subname=trim(modName)//':(InitializeRealize) '
+    !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
 
-    NLFilename = 'unused'
-
-    !--------------------------------
-    ! generate local mpi comm
-    !--------------------------------
-
-    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=__FILE__)) &
-      return  ! bail out
-    call ESMF_VMGet(vm, mpiCommunicator=lmpicom, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=__FILE__)) &
-      return  ! bail out
-    call MPI_Comm_Dup(lmpicom, mpicom, ierr)
-
-    call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=__FILE__)) &
-      return  ! bail out
-    read(cvalue,*) MCTID  ! convert from string to integer
-
-    phase = 1
-
-    if (phase == 1) then
-       unpack_import = .false.
-       do n = 1,fldsToOcn%num
-          connected = NUOPC_IsConnected(importState, fieldName=fldsToOcn%shortname(n))
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) call shr_sys_abort()
-          if (connected) unpack_import = .true.
-       end do
-       if (.not. unpack_import) then
-          call ESMF_LogWrite(trim(subname)//": will not unpack import state ", ESMF_LOGMSG_INFO, rc=dbrc)
-       end if
-
-       !--------------------------------
-       ! setup cdata for use inside data model
-       ! initialize cleanly on data model side
-       ! don't use seq_cdata_init as it grabs stuff from seq_comm
-       !--------------------------------
-       cdata%name     =  'docn'
-       cdata%ID       =  MCTID
-       cdata%mpicom   =  mpicom
-       cdata%dom      => ggrid
-       cdata%gsMap    => gsMap
-       cdata%infodata => infodata
-       !-------------------------
-       call MPI_COMM_RANK(mpicom, iam, rc)
-       call shr_nuopc_dmodel_AttrCopyToInfodata(gcomp, infodata, rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-       call seq_infodata_PutData(infodata,ocn_phase=phase)
-    else
-       call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-    endif
-
-    !--------------------------------
-    ! call init routine
-    !--------------------------------
-
-    call docn_comp_init(clock, cdata, x2d, d2x, NLFilename)
+    !----------------------------------------------------------------------------
+    ! Reset shr logging to my log file
+    !----------------------------------------------------------------------------
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
     call shr_file_setLogUnit (logunit)
+
+    !----------------------------------------------------------------------------
+    ! Read input namelists and set present and prognostic flags
+    !----------------------------------------------------------------------------
+
+    phase = 1  !TODO - this is hard-wired for now and needs to be generalized
+
+    if (phase .ne. 1) then
+       if (ocn_prognostic) then
+          do n = 1,fldsToOcn%num
+             connected = NUOPC_IsConnected(importState, fieldName=fldsToOcn%shortname(n))
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) call shr_sys_abort()
+             if (.not. connected) then
+                call shr_sys_abort("Ocn prognostic .true. requires connection for " // trim(fldsToOcn%shortname(n)))
+             end if
+          end do
+          call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+       end if
+    endif
+
+    !--------------------------------
+    ! call docn init routine
+    !--------------------------------
+
+    gsmap => gsmap_target
+    ggrid => ggrid_target
+
+    call NUOPC_CompAttributeGet(gcomp, name='scmlon', value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, &
+         file=u_FILE_u)) &
+         return  ! bail out
+    read(cvalue,*) scmlon
+
+    call NUOPC_CompAttributeGet(gcomp, name='scmlat', value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, &
+         file=u_FILE_u)) &
+         return  ! bail out
+    read(cvalue,*) scmlat
+
+    call NUOPC_CompAttributeGet(gcomp, name='single_column', value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, &
+         file=u_FILE_u)) &
+         return  ! bail out
+    read(cvalue,*) scmMode
+
+    call NUOPC_CompAttributeGet(gcomp, name='read_restart', value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, &
+         file=u_FILE_u)) &
+         return  ! bail out
+    read(cvalue,*) read_restart
+
+    call docn_comp_init(clock, x2d, d2x, &
+         seq_flds_x2o_fields, seq_flds_o2x_fields, &
+         SDOCN, gsmap, ggrid, mpicom, compid, my_task, master_task, &
+         inst_suffix, inst_name, logunit, read_restart, &
+         scmMode, scmlat, scmlon)
 
     !--------------------------------
     ! generate the grid or mesh from the gsmap and ggrid
     ! grid_option specifies grid or mesh
     !--------------------------------
 
-    call seq_infodata_GetData(infodata, ocn_nx=nx_global, ocn_ny=ny_global)
-    call shr_nuopc_dmodel_gridinit(nx_global,ny_global,mpicom,gsMap,ggrid,grid_option,EGrid,Emesh,rc)
+    nx_global = SDOCN%nxg
+    ny_global = SDOCN%nyg
+    call shr_nuopc_dmodel_gridinit(nx_global, ny_global, mpicom, gsMap, ggrid, grid_option, EGrid, Emesh, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
-    ! realize the actively coupled fields
+    ! realize the actively coupled fields, now that a grid or mesh is established
+    ! Note: shr_nuopc_fldList_Realize does the following:
+    ! 1) loops over all of the entries in fldsToOcn and creates a field
+    !    for each one via one of the following commands:
+    !     field = ESMF_FieldCreate(grid, ESMF_TYPEKIND_R8, name=fldlist%shortname(n), rc=rc)
+    !     field = ESMF_FieldCreate(mesh, ESMF_TYPEKIND_R8, name=fldlist%shortname(n), meshloc=ESMF_MESHLOC_ELEMENT, rc=rc)
+    ! 2) realizes the field via the following call
+    !     call NUOPC_Realize(state, field=field, rc=rc)
+    !    where state is either importState or exportState
+    !  NUOPC_Realize "realizes" a previously advertised field in the importState and exportState
+    !  by replacing the advertised fields with the fields in fldsToOcn of the same name.
     !--------------------------------
 
     if (grid_option == 'mesh') then
 
-      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+       if (ocn_prognostic) then
+          call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+       end if
+       call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     else
 
-      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+       if (ocn_prognostic) then
+          call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+       end if
+       call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     endif
 
@@ -373,14 +498,12 @@ module docn_comp_nuopc
     call shr_nuopc_dmodel_AvectToState(d2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(1.0_r8,         seq_flds_scalar_index_present, exportState, mpicom, rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-    call shr_nuopc_methods_State_SetScalar(0.0_r8,         seq_flds_scalar_index_prognostic, exportState, mpicom, rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     call shr_nuopc_methods_State_SetScalar(dble(ny_global),seq_flds_scalar_index_nx, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+
     call shr_nuopc_methods_State_SetScalar(dble(nx_global),seq_flds_scalar_index_ny, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+
     call shr_nuopc_methods_State_SetScalar(0.0_r8,         seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
@@ -443,7 +566,7 @@ module docn_comp_nuopc
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine InitializeRealize
-  
+
   !===============================================================================
 
 #if (1 == 0)
@@ -451,7 +574,7 @@ module docn_comp_nuopc
     implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-    
+
     ! local variables
     type(ESMF_Clock)            :: mclock,dclock
     type(ESMF_Time)             :: dcurrtime, dstarttime, dstoptime
@@ -487,7 +610,7 @@ module docn_comp_nuopc
       line=__LINE__, &
       file=u_FILE_u)) &
       return  ! bail out
- 
+
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine SetClock
@@ -498,21 +621,20 @@ module docn_comp_nuopc
     implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-    
+
     ! local variables
-    type(ESMF_Clock)              :: clock
-    type(ESMF_Time)               :: time
-    type(ESMF_State)              :: importState, exportState
-    integer  :: CurrentYMD, CurrentTOD, yy, mm, dd, stepno, idt
-    integer  :: shrlogunit, shrloglev
-    real(r8) :: value
-    real(r8) :: nextsw_cday
-    character(len=128) :: calendar
+    type(ESMF_Clock)         :: clock
+    type(ESMF_State)         :: importState, exportState
+    integer(IN)              :: shrlogunit   ! original log unit
+    integer(IN)              :: shrloglev    ! original log level
+    character(CL)            :: case_name    ! case name
+    logical                  :: read_restart ! start from restart
     character(len=*),parameter  :: subname=trim(modName)//':(ModelAdvance) '
+    !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
-    
+
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
     call shr_file_setLogLevel(max(shrloglev,1))
@@ -546,7 +668,9 @@ module docn_comp_nuopc
     ! Run model
     !--------------------------------
 
-    call docn_comp_run(clock, cdata, x2d, d2x)
+    call docn_comp_run(clock, x2d, d2x, &
+       SDOCN, gsmap, ggrid, mpicom, compid, my_task, master_task, &
+       inst_suffix, logunit, read_restart, case_name)
 
     !--------------------------------
     ! Pack export state
@@ -603,10 +727,11 @@ module docn_comp_nuopc
     type(ESMF_Alarm)         :: dalarm
     integer                  :: alarmcount, n
     character(len=*),parameter :: subname=trim(modName)//':(ModelSetRunClock) '
+    !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
-    
+
     ! query the Component for its clock, importState and exportState
     call NUOPC_ModelGet(gcomp, driverClock=dclock, modelClock=mclock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -678,25 +803,24 @@ module docn_comp_nuopc
     implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-    
+
     ! local variables
     character(len=*),parameter  :: subname=trim(modName)//':(ModelFinalize) '
+    !-------------------------------------------------------------------------------
 
     !--------------------------------
-    ! Finalize routine 
+    ! Finalize routine
     !--------------------------------
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
-    
-    call docn_comp_final()
+
+    call docn_comp_final(my_task, master_task, logunit)
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine ModelFinalize
 
   !===============================================================================
-
-#endif
 
 end module docn_comp_nuopc

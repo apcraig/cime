@@ -498,7 +498,17 @@ module datm_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
-    ! realize the actively coupled fields
+    ! realize the actively coupled fields, now that a grid or mesh is established
+    ! Note: shr_nuopc_fldList_Realize does the following:
+    ! 1) loops over all of the entries in fldsToOcn and creates a field
+    !    for each one via one of the following commands:
+    !     field = ESMF_FieldCreate(grid, ESMF_TYPEKIND_R8, name=fldlist%shortname(n), rc=rc)
+    !     field = ESMF_FieldCreate(mesh, ESMF_TYPEKIND_R8, name=fldlist%shortname(n), meshloc=ESMF_MESHLOC_ELEMENT, rc=rc)
+    ! 2) realizes the field via the following call
+    !     call NUOPC_Realize(state, field=field, rc=rc)
+    !    where state is either importState or exportState
+    !  NUOPC_Realize "realizes" a previously advertised field in the importState and exportState
+    !  by replacing the advertised fields with the fields in fldsToOcn of the same name.
     !--------------------------------
 
     if (grid_option == 'mesh') then
