@@ -1275,7 +1275,6 @@ module MED
 
         elseif (fieldStatus==ESMF_FIELDSTATUS_COMPLETE) then
 
-          write(6,*)'DEBUG: fieldStatus is ',fieldStatus
           call ESMF_LogWrite(trim(subname)//trim(string)//": no grid provided for "//trim(fieldNameList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
 
         else
