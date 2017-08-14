@@ -4,20 +4,19 @@ module satm_comp_nuopc
   ! satm_comp_nuopc Component.
   !-----------------------------------------------------------------------------
 
-#ifdef NUOPC_INTERFACE 
   use ESMF
   use NUOPC
   use NUOPC_Model, &
     model_routine_SS    => SetServices, &
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Advance => label_Advance
- 
+
   implicit none
-  
+
   private
-  
+
   public SetServices
-  
+
   !----- formats -----
   character(*),parameter :: modName =  "(satm_comp_nuopc)"
   character(*),parameter :: u_FILE_u = &
@@ -26,15 +25,15 @@ module satm_comp_nuopc
   !-----------------------------------------------------------------------------
   contains
   !-----------------------------------------------------------------------------
-  
+
   subroutine SetServices(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-    
+
     character(len=*),parameter :: subname=trim(modName)//':(SetServices) '
 
     rc = ESMF_SUCCESS
-    
+
     ! the NUOPC model component will register the generic methods
     call NUOPC_CompDerive(gcomp, model_routine_SS, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -54,15 +53,15 @@ module satm_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=u_FILE_u)) &
-      return  ! bail out                                                                                                    
+      return  ! bail out
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetRunClock, &
       specRoutine=ModelSetRunClock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=u_FILE_u)) &
-      return  ! bail out                                                                                                     
+      return  ! bail out
   end subroutine SetServices
-  
+
   !-----------------------------------------------------------------------------
 
   subroutine ModelSetRunClock(gcomp, rc)
@@ -78,7 +77,7 @@ module satm_comp_nuopc
     character(len=*),parameter :: subname=trim(modName)//':(ModelSetRunClock) '
 
     rc = ESMF_SUCCESS
-    
+
     ! query the Component for its clock, importState and exportState
     call NUOPC_ModelGet(gcomp, driverClock=dclock, modelClock=mclock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -108,11 +107,10 @@ module satm_comp_nuopc
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
     character(len=*),parameter :: subname=trim(modName)//':(ModelAdvance) '
-    
+
     rc = ESMF_SUCCESS
-    
+
   end subroutine ModelAdvance
 
   !-----------------------------------------------------------------------------
-#endif
 end module satm_comp_nuopc

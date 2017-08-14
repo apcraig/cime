@@ -66,12 +66,14 @@ def build_xcpl_lib(argv, compclass):
 
         cimeroot  = case.get_value("CIMEROOT")
 
+        driver = case.get_value("COMP_INTERFACE").lower()
+
         # Write directory list
         compname = "x" + compclass
         with open('Filepath', 'w') as out:
             out.write(os.path.join(caseroot, "SourceMods", "src.{}", compname) + "\n")
             out.write(os.path.join(cimeroot, "src", "components", "xcpl_comps", "xshare") + "\n")
-            out.write(os.path.join(cimeroot, "src", "components", "xcpl_comps",compname, "cpl") + "\n")
+            out.write(os.path.join(cimeroot, "src", "components", "xcpl_comps", compname, driver) + "\n")
 
         # Build the component
         run_gmake(case, compclass, libroot)
@@ -86,12 +88,14 @@ def build_stub_lib(argv, compclass):
 
         cimeroot = case.get_value("CIMEROOT")
 
+        driver = case.get_value("COMP_INTERFACE").lower()
+
         # Write directory list
         compname = "s" + compclass
         with open('Filepath', 'w') as out:
             out.write(os.path.join(caseroot, "SourceMods", "src.{}", compname) + "\n")
             out.write(os.path.join(cimeroot, "src", "components", "stub_comps", "xshare") + "\n")
-            out.write(os.path.join(cimeroot, "src", "components", "stub_comps",compname, "cpl") + "\n")
+            out.write(os.path.join(cimeroot, "src", "components", "stub_comps", compname, driver) + "\n")
 
         # Build the component
         run_gmake(case, compclass, libroot)

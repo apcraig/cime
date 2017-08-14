@@ -61,14 +61,7 @@ module cesm_init_mod
   use seq_timemgr_mod, only: EClock_w => seq_timemgr_Eclock_w
   use seq_timemgr_mod, only: EClock_e => seq_timemgr_Eclock_e
 
-  !----------------------------------------------------------------------------
-  ! "infodata" gathers various control flags into one datatype
-  !----------------------------------------------------------------------------
-  use seq_infodata_mod, only: seq_infodata_putData, seq_infodata_GetData
-  use seq_infodata_mod, only: seq_infodata_init1, seq_infodata_init2
-  use seq_infodata_mod, only: seq_infodata_orb_variable_year
-  use seq_infodata_mod, only: seq_infodata_orb_fixed_year
-  use seq_infodata_mod, only: seq_infodata_orb_fixed_parameters
+  use seq_infodata_mod, only: seq_infodata_init1, seq_infodata_init2, seq_infodata_putdata
   use seq_infodata_mod, only: infodata=>seq_infodata_infodata
 
   !----------------------------------------------------------------------------
@@ -77,7 +70,7 @@ module cesm_init_mod
   use seq_flds_mod, only : seq_flds_set
 
   !----------------------------------------------------------------------------
-  ! timing routines 
+  ! timing routines
   !----------------------------------------------------------------------------
   use t_drv_timers_mod
 
@@ -93,6 +86,16 @@ module cesm_init_mod
   public :: mpicom_GLOID
 
 #include <mpif.h>
+
+  !----------------------------------------------------------------------------
+  ! "infodata" gathers various control flags into one datatype
+  !----------------------------------------------------------------------------
+  character(len=*), public, parameter :: seq_infodata_start_type_start     = "startup"
+  character(len=*), public, parameter :: seq_infodata_start_type_cont      = "continue"
+  character(len=*), public, parameter :: seq_infodata_start_type_brnch     = "branch"
+  character(len=*), public, parameter :: seq_infodata_orb_fixed_year       = 'fixed_year'
+  character(len=*), public, parameter :: seq_infodata_orb_variable_year    = 'variable_year'
+  character(len=*), public, parameter :: seq_infodata_orb_fixed_parameters = 'fixed_parameters'
 
   !----------------------------------------------------------------------------
   ! communicator groups and related
@@ -156,9 +159,9 @@ contains
     ! USES:
     use pio             , only: file_desc_t, pio_closefile, pio_file_is_open
     use shr_pio_mod     , only: shr_pio_init1, shr_pio_init2
-    use shr_const_mod   , only: shr_const_tkfrz, shr_const_tktrip 
+    use shr_const_mod   , only: shr_const_tkfrz, shr_const_tktrip
     use shr_const_mod   , only: shr_const_mwwv, shr_const_mwdair
-    use shr_wv_sat_mod  , only: shr_wv_sat_set_default, shr_wv_sat_init 
+    use shr_wv_sat_mod  , only: shr_wv_sat_set_default, shr_wv_sat_init
     use shr_wv_sat_mod  , only: ShrWVSatTableSpec, shr_wv_sat_make_tables
     use shr_wv_sat_mod,   only: shr_wv_sat_get_scheme_idx, shr_wv_sat_valid_idx
     use shr_orb_mod     , only: SHR_ORB_UNDEF_INT, SHR_ORB_UNDEF_REAL, shr_orb_params
@@ -230,7 +233,6 @@ contains
     logical                         :: single_column         ! scm mode logical
     real(SHR_KIND_R8)               :: scmlon                ! single column lon
     real(SHR_KIND_R8)               :: scmlat                ! single column lat
-    logical                         :: aqua_planet           ! aqua planet mode (cam only)
     logical                         :: atm_aero              ! atm provides aerosol data
     type(file_desc_t)               :: pioid
     integer                         :: maxthreads
@@ -239,11 +241,11 @@ contains
     logical                         :: wv_sat_use_tables
     real(SHR_KIND_R8)               :: wv_sat_table_spacing
     character(SHR_KIND_CL)          :: errstring
-    character(SHR_KIND_CL)          :: cvalue  
+    character(SHR_KIND_CL)          :: cvalue
     type(ShrWVSatTableSpec)         :: liquid_spec
     type(ShrWVSatTableSpec)         :: ice_spec
     type(ShrWVSatTableSpec)         :: mixed_spec
-    integer                         :: comp_id(num_inst_total) 
+    integer                         :: comp_id(num_inst_total)
     integer                         :: comp_comm(num_inst_total)
     integer                         :: comp_comm_iam(num_inst_total)
     logical                         :: comp_iamin(num_inst_total)
@@ -512,41 +514,41 @@ contains
     ! Initialize infodata
     !----------------------------------------------------------
 
-    call seq_infodata_init1(infodata, driver, GLOID)
+    call seq_infodata_init1(infodata, GLOID)
 
     !----------------------------------------------------------
-    ! Add atm_aero to driver attributes 
+    ! Add atm_aero to driver attributes
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeAdd(driver, attrList=(/'atm_aero'/), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     ! set initial value to .false.
     ! Note currently this is a duplicate setting of what is done in infodata
     call NUOPC_CompAttributeSet(driver, name='atm_aero', value='.false.', rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     !----------------------------------------------------------
     ! Deterine same grid attributes
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name="atm_gnam", value=atm_gnam, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeGet(driver, name="lnd_gnam", value=lnd_gnam, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeGet(driver, name="rof_gnam", value=rof_gnam, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeGet(driver, name="ice_gnam", value=ice_gnam, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeGet(driver, name="ocn_gnam", value=ocn_gnam, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeGet(driver, name="wav_gnam", value=wav_gnam, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     samegrid_ao  = '.true.'
     samegrid_al  = '.true.'
@@ -582,43 +584,43 @@ contains
     call NUOPC_CompAttributeAdd(driver, attrList=(/'samegrid_ao', 'samegrid_al', 'samegrid_lr', &
          'samegrid_oi', 'samegrid_ro', 'samegrid_aw', 'samegrid_ow', 'samegrid_lg', &
          'samegrid_og', 'samegrid_ig', 'samegrid_alo'/), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeSet(driver, name="samegrid_ao", value=samegrid_ao, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeSet(driver, name="samegrid_al", value=samegrid_al, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeSet(driver, name="samegrid_lr", value=samegrid_lr, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeSet(driver, name="samegrid_oi", value=samegrid_oi, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeSet(driver, name="samegrid_ro", value=samegrid_ro, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeSet(driver, name="samegrid_aw", value=samegrid_aw, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeSet(driver, name="samegrid_ow", value=samegrid_ow, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeSet(driver, name="samegrid_lg", value=samegrid_lg, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeSet(driver, name="samegrid_og", value=samegrid_og, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeSet(driver, name="samegrid_ig", value=samegrid_ig, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeSet(driver, name="samegrid_alo", value=samegrid_alo, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     !----------------------------------------------------------
-    ! Check consistency of driver attributes 
+    ! Check consistency of driver attributes
     !----------------------------------------------------------
 
     call driver_attributes_check(driver)
@@ -628,10 +630,10 @@ contains
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name="cime_model", value=cime_model, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call NUOPC_CompAttributeGet(driver, name="cime_model", value=cime_model, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
     if ( trim(cime_model) /= 'acme' .and. trim(cime_model) /= 'cesm') then
        call shr_sys_abort( subname//': cime_model must be set to acme or cesm, aborting')
     end if
@@ -643,7 +645,7 @@ contains
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name="shr_map_dopole", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
     read(cvalue,*) shr_map_dopole
 
     call shr_map_setDopole(shr_map_dopole)
@@ -653,16 +655,16 @@ contains
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name="reprosum_use_ddpdd", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-    read(cvalue,*) reprosum_use_ddpdd 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    read(cvalue,*) reprosum_use_ddpdd
 
     call NUOPC_CompAttributeGet(driver, name="reprosum_diffmax", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-    read(cvalue,*) reprosum_diffmax 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    read(cvalue,*) reprosum_diffmax
 
     call NUOPC_CompAttributeGet(driver, name="reprosum_recompute", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-    read(cvalue,*) reprosum_recompute 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    read(cvalue,*) reprosum_recompute
 
     call shr_reprosum_setopts(repro_sum_use_ddpdd_in=reprosum_use_ddpdd, &
          repro_sum_rel_diff_max_in=reprosum_diffmax, repro_sum_recompute_in=reprosum_recompute)
@@ -672,7 +674,7 @@ contains
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name="cpl_seq_option", value=cpl_seq_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     if (trim(cpl_seq_option) /= 'CESM1_ORIG' .and. &
         trim(cpl_seq_option) /= 'CESM1_ORIG_TIGHT' .and. &
@@ -688,8 +690,8 @@ contains
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name="drv_threading", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-    read(cvalue,*) drv_threading 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    read(cvalue,*) drv_threading
 
     if (drv_threading) then
        if (iamroot_GLOID) write(logunit,*) ' '
@@ -723,11 +725,11 @@ contains
     !-----------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name='start_type', value=start_type, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     ! Check valid values of start type
     call NUOPC_CompAttributeGet(driver, name="start_type", value=start_type, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     if ((trim(start_type) /= start_type_start) .and.  &
         (trim(start_type) /= start_type_cont ) .and.  &
@@ -742,15 +744,15 @@ contains
 
     ! Add rest_case_name and read_restart to driver attributes
     call NUOPC_CompAttributeAdd(driver, attrList=(/'rest_case_name','read_restart'/), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
-    rest_case_name = ' ' 
+    rest_case_name = ' '
     call NUOPC_CompAttributeSet(driver, name='rest_case_name', value=rest_case_name, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     write(cvalue,*) read_restart
     call NUOPC_CompAttributeSet(driver, name='read_restart', value=trim(cvalue), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     !-----------------------------------------------------
     ! Read Restart (seq_io_read must be called on all pes)
@@ -758,7 +760,7 @@ contains
 
     ! Error check on restart_pfile
     call NUOPC_CompAttributeGet(driver, name="restart_pfile", value=restart_pfile, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
     if ( len_trim(restart_pfile) == 0 ) then
        call shr_sys_abort( subname//': restart_pfile must be set' )
     end if
@@ -768,13 +770,13 @@ contains
        if (seq_comm_iamroot(GLOID)) then
 
           call NUOPC_CompAttributeGet(driver, name='restart_file', value=restart_file, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
           if (trim(restart_file) == trim(sp_str)) then
              ! Read pointer file
 
              call NUOPC_CompAttributeGet(driver, name='restart_pfile', value=restart_file, rc=rc)
-             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
              unitn = shr_file_getUnit()
              if (loglevel > 0) write(logunit,"(3A)") subname," read rpointer file ", trim(restart_pfile)
@@ -794,24 +796,21 @@ contains
        call shr_mpi_bcast(restart_file,mpicom_GLOID)
 
        call NUOPC_CompAttributeSet(driver, name='restart_pfile', value=restart_file, rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
        !--- NOTE: use CPLID here because seq_io is only value on CPLID
        if (seq_comm_iamin(CPLID)) then
           call seq_io_read(restart_file, pioid, nextsw_cday   , 'seq_infodata_nextsw_cday')
           call seq_io_read(restart_file, pioid, precip_fact   , 'seq_infodata_precip_fact')
-          call seq_io_read(restart_file ,pioid ,rest_case_name, 'seq_infodata_case_name'  )
        endif
 
        !--- Send from CPLID ROOT to GLOBALID ROOT, use bcast as surrogate
        call shr_mpi_bcast(nextsw_cday    ,mpicom_GLOID, pebcast=seq_comm_gloroot(CPLID))
        call shr_mpi_bcast(precip_fact    ,mpicom_GLOID, pebcast=seq_comm_gloroot(CPLID))
-       call shr_mpi_bcast(rest_case_name ,mpicom_GLOID, pebcast=seq_comm_gloroot(CPLID))
 
        call seq_infodata_putData(infodata, &
             nextsw_cday=nextsw_cday,       &
-            precip_fact=precip_fact,       &
-            rest_case_name=rest_case_name)
+            precip_fact=precip_fact)
     endif
 
     !----------------------------------------------------------
@@ -819,11 +818,11 @@ contains
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name='read_restart', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
     read(cvalue,*) read_restart
 
     call NUOPC_CompAttributeGet(driver, name="restart_file", value=restart_file, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call seq_timemgr_clockInit(seq_SyncClock, nlfilename, &
          read_restart, restart_file, pioid, mpicom_gloid, &
@@ -845,37 +844,37 @@ contains
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name="tfreeze_option", value=tfreeze_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     call shr_frz_freezetemp_init(tfreeze_option)
 
     !----------------------------------------------------------
-    ! Initialize orbital related values 
+    ! Initialize orbital related values
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name="orb_mode", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-    read(cvalue,*) orb_mode 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    read(cvalue,*) orb_mode
 
     call NUOPC_CompAttributeGet(driver, name="orb_iyear", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
     read(cvalue,*) orb_iyear
 
     call NUOPC_CompAttributeGet(driver, name="orb_iyear_align", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
     read(cvalue,*) orb_iyear_align
 
     call NUOPC_CompAttributeGet(driver, name="orb_obliq", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-    read(cvalue,*) orb_obliq 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    read(cvalue,*) orb_obliq
 
     call NUOPC_CompAttributeGet(driver, name="orb_eccen", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-    read(cvalue,*) orb_eccen 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    read(cvalue,*) orb_eccen
 
     call NUOPC_CompAttributeGet(driver, name="orb_mvelp", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-    read(cvalue,*) orb_mvelp 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    read(cvalue,*) orb_mvelp
 
     if (trim(orb_mode) == trim(seq_infodata_orb_fixed_year)) then
        orb_obliq = SHR_ORB_UNDEF_REAL
@@ -934,33 +933,33 @@ contains
        call shr_sys_abort(subname//': orb params incorrect')
     endif
 
-    ! Add updated orbital params to driver attributes 
+    ! Add updated orbital params to driver attributes
 
     call NUOPC_CompAttributeAdd(driver, attrList=(/'orb_obliqr', 'orb_lambm0', 'orb_mvelpp'/), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     write(cvalue,*) orb_eccen
     call NUOPC_CompAttributeSet(driver, name="orb_eccen", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     write(cvalue,*) orb_obliqr
     call NUOPC_CompAttributeSet(driver, name="orb_obliqr", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     write(cvalue,*) orb_lambm0
     call NUOPC_CompAttributeSet(driver, name="orb_lambm0", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     write(cvalue,*) orb_mvelpp
     call NUOPC_CompAttributeSet(driver, name="orb_mvelpp", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     !----------------------------------------------------------
     ! Initialize water vapor info
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name="wv_sat_scheme", value=wv_sat_scheme, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     if (.not. shr_wv_sat_valid_idx(shr_wv_sat_get_scheme_idx(trim(wv_sat_scheme)))) then
        call shr_sys_abort(subname//': "'//trim(wv_sat_scheme)//'" is not a recognized saturation vapor pressure scheme name')
@@ -970,19 +969,19 @@ contains
     end if
 
     call NUOPC_CompAttributeGet(driver, name="wv_sat_transition_start", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-    read(cvalue,*) wv_sat_transition_start 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    read(cvalue,*) wv_sat_transition_start
 
     call shr_assert_in_domain(wv_sat_transition_start, &
          ge=0._SHR_KIND_R8, le=40._SHR_KIND_R8, &
          varname="wv_sat_transition_start", msg="Invalid transition temperature range.")
 
     call NUOPC_CompAttributeGet(driver, name="wv_sat_use_tables", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
-    read(cvalue,*) wv_sat_use_tables 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    read(cvalue,*) wv_sat_use_tables
 
     call NUOPC_CompAttributeGet(driver, name="wv_sat_table_spacing", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
     read(cvalue,*) wv_sat_table_spacing
 
     ! A transition range averaging method in CAM is only valid for:
@@ -1020,33 +1019,25 @@ contains
     !----------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name="single_column", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
     read(cvalue,*) single_column
 
-    call seq_infodata_getData( infodata, aqua_planet=aqua_planet)
-
-    if (.not.aqua_planet .and. single_column) then
+    ! NOTE: cam stand-alone aqua-planet model will no longer be supported here - only the data model aqua-planet
+    ! will be supported
+    if (single_column) then
 
        call NUOPC_CompAttributeGet(driver, name="scmlon", value=cvalue, rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
        read(cvalue,*) scmlon
 
        call NUOPC_CompAttributeGet(driver, name="scmlat", value=cvalue, rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
        read(cvalue,*) scmlat
-
-       call seq_infodata_GetData(infodata, &
-            atm_present=atm_present     , &
-            lnd_present=lnd_present     , &
-            ice_present=ice_present     , &
-            ocn_present=ocn_present     , &
-            glc_present=glc_present     , &
-            rof_present=rof_present     , &
-            wav_present=wav_present     , &
-            esp_present=esp_present)
 
        call seq_comm_getinfo(OCNID(ens1), mpicom=mpicom_OCNID)
 
+       ! TODO: Single column mode needs to be re-implemented - previously all of the xxx_present flags were set
+       ! in seq_infodata calls, reset here and the put back into seq_infodata - this is no longer the case
        call shr_scam_checkSurface(scmlon, scmlat, &
             OCNID(ens1), mpicom_OCNID,            &
             lnd_present=lnd_present,              &
@@ -1056,13 +1047,6 @@ contains
             flood_present=flood_present,          &
             rofice_present=rofice_present)
 
-       call seq_infodata_putData(infodata,  &
-            lnd_present=lnd_present,        &
-            ocn_present=ocn_present,        &
-            ice_present=ice_present,        &
-            rof_present=rof_present,        &
-            flood_present=flood_present,    &
-            rofice_present=rofice_present)
     endif
 
     !----------------------------------------------------------
@@ -1165,7 +1149,7 @@ contains
 
     ! --- Case name and restart case name ------
     ! call NUOPC_CompAttributeGet(driver, name="rest_case_name", value=rest_case_name, rc=rc)
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()  
+    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     ! if ((trim(start_type) == start_type_cont ) .and. (trim(case_name)  /= trim(rest_case_name))) then
     !    write(logunit,'(10a)') subname,' case_name =',trim(case_name),':',' rest_case_name =',trim(rest_case_name),':'

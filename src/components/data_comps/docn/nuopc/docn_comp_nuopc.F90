@@ -74,6 +74,8 @@ module docn_comp_nuopc
   integer(IN)                :: logunit                   ! logging unit number
   integer(IN),parameter      :: master_task=0             ! task number of master task
   logical                    :: ocn_prognostic            ! flag
+  logical                    :: rofice_present            ! flag
+  logical                    :: flood_present             ! flag
   logical                    :: unpack_import
   integer                    :: dbrc
   integer, parameter         :: dbug = 10
@@ -332,10 +334,8 @@ module docn_comp_nuopc
     ! advertise import and export fields
     !--------------------------------
 
-    if (ocn_prognostic) then
-       call shr_nuopc_fldList_Advertise(importState, fldsToOcn, subname//':docnImport', rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    end if
+    call shr_nuopc_fldList_Advertise(importState, fldsToOcn, subname//':docnImport', rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call shr_nuopc_fldList_Advertise(exportState, fldsFrOcn, subname//':docnExport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
@@ -385,7 +385,7 @@ module docn_comp_nuopc
     call shr_file_setLogUnit (logunit)
 
     !----------------------------------------------------------------------------
-    ! Read input namelists and set present and prognostic flags
+    ! If component is prognostic, map ESMF state to attribute vector
     !----------------------------------------------------------------------------
 
     phase = 1  !TODO - this is hard-wired for now and needs to be generalized
@@ -471,19 +471,17 @@ module docn_comp_nuopc
 
     if (grid_option == 'mesh') then
 
-       if (ocn_prognostic) then
-          call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-       end if
+       call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
        call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     else
 
-       if (ocn_prognostic) then
-          call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-       end if
+       call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
        call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -494,6 +492,9 @@ module docn_comp_nuopc
     ! Copy from d2x to exportState
     ! Set the coupling scalars
     !--------------------------------
+
+    !TODO: add ocnrof_prognostic here - if this is true - then will need to route runoff to ocn model - and
+    ! ocn model will need to be prognostic!!! How will this be handled?
 
     call shr_nuopc_dmodel_AvectToState(d2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out

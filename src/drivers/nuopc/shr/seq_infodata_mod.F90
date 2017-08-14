@@ -186,9 +186,9 @@ MODULE seq_infodata_mod
 CONTAINS
 
   !===============================================================================
-  SUBROUTINE seq_infodata_Init1(infodata, driver, ID)
+  SUBROUTINE seq_infodata_Init1(infodata, ID)
 
-    ! !DESCRIPTION: 
+    ! !DESCRIPTION:
     ! Read in input from driver attributes and output derived type for miscillaneous info.
 
     ! !USES:
@@ -196,7 +196,6 @@ CONTAINS
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(seq_infodata_type), intent(INOUT) :: infodata  ! infodata object
-    type(ESMF_GridComp)    , intent(INOUT) :: driver
     integer(SHR_KIND_IN),    intent(IN)    :: ID        ! seq_comm ID
 
     !----- local -----
@@ -1043,7 +1042,7 @@ CONTAINS
 
     use shr_mpi_mod, only : shr_mpi_bcast
 
-    ! !DESCRIPTION: 
+    ! !DESCRIPTION:
     ! Broadcast the pause_resume data from an infodata across pes of mpicom
 
     ! !INPUT/OUTPUT PARAMETERS:
@@ -1104,7 +1103,7 @@ CONTAINS
 
     implicit none
 
-    ! !DESCRIPTION:  
+    ! !DESCRIPTION:
     ! Broadcast an infodata across pes of mpicom
 
     ! !INPUT/OUTPUT PARAMETERS:

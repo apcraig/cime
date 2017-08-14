@@ -73,7 +73,6 @@ module dice_comp_nuopc
   character(len=16)          :: inst_suffix = ""          ! char string associated with instance (ie. "_0001" or "")
   integer(IN)                :: logunit                   ! logging unit number
   integer(IN),parameter      :: master_task=0             ! task number of master task
-  logical                    :: ice_present               ! flag
   logical                    :: ice_prognostic            ! flag
   logical                    :: unpack_import
   integer                    :: dbrc
@@ -201,6 +200,7 @@ module dice_comp_nuopc
     integer, intent(out) :: rc
 
     ! local variables
+    logical       :: ice_present ! flag
     type(ESMF_VM) :: vm
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
@@ -296,19 +296,19 @@ module dice_comp_nuopc
     ! create import fields list
     !--------------------------------
 
-    if (ice_prognostic) then
-       call shr_nuopc_fldList_Zero(fldsToIce, rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    call shr_nuopc_fldList_Zero(fldsToIce, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
+    if (ice_prognostic) then
        call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_states, "will provide", subname//":seq_flds_x2i_states", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
        call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_fluxes, "will provide", subname//":seq_flds_x2i_fluxes", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_Add(fldsToIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
+
+    call shr_nuopc_fldList_Add(fldsToIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! create export fields list
@@ -330,10 +330,8 @@ module dice_comp_nuopc
     ! advertise import and export fields
     !--------------------------------
 
-    if (ice_prognostic) then
-       call shr_nuopc_fldList_Advertise(importState, fldsToIce, subname//':diceImport', rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    end if
+    call shr_nuopc_fldList_Advertise(importState, fldsToIce, subname//':diceImport', rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call shr_nuopc_fldList_Advertise(exportState, fldsFrIce, subname//':diceExport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
@@ -456,7 +454,7 @@ module dice_comp_nuopc
     !--------------------------------
     ! realize the actively coupled fields, now that a grid or mesh is established
     ! Note: shr_nuopc_fldList_Realize does the following:
-    ! 1) loops over all of the entries in fldsToOcn and creates a field
+    ! 1) loops over all of the entries in fldsToIce and creates a field
     !    for each one via one of the following commands:
     !     field = ESMF_FieldCreate(grid, ESMF_TYPEKIND_R8, name=fldlist%shortname(n), rc=rc)
     !     field = ESMF_FieldCreate(mesh, ESMF_TYPEKIND_R8, name=fldlist%shortname(n), meshloc=ESMF_MESHLOC_ELEMENT, rc=rc)
@@ -464,24 +462,22 @@ module dice_comp_nuopc
     !     call NUOPC_Realize(state, field=field, rc=rc)
     !    where state is either importState or exportState
     !  NUOPC_Realize "realizes" a previously advertised field in the importState and exportState
-    !  by replacing the advertised fields with the fields in fldsToOcn of the same name.
+    !  by replacing the advertised fields with the fields in fldsToIce of the same name.
     !--------------------------------
 
     if (grid_option == 'mesh') then
 
-       if (ice_prognostic) then
-          call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-       end if
+       call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
        call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrIce, tag=subname//':diceExport', rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     else
 
-       if (ice_prognostic) then
-          call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-       end if
+       call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
        call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrIce, tag=subname//':diceExport', rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
