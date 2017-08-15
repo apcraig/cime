@@ -3894,7 +3894,7 @@ module shr_nuopc_methods_mod
         if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
         call seq_infodata_putData(infodata,atm_nx=nint(data(seq_flds_scalar_index_nx)), &
                                            atm_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           atm_aero=(nint(data(seq_flds_scalar_index_prognostic))/=0), &
+                                           atm_aero=(nint(data(seq_flds_scalar_index_atm_aero))/=0), &
                                            dead_comps=dead_comps, &
                                            nextsw_cday=data(seq_flds_scalar_index_nextsw_cday))
 

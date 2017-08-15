@@ -46,8 +46,8 @@ MODULE seq_infodata_mod
   type seq_infodata_type
      private     ! This type is opaque
 
-     !--- set via components and held fixed ---
-     logical                 :: atm_prognostic          ! does component model need input data from driver
+     !--- set via components and held fixed after initialization ---
+     logical                 :: dead_comps              ! do we have dead models
      logical                 :: rofice_present          ! does rof have iceberg coupling on
      logical                 :: rof_prognostic          ! does rof component need input data
      logical                 :: flood_present           ! does rof have flooding on
@@ -57,7 +57,6 @@ MODULE seq_infodata_mod
      logical                 :: glcocn_present          ! does glc have ocean runoff on
      logical                 :: glcice_present          ! does glc have iceberg coupling on
      logical                 :: glc_coupled_fluxes      ! does glc send fluxes to other components (only relevant if glc_present is .true.)
-     logical                 :: dead_comps              ! do we have dead models
      integer(SHR_KIND_IN)    :: atm_nx                  ! nx, ny of "2d" grid
      integer(SHR_KIND_IN)    :: atm_ny                  ! nx, ny of "2d" grid
      integer(SHR_KIND_IN)    :: lnd_nx                  ! nx, ny of "2d" grid
@@ -89,19 +88,9 @@ MODULE seq_infodata_mod
 
      !--- set by driver and may be time varying
      logical                 :: glc_valid_input = .true.  ! is valid accumulated data being sent to prognostic glc
-
   end type seq_infodata_type
 
   type (seq_infodata_type), target :: seq_infodata_infodata ! single instance for cpl and all comps
-
-  ! --- public interfaces --------------------------------------------------------
-  interface seq_infodata_GetData
-     module procedure seq_infodata_GetData_explicit
-  end interface seq_infodata_GetData
-
-  interface seq_infodata_PutData
-     module procedure seq_infodata_PutData_explicit
-  end interface seq_infodata_PutData
   !===============================================================================
 
 CONTAINS
@@ -110,10 +99,7 @@ CONTAINS
   SUBROUTINE seq_infodata_Init1(infodata, ID)
 
     ! !DESCRIPTION:
-    ! Read in input from driver attributes and output derived type for miscillaneous info.
-
-    ! !USES:
-    use seq_timemgr_mod, only : seq_timemgr_pause_active
+    ! Initialize pause_resume
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(seq_infodata_type), intent(INOUT) :: infodata  ! infodata object
@@ -122,10 +108,6 @@ CONTAINS
     !----- local -----
     character(len=*),    parameter :: subname = '(seq_infodata_Init1) '
     !-------------------------------------------------------------------------------
-
-    !---------------------------------------------------------------
-    ! Set via components during runtime and may be time varying
-    !---------------------------------------------------------------
 
     if (associated(infodata%pause_resume)) then
        deallocate(infodata%pause_resume)
@@ -137,7 +119,7 @@ CONTAINS
   !===============================================================================
   SUBROUTINE seq_infodata_Init2(infodata)
 
-    ! !DESCRIPTION: Initialize infodata items that depend on the time manager setup
+    ! !DESCRIPTION: re-initialize pause-resume depending on the time manager setup
 
     ! !USES:
     use seq_timemgr_mod, only : seq_timemgr_pause_active
@@ -154,9 +136,8 @@ CONTAINS
   END SUBROUTINE seq_infodata_Init2
 
   !===============================================================================
-  SUBROUTINE seq_infodata_GetData_explicit( infodata, &
+  SUBROUTINE seq_infodata_GetData( infodata, &
        flux_epbal              , &
-       atm_prognostic          , &
        ocnrof_prognostic       , &
        glc_coupled_fluxes      , &
        flood_present           , &
@@ -164,6 +145,7 @@ CONTAINS
        glclnd_present          , &
        glcocn_present          , &
        glcice_present          , &
+       glc_valid_input         , &
        iceberg_prognostic      , &
        dead_comps              , &
        flux_epbalfact          , &
@@ -199,8 +181,7 @@ CONTAINS
        glc_resume              , &
        rof_resume              , &
        wav_resume              , &
-       cpl_resume              , &
-       glc_valid_input)
+       cpl_resume              )
 
     implicit none
 
@@ -211,7 +192,6 @@ CONTAINS
     type(seq_infodata_type),          intent(IN)  :: infodata                ! Input CCSM structure
     character(SHR_KIND_CL), optional, intent(IN)  :: flux_epbal     ! selects E,P,R adjustment technique
     logical,                optional, intent(OUT) :: dead_comps              ! do we have dead models
-    logical,                optional, intent(OUT) :: atm_prognostic          ! need data
     logical,                optional, intent(OUT) :: rofice_present
     logical,                optional, intent(OUT) :: flood_present
     logical,                optional, intent(OUT) :: ocnrof_prognostic
@@ -257,12 +237,11 @@ CONTAINS
     character(SHR_KIND_CL), optional, intent(OUT) :: cpl_resume ! cpl read resume state
 
     !----- local -----
-    character(len=*), parameter :: subname = '(seq_infodata_GetData_explicit) '
+    character(len=*), parameter :: subname = '(seq_infodata_GetData) '
 
     !-------------------------------------------------------------------------------
 
     if ( present(dead_comps)          ) dead_comps         = infodata%dead_comps
-    if ( present(atm_prognostic)      ) atm_prognostic     = infodata%atm_prognostic
     if ( present(rofice_present)      ) rofice_present     = infodata%rofice_present
     if ( present(flood_present)       ) flood_present      = infodata%flood_present
     if ( present(ocnrof_prognostic)   ) ocnrof_prognostic  = infodata%ocnrof_prognostic
@@ -271,6 +250,10 @@ CONTAINS
     if ( present(glcocn_present)      ) glcocn_present     = infodata%glcocn_present
     if ( present(glcice_present)      ) glcice_present     = infodata%glcice_present
     if ( present(glc_coupled_fluxes)  ) glc_coupled_fluxes = infodata%glc_coupled_fluxes
+    if ( present(glc_valid_input)     ) glc_valid_input    = infodata%glc_valid_input
+    if ( present(atm_aero)            ) atm_aero           = infodata%atm_aero
+    if ( present(nextsw_cday)         ) nextsw_cday        = infodata%nextsw_cday
+    if ( present(precip_fact)         ) precip_fact        = infodata%precip_fact
     if ( present(atm_nx)              ) atm_nx             = infodata%atm_nx
     if ( present(atm_ny)              ) atm_ny             = infodata%atm_ny
     if ( present(lnd_nx)              ) lnd_nx             = infodata%lnd_nx
@@ -285,8 +268,6 @@ CONTAINS
     if ( present(glc_ny)              ) glc_ny             = infodata%glc_ny
     if ( present(wav_nx)              ) wav_nx             = infodata%wav_nx
     if ( present(wav_ny)              ) wav_ny             = infodata%wav_ny
-    if ( present(nextsw_cday)         ) nextsw_cday        = infodata%nextsw_cday
-    if ( present(precip_fact)         ) precip_fact        = infodata%precip_fact
     if ( present(atm_phase)           ) atm_phase          = infodata%atm_phase
     if ( present(lnd_phase)           ) lnd_phase          = infodata%lnd_phase
     if ( present(ice_phase)           ) ice_phase          = infodata%ice_phase
@@ -295,7 +276,6 @@ CONTAINS
     if ( present(rof_phase)           ) rof_phase          = infodata%rof_phase
     if ( present(wav_phase)           ) wav_phase          = infodata%wav_phase
     if ( present(esp_phase)           ) esp_phase          = infodata%esp_phase
-    if ( present(atm_aero)            ) atm_aero           = infodata%atm_aero
 
     if ( present(flux_epbalfact) ) then
        if (.not. present(flux_epbal)) then
@@ -313,6 +293,7 @@ CONTAINS
           flux_epbalfact = 1.0_SHR_KIND_R8
        end if
     endif
+
     if ( present(atm_resume) ) then
        if (associated(infodata%pause_resume)) then
           atm_resume(:)  = infodata%pause_resume%atm_resume(:)
@@ -369,13 +350,11 @@ CONTAINS
           cpl_resume = ' '
        end if
     end if
-    if ( present(glc_valid_input)) glc_valid_input = infodata%glc_valid_input
 
-  END SUBROUTINE seq_infodata_GetData_explicit
+  END SUBROUTINE seq_infodata_GetData
 
   !===============================================================================
-  SUBROUTINE seq_infodata_PutData_explicit( infodata , &
-       atm_prognostic          , &
+  SUBROUTINE seq_infodata_PutData( infodata , &
        ocnrof_prognostic       , &
        glc_coupled_fluxes      , &
        flood_present           , &
@@ -427,7 +406,6 @@ CONTAINS
     ! !INPUT/OUTPUT PARAMETERS:
     type(seq_infodata_type),          intent(INOUT) :: infodata                ! Input CCSM structure
     logical,                optional, intent(IN) :: dead_comps     ! do we have dead models
-    logical,                optional, intent(IN) :: atm_prognostic ! need data
     logical,                optional, intent(IN) :: rofice_present
     logical,                optional, intent(IN) :: flood_present
     logical,                optional, intent(IN) :: ocnrof_prognostic
@@ -436,6 +414,10 @@ CONTAINS
     logical,                optional, intent(IN) :: glcocn_present
     logical,                optional, intent(IN) :: glcice_present
     logical,                optional, intent(IN) :: glc_coupled_fluxes
+    logical,                optional, intent(IN) :: glc_valid_input
+    logical,                optional, intent(IN) :: atm_aero       ! atm aerosols
+    real(SHR_KIND_R8),      optional, intent(IN) :: nextsw_cday    ! calendar of next atm shortwave
+    real(SHR_KIND_R8),      optional, intent(IN) :: precip_fact    ! precip factor
     integer(SHR_KIND_IN),   optional, intent(IN) :: atm_nx         ! nx,ny 2d grid size global
     integer(SHR_KIND_IN),   optional, intent(IN) :: atm_ny         ! nx,ny 2d grid size global
     integer(SHR_KIND_IN),   optional, intent(IN) :: lnd_nx
@@ -450,8 +432,6 @@ CONTAINS
     integer(SHR_KIND_IN),   optional, intent(IN) :: glc_ny
     integer(SHR_KIND_IN),   optional, intent(IN) :: wav_nx
     integer(SHR_KIND_IN),   optional, intent(IN) :: wav_ny
-    real(SHR_KIND_R8),      optional, intent(IN) :: nextsw_cday    ! calendar of next atm shortwave
-    real(SHR_KIND_R8),      optional, intent(IN) :: precip_fact    ! precip factor
     integer(SHR_KIND_IN),   optional, intent(IN) :: atm_phase      ! atm phase
     integer(SHR_KIND_IN),   optional, intent(IN) :: lnd_phase      ! lnd phase
     integer(SHR_KIND_IN),   optional, intent(IN) :: ice_phase      ! ice phase
@@ -460,8 +440,6 @@ CONTAINS
     integer(SHR_KIND_IN),   optional, intent(IN) :: rof_phase      ! rof phase
     integer(SHR_KIND_IN),   optional, intent(IN) :: wav_phase      ! wav phase
     integer(SHR_KIND_IN),   optional, intent(IN) :: esp_phase      ! esp phase
-    logical,                optional, intent(IN) :: atm_aero       ! atm aerosols
-    logical,                optional, intent(IN) :: glc_valid_input
     character(SHR_KIND_CL), optional, intent(IN) :: atm_resume(:)  ! atm resume
     character(SHR_KIND_CL), optional, intent(IN) :: lnd_resume(:)  ! lnd resume
     character(SHR_KIND_CL), optional, intent(IN) :: ice_resume(:)  ! ice resume
@@ -472,11 +450,10 @@ CONTAINS
     character(SHR_KIND_CL), optional, intent(IN) :: cpl_resume     ! cpl resume
 
     !----- local -----
-    character(len=*), parameter :: subname = '(seq_infodata_PutData_explicit) '
+    character(len=*), parameter :: subname = '(seq_infodata_PutData) '
     !-------------------------------------------------------------------------------
 
     if ( present(dead_comps)            ) infodata%dead_comps         = dead_comps
-    if ( present(atm_prognostic)        ) infodata%atm_prognostic     = atm_prognostic
     if ( present(rofice_present)        ) infodata%rofice_present     = rofice_present
     if ( present(flood_present)         ) infodata%flood_present      = flood_present
     if ( present(ocnrof_prognostic)     ) infodata%ocnrof_prognostic  = ocnrof_prognostic
@@ -485,6 +462,10 @@ CONTAINS
     if ( present(glcocn_present)        ) infodata%glcocn_present     = glcocn_present
     if ( present(glcice_present)        ) infodata%glcice_present     = glcice_present
     if ( present(glc_coupled_fluxes)    ) infodata%glc_coupled_fluxes = glc_coupled_fluxes
+    if ( present(glc_valid_input)       ) infodata%glc_valid_input    = glc_valid_input
+    if ( present(atm_aero)              ) infodata%atm_aero           = atm_aero
+    if ( present(nextsw_cday)           ) infodata%nextsw_cday        = nextsw_cday
+    if ( present(precip_fact)           ) infodata%precip_fact        = precip_fact
     if ( present(atm_nx)                ) infodata%atm_nx             = atm_nx
     if ( present(atm_ny)                ) infodata%atm_ny             = atm_ny
     if ( present(lnd_nx)                ) infodata%lnd_nx             = lnd_nx
@@ -499,8 +480,6 @@ CONTAINS
     if ( present(glc_ny)                ) infodata%glc_ny             = glc_ny
     if ( present(wav_nx)                ) infodata%wav_nx             = wav_nx
     if ( present(wav_ny)                ) infodata%wav_ny             = wav_ny
-    if ( present(nextsw_cday)           ) infodata%nextsw_cday        = nextsw_cday
-    if ( present(precip_fact)           ) infodata%precip_fact        = precip_fact
     if ( present(atm_phase)             ) infodata%atm_phase          = atm_phase
     if ( present(lnd_phase)             ) infodata%lnd_phase          = lnd_phase
     if ( present(ice_phase)             ) infodata%ice_phase          = ice_phase
@@ -509,8 +488,6 @@ CONTAINS
     if ( present(rof_phase)             ) infodata%rof_phase          = rof_phase
     if ( present(wav_phase)             ) infodata%wav_phase          = wav_phase
     if ( present(esp_phase)             ) infodata%esp_phase          = esp_phase
-    if ( present(atm_aero)              ) infodata%atm_aero           = atm_aero
-    if ( present(glc_valid_input)       ) infodata%glc_valid_input    = glc_valid_input
 
     if ( present(atm_resume) ) then
        if (associated(infodata%pause_resume)) then
@@ -577,65 +554,6 @@ CONTAINS
        end if
     end if
 
-  END SUBROUTINE seq_infodata_PutData_explicit
-
-  !===============================================================================
-  subroutine seq_infodata_pauseresume_bcast(infodata, mpicom, pebcast)
-
-    use shr_mpi_mod, only : shr_mpi_bcast
-
-    ! !DESCRIPTION:
-    ! Broadcast the pause_resume data from an infodata across pes of mpicom
-
-    ! !INPUT/OUTPUT PARAMETERS:
-
-    type(seq_infodata_type),        intent(INOUT) :: infodata ! assume valid on root pe
-    integer(SHR_KIND_IN),           intent(IN)    :: mpicom   ! MPI Communicator
-    integer(SHR_KIND_IN), optional, intent(IN)    :: pebcast  ! pe sending
-
-    !----- local -----
-    integer                     :: ind
-    integer(SHR_KIND_IN)        :: pebcast_local
-    character(len=*), parameter :: subname = '(seq_infodata_pauseresume_bcast) '
-
-    if (present(pebcast)) then
-       pebcast_local = pebcast
-    else
-       pebcast_local = 0
-    end if
-
-    if (associated(infodata%pause_resume)) then
-       do ind = 1, num_inst_atm
-          call shr_mpi_bcast(infodata%pause_resume%atm_resume(ind), mpicom,       &
-               pebcast=pebcast_local)
-       end do
-       do ind = 1, num_inst_lnd
-          call shr_mpi_bcast(infodata%pause_resume%lnd_resume(ind), mpicom,       &
-               pebcast=pebcast_local)
-       end do
-       do ind = 1, num_inst_ice
-          call shr_mpi_bcast(infodata%pause_resume%ice_resume(ind), mpicom,       &
-               pebcast=pebcast_local)
-       end do
-       do ind = 1, num_inst_ocn
-          call shr_mpi_bcast(infodata%pause_resume%ocn_resume(ind), mpicom,       &
-               pebcast=pebcast_local)
-       end do
-       do ind = 1, num_inst_glc
-          call shr_mpi_bcast(infodata%pause_resume%glc_resume(ind), mpicom,       &
-               pebcast=pebcast_local)
-       end do
-       do ind = 1, num_inst_rof
-          call shr_mpi_bcast(infodata%pause_resume%rof_resume(ind), mpicom,       &
-               pebcast=pebcast_local)
-       end do
-       do ind = 1, num_inst_wav
-          call shr_mpi_bcast(infodata%pause_resume%wav_resume(ind), mpicom,       &
-               pebcast=pebcast_local)
-       end do
-       call shr_mpi_bcast(infodata%pause_resume%cpl_resume,        mpicom,       &
-            pebcast=pebcast_local)
-    end if
-  end subroutine seq_infodata_pauseresume_bcast
+  END SUBROUTINE seq_infodata_PutData
 
 END MODULE seq_infodata_mod
