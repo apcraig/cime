@@ -20,7 +20,8 @@ module MED
 
   use shr_kind_mod          , only: SHR_KIND_CL
   use seq_flds_mod
-  use seq_infodata_mod      , only: infodata=>seq_infodata_infodata
+  use med_infodata_mod      , only: med_infodata_CopyStateToInfodata
+  use med_infodata_mod      , only: infodata=>med_infodata
 
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Zero
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_fromseqflds
@@ -34,7 +35,6 @@ module MED
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_GeomPrint
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_GeomWrite
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_reset
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_CopyStateToInfodata
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_clock_timeprint
   use med_internalstate_mod , only: InternalState
@@ -2145,37 +2145,37 @@ module MED
       ! fields during its first time step. However, here for testing
       ! I simply initialize to zero.
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_atmImp,infodata,'atm2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_atmImp,infodata,'atm2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_State_reset(is_local%wrap%NState_atmImp, value=spval_init, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_ocnImp,infodata,'ocn2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_ocnImp,infodata,'ocn2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_State_reset(is_local%wrap%NState_ocnImp, value=spval_init, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_iceImp,infodata,'ice2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_iceImp,infodata,'ice2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_State_reset(is_local%wrap%NState_iceImp, value=spval_init, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_lndImp,infodata,'lnd2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_lndImp,infodata,'lnd2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_State_reset(is_local%wrap%NState_lndImp, value=spval_init, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_rofImp,infodata,'rof2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_rofImp,infodata,'rof2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_State_reset(is_local%wrap%NState_rofImp, value=spval_init, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_wavImp,infodata,'wav2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_wavImp,infodata,'wav2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_State_reset(is_local%wrap%NState_wavImp, value=spval_init, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_glcImp,infodata,'glc2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_glcImp,infodata,'glc2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_State_reset(is_local%wrap%NState_glcImp, value=spval_init, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return

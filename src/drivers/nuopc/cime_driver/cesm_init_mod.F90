@@ -61,8 +61,8 @@ module cesm_init_mod
   use seq_timemgr_mod, only: EClock_w => seq_timemgr_Eclock_w
   use seq_timemgr_mod, only: EClock_e => seq_timemgr_Eclock_e
 
-  use seq_infodata_mod, only: seq_infodata_init1, seq_infodata_init2, seq_infodata_putdata
-  use seq_infodata_mod, only: infodata=>seq_infodata_infodata
+  use med_infodata_mod, only: med_infodata_init1, med_infodata_init2, med_infodata_putdata
+  use med_infodata_mod, only: infodata=>med_infodata
 
   !----------------------------------------------------------------------------
   ! list of fields transferred between components
@@ -90,12 +90,9 @@ module cesm_init_mod
   !----------------------------------------------------------------------------
   ! "infodata" gathers various control flags into one datatype
   !----------------------------------------------------------------------------
-  character(len=*), public, parameter :: seq_infodata_start_type_start     = "startup"
-  character(len=*), public, parameter :: seq_infodata_start_type_cont      = "continue"
-  character(len=*), public, parameter :: seq_infodata_start_type_brnch     = "branch"
-  character(len=*), public, parameter :: seq_infodata_orb_fixed_year       = 'fixed_year'
-  character(len=*), public, parameter :: seq_infodata_orb_variable_year    = 'variable_year'
-  character(len=*), public, parameter :: seq_infodata_orb_fixed_parameters = 'fixed_parameters'
+  character(len=*), public, parameter :: orb_fixed_year       = 'fixed_year'
+  character(len=*), public, parameter :: orb_variable_year    = 'variable_year'
+  character(len=*), public, parameter :: orb_fixed_parameters = 'fixed_parameters'
 
   !----------------------------------------------------------------------------
   ! communicator groups and related
@@ -514,7 +511,7 @@ contains
     ! Initialize infodata
     !----------------------------------------------------------
 
-    call seq_infodata_init1(infodata, GLOID)
+    call med_infodata_init1(infodata, GLOID)
 
     !----------------------------------------------------------
     ! Add atm_aero to driver attributes
@@ -800,15 +797,15 @@ contains
 
        !--- NOTE: use CPLID here because seq_io is only value on CPLID
        if (seq_comm_iamin(CPLID)) then
-          call seq_io_read(restart_file, pioid, nextsw_cday   , 'seq_infodata_nextsw_cday')
-          call seq_io_read(restart_file, pioid, precip_fact   , 'seq_infodata_precip_fact')
+          call seq_io_read(restart_file, pioid, nextsw_cday, 'seq_infodata_nextsw_cday')
+          call seq_io_read(restart_file, pioid, precip_fact, 'seq_infodata_precip_fact')
        endif
 
        !--- Send from CPLID ROOT to GLOBALID ROOT, use bcast as surrogate
        call shr_mpi_bcast(nextsw_cday    ,mpicom_GLOID, pebcast=seq_comm_gloroot(CPLID))
        call shr_mpi_bcast(precip_fact    ,mpicom_GLOID, pebcast=seq_comm_gloroot(CPLID))
 
-       call seq_infodata_putData(infodata, &
+       call med_infodata_putData(infodata, &
             nextsw_cday=nextsw_cday,       &
             precip_fact=precip_fact)
     endif
@@ -837,7 +834,7 @@ contains
     ! Initialize infodata items which need the clocks
     !----------------------------------------------------------
 
-    call seq_infodata_init2(infodata)
+    call med_infodata_init2(infodata)
 
     !----------------------------------------------------------
     ! Initialize freezing point calculation for all components
@@ -876,7 +873,7 @@ contains
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
     read(cvalue,*) orb_mvelp
 
-    if (trim(orb_mode) == trim(seq_infodata_orb_fixed_year)) then
+    if (trim(orb_mode) == trim(orb_fixed_year)) then
        orb_obliq = SHR_ORB_UNDEF_REAL
        orb_eccen = SHR_ORB_UNDEF_REAL
        orb_mvelp = SHR_ORB_UNDEF_REAL
@@ -886,7 +883,7 @@ contains
           call shr_sys_abort(subname//' ERROR: invalid settings for orb_mode '//trim(orb_mode))
        endif
 
-    elseif (trim(orb_mode) == trim(seq_infodata_orb_variable_year)) then
+    elseif (trim(orb_mode) == trim(orb_variable_year)) then
        orb_obliq = SHR_ORB_UNDEF_REAL
        orb_eccen = SHR_ORB_UNDEF_REAL
        orb_mvelp = SHR_ORB_UNDEF_REAL
@@ -896,7 +893,7 @@ contains
           call shr_sys_abort(subname//' ERROR: invalid settings for orb_mode '//trim(orb_mode))
        endif
 
-    elseif (trim(orb_mode) == trim(seq_infodata_orb_fixed_parameters)) then
+    elseif (trim(orb_mode) == trim(orb_fixed_parameters)) then
        !-- force orb_iyear to undef to make sure shr_orb_params works properly
        orb_iyear = SHR_ORB_UNDEF_INT
        orb_iyear_align = SHR_ORB_UNDEF_INT
@@ -915,7 +912,7 @@ contains
 
     ! Determine orbital params
 
-    if (trim(orb_mode) == trim(seq_infodata_orb_variable_year)) then
+    if (trim(orb_mode) == trim(orb_variable_year)) then
        call seq_timemgr_EClockGetData( EClock_d, curr_ymd=ymd)
        call shr_cal_date2ymd(ymd,year,month,day)
        orb_cyear = orb_iyear + (year - orb_iyear_align)
@@ -1037,7 +1034,7 @@ contains
        call seq_comm_getinfo(OCNID(ens1), mpicom=mpicom_OCNID)
 
        ! TODO: Single column mode needs to be re-implemented - previously all of the xxx_present flags were set
-       ! in seq_infodata calls, reset here and the put back into seq_infodata - this is no longer the case
+       ! in med_infodata calls, reset here and the put back into med_infodata - this is no longer the case
        call shr_scam_checkSurface(scmlon, scmlat, &
             OCNID(ens1), mpicom_OCNID,            &
             lnd_present=lnd_present,              &

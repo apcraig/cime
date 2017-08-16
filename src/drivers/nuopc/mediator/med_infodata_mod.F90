@@ -1,15 +1,26 @@
-MODULE seq_infodata_mod
+module med_infodata_mod
 
   ! !DESCRIPTION: A module to get, put, and store some standard scalar data
 
   ! !USES:
+  use ESMF
+  use NUOPC
+  use mpi
   use shr_kind_mod, only: SHR_KIND_CS, SHR_KIND_CL, SHR_KIND_IN, SHR_KIND_R8, SHR_KIND_I8
   use shr_sys_mod,  only: shr_sys_flush, shr_sys_abort
-  use shr_orb_mod,  only: SHR_ORB_UNDEF_INT, SHR_ORB_UNDEF_REAL, shr_orb_params
   use seq_comm_mct, only: logunit, loglevel
   use seq_comm_mct, only: num_inst_atm, num_inst_lnd, num_inst_rof
   use seq_comm_mct, only: num_inst_ocn, num_inst_ice, num_inst_glc
   use seq_comm_mct, only: num_inst_wav
+  use seq_flds_mod, only: seq_flds_scalar_num, seq_flds_scalar_name
+  use seq_flds_mod, only: seq_flds_scalar_index_nx,  seq_flds_scalar_index_ny
+  use seq_flds_mod, only: seq_flds_scalar_index_phase
+  use seq_flds_mod, only: seq_flds_scalar_index_flood_present
+  use seq_flds_mod, only: seq_flds_scalar_index_rofice_present
+  use seq_flds_mod, only: seq_flds_scalar_index_precip_fact
+  use seq_flds_mod, only: seq_flds_scalar_index_nextsw_cday
+  use seq_flds_mod, only: seq_flds_scalar_index_atm_aero
+  use seq_flds_mod, only: seq_flds_scalar_index_dead_comps
 
   implicit none
 
@@ -17,17 +28,19 @@ MODULE seq_infodata_mod
 
   ! !PUBLIC TYPES:
 
-  public :: seq_infodata_type
+  public :: med_infodata_type
 
   ! !PUBLIC MEMBER FUNCTIONS
 
-  public :: seq_infodata_Init1           ! Initialize before clocks are initialized
-  public :: seq_infodata_Init2           ! Init after clocks are initialized
-  public :: seq_infodata_GetData         ! Get values from infodata object
-  public :: seq_infodata_PutData         ! Change values in infodata object
+  public :: med_infodata_init1           ! Initialize before clocks are initialized
+  public :: med_infodata_init2           ! Init after clocks are initialized
+  public :: med_infodata_GetData         ! Get values from infodata object
+  public :: med_infodata_PutData         ! Change values in infodata object
+  public :: med_infodata_CopyStateToInfodata
+  public :: med_infodata_CopyInfodataToState
 
   ! !PUBLIC DATA MEMBERS:
-  public :: seq_infodata_infodata        ! instance of infodata datatype
+  public :: med_infodata                  ! instance of infodata datatype
 
   ! Type to hold pause/resume signaling information
   type seq_pause_resume_type
@@ -43,7 +56,7 @@ MODULE seq_infodata_mod
   end type seq_pause_resume_type
 
   ! InputInfo derived type
-  type seq_infodata_type
+  type med_infodata_type
      private     ! This type is opaque
 
      !--- set via components and held fixed after initialization ---
@@ -56,7 +69,8 @@ MODULE seq_infodata_mod
      logical                 :: glclnd_present          ! does glc have land coupling fields on
      logical                 :: glcocn_present          ! does glc have ocean runoff on
      logical                 :: glcice_present          ! does glc have iceberg coupling on
-     logical                 :: glc_coupled_fluxes      ! does glc send fluxes to other components (only relevant if glc_present is .true.)
+     logical                 :: glc_coupled_fluxes      ! does glc send fluxes to other components
+                                                        ! (only relevant if glc_present is .true.)
 
      !--- set via components and may be time varying ---
      integer(SHR_KIND_IN)    :: atm_phase = 1                  ! atm phase
@@ -74,25 +88,31 @@ MODULE seq_infodata_mod
 
      !--- set by driver and may be time varying
      logical                 :: glc_valid_input = .true.  ! is valid accumulated data being sent to prognostic glc
-  end type seq_infodata_type
+  end type med_infodata_type
 
-  type (seq_infodata_type), target :: seq_infodata_infodata ! single instance for cpl and all comps
+  type (med_infodata_type), target :: med_infodata ! single instance for cpl and all comps
+
+  ! used/reused in module
+  integer                :: dbrc
+  character(len=1024)    :: msgString
+  character(*),parameter :: u_FILE_u = &
+    __FILE__
   !===============================================================================
 
 CONTAINS
 
   !===============================================================================
-  SUBROUTINE seq_infodata_Init1(infodata, ID)
+  subroutine med_infodata_init1(infodata, ID)
 
     ! !DESCRIPTION:
     ! Initialize pause_resume
 
     ! !INPUT/OUTPUT PARAMETERS:
-    type(seq_infodata_type), intent(INOUT) :: infodata  ! infodata object
+    type(med_infodata_type), intent(INOUT) :: infodata  ! infodata object
     integer(SHR_KIND_IN),    intent(IN)    :: ID        ! seq_comm ID
 
     !----- local -----
-    character(len=*),    parameter :: subname = '(seq_infodata_Init1) '
+    character(len=*),    parameter :: subname = '(med_infodata_Init1) '
     !-------------------------------------------------------------------------------
 
     if (associated(infodata%pause_resume)) then
@@ -100,10 +120,10 @@ CONTAINS
     end if
     nullify(infodata%pause_resume)
 
-  end SUBROUTINE seq_infodata_Init1
+  end subroutine med_infodata_init1
 
   !===============================================================================
-  SUBROUTINE seq_infodata_Init2(infodata)
+  subroutine med_infodata_init2(infodata)
 
     ! !DESCRIPTION: re-initialize pause-resume depending on the time manager setup
 
@@ -111,7 +131,7 @@ CONTAINS
     use seq_timemgr_mod, only : seq_timemgr_pause_active
 
     ! !INPUT/OUTPUT PARAMETERS:
-    type(seq_infodata_type), intent(INOUT) :: infodata  ! infodata object
+    type(med_infodata_type), intent(INOUT) :: infodata  ! infodata object
     !----------------------------------------------------------
 
     !| If pause/resume is active, initialize the resume data
@@ -119,10 +139,230 @@ CONTAINS
        allocate(infodata%pause_resume)
     end if
 
-  END SUBROUTINE seq_infodata_Init2
+  end subroutine med_infodata_init2
+
+!================================================================================
+
+  subroutine med_infodata_CopyStateToInfodata(State, infodata, type, mpicom, rc)
+    ! ----------------------------------------------
+    ! Copy scalar data from State to local data on root then broadcast data
+    ! to all PETs in component.
+    ! ----------------------------------------------
+    type(ESMF_State),  intent(in)     :: State
+    type(med_infodata_type),intent(inout)  :: infodata
+    character(len=*),  intent(in)     :: type
+    integer,           intent(in)     :: mpicom
+    integer,           intent(inout)  :: rc
+
+    ! local variables
+    integer                         :: mytask, ierr, len
+    character(MPI_MAX_ERROR_STRING) :: lstring
+    type(ESMF_Field)                :: field
+    type(ESMF_StateItem_Flag)       :: itemType
+    real(ESMF_KIND_R8), pointer     :: farrayptr(:,:)
+    real(ESMF_KIND_R8)              :: data(seq_flds_scalar_num)
+    logical                         :: dead_comps
+    character(len=*), parameter     :: subname='(med_infodata_CopyStateToInfodata)'
+    !----------------------------------------------------------
+
+    rc = ESMF_SUCCESS
+
+    call MPI_COMM_RANK(mpicom, mytask, rc)
+    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), itemType=itemType, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
+    if (itemType == ESMF_STATEITEM_NOTFOUND) then
+      call ESMF_LogWrite(trim(subname)//": "//trim(seq_flds_scalar_name)//" not found", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
+    else
+      call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
+      if (mytask == 0) then
+        call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+        if (size(data) < seq_flds_scalar_num .or. size(farrayptr) < seq_flds_scalar_num) then
+          call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
+          rc = ESMF_FAILURE
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+        endif
+        data(1:seq_flds_scalar_num) = farrayptr(1,1:seq_flds_scalar_num)
+      endif
+
+      call MPI_BCAST(data, seq_flds_scalar_num, MPI_REAL8, 0, mpicom, rc)
+      if (rc /= MPI_SUCCESS) then
+        call MPI_ERROR_STRING(rc,lstring,len,ierr)
+        call ESMF_LogWrite(trim(subname)//": ERROR "//trim(lstring), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
+        rc = ESMF_FAILURE
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+      endif
+
+      if (type == 'atm2cpli') then
+        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
+        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+        call med_infodata_getData(infodata,dead_comps=dead_comps)
+        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
+        call med_infodata_putData(infodata,atm_aero=(nint(data(seq_flds_scalar_index_atm_aero))/=0), &
+                                           dead_comps=dead_comps, &
+                                           nextsw_cday=data(seq_flds_scalar_index_nextsw_cday))
+
+      elseif (type == 'ocn2cpli') then
+        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
+        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+        call med_infodata_getData(infodata,dead_comps=dead_comps)
+        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
+        call med_infodata_putData(infodata,precip_fact=data(seq_flds_scalar_index_precip_fact), &
+                                           dead_comps=dead_comps)
+
+      elseif (type == 'ice2cpli') then
+        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
+        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+        call med_infodata_getData(infodata,dead_comps=dead_comps)
+        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
+        call med_infodata_putData(infodata, dead_comps=dead_comps)
+
+      elseif (type == 'lnd2cpli') then
+        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
+        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+        call med_infodata_getData(infodata,dead_comps=dead_comps)
+        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
+        call med_infodata_putData(infodata, dead_comps=dead_comps)
+
+      elseif (type == 'rof2cpli') then
+        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
+        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+        call med_infodata_getData(infodata,dead_comps=dead_comps)
+        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
+        call med_infodata_putData(infodata, dead_comps=dead_comps, &
+                                            flood_present=(nint(data(seq_flds_scalar_index_flood_present)) /= 0), &
+                                            rofice_present=(nint(data(seq_flds_scalar_index_rofice_present)) /= 0))
+
+      elseif (type == 'wav2cpli') then
+        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
+        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+        call med_infodata_getData(infodata,dead_comps=dead_comps)
+        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
+        call med_infodata_putData(infodata, dead_comps=dead_comps)
+
+      elseif (type == 'glc2cpli') then
+        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
+        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+        call med_infodata_getData(infodata,dead_comps=dead_comps)
+        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
+        call med_infodata_putData(infodata, dead_comps=dead_comps)
+
+      elseif (type == 'atm2cpl') then
+        call med_infodata_putData(infodata,nextsw_cday=data(seq_flds_scalar_index_nextsw_cday))
+
+      elseif (type == 'ocn2cpl') then
+        call med_infodata_putData(infodata,precip_fact=data(seq_flds_scalar_index_precip_fact))
+
+      elseif (type == 'ice2cpl') then
+        ! nothing
+
+      elseif (type == 'lnd2cpl') then
+        ! nothing
+
+      elseif (type == 'rof2cpl') then
+        ! nothing
+
+      elseif (type == 'wav2cpl') then
+        ! nothing
+
+      elseif (type == 'glc2cpl') then
+        ! nothing
+
+      else
+        call ESMF_LogWrite(trim(subname)//": ERROR in type = "//trim(type), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
+        rc = ESMF_FAILURE
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+      endif
+
+    endif
+
+  end subroutine med_infodata_CopyStateToInfodata
+
+!================================================================================
+
+  subroutine med_infodata_CopyInfodataToState(infodata, State, type, mpicom, rc)
+    ! ----------------------------------------------
+    ! Copy local scalar data into State, root only,
+    ! but called on all PETs in component
+    ! ----------------------------------------------
+    type(med_infodata_type),intent(in):: infodata
+    type(ESMF_State),  intent(inout)  :: State
+    character(len=*),  intent(in)     :: type
+    integer,           intent(in)     :: mpicom
+    integer,           intent(inout)  :: rc
+
+    ! local variables
+    integer                     :: mytask
+    type(ESMF_Field)            :: field
+    type(ESMF_StateItem_Flag)   :: ItemType
+    real(ESMF_KIND_R8), pointer :: farrayptr(:,:)
+    integer                     :: phase
+    logical                     :: dead_comps
+    real(ESMF_KIND_R8)          :: nextsw_cday, precip_fact
+    character(len=*), parameter :: subname='(med_infodata_CopyInfodataToState)'
+    !----------------------------------------------------------
+
+    rc = ESMF_SUCCESS
+
+    call MPI_COMM_RANK(mpicom, mytask, rc)
+
+    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), itemType=itemType, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
+    if (itemType == ESMF_STATEITEM_NOTFOUND) then
+      call ESMF_LogWrite(trim(subname)//": "//trim(seq_flds_scalar_name)//" not found", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
+    else
+      call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+      if (mytask == 0) then
+        call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+        if (size(farrayptr) < seq_flds_scalar_num) then
+          call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
+          rc = ESMF_FAILURE
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+        endif
+
+        call med_infodata_getData(infodata, nextsw_cday=nextsw_cday, &
+                                            precip_fact=precip_fact, &
+                                            dead_comps=dead_comps)
+
+        if (type == 'cpl2atm') then
+          call med_infodata_getData(infodata,atm_phase=phase)
+        elseif (type == 'cpl2ocn') then
+          call med_infodata_getData(infodata,ocn_phase=phase)
+        elseif (type == 'cpl2ice') then
+          call med_infodata_getData(infodata,ice_phase=phase)
+        elseif (type == 'cpl2lnd') then
+          call med_infodata_getData(infodata,lnd_phase=phase)
+        elseif (type == 'cpl2rof') then
+          call med_infodata_getData(infodata,rof_phase=phase)
+        elseif (type == 'cpl2wav') then
+          call med_infodata_getData(infodata,wav_phase=phase)
+        elseif (type == 'cpl2glc') then
+          call med_infodata_getData(infodata,glc_phase=phase)
+        else
+          call ESMF_LogWrite(trim(subname)//": ERROR in type = "//trim(type), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
+          rc = ESMF_FAILURE
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+        endif
+
+        farrayptr(1,seq_flds_scalar_index_phase) = phase
+        farrayptr(1,seq_flds_scalar_index_nextsw_cday) = nextsw_cday
+        farrayptr(1,seq_flds_scalar_index_precip_fact) = precip_fact
+        farrayptr(1,seq_flds_scalar_index_dead_comps) = 0._ESMF_KIND_R8
+        if (dead_comps) farrayptr(1,seq_flds_scalar_index_dead_comps) = 1._ESMF_KIND_R8
+
+      endif
+    endif
+
+  end subroutine med_infodata_CopyInfodataToState
 
   !===============================================================================
-  SUBROUTINE seq_infodata_GetData( infodata, &
+  SUBROUTINE med_infodata_GetData( infodata, &
        flux_epbal              , &
        ocnrof_prognostic       , &
        glc_coupled_fluxes      , &
@@ -161,7 +401,7 @@ CONTAINS
 
     ! !INPUT/OUTPUT PARAMETERS:
 
-    type(seq_infodata_type),          intent(IN)  :: infodata                ! Input CCSM structure
+    type(med_infodata_type),          intent(IN)  :: infodata                ! Input CCSM structure
     character(SHR_KIND_CL), optional, intent(IN)  :: flux_epbal     ! selects E,P,R adjustment technique
     logical,                optional, intent(OUT) :: dead_comps              ! do we have dead models
     logical,                optional, intent(OUT) :: rofice_present
@@ -195,7 +435,7 @@ CONTAINS
     character(SHR_KIND_CL), optional, intent(OUT) :: cpl_resume ! cpl read resume state
 
     !----- local -----
-    character(len=*), parameter :: subname = '(seq_infodata_GetData) '
+    character(len=*), parameter :: subname = '(med_infodata_GetData) '
 
     !-------------------------------------------------------------------------------
 
@@ -295,10 +535,10 @@ CONTAINS
        end if
     end if
 
-  END SUBROUTINE seq_infodata_GetData
+  END SUBROUTINE med_infodata_GetData
 
   !===============================================================================
-  SUBROUTINE seq_infodata_PutData( infodata , &
+  SUBROUTINE med_infodata_PutData( infodata , &
        ocnrof_prognostic       , &
        glc_coupled_fluxes      , &
        flood_present           , &
@@ -334,7 +574,7 @@ CONTAINS
     ! !DESCRIPTION:  Put values into the infodata object.
 
     ! !INPUT/OUTPUT PARAMETERS:
-    type(seq_infodata_type),          intent(INOUT) :: infodata                ! Input CCSM structure
+    type(med_infodata_type),          intent(INOUT) :: infodata                ! Input CCSM structure
     logical,                optional, intent(IN) :: dead_comps     ! do we have dead models
     logical,                optional, intent(IN) :: rofice_present
     logical,                optional, intent(IN) :: flood_present
@@ -366,7 +606,7 @@ CONTAINS
     character(SHR_KIND_CL), optional, intent(IN) :: cpl_resume     ! cpl resume
 
     !----- local -----
-    character(len=*), parameter :: subname = '(seq_infodata_PutData) '
+    character(len=*), parameter :: subname = '(med_infodata_PutData) '
     !-------------------------------------------------------------------------------
 
     if ( present(dead_comps)            ) infodata%dead_comps         = dead_comps
@@ -456,6 +696,6 @@ CONTAINS
        end if
     end if
 
-  END SUBROUTINE seq_infodata_PutData
+  END SUBROUTINE med_infodata_PutData
 
-END MODULE seq_infodata_mod
+end module med_infodata_mod

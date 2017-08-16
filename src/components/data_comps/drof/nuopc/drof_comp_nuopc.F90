@@ -472,19 +472,19 @@ module drof_comp_nuopc
     call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    ! if (flood_present) then
-    !    call shr_nuopc_methods_State_SetScalar(1.0_r8, seq_flds_scalar_index_flood_present, exportState, mpicom, rc)
-    ! else
-    !    call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_flood_present, exportState, mpicom, rc)
-    ! end if
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    if (flood_present) then
+       call shr_nuopc_methods_State_SetScalar(1.0_r8, seq_flds_scalar_index_flood_present, exportState, mpicom, rc)
+    else
+       call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_flood_present, exportState, mpicom, rc)
+    end if
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    ! if (rofice_present) then
-    !    call shr_nuopc_methods_State_SetScalar(1.0_r8, seq_flds_scalar_index_rofice_present, exportState, mpicom, rc)
-    ! else
-    !    call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_rofice_present, exportState, mpicom, rc)
-    ! end if
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    if (rofice_present) then
+       call shr_nuopc_methods_State_SetScalar(1.0_r8, seq_flds_scalar_index_rofice_present, exportState, mpicom, rc)
+    else
+       call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_rofice_present, exportState, mpicom, rc)
+    end if
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
     ! diagnostics
