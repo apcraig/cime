@@ -1,6 +1,5 @@
 module shr_nuopc_methods_mod
 
-#ifdef NUOPC_INTERFACE
   !-----------------------------------------------------------------------------
   ! Generic operation methods used by the Mediator Component.
   !-----------------------------------------------------------------------------
@@ -3892,9 +3891,7 @@ module shr_nuopc_methods_mod
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
         call seq_infodata_getData(infodata,dead_comps=dead_comps)
         if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,atm_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           atm_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           atm_aero=(nint(data(seq_flds_scalar_index_atm_aero))/=0), &
+        call seq_infodata_putData(infodata,atm_aero=(nint(data(seq_flds_scalar_index_atm_aero))/=0), &
                                            dead_comps=dead_comps, &
                                            nextsw_cday=data(seq_flds_scalar_index_nextsw_cday))
 
@@ -3903,9 +3900,7 @@ module shr_nuopc_methods_mod
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
         call seq_infodata_getData(infodata,dead_comps=dead_comps)
         if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,ocn_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           ocn_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           precip_fact=data(seq_flds_scalar_index_precip_fact), &
+        call seq_infodata_putData(infodata,precip_fact=data(seq_flds_scalar_index_precip_fact), &
                                            dead_comps=dead_comps)
 
       elseif (type == 'ice2cpli') then
@@ -3913,58 +3908,57 @@ module shr_nuopc_methods_mod
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
         call seq_infodata_getData(infodata,dead_comps=dead_comps)
         if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,ice_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           ice_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           dead_comps=dead_comps)
+        call seq_infodata_putData(infodata, dead_comps=dead_comps)
       elseif (type == 'lnd2cpli') then
 
         write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
         call seq_infodata_getData(infodata,dead_comps=dead_comps)
         if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,lnd_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           lnd_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           dead_comps=dead_comps)
+        call seq_infodata_putData(infodata, dead_comps=dead_comps)
 
       elseif (type == 'rof2cpli') then
         write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
         call seq_infodata_getData(infodata,dead_comps=dead_comps)
         if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,rof_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           rof_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           dead_comps=dead_comps)
+        call seq_infodata_putData(infodata, dead_comps=dead_comps)
 
       elseif (type == 'wav2cpli') then
         write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
         call seq_infodata_getData(infodata,dead_comps=dead_comps)
         if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,wav_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           wav_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           dead_comps=dead_comps)
+        call seq_infodata_putData(infodata, dead_comps=dead_comps)
+
       elseif (type == 'glc2cpli') then
         write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
         call seq_infodata_getData(infodata,dead_comps=dead_comps)
         if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,glc_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           glc_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           dead_comps=dead_comps)
+        call seq_infodata_putData(infodata, dead_comps=dead_comps)
+
       elseif (type == 'atm2cpl') then
         call seq_infodata_putData(infodata,nextsw_cday=data(seq_flds_scalar_index_nextsw_cday))
+
       elseif (type == 'ocn2cpl') then
         call seq_infodata_putData(infodata,precip_fact=data(seq_flds_scalar_index_precip_fact))
+
       elseif (type == 'ice2cpl') then
         ! nothing
+
       elseif (type == 'lnd2cpl') then
         ! nothing
+
       elseif (type == 'rof2cpl') then
         ! nothing
+
       elseif (type == 'wav2cpl') then
         ! nothing
+
       elseif (type == 'glc2cpl') then
         ! nothing
+
       else
         call ESMF_LogWrite(trim(subname)//": ERROR in type = "//trim(type), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
         rc = ESMF_FAILURE
@@ -4202,6 +4196,5 @@ module shr_nuopc_methods_mod
   end function shr_nuopc_methods_ChkErr
 
   !-----------------------------------------------------------------------------
-#endif
 
 end module shr_nuopc_methods_mod

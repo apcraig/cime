@@ -57,20 +57,6 @@ MODULE seq_infodata_mod
      logical                 :: glcocn_present          ! does glc have ocean runoff on
      logical                 :: glcice_present          ! does glc have iceberg coupling on
      logical                 :: glc_coupled_fluxes      ! does glc send fluxes to other components (only relevant if glc_present is .true.)
-     integer(SHR_KIND_IN)    :: atm_nx                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: atm_ny                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: lnd_nx                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: lnd_ny                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: ice_nx                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: ice_ny                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: ocn_nx                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: ocn_ny                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: rof_nx                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: rof_ny                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: glc_nx                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: glc_ny                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: wav_nx                  ! nx, ny of "2d" grid
-     integer(SHR_KIND_IN)    :: wav_ny                  ! nx, ny of "2d" grid
 
      !--- set via components and may be time varying ---
      integer(SHR_KIND_IN)    :: atm_phase = 1                  ! atm phase
@@ -160,20 +146,6 @@ CONTAINS
        ice_phase               , &
        wav_phase               , &
        esp_phase               , &
-       wav_nx                  , &
-       wav_ny                  , &
-       atm_nx                  , &
-       atm_ny                  , &
-       lnd_nx                  , &
-       lnd_ny                  , &
-       rof_nx                  , &
-       rof_ny                  , &
-       ice_nx                  , &
-       ice_ny                  , &
-       ocn_nx                  , &
-       ocn_ny                  , &
-       glc_nx                  , &
-       glc_ny                  , &
        atm_resume              , &
        lnd_resume              , &
        ocn_resume              , &
@@ -200,20 +172,6 @@ CONTAINS
     logical,                optional, intent(OUT) :: glcocn_present
     logical,                optional, intent(OUT) :: glcice_present
     logical,                optional, intent(OUT) :: glc_coupled_fluxes
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: atm_nx                  ! nx,ny 2d grid size global
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: atm_ny                  ! nx,ny 2d grid size global
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: lnd_nx
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: lnd_ny
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: rof_nx
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: rof_ny
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: ice_nx
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: ice_ny
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: ocn_nx
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: ocn_ny
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: glc_nx
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: glc_ny
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: wav_nx
-    integer(SHR_KIND_IN),   optional, intent(OUT) :: wav_ny
     real(SHR_KIND_R8),      optional, intent(OUT) :: nextsw_cday             ! calendar of next atm shortwave
     real(SHR_KIND_R8),      optional, intent(OUT) :: precip_fact             ! precip factor
     real(SHR_KIND_R8),      optional, intent(OUT) :: flux_epbalfact          ! adjusted precip factor
@@ -254,20 +212,6 @@ CONTAINS
     if ( present(atm_aero)            ) atm_aero           = infodata%atm_aero
     if ( present(nextsw_cday)         ) nextsw_cday        = infodata%nextsw_cday
     if ( present(precip_fact)         ) precip_fact        = infodata%precip_fact
-    if ( present(atm_nx)              ) atm_nx             = infodata%atm_nx
-    if ( present(atm_ny)              ) atm_ny             = infodata%atm_ny
-    if ( present(lnd_nx)              ) lnd_nx             = infodata%lnd_nx
-    if ( present(lnd_ny)              ) lnd_ny             = infodata%lnd_ny
-    if ( present(rof_nx)              ) rof_nx             = infodata%rof_nx
-    if ( present(rof_ny)              ) rof_ny             = infodata%rof_ny
-    if ( present(ice_nx)              ) ice_nx             = infodata%ice_nx
-    if ( present(ice_ny)              ) ice_ny             = infodata%ice_ny
-    if ( present(ocn_nx)              ) ocn_nx             = infodata%ocn_nx
-    if ( present(ocn_ny)              ) ocn_ny             = infodata%ocn_ny
-    if ( present(glc_nx)              ) glc_nx             = infodata%glc_nx
-    if ( present(glc_ny)              ) glc_ny             = infodata%glc_ny
-    if ( present(wav_nx)              ) wav_nx             = infodata%wav_nx
-    if ( present(wav_ny)              ) wav_ny             = infodata%wav_ny
     if ( present(atm_phase)           ) atm_phase          = infodata%atm_phase
     if ( present(lnd_phase)           ) lnd_phase          = infodata%lnd_phase
     if ( present(ice_phase)           ) ice_phase          = infodata%ice_phase
@@ -362,6 +306,7 @@ CONTAINS
        glclnd_present          , &
        glcocn_present          , &
        glcice_present          , &
+       glc_valid_input         , &
        iceberg_prognostic      , &
        dead_comps              , &
        nextsw_cday             , &
@@ -375,20 +320,6 @@ CONTAINS
        ice_phase               , &
        wav_phase               , &
        esp_phase               , &
-       wav_nx                  , &
-       wav_ny                  , &
-       atm_nx                  , &
-       atm_ny                  , &
-       lnd_nx                  , &
-       lnd_ny                  , &
-       rof_nx                  , &
-       rof_ny                  , &
-       ice_nx                  , &
-       ice_ny                  , &
-       ocn_nx                  , &
-       ocn_ny                  , &
-       glc_nx                  , &
-       glc_ny                  , &
        atm_resume              , &
        lnd_resume              , &
        ocn_resume              , &
@@ -396,8 +327,7 @@ CONTAINS
        glc_resume              , &
        rof_resume              , &
        wav_resume              , &
-       cpl_resume              , &
-       glc_valid_input)
+       cpl_resume              )
 
     implicit none
 
@@ -418,20 +348,6 @@ CONTAINS
     logical,                optional, intent(IN) :: atm_aero       ! atm aerosols
     real(SHR_KIND_R8),      optional, intent(IN) :: nextsw_cday    ! calendar of next atm shortwave
     real(SHR_KIND_R8),      optional, intent(IN) :: precip_fact    ! precip factor
-    integer(SHR_KIND_IN),   optional, intent(IN) :: atm_nx         ! nx,ny 2d grid size global
-    integer(SHR_KIND_IN),   optional, intent(IN) :: atm_ny         ! nx,ny 2d grid size global
-    integer(SHR_KIND_IN),   optional, intent(IN) :: lnd_nx
-    integer(SHR_KIND_IN),   optional, intent(IN) :: lnd_ny
-    integer(SHR_KIND_IN),   optional, intent(IN) :: rof_nx
-    integer(SHR_KIND_IN),   optional, intent(IN) :: rof_ny
-    integer(SHR_KIND_IN),   optional, intent(IN) :: ice_nx
-    integer(SHR_KIND_IN),   optional, intent(IN) :: ice_ny
-    integer(SHR_KIND_IN),   optional, intent(IN) :: ocn_nx
-    integer(SHR_KIND_IN),   optional, intent(IN) :: ocn_ny
-    integer(SHR_KIND_IN),   optional, intent(IN) :: glc_nx
-    integer(SHR_KIND_IN),   optional, intent(IN) :: glc_ny
-    integer(SHR_KIND_IN),   optional, intent(IN) :: wav_nx
-    integer(SHR_KIND_IN),   optional, intent(IN) :: wav_ny
     integer(SHR_KIND_IN),   optional, intent(IN) :: atm_phase      ! atm phase
     integer(SHR_KIND_IN),   optional, intent(IN) :: lnd_phase      ! lnd phase
     integer(SHR_KIND_IN),   optional, intent(IN) :: ice_phase      ! ice phase
@@ -466,20 +382,6 @@ CONTAINS
     if ( present(atm_aero)              ) infodata%atm_aero           = atm_aero
     if ( present(nextsw_cday)           ) infodata%nextsw_cday        = nextsw_cday
     if ( present(precip_fact)           ) infodata%precip_fact        = precip_fact
-    if ( present(atm_nx)                ) infodata%atm_nx             = atm_nx
-    if ( present(atm_ny)                ) infodata%atm_ny             = atm_ny
-    if ( present(lnd_nx)                ) infodata%lnd_nx             = lnd_nx
-    if ( present(lnd_ny)                ) infodata%lnd_ny             = lnd_ny
-    if ( present(rof_nx)                ) infodata%rof_nx             = rof_nx
-    if ( present(rof_ny)                ) infodata%rof_ny             = rof_ny
-    if ( present(ice_nx)                ) infodata%ice_nx             = ice_nx
-    if ( present(ice_ny)                ) infodata%ice_ny             = ice_ny
-    if ( present(ocn_nx)                ) infodata%ocn_nx             = ocn_nx
-    if ( present(ocn_ny)                ) infodata%ocn_ny             = ocn_ny
-    if ( present(glc_nx)                ) infodata%glc_nx             = glc_nx
-    if ( present(glc_ny)                ) infodata%glc_ny             = glc_ny
-    if ( present(wav_nx)                ) infodata%wav_nx             = wav_nx
-    if ( present(wav_ny)                ) infodata%wav_ny             = wav_ny
     if ( present(atm_phase)             ) infodata%atm_phase          = atm_phase
     if ( present(lnd_phase)             ) infodata%lnd_phase          = lnd_phase
     if ( present(ice_phase)             ) infodata%ice_phase          = ice_phase
