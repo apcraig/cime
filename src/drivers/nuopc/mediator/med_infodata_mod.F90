@@ -199,49 +199,37 @@ CONTAINS
       if (type == 'atm2cpli') then
         write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call med_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call med_infodata_putData(infodata,atm_aero=(nint(data(seq_flds_scalar_index_atm_aero))/=0), &
-                                           dead_comps=dead_comps, &
-                                           nextsw_cday=data(seq_flds_scalar_index_nextsw_cday))
+        if (infodata%dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) infodata%dead_comps = .true.
+        infodata%atm_aero = (nint(data(seq_flds_scalar_index_atm_aero))/=0)
+        infodata%nextsw_cday = data(seq_flds_scalar_index_nextsw_cday)
 
       elseif (type == 'ocn2cpli') then
         write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call med_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call med_infodata_putData(infodata,precip_fact=data(seq_flds_scalar_index_precip_fact), &
-                                           dead_comps=dead_comps)
+        if (infodata%dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) infodata%dead_comps = .true.
+        infodata%precip_fact=data(seq_flds_scalar_index_precip_fact)
 
       elseif (type == 'ice2cpli') then
         write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call med_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call med_infodata_putData(infodata, dead_comps=dead_comps)
+        if (infodata%dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) infodata%dead_comps = .true.
 
       elseif (type == 'lnd2cpli') then
         write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call med_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call med_infodata_putData(infodata, dead_comps=dead_comps)
+        if (infodata%dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) infodata%dead_comps = .true.
 
       elseif (type == 'rof2cpli') then
         write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call med_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call med_infodata_putData(infodata, dead_comps=dead_comps, &
-                                            flood_present=(nint(data(seq_flds_scalar_index_flood_present)) /= 0), &
-                                            rofice_present=(nint(data(seq_flds_scalar_index_rofice_present)) /= 0))
+        if (infodata%dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) infodata%dead_comps = .true.
+        infodata%flood_present=(nint(data(seq_flds_scalar_index_flood_present)) /= 0)
+        infodata%rofice_present=(nint(data(seq_flds_scalar_index_rofice_present)) /= 0)
 
       elseif (type == 'wav2cpli') then
         write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
         call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call med_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call med_infodata_putData(infodata, dead_comps=dead_comps)
+        if (infodata%dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) infodata%dead_comps = .true.
 
       elseif (type == 'glc2cpli') then
         write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny))
@@ -251,10 +239,10 @@ CONTAINS
         call med_infodata_putData(infodata, dead_comps=dead_comps)
 
       elseif (type == 'atm2cpl') then
-        call med_infodata_putData(infodata,nextsw_cday=data(seq_flds_scalar_index_nextsw_cday))
+         infodata%nextsw_cday=data(seq_flds_scalar_index_nextsw_cday)
 
       elseif (type == 'ocn2cpl') then
-        call med_infodata_putData(infodata,precip_fact=data(seq_flds_scalar_index_precip_fact))
+         infodata%precip_fact=data(seq_flds_scalar_index_precip_fact)
 
       elseif (type == 'ice2cpl') then
         ! nothing
@@ -313,37 +301,42 @@ CONTAINS
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (itemType == ESMF_STATEITEM_NOTFOUND) then
+
       call ESMF_LogWrite(trim(subname)//": "//trim(seq_flds_scalar_name)//" not found", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
+
     else
+
       call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
       if (mytask == 0) then
         call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
         if (size(farrayptr) < seq_flds_scalar_num) then
           call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
         endif
 
-        call med_infodata_getData(infodata, nextsw_cday=nextsw_cday, &
-                                            precip_fact=precip_fact, &
-                                            dead_comps=dead_comps)
+        nextsw_cday = infodata%nextsw_cday
+        precip_fact = infodata%precip_fact
+        dead_comps = infodata%dead_comps
 
         if (type == 'cpl2atm') then
-          call med_infodata_getData(infodata,atm_phase=phase)
+           phase = infodata%atm_phase
         elseif (type == 'cpl2ocn') then
-          call med_infodata_getData(infodata,ocn_phase=phase)
+           phase = infodata%ocn_phase
         elseif (type == 'cpl2ice') then
-          call med_infodata_getData(infodata,ice_phase=phase)
+           phase = infodata%ice_phase
         elseif (type == 'cpl2lnd') then
-          call med_infodata_getData(infodata,lnd_phase=phase)
+           phase = infodata%lnd_phase
         elseif (type == 'cpl2rof') then
-          call med_infodata_getData(infodata,rof_phase=phase)
+           phase = infodata%rof_phase
         elseif (type == 'cpl2wav') then
-          call med_infodata_getData(infodata,wav_phase=phase)
+           phase = infodata%wav_phase
         elseif (type == 'cpl2glc') then
-          call med_infodata_getData(infodata,glc_phase=phase)
+           phase = infodata%glc_phase
         else
           call ESMF_LogWrite(trim(subname)//": ERROR in type = "//trim(type), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
@@ -353,8 +346,11 @@ CONTAINS
         farrayptr(1,seq_flds_scalar_index_phase) = phase
         farrayptr(1,seq_flds_scalar_index_nextsw_cday) = nextsw_cday
         farrayptr(1,seq_flds_scalar_index_precip_fact) = precip_fact
-        farrayptr(1,seq_flds_scalar_index_dead_comps) = 0._ESMF_KIND_R8
-        if (dead_comps) farrayptr(1,seq_flds_scalar_index_dead_comps) = 1._ESMF_KIND_R8
+        if (dead_comps) then
+           farrayptr(1,seq_flds_scalar_index_dead_comps) = 1._ESMF_KIND_R8
+        else
+           farrayptr(1,seq_flds_scalar_index_dead_comps) = 0._ESMF_KIND_R8
+        end if
 
       endif
     endif
