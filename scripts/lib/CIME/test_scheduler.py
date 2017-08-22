@@ -376,6 +376,8 @@ class TestScheduler(object):
             else:
                 (component, modspath) = test_mods.split('/',1)
 
+            if component == "drv" and self._driver == 'drv-nuopc':
+                component = "drv-nuopc"
             testmods_dir = files.get_value("TESTS_MODS_DIR", {"component": component})
             test_mod_file = os.path.join(testmods_dir, component, modspath)
             if not os.path.exists(test_mod_file):

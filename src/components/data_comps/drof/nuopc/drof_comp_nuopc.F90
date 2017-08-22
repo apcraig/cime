@@ -510,10 +510,10 @@ module drof_comp_nuopc
     call ESMF_AttributeSet(comp, "ShortName", "DROF", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "LongName", &
-         "Climatological Ocean Data Model", &
+         "Data River Model", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "Description", &
-         "The CESM data models perform the basic function of " // &
+         "The CIME data models perform the basic function of " // &
          "reading external data, modifying that data, and then " // &
          "sending it to the driver via standard CESM coupling " // &
          "interfaces. The driver and other models have no " // &

@@ -17,6 +17,8 @@ module datm_comp_nuopc
   use shr_nuopc_fldList_mod
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_Diagnose
   use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_gridinit
   use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_AvectToState
   use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_StateToAvect
@@ -34,12 +36,11 @@ module datm_comp_nuopc
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Finalize  => label_Finalize
 
-  use datm_shr_mod , only: presaero  !TODO - need to add this to scalar data
+  use datm_shr_mod , only: presaero
   use datm_shr_mod , only: datm_shr_read_namelists
   use datm_comp_mod, only: datm_comp_init, datm_comp_run, datm_comp_final
   use perf_mod
   use mct_mod
-  use shr_nuopc_methods_mod, only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
 
   implicit none
 
@@ -579,7 +580,7 @@ module datm_comp_nuopc
     call ESMF_AttributeSet(comp, "ShortName", "DATM", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "LongName", &
-         "Climatological Atmosphere Data Model", &
+         "Data Atmosphere Model", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "Description", &
          "The CIME data models perform the basic function of " // &
