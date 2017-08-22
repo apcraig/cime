@@ -1,4 +1,4 @@
-module xlnd_comp_nuopc
+module xglc_comp_nuopc
 
 !----------------------------------------------------------------------------
 ! This is the NUOPC cap
@@ -7,7 +7,6 @@ module xlnd_comp_nuopc
 ! datatypes and mct datatypes is implemented via share code.
 !----------------------------------------------------------------------------
 
-#ifdef NUOPC_INTERFACE 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN, &
        CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod   ! shared system calls
@@ -45,8 +44,8 @@ module xlnd_comp_nuopc
 
   private ! except
 
-  type (shr_nuopc_fldList_Type) :: fldsToLnd
-  type (shr_nuopc_fldList_Type) :: fldsFrLnd
+  type (shr_nuopc_fldList_Type) :: fldsToGlc
+  type (shr_nuopc_fldList_Type) :: fldsFrGlc
 
   type(seq_cdata)         :: cdata
   type(seq_infodata_type),target :: infodata
@@ -62,7 +61,7 @@ module xlnd_comp_nuopc
   integer, parameter      :: dbug = 10
 
   !----- formats -----
-  character(*),parameter :: modName =  "(xlnd_comp_nuopc)"
+  character(*),parameter :: modName =  "(xglc_comp_nuopc)"
   character(*),parameter :: u_FILE_u = &
     __FILE__
 
@@ -125,7 +124,7 @@ module xlnd_comp_nuopc
       file=u_FILE_u)) &
       return  ! bail out
 
-    call ESMF_MethodRemove(gcomp, label=model_label_SetRunClock, rc=rc) 
+    call ESMF_MethodRemove(gcomp, label=model_label_SetRunClock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=u_FILE_u)) &
@@ -155,7 +154,7 @@ module xlnd_comp_nuopc
     type(ESMF_State)      :: importState, exportState
     type(ESMF_Clock)      :: clock
     integer, intent(out)  :: rc
-    
+
     character(len=10)     :: value
     type(ESMF_VM)         :: vm
     integer               :: lpet
@@ -183,7 +182,7 @@ module xlnd_comp_nuopc
       return  ! bail out
 
   end subroutine InitializeP0
-  
+
   !===============================================================================
 
   subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
@@ -193,9 +192,9 @@ module xlnd_comp_nuopc
     type(ESMF_Clock)     :: clock
     integer, intent(out) :: rc
 
-    ! local variables    
+    ! local variables
     character(len=*),parameter  :: subname=trim(modName)//':(InitializeAdvertise) '
-    
+
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -203,41 +202,41 @@ module xlnd_comp_nuopc
     ! create import fields list
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsToLnd, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsToGlc, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToLnd, seq_flds_x2l_states, "will provide", subname//":seq_flds_x2l_states", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2g_states, "will provide", subname//":seq_flds_x2g_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToLnd, seq_flds_x2l_fluxes, "will provide", subname//":seq_flds_x2l_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2g_fluxes, "will provide", subname//":seq_flds_x2g_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Add(fldsToLnd, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsToGlc, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! create export fields list
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsFrLnd, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsFrGlc, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsFrLnd, seq_flds_l2x_states, "will provide", subname//":seq_flds_l2x_states", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_g2x_states, "will provide", subname//":seq_flds_g2x_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsFrLnd, seq_flds_l2x_fluxes, "will provide", subname//":seq_flds_l2x_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_g2x_fluxes, "will provide", subname//":seq_flds_g2x_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Add(fldsFrLnd, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFrGlc, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    call shr_nuopc_fldList_Advertise(importState, fldsToLnd, subname//':dlndImport', rc)
+    call shr_nuopc_fldList_Advertise(importState, fldsToGlc, subname//':dglcImport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Advertise(exportState, fldsFrLnd, subname//':dlndExport', rc)
+    call shr_nuopc_fldList_Advertise(exportState, fldsFrGlc, subname//':dglcExport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine InitializeAdvertise
-  
+
   !===============================================================================
 
   subroutine InitializeRealize(gcomp, importState, exportState, clock, rc)
@@ -246,8 +245,8 @@ module xlnd_comp_nuopc
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
     integer, intent(out) :: rc
-    
-    ! local variables    
+
+    ! local variables
     integer(IN)      :: MCTID
     character(CL)    :: NLFilename, cvalue
     integer(IN)      :: phase, lmpicom, ierr
@@ -296,9 +295,9 @@ module xlnd_comp_nuopc
        ! initialize cleanly on data model side
        ! don't use seq_cdata_init as it grabs stuff from seq_comm
        !--------------------------------
-!       call seq_cdata_init(cdata,MCTID,ggrid,gsmap,infodata,'dlnd')
+!       call seq_cdata_init(cdata,MCTID,ggrid,gsmap,infodata,'dglc')
 !       call seq_cdata_setptrs(cdata,mpicom=mpicom)
-       cdata%name     =  'dlnd'
+       cdata%name     =  'dglc'
        cdata%ID       =  MCTID
        cdata%mpicom   =  mpicom
        cdata%dom      => ggrid
@@ -308,7 +307,7 @@ module xlnd_comp_nuopc
        call MPI_COMM_RANK(mpicom, iam, rc)
        call shr_nuopc_dmodel_AttrCopyToInfodata(gcomp, infodata, rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-       call seq_infodata_PutData(infodata,lnd_phase=phase)
+       call seq_infodata_PutData(infodata,glc_phase=phase)
     else
        call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -318,7 +317,7 @@ module xlnd_comp_nuopc
     ! call init routine
     !--------------------------------
 
-    call dead_init_mct('lnd', seq_flds_l2x_fields, seq_flds_x2l_fields, clock, cdata, x2d, d2x, NLFilename )
+    call dead_init_mct('glc', seq_flds_g2x_fields, seq_flds_x2g_fields, clock, cdata, x2d, d2x, NLFilename )
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
@@ -329,7 +328,7 @@ module xlnd_comp_nuopc
     ! grid_option specifies grid or mesh
     !--------------------------------
 
-    call seq_infodata_GetData(infodata, lnd_nx=nx_global, lnd_ny=ny_global)
+    call seq_infodata_GetData(infodata, glc_nx=nx_global, glc_ny=ny_global)
     call shr_nuopc_dmodel_gridinit(nx_global,ny_global,mpicom,gsMap,ggrid,grid_option,EGrid,Emesh,rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -339,16 +338,16 @@ module xlnd_comp_nuopc
 
     if (grid_option == 'mesh') then
 
-      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToLnd, tag=subname//':dlndImport', rc=rc)
+      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToGlc, tag=subname//':dglcImport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrLnd, tag=subname//':dlndExport', rc=rc)
+      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrGlc, tag=subname//':dglcExport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     else
 
-      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToLnd, tag=subname//':dlndImport', rc=rc)
+      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToGlc, tag=subname//':dglcImport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrLnd, tag=subname//':dlndExport', rc=rc)
+      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrGlc, tag=subname//':dglcExport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     endif
@@ -394,10 +393,10 @@ module xlnd_comp_nuopc
     call ESMF_AttributeAdd(comp,  &
          convention=convCIM, purpose=purpComp, rc=rc)
 
-    call ESMF_AttributeSet(comp, "ShortName", "XLND", &
+    call ESMF_AttributeSet(comp, "ShortName", "XGLC", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "LongName", &
-         "Land Dead Model", &
+         "Landice Dead Model", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "Description", &
          "The CESM dead models stand in as test model for active " // &
@@ -405,7 +404,7 @@ module xlnd_comp_nuopc
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "ReleaseDate", "2017", &
          convention=convCIM, purpose=purpComp, rc=rc)
-    call ESMF_AttributeSet(comp, "ModelType", "Land", &
+    call ESMF_AttributeSet(comp, "ModelType", "Landice", &
          convention=convCIM, purpose=purpComp, rc=rc)
 
     !   call ESMF_AttributeSet(comp, "Name", "Cecile Hannay", &
@@ -423,7 +422,7 @@ module xlnd_comp_nuopc
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine InitializeRealize
-  
+
   !===============================================================================
 
 #if (1 == 0)
@@ -431,7 +430,7 @@ module xlnd_comp_nuopc
     implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-    
+
     ! local variables
     type(ESMF_Clock)            :: mclock,dclock
     type(ESMF_Time)             :: dcurrtime, dstarttime, dstoptime
@@ -467,7 +466,7 @@ module xlnd_comp_nuopc
       line=__LINE__, &
       file=u_FILE_u)) &
       return  ! bail out
- 
+
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine SetClock
@@ -478,7 +477,7 @@ module xlnd_comp_nuopc
     implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-    
+
     ! local variables
     type(ESMF_Clock)              :: clock
     type(ESMF_Time)               :: time
@@ -492,7 +491,7 @@ module xlnd_comp_nuopc
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
-    
+
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
     call shr_file_setLogLevel(max(shrloglev,1))
@@ -524,7 +523,7 @@ module xlnd_comp_nuopc
     ! Run model
     !--------------------------------
 
-    call dead_run_mct('lnd',clock, cdata, x2d, d2x)
+    call dead_run_mct('glc',clock, cdata, x2d, d2x)
 
     !--------------------------------
     ! Pack export state
@@ -547,7 +546,7 @@ module xlnd_comp_nuopc
     endif
 
     call ESMF_ClockPrint(clock, options="currTime", &
-      preString="------>Advancing LND from: ", rc=rc)
+      preString="------>Advancing GLC from: ", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=u_FILE_u)) &
@@ -587,7 +586,7 @@ module xlnd_comp_nuopc
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
-    
+
     ! query the Component for its clock, importState and exportState
     call NUOPC_ModelGet(gcomp, driverClock=dclock, modelClock=mclock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -659,18 +658,18 @@ module xlnd_comp_nuopc
     implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-    
+
     ! local variables
     type(ESMF_Clock)     :: clock
     character(len=*),parameter  :: subname=trim(modName)//':(ModelFinalize) '
 
     !--------------------------------
-    ! Finalize routine 
+    ! Finalize routine
     !--------------------------------
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
-    
+
     !--------------------------------
     ! query the Component for its clock
     !--------------------------------
@@ -681,7 +680,7 @@ module xlnd_comp_nuopc
       file=u_FILE_u)) &
       return  ! bail out
 
-    call dead_final_mct('lnd', clock, cdata, x2d, d2x)
+    call dead_final_mct('glc', clock, cdata, x2d, d2x)
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -689,6 +688,4 @@ module xlnd_comp_nuopc
 
   !===============================================================================
 
-#endif
-
-end module xlnd_comp_nuopc
+end module xglc_comp_nuopc

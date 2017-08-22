@@ -1,4 +1,4 @@
-module xatm_comp_nuopc
+module xrof_comp_nuopc
 
 !----------------------------------------------------------------------------
 ! This is the NUOPC cap
@@ -7,7 +7,6 @@ module xatm_comp_nuopc
 ! datatypes and mct datatypes is implemented via share code.
 !----------------------------------------------------------------------------
 
-#ifdef NUOPC_INTERFACE 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN, &
        CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod   ! shared system calls
@@ -45,8 +44,8 @@ module xatm_comp_nuopc
 
   private ! except
 
-  type (shr_nuopc_fldList_Type) :: fldsToAtm
-  type (shr_nuopc_fldList_Type) :: fldsFrAtm
+  type (shr_nuopc_fldList_Type) :: fldsToRof
+  type (shr_nuopc_fldList_Type) :: fldsFrRof
 
   type(seq_cdata)         :: cdata
   type(seq_infodata_type),target :: infodata
@@ -62,7 +61,7 @@ module xatm_comp_nuopc
   integer, parameter      :: dbug = 10
 
   !----- formats -----
-  character(*),parameter :: modName =  "(xatm_comp_nuopc)"
+  character(*),parameter :: modName =  "(xrof_comp_nuopc)"
   character(*),parameter :: u_FILE_u = &
     __FILE__
 
@@ -203,35 +202,35 @@ module xatm_comp_nuopc
     ! create import fields list
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsToAtm, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsToRof, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_states, "will provide", subname//":seq_flds_x2a_states", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_states, "will provide", subname//":seq_flds_x2r_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_fluxes, "will provide", subname//":seq_flds_x2a_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_fluxes, "will provide", subname//":seq_flds_x2r_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Add(fldsToAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsToRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! create export fields list
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsFrAtm, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsFrRof, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_states, "will provide", subname//":seq_flds_a2x_states", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_states, "will provide", subname//":seq_flds_r2x_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_fluxes, "will provide", subname//":seq_flds_a2x_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_fluxes, "will provide", subname//":seq_flds_r2x_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Add(fldsFrAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFrRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    call shr_nuopc_fldList_Advertise(importState, fldsToAtm, subname//':datmImport', rc)
+    call shr_nuopc_fldList_Advertise(importState, fldsToRof, subname//':drofImport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Advertise(exportState, fldsFrAtm, subname//':datmExport', rc)
+    call shr_nuopc_fldList_Advertise(exportState, fldsFrRof, subname//':drofExport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
@@ -296,9 +295,9 @@ module xatm_comp_nuopc
        ! initialize cleanly on data model side
        ! don't use seq_cdata_init as it grabs stuff from seq_comm
        !--------------------------------
-!       call seq_cdata_init(cdata,MCTID,ggrid,gsmap,infodata,'datm')
+!       call seq_cdata_init(cdata,MCTID,ggrid,gsmap,infodata,'drof')
 !       call seq_cdata_setptrs(cdata,mpicom=mpicom)
-       cdata%name     =  'datm'
+       cdata%name     =  'drof'
        cdata%ID       =  MCTID
        cdata%mpicom   =  mpicom
        cdata%dom      => ggrid
@@ -308,7 +307,7 @@ module xatm_comp_nuopc
        call MPI_COMM_RANK(mpicom, iam, rc)
        call shr_nuopc_dmodel_AttrCopyToInfodata(gcomp, infodata, rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-       call seq_infodata_PutData(infodata,atm_phase=phase)
+       call seq_infodata_PutData(infodata,rof_phase=phase)
     else
        call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -318,7 +317,7 @@ module xatm_comp_nuopc
     ! call init routine
     !--------------------------------
 
-    call dead_init_mct('atm', seq_flds_a2x_fields, seq_flds_x2a_fields, clock, cdata, x2d, d2x, NLFilename )
+    call dead_init_mct('rof', seq_flds_r2x_fields, seq_flds_x2r_fields, clock, cdata, x2d, d2x, NLFilename )
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
@@ -329,7 +328,7 @@ module xatm_comp_nuopc
     ! grid_option specifies grid or mesh
     !--------------------------------
 
-    call seq_infodata_GetData(infodata, atm_nx=nx_global, atm_ny=ny_global)
+    call seq_infodata_GetData(infodata, rof_nx=nx_global, rof_ny=ny_global)
     call shr_nuopc_dmodel_gridinit(nx_global,ny_global,mpicom,gsMap,ggrid,grid_option,EGrid,Emesh,rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -339,16 +338,16 @@ module xatm_comp_nuopc
 
     if (grid_option == 'mesh') then
 
-      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToAtm, tag=subname//':datmImport', rc=rc)
+      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToRof, tag=subname//':drofImport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrAtm, tag=subname//':datmExport', rc=rc)
+      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrRof, tag=subname//':drofExport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     else
 
-      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToAtm, tag=subname//':datmImport', rc=rc)
+      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToRof, tag=subname//':drofImport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrAtm, tag=subname//':datmExport', rc=rc)
+      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrRof, tag=subname//':drofExport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     endif
@@ -372,9 +371,6 @@ module xatm_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     call shr_nuopc_methods_State_SetScalar(0.0_r8,         seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-    call seq_infodata_GetData(infodata, nextsw_cday=nextsw_cday)
-    call shr_nuopc_methods_State_SetScalar(nextsw_cday,    seq_flds_scalar_index_nextsw_cday, exportState, mpicom, rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
     ! diagnostics
@@ -397,10 +393,10 @@ module xatm_comp_nuopc
     call ESMF_AttributeAdd(comp,  &
          convention=convCIM, purpose=purpComp, rc=rc)
 
-    call ESMF_AttributeSet(comp, "ShortName", "XATM", &
+    call ESMF_AttributeSet(comp, "ShortName", "XROF", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "LongName", &
-         "Atmosphere Dead Model", &
+         "Runoff Dead Model", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "Description", &
          "The CESM dead models stand in as test model for active " // &
@@ -408,7 +404,7 @@ module xatm_comp_nuopc
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "ReleaseDate", "2017", &
          convention=convCIM, purpose=purpComp, rc=rc)
-    call ESMF_AttributeSet(comp, "ModelType", "Atmosphere", &
+    call ESMF_AttributeSet(comp, "ModelType", "Runoff", &
          convention=convCIM, purpose=purpComp, rc=rc)
 
     !   call ESMF_AttributeSet(comp, "Name", "Cecile Hannay", &
@@ -527,7 +523,7 @@ module xatm_comp_nuopc
     ! Run model
     !--------------------------------
 
-    call dead_run_mct('atm',clock, cdata, x2d, d2x)
+    call dead_run_mct('rof',clock, cdata, x2d, d2x)
 
     !--------------------------------
     ! Pack export state
@@ -550,7 +546,7 @@ module xatm_comp_nuopc
     endif
 
     call ESMF_ClockPrint(clock, options="currTime", &
-      preString="------>Advancing ATM from: ", rc=rc)
+      preString="------>Advancing ROF from: ", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=u_FILE_u)) &
@@ -684,7 +680,7 @@ module xatm_comp_nuopc
       file=u_FILE_u)) &
       return  ! bail out
 
-    call dead_final_mct('atm', clock, cdata, x2d, d2x)
+    call dead_final_mct('rof', clock, cdata, x2d, d2x)
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -692,6 +688,4 @@ module xatm_comp_nuopc
 
   !===============================================================================
 
-#endif
-
-end module xatm_comp_nuopc
+end module xrof_comp_nuopc

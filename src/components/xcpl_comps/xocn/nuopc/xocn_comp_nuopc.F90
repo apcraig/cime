@@ -1,4 +1,4 @@
-module xice_comp_nuopc
+module xocn_comp_nuopc
 
 !----------------------------------------------------------------------------
 ! This is the NUOPC cap
@@ -7,7 +7,6 @@ module xice_comp_nuopc
 ! datatypes and mct datatypes is implemented via share code.
 !----------------------------------------------------------------------------
 
-#ifdef NUOPC_INTERFACE 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN, &
        CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod   ! shared system calls
@@ -45,8 +44,8 @@ module xice_comp_nuopc
 
   private ! except
 
-  type (shr_nuopc_fldList_Type) :: fldsToIce
-  type (shr_nuopc_fldList_Type) :: fldsFrIce
+  type (shr_nuopc_fldList_Type) :: fldsToOcn
+  type (shr_nuopc_fldList_Type) :: fldsFrOcn
 
   type(seq_cdata)         :: cdata
   type(seq_infodata_type),target :: infodata
@@ -62,7 +61,7 @@ module xice_comp_nuopc
   integer, parameter      :: dbug = 10
 
   !----- formats -----
-  character(*),parameter :: modName =  "(xice_comp_nuopc)"
+  character(*),parameter :: modName =  "(xocn_comp_nuopc)"
   character(*),parameter :: u_FILE_u = &
     __FILE__
 
@@ -203,35 +202,35 @@ module xice_comp_nuopc
     ! create import fields list
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsToIce, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsToOcn, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_states, "will provide", subname//":seq_flds_x2i_states", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_states, "will provide", subname//":seq_flds_x2o_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_fluxes, "will provide", subname//":seq_flds_x2i_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_fluxes, "will provide", subname//":seq_flds_x2o_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Add(fldsToIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsToOcn, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! create export fields list
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsFrIce, rc=rc)
+    call shr_nuopc_fldList_Zero(fldsFrOcn, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_states, "will provide", subname//":seq_flds_i2x_states", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_states, "will provide", subname//":seq_flds_o2x_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_fluxes, "will provide", subname//":seq_flds_i2x_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_fluxes, "will provide", subname//":seq_flds_o2x_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Add(fldsFrIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFrOcn, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    call shr_nuopc_fldList_Advertise(importState, fldsToIce, subname//':diceImport', rc)
+    call shr_nuopc_fldList_Advertise(importState, fldsToOcn, subname//':docnImport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    call shr_nuopc_fldList_Advertise(exportState, fldsFrIce, subname//':diceExport', rc)
+    call shr_nuopc_fldList_Advertise(exportState, fldsFrOcn, subname//':docnExport', rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
@@ -296,9 +295,9 @@ module xice_comp_nuopc
        ! initialize cleanly on data model side
        ! don't use seq_cdata_init as it grabs stuff from seq_comm
        !--------------------------------
-!       call seq_cdata_init(cdata,MCTID,ggrid,gsmap,infodata,'dice')
+!       call seq_cdata_init(cdata,MCTID,ggrid,gsmap,infodata,'docn')
 !       call seq_cdata_setptrs(cdata,mpicom=mpicom)
-       cdata%name     =  'dice'
+       cdata%name     =  'docn'
        cdata%ID       =  MCTID
        cdata%mpicom   =  mpicom
        cdata%dom      => ggrid
@@ -308,7 +307,7 @@ module xice_comp_nuopc
        call MPI_COMM_RANK(mpicom, iam, rc)
        call shr_nuopc_dmodel_AttrCopyToInfodata(gcomp, infodata, rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-       call seq_infodata_PutData(infodata,ice_phase=phase)
+       call seq_infodata_PutData(infodata,ocn_phase=phase)
     else
        call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -318,7 +317,7 @@ module xice_comp_nuopc
     ! call init routine
     !--------------------------------
 
-    call dead_init_mct('ice', seq_flds_i2x_fields, seq_flds_x2i_fields, clock, cdata, x2d, d2x, NLFilename )
+    call dead_init_mct('ocn', seq_flds_o2x_fields, seq_flds_x2o_fields, clock, cdata, x2d, d2x, NLFilename )
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
@@ -329,7 +328,7 @@ module xice_comp_nuopc
     ! grid_option specifies grid or mesh
     !--------------------------------
 
-    call seq_infodata_GetData(infodata, ice_nx=nx_global, ice_ny=ny_global)
+    call seq_infodata_GetData(infodata, ocn_nx=nx_global, ocn_ny=ny_global)
     call shr_nuopc_dmodel_gridinit(nx_global,ny_global,mpicom,gsMap,ggrid,grid_option,EGrid,Emesh,rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -339,16 +338,16 @@ module xice_comp_nuopc
 
     if (grid_option == 'mesh') then
 
-      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
+      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrIce, tag=subname//':diceExport', rc=rc)
+      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     else
 
-      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
+      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrIce, tag=subname//':diceExport', rc=rc)
+      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     endif
@@ -394,10 +393,10 @@ module xice_comp_nuopc
     call ESMF_AttributeAdd(comp,  &
          convention=convCIM, purpose=purpComp, rc=rc)
 
-    call ESMF_AttributeSet(comp, "ShortName", "XICE", &
+    call ESMF_AttributeSet(comp, "ShortName", "XOCN", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "LongName", &
-         "Sea Ice Dead Model", &
+         "Ocean Dead Model", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "Description", &
          "The CESM dead models stand in as test model for active " // &
@@ -405,7 +404,7 @@ module xice_comp_nuopc
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "ReleaseDate", "2017", &
          convention=convCIM, purpose=purpComp, rc=rc)
-    call ESMF_AttributeSet(comp, "ModelType", "Sea Ice", &
+    call ESMF_AttributeSet(comp, "ModelType", "Ocean", &
          convention=convCIM, purpose=purpComp, rc=rc)
 
     !   call ESMF_AttributeSet(comp, "Name", "Cecile Hannay", &
@@ -524,7 +523,7 @@ module xice_comp_nuopc
     ! Run model
     !--------------------------------
 
-    call dead_run_mct('ice',clock, cdata, x2d, d2x)
+    call dead_run_mct('ocn',clock, cdata, x2d, d2x)
 
     !--------------------------------
     ! Pack export state
@@ -547,7 +546,7 @@ module xice_comp_nuopc
     endif
 
     call ESMF_ClockPrint(clock, options="currTime", &
-      preString="------>Advancing ICE from: ", rc=rc)
+      preString="------>Advancing OCN from: ", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=u_FILE_u)) &
@@ -681,7 +680,7 @@ module xice_comp_nuopc
       file=u_FILE_u)) &
       return  ! bail out
 
-    call dead_final_mct('ice', clock, cdata, x2d, d2x)
+    call dead_final_mct('ocn', clock, cdata, x2d, d2x)
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -689,6 +688,4 @@ module xice_comp_nuopc
 
   !===============================================================================
 
-#endif
-
-end module xice_comp_nuopc
+end module xocn_comp_nuopc
