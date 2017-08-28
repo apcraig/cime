@@ -1170,7 +1170,6 @@ class Namelist(object):
             for name in sorted(group.keys()):
                 values = group[name]
                 if "component_list" in name:
-                    print "DEBUG: values[0] = ",values[0]
                     for skip_comp in skip_comps:
                         if skip_comp in values[0]:
                             values[0] = values[0].replace(skip_comp,"")

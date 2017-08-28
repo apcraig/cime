@@ -818,8 +818,11 @@ subroutine seq_hist_writeavg(infodata, EClock_d, &
             if (atm_present .and. histavg_atm) then
                gsmap => component_get_gsmap_cx(atm(1))
                dom   => component_get_dom_cx(atm(1))
+               write(6,*)'DEBUG: atm_nx= ',atm_nx
+               write(6,*)'DEBUG: atm_ny= ',atm_ny
                call seq_io_write(hist_file, gsmap, dom%data, 'dom_ax',  &
                     nx=atm_nx, ny=atm_ny, nt=1, whead=whead, wdata=wdata, pre='doma')
+               write(6,*)'DEBUG: i am here'
 
                call seq_io_write(hist_file, gsmap, x2a_ax_avg, 'x2a_ax',  &
                     nx=atm_nx, ny=atm_ny, nt=1, whead=whead, wdata=wdata,  &

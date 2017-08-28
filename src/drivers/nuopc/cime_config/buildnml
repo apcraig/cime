@@ -98,8 +98,6 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
             mindt = min(mindt, cpl_dt)
             # elif comp.lower() is not 'cpl':
 
-    print "DEBUG: components = ",nmlgen.get_value("CESM_component_list")
-
     #--------------------------------
     # Overwrite: set start_ymd
     #--------------------------------
@@ -188,7 +186,6 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     # Determine components that are not present
     skip_comps = []
     for item in comp_types:
-        print "DEBUG: item is ",item
         # stub comps
         if case.get_value("COMP_" + item.upper()) == 's' + item:
             skip_comps.append(item.upper())

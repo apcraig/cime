@@ -173,12 +173,13 @@ module seq_flds_mod
    integer , parameter :: seq_flds_scalar_index_dead_comps         = 7
    integer , parameter :: seq_flds_scalar_index_rofice_present     = 8  ! does rof have iceberg coupling on
    integer , parameter :: seq_flds_scalar_index_flood_present      = 9  ! does rof have flooding on
-   integer , parameter :: seq_flds_scalar_index_ocnrof_prognostic  = 10 ! does component need rof data
-   integer , parameter :: seq_flds_scalar_index_iceberg_prognostic = 11 ! does the ice model support icebergs
+   integer , parameter :: seq_flds_scalar_index_ocnrof_prognostic  = 10 ! does ocn need rof data
+   integer , parameter :: seq_flds_scalar_index_iceberg_prognostic = 11 ! does ice model support icebergs
    integer , parameter :: seq_flds_scalar_index_glclnd_present     = 12 ! does glc have land coupling fields on
    integer , parameter :: seq_flds_scalar_index_glcocn_present     = 13 ! does glc have ocean runoff on
    integer , parameter :: seq_flds_scalar_index_glcice_present     = 14 ! does glc have iceberg coupling on
-   integer , parameter :: seq_flds_scalar_index_glc_valid_input    = 15 ! is valid accumulated data being sent to prognostic glc
+   integer , parameter :: seq_flds_scalar_index_glc_valid_input    = 15 ! does glc have is valid accumulated data being sent to it?
+                                                                        ! (only valid of glc_prognostic is .true.)
    integer , parameter :: seq_flds_scalar_index_glc_coupled_fluxes = 16 ! does glc send fluxes to other components
                                                                         ! (only relevant if glc_present is .true.)
 

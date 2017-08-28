@@ -601,6 +601,53 @@ module ESM
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
+      ! GLC
+      !--------
+
+      elseif (trim(prefix) == "GLC") then
+
+        call seq_comm_petlist(GLCID(1),petList)
+        if (trim(model) == "cism") then
+#ifdef ESMFUSE_NOTYET_clm
+          call NUOPC_DriverAddComp(driver, "GLC", clm_SS, petList=petList, comp=child, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+#else
+          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
+            msg=subname//' model unavailable = '//trim(prefix)//':'//trim(model), &
+            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
+          return  ! bail out
+#endif
+        elseif (trim(model) == "xglc") then
+#ifdef ESMFUSE_xglc
+          call NUOPC_DriverAddComp(driver, "GLC", xglc_SS, petList=petList, comp=child, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+#else
+          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
+            msg=subname//' model unavailable = '//trim(prefix)//':'//trim(model), &
+            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
+          return  ! bail out
+#endif
+        else
+          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
+            msg=subname//' invalid model = '//trim(prefix)//':'//trim(model), &
+            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
+          return  ! bail out
+        endif
+        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call esm_AddAttributes(child, driver, GLCID(1), rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+        ! read GLC attributes from config file into FreeFormat
+        attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", &
+          relaxedflag=.true., rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !--------
       ! ROF
       !--------
 

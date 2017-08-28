@@ -366,6 +366,7 @@ module dice_comp_nuopc
     real(R8)                 :: scmLat  = shr_const_SPVAL ! single column lat
     real(R8)                 :: scmLon  = shr_const_SPVAL ! single column lon
     logical                  :: connected                 ! is field connected?
+    real(R8)                 :: scalar                    ! temporary if if-logic
     character(len=*),parameter :: subname=trim(modName)//':(InitializeRealize) '
     !-------------------------------------------------------------------------------
 
@@ -492,20 +493,27 @@ module dice_comp_nuopc
     call shr_nuopc_dmodel_AvectToState(d2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    ! call shr_nuopc_methods_State_SetScalar(1.0_r8,         seq_flds_scalar_index_present, exportState, mpicom, rc)
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-
-    ! call shr_nuopc_methods_State_SetScalar(0.0_r8,         seq_flds_scalar_index_prognostic, exportState, mpicom, rc)
-    ! if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-
     call shr_nuopc_methods_State_SetScalar(dble(ny_global),seq_flds_scalar_index_nx, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     call shr_nuopc_methods_State_SetScalar(dble(nx_global),seq_flds_scalar_index_ny, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(0.0_r8,         seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+
+    call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+
+    if (iceberg_prognostic) then
+       scalar = 1.0_r8
+    else
+       scalar = 0.0_r8
+    end if
+    call shr_nuopc_methods_State_SetScalar(scalar, seq_flds_scalar_index_iceberg_prognostic, exportState, mpicom, rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+
+   integer , parameter :: seq_flds_scalar_index_iceberg_prognostic = 11 ! does the ice model support icebergs
 
     !--------------------------------
     ! diagnostics
