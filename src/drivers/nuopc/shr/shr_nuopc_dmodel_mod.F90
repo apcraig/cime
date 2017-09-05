@@ -1,12 +1,9 @@
 !================================================================================
 module shr_nuopc_dmodel_mod
 
-#ifdef NUOPC_INTERFACE 
-
   use shr_kind_mod,only : r8 => SHR_KIND_r8, IN => SHR_KIND_I4, CXX => SHR_KIND_CXX
   use shr_kind_mod,only : CL => SHR_KIND_CL, CX => SHR_KIND_CX, CS => SHR_KIND_CS
   use shr_sys_mod, only : shr_sys_abort
-  use seq_infodata_mod, only: seq_infodata_type, seq_infodata_PutData
   use shr_nuopc_methods_mod, only: shr_nuopc_methods_State_reset
   use ESMF
   use NUOPC
@@ -18,7 +15,6 @@ module shr_nuopc_dmodel_mod
   integer :: dbrc
 
   public :: shr_nuopc_dmodel_GridInit
-  public :: shr_nuopc_dmodel_AttrCopyToInfodata
   public :: shr_nuopc_dmodel_AvectToState
   public :: shr_nuopc_dmodel_StateToAvect
 
@@ -119,12 +115,12 @@ contains
          staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-      call ESMF_GridGetCoord(Egrid, coordDim=1, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, & 
+      call ESMF_GridGetCoord(Egrid, coordDim=1, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, &
         farrayPtr=farray1, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
       call mct_gGrid_exportRattr(ggrid,'lon',farray1,lsize)
 
-      call ESMF_GridGetCoord(Egrid, coordDim=2, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, & 
+      call ESMF_GridGetCoord(Egrid, coordDim=2, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, &
         farrayPtr=farray1, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
       call mct_gGrid_exportRattr(ggrid,'lat',farray1,lsize)
@@ -261,16 +257,16 @@ contains
 !         write(tmpstr,'(a,i8,4g13.6)') subname//' grid values ',DE,falon(n),falat(n),famask(n),faarea(n)
 !         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
-         call ESMF_GridGetCoord(Egrid, coordDim=1, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, & 
+         call ESMF_GridGetCoord(Egrid, coordDim=1, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, &
            computationalLBound=lbnd, computationalUBound=ubnd, &
            farrayPtr=farray2, rc=rc)
          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
          farray2(1,1) = falon(n)
 
-!         write(tmpstr,'(a,5i8)') subname//' lbnd ubnd ',DE,lbnd,ubnd       
+!         write(tmpstr,'(a,5i8)') subname//' lbnd ubnd ',DE,lbnd,ubnd
 !         call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
-         call ESMF_GridGetCoord(Egrid, coordDim=2, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, & 
+         call ESMF_GridGetCoord(Egrid, coordDim=2, localDE=DE, staggerLoc=ESMF_STAGGERLOC_CENTER, &
            farrayPtr=farray2, rc=rc)
          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
          farray2(1,1) = falat(n)
@@ -446,132 +442,6 @@ contains
     endif   ! grid_option
 
   end subroutine shr_nuopc_dmodel_GridInit
-  
-!-----------------------------------------------------------------------------
-
-  subroutine shr_nuopc_dmodel_AttrCopyToInfodata(gcomp, infodata, rc)
-
-    ! Get specific set of attributes from gcomp and copy to infodata
-
-    ! input/output parameters
-    type(ESMF_GridComp)    ,intent(in)    :: gcomp
-    type(seq_infodata_type),intent(inout) :: infodata
-    integer                ,intent(inout) :: rc
-
-    ! locals
-    character(len=CL) :: cvalue
-    integer  :: ivalue, n
-    real(r8) :: rvalue
-    logical  :: lvalue
-    integer, parameter :: nattrlist = 20
-    character(len=*), parameter :: attrList(nattrlist) = &
-      (/ "case_name"    ,"single_column","scmlat"        ,"scmlon"               , &
-         "orb_eccen"    ,"orb_obliqr"   ,"orb_lambm0"    ,"orb_mvelpp"           , &
-         "read_restart" ,"start_type"   ,"tfreeze_option","model_version"        , &
-         "info_debug"   ,"atm_aero"     ,"aqua_planet"   ,"brnch_retain_casename", &
-         "perpetual"    ,"perpetual_ymd","hostname"      ,"username"/)
-    character(len=*), parameter :: subname = "(shr_nuopc_dmodel_AttrCopyToInfodata)"
-    !-------------------------------------------    
-
-    rc = ESMF_Success
-
-    do n = 1,nattrlist
-
-      call NUOPC_CompAttributeGet(gcomp, name=trim(attrList(n)), value=cvalue, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-        line=__LINE__, &
-        file=u_FILE_u)) &
-        return  ! bail out
-
-      select case(trim(attrList(n)))
-
-      case("case_name")
-        call seq_infodata_PutData(infodata, case_name=cvalue)
-
-      case("single_column")
-        lvalue = (trim(cvalue) == "true")
-        call seq_infodata_PutData(infodata, single_column=lvalue)
-
-      case ("scmlat")
-        read(cvalue,*) rvalue
-        call seq_infodata_PutData(infodata, scmlat=rvalue)
-
-      case ("scmlon")
-        read(cvalue,*) rvalue
-        call seq_infodata_PutData(infodata, scmlon=rvalue)
-
-      case("orb_eccen")
-        read(cvalue,*) rvalue
-        call seq_infodata_PutData(infodata, orb_eccen=rvalue)
-
-      case("orb_obliqr")
-        read(cvalue,*) rvalue
-        call seq_infodata_PutData(infodata, orb_obliqr=rvalue)
-
-      case("orb_lambm0")
-        read(cvalue,*) rvalue
-        call seq_infodata_PutData(infodata, orb_lambm0=rvalue)
-
-      case("orb_mvelpp")
-        read(cvalue,*) rvalue
-        call seq_infodata_PutData(infodata, orb_mvelpp=rvalue)
-
-      case("read_restart")
-        lvalue = (trim(cvalue) == "true")
-        call seq_infodata_PutData(infodata, read_restart=lvalue)
-
-      case("start_type")
-        call seq_infodata_PutData(infodata, start_type=cvalue)
-
-      case("tfreeze_option")
-        call seq_infodata_PutData(infodata, tfreeze_option=cvalue)
-
-      case("model_version")
-        call seq_infodata_PutData(infodata, model_version=cvalue)
-
-      case("info_debug")
-        read(cvalue,*) ivalue
-        call seq_infodata_PutData(infodata, info_debug=ivalue)
-
-      case("atm_aero")
-        lvalue = (trim(cvalue) == "true")
-        call seq_infodata_PutData(infodata, atm_aero=lvalue)
-
-      case("aqua_planet")
-        lvalue = (trim(cvalue) == "true")
-        call seq_infodata_PutData(infodata, aqua_planet=lvalue)
-
-      case("brnch_retain_casename")
-        lvalue = (trim(cvalue) == "true")
-        call seq_infodata_PutData(infodata, brnch_retain_casename=lvalue)
-
-      case("perpetual")
-        lvalue = (trim(cvalue) == "true")
-        call seq_infodata_PutData(infodata, perpetual=lvalue)
-
-      case("perpetual_ymd")
-        read(cvalue,*) ivalue
-        call seq_infodata_PutData(infodata, perpetual_ymd=ivalue)
-
-      case("hostname")
-        call seq_infodata_PutData(infodata, hostname=cvalue)
-
-      case("username")
-        call seq_infodata_PutData(infodata, username=cvalue)
-
-      case default
-        rc = ESMF_Failure
-        call ESMF_LogWrite(trim(subname)//": unknown attrlist = "//trim(attrList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-          line=__LINE__, &
-          file=u_FILE_u)) &
-          return  ! bail out
-
-      end select
-
-    enddo
-
-  end subroutine shr_nuopc_dmodel_AttrCopyToInfodata
 
 !-----------------------------------------------------------------------------
 
@@ -740,8 +610,5 @@ contains
   end subroutine shr_nuopc_dmodel_StateToAvect
 
 !-----------------------------------------------------------------------------
-  
-#endif
-  
+
 end module shr_nuopc_dmodel_mod
-  

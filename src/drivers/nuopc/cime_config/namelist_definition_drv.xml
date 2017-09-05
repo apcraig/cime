@@ -49,7 +49,7 @@
     <category>nuopc</category>
     <group>nuopc_var</group>
     <values>
-      <value>ATM OCN ICE LND ROF MED</value>
+      <value>ATM OCN ICE LND ROF GLC WAV MED</value>
     </values>
   </entry>
 
@@ -181,6 +181,42 @@
     </values>
   </entry>
 
+  <entry id="GLC_model" modify_via_xml="COMP_GLC">
+    <type>char</type>
+    <category>nuopc</category>
+    <group>nuopc_var</group>
+    <values>
+      <value>$COMP_GLC</value>
+    </values>
+  </entry>
+
+  <entry id="Verbosity@GLC_attributes">
+    <type>char</type>
+    <category>nuopc</category>
+    <group>GLC_attributes</group>
+    <values>
+      <value>0</value>
+    </values>
+  </entry>
+
+  <entry id="WAV_model" modify_via_xml="COMP_WAV">
+    <type>char</type>
+    <category>nuopc</category>
+    <group>nuopc_var</group>
+    <values>
+      <value>$COMP_WAV</value>
+    </values>
+  </entry>
+
+  <entry id="Verbosity@WAV_attributes">
+    <type>char</type>
+    <category>nuopc</category>
+    <group>WAV_attributes</group>
+    <values>
+      <value>0</value>
+    </values>
+  </entry>
+
   <!-- =========================== -->
   <!--  NUOPC driver run sequence  -->
   <!-- =========================== -->
@@ -200,15 +236,22 @@
             MED med_phases_prep_ice
             MED med_connectors_prep_med2ice
             MED -> ICE :remapMethod=redist
+            MED med_phases_prep_wav
+            MED med_connectors_prep_med2wav
+            MED -> WAV :remapMethod=redist
             MED med_phases_prep_lnd
             MED med_connectors_prep_med2lnd
             MED -> LND :remapMethod=redist
+            MED med_phases_prep_glc
+            MED med_connectors_prep_med2glc
+            MED -> GLC :remapMethod=redist
             MED med_phases_prep_rof
             MED med_connectors_prep_med2rof
             MED -> ROF :remapMethod=redist
             ICE
             LND
             ROF
+	    WAV
             ROF -> MED :remapMethod=redist
             MED med_connectors_post_rof2med
             LND -> MED :remapMethod=redist
@@ -219,6 +262,11 @@
             MED med_connectors_prep_med2atm
             MED -> ATM :remapMethod=redist
             ATM
+	    GLC
+            WAV -> MED :remapMethod=redist
+            MED med_connectors_post_wav2med
+            GLC -> MED :remapMethod=redist
+            MED med_connectors_post_glc2med
             ATM -> MED :remapMethod=redist
             MED med_connectors_post_atm2med
             MED med_phases_accum_fast
@@ -2420,7 +2468,7 @@
     <category>aux_hist</category>
     <group>DRIVER_auxhist_attributes</group>
     <desc>
-      Auxiliary coupler a2x history fields 
+      Auxiliary coupler a2x history fields
     </desc>
     <values>
       <value>Faxa_swndr:Faxa_swvdr:Faxa_swndf:Faxa_swvdf</value>
@@ -3872,7 +3920,7 @@
     <group>ccsm_pes</group>
     <desc>
       Determines what ESMF log files (if any) are generated when
-          USE_ESMF_LIB is TRUE. 
+          USE_ESMF_LIB is TRUE.
       ESMF_LOGKIND_SINGLE: Use a single log file, combining messages from
           all of the PETs. Not supported on some platforms.
       ESMF_LOGKIND_MULTI: Use multiple log files — one per PET.
@@ -4255,4 +4303,3 @@
   </entry>
 
 </entry_id>
-

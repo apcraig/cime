@@ -49,10 +49,11 @@ my @filepath = ("$CASEROOT/SourceMods/src.share");
 
 if($comp eq "nuopc") {
     push(@filepath,"$CIMEROOT/src/drivers/nuopc/shr");
+} else {
+    push(@filepath,"$CIMEROOT/src/drivers/mct/shr");
 }
 
-my @filepath_add = ("$CIMEROOT/src/drivers/mct/shr",
-		    "$CIMEROOT/src/components/xcpl_models/xshare",
+my @filepath_add = ("$CIMEROOT/src/components/xcpl_models/xshare",
 		    "$CIMEROOT/src/share/util",
 		    "$CIMEROOT/src/share/RandNum/src",
 		    "$CIMEROOT/src/share/RandNum/src/dsfmt_f03",
@@ -111,5 +112,3 @@ if ( ! -d "$installdir/lib"){
 }
 system("cp -p -f libcsm_share.a $installdir/lib/");
 system("cp -p -f *.mod $installdir/include/");
-
-

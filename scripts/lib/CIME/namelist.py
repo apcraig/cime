@@ -1111,9 +1111,9 @@ class Namelist(object):
                 self.set_variable_value(group_name, variable_name, merged_val,
                                         var_size=len(merged_val))
 
-    def write(self, out_file, groups=None, append=False, format_='nml', sorted_groups=True, 
+    def write(self, out_file, groups=None, append=False, format_='nml', sorted_groups=True,
               skip_comps=None, prognostic_comps=None, atm_cpl_dt=None, ocn_cpl_dt=None):
-        
+
         """Write a Fortran namelist to a file.
 
         As with `parse`, the `out_file` argument can be either a file name, or a
@@ -1216,12 +1216,13 @@ class Namelist(object):
                         for run_entry in run_entries:
                             print_entry = True
                             for skip_comp in skip_comps:
-                                if skip_comp in run_entry:
-                                    print_entry = False
-                                    logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
-                                if skip_comp.lower().strip() in run_entry:
-                                    print_entry = False
-                                    logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
+                                if "@" not in run_entry:
+                                    if skip_comp in run_entry:
+                                        print_entry = False
+                                        logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
+                                    if skip_comp.lower().strip() in run_entry:
+                                        print_entry = False
+                                        logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
                             if print_entry:
                                 if "@atm_cpl_dt" in run_entry:
                                     run_entry = run_entry.replace("atm_cpl_dt",atm_cpl_dt)
@@ -1234,7 +1235,7 @@ class Namelist(object):
 
             if "_attribute" in group_name or "runseq" in group_name:
                 out_file.write("::\n\n")
-                
+
     def _write(self, out_file, groups, format_, sorted_groups):
         """Unwrapped version of `write` assuming that a file object is input."""
         if groups is None:
