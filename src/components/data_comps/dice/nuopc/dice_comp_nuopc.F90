@@ -78,6 +78,7 @@ module dice_comp_nuopc
   integer                    :: dbrc
   integer, parameter         :: dbug = 10
   character(len=*),parameter :: grid_option = "mesh"      ! grid_de, grid_arb, grid_reg, mesh
+  logical                    :: iceberg_prognostic = .false.
 
   type (shr_nuopc_fldList_Type) :: fldsToIce
   type (shr_nuopc_fldList_Type) :: fldsFrIce
@@ -512,8 +513,6 @@ module dice_comp_nuopc
     end if
     call shr_nuopc_methods_State_SetScalar(scalar, seq_flds_scalar_index_iceberg_prognostic, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-
-   integer , parameter :: seq_flds_scalar_index_iceberg_prognostic = 11 ! does the ice model support icebergs
 
     !--------------------------------
     ! diagnostics
