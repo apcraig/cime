@@ -152,7 +152,9 @@ contains
        !-------------------------------------------------------------------------
        ! invalid decomposition type
        !-------------------------------------------------------------------------
-       write(logunit,F01) 'ERROR: invalid decomp_type = ',decomp_type
+       if (mype == 0) then
+          write(logunit,F01) 'ERROR: invalid decomp_type = ',decomp_type
+       end if
        call shr_sys_abort(subName//'invalid decomp_type')
     endif
 
@@ -160,8 +162,9 @@ contains
        lsize = 0
        allocate(gbuf(lsize,dead_grid_total))
        !      gbuf = -888.0_R8
-       if (mype == 0) &
-            write(logunit,*) subname,' grid size is zero, lsize = ',lsize
+       if (mype == 0) then
+          write(logunit,*) subname,' grid size is zero, lsize = ',lsize
+       end if
        return
     endif
 
@@ -286,7 +289,9 @@ contains
           i = i + 1
        enddo
 
-       write(logunit,*) 'dead_setNewGrid decomp seg ',mype,lsize,nx
+       if (mype == 0) then
+          write(logunit,*) 'dead_setNewGrid decomp seg ',mype,lsize,nx
+       end if
 
        found = .true.
 
@@ -302,8 +307,9 @@ contains
 
     allocate(gbuf(lsize,dead_grid_total))
     gbuf = -888.0_R8
-    if (mype == 0) &
-         write(logunit,*) subname,' Decomp is ',decomp_type,' lsize = ',lsize
+    if (mype == 0) then
+       write(logunit,*) subname,' Decomp is ',decomp_type,' lsize = ',lsize
+    end if
 
     n=0
     dx = 360.0_R8/nxg * deg2rad

@@ -609,6 +609,4 @@ contains
 
   end subroutine shr_nuopc_dmodel_StateToAvect
 
-!-----------------------------------------------------------------------------
-
 end module shr_nuopc_dmodel_mod

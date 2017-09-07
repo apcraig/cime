@@ -508,7 +508,7 @@ function shr_string_convert_tabs(str_input,rc) result(str_output)
          str_output(i:i) = str_input(i:i)
       end if
    end do
-   
+
    if (present(rc)) rc = 0
 
  end function shr_string_convert_tabs
@@ -991,6 +991,7 @@ subroutine shr_string_listGetName(list,k,name,rc)
    kFlds = shr_string_listGetNum(list)
    if (k<1 .or. kFlds<k) then
       write(s_logunit,*) subName,"ERROR: invalid index = ",k
+      write(s_logunit,*) subName,"ERROR:         kflds = ",kFlds
       write(s_logunit,*) subName,"ERROR:          list = ",trim(list)
       call shr_string_abort(subName//" ERROR: invalid index")
    end if
