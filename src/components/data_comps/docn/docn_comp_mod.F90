@@ -76,7 +76,7 @@ module docn_comp_mod
   real(R8),parameter :: latice  = shr_const_latice  ! latent heat of fusion
   real(R8),parameter :: ocnsalt = shr_const_ocn_ref_sal  ! ocean reference salinity
 
-  integer(IN)   :: kt,ks,ku,kv,kdhdx,kdhdy,kq,kswp  ! field indices
+  integer(IN)   :: km,kt,ks,ku,kv,kdhdx,kdhdy,kq,kswp  ! field indices
   integer(IN)   :: kswnet,klwup,klwdn,ksen,klat,kmelth,ksnow,krofi
   integer(IN)   :: kh,kqbot
   integer(IN)   :: index_lat, index_lon
@@ -86,7 +86,7 @@ module docn_comp_mod
   type(mct_avect)        :: avstrm       ! av of data from stream
   real(R8), pointer      :: somtp(:)
   real(R8), pointer      :: tfreeze(:)
-  integer , pointer      :: imask(:)
+  integer(IN), pointer   :: imask(:)
   real(R8), pointer      :: xc(:), yc(:) ! arryas of model latitudes and longitudes
   integer(IN)            :: aquap_option
 
@@ -430,6 +430,7 @@ subroutine docn_comp_init( EClock, cdata, x2o, o2x, NLFilename )
     call mct_aVect_init(o2x, rList=seq_flds_o2x_fields, lsize=lsize)
     call mct_aVect_zero(o2x)
 
+    km    = mct_aVect_indexRA(o2x,'So_omask')
     kt    = mct_aVect_indexRA(o2x,'So_t')
     ks    = mct_aVect_indexRA(o2x,'So_s')
     ku    = mct_aVect_indexRA(o2x,'So_u')
@@ -638,6 +639,7 @@ subroutine docn_comp_run( EClock, cdata,  x2o, o2x)
       !--- defaults ---
       lsize = mct_avect_lsize(o2x)
       do n = 1,lsize
+         o2x%rAttr(km   ,n) = imask(n)
          o2x%rAttr(kt   ,n) = TkFrz
          o2x%rAttr(ks   ,n) = ocnsalt
          o2x%rAttr(ku   ,n) = 0.0_R8

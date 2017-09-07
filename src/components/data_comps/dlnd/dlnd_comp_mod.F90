@@ -50,6 +50,8 @@ module dlnd_comp_mod
   integer(IN),parameter :: master_task=0 ! task number of master task
   integer(IN),public :: logunit          ! logging unit number
   integer       :: inst_index            ! number of current instance (ie. 1)
+  integer       :: kf                    ! index for frac in AV
+  real(R8),pointer :: lfrac(:)           ! land frac
   character(len=16) :: inst_name         ! fullname of current instance (ie. "lnd_0001")
   character(len=16) :: inst_suffix       ! char string associated with instance
                                          ! (ie. "_0001" or "")
@@ -169,6 +171,7 @@ subroutine dlnd_comp_init( EClock, cdata_l, x2l, l2x, NLFilename )
     logical       :: exists      ! file existance logical
     logical       :: exists_l    ! file existance logical
     integer(IN)   :: nu          ! unit number
+    integer(IN)   :: kfrac       ! AV index
 
     type(iosystem_desc_t), pointer :: lnd_pio_subsys
     integer(IN) :: lnd_pio_iotype
@@ -391,6 +394,9 @@ subroutine dlnd_comp_init( EClock, cdata_l, x2l, l2x, NLFilename )
     call shr_sys_flush(logunit)
 
     if (lnd_present) call shr_dmodel_rearrGGrid(SDLND%grid, dom_l, gsmap_l, rearr_l, mpicom)
+    kfrac = mct_aVect_indexRA(dom_l%data,'frac')
+    allocate(lfrac(lsize_l))
+    lfrac(:) = dom_l%data%rAttr(kfrac,:))
 
     call t_stopf('dlnd_initmctdom')
 
@@ -407,6 +413,8 @@ subroutine dlnd_comp_init( EClock, cdata_l, x2l, l2x, NLFilename )
 
     call mct_aVect_init(x2l, rList=seq_flds_x2l_fields, lsize=lsize_l)
     call mct_aVect_zero(x2l)
+
+    kf = mct_aVect_indexRA(l2x,'Sl_lfrin')
 
     call t_stopf('dlnd_initmctavs')
 
@@ -588,6 +596,10 @@ subroutine dlnd_comp_run( EClock, cdata_l,  x2l, l2x)
    call t_startf('dlnd_l')
 
    if (trim(lnd_mode) /= 'NULL') then
+      lsize = mct_avect_lsize(l2x)
+      do n = 1,lsize
+         l2x%rAttr(kf,n) = lfrac(n)
+      enddo
       call t_startf('dlnd_l_strdata_advance')
       call shr_strdata_advance(SDLND,currentYMD,currentTOD,mpicom,'dlnd_l')
       call t_stopf('dlnd_l_strdata_advance')

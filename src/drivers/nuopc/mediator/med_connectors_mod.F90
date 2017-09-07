@@ -110,50 +110,45 @@ contains
     select case (type)
 
     case('atm')
-       if (medToAtm) then
-          call med_connectors_diagnose(is_local%wrap%NState_AtmExp, is_local%wrap%atmcntr, "med_to_atm", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_AtmExp,'cpl2atm',is_local%wrap%mpicom,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_AtmImp,'cpl2atm',is_local%wrap%mpicom,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
+      call med_connectors_diagnose(is_local%wrap%NState_AtmExp, is_local%wrap%atmcntr, "med_to_atm", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_AtmExp,'cpl2atm',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_AtmImp,'cpl2atm',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     case('ocn')
-       if (medToOcn) then
-          call med_connectors_diagnose(is_local%wrap%NState_OcnExp, is_local%wrap%ocncntr, "med_to_ocn", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_OcnExp,'cpl2ocn',is_local%wrap%mpicom,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_OcnImp,'cpl2ocn',is_local%wrap%mpicom,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
+      call med_connectors_diagnose(is_local%wrap%NState_OcnExp, is_local%wrap%ocncntr, "med_to_ocn", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_OcnExp,'cpl2ocn',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_OcnImp,'cpl2ocn',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     case('ice')
-       if (medToIce) then
-          call med_connectors_diagnose(is_local%wrap%NState_IceExp, is_local%wrap%icecntr, "med_to_ice", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_IceExp,'cpl2ice',is_local%wrap%mpicom,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_IceImp,'cpl2ice',is_local%wrap%mpicom,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
+      call med_connectors_diagnose(is_local%wrap%NState_IceExp, is_local%wrap%icecntr, "med_to_ice", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_IceExp,'cpl2ice',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_IceImp,'cpl2ice',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     case('lnd')
-       if (medToLnd) then
-          call med_connectors_diagnose(is_local%wrap%NState_LndExp, is_local%wrap%lndcntr, "med_to_lnd", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_LndExp,'cpl2lnd',is_local%wrap%mpicom,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_LndImp,'cpl2lnd',is_local%wrap%mpicom,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
+      call med_connectors_diagnose(is_local%wrap%NState_LndExp, is_local%wrap%lndcntr, "med_to_lnd", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_LndExp,'cpl2lnd',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_LndImp,'cpl2lnd',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     case('rof')
-       if (medToRof) then
-          call med_connectors_diagnose(is_local%wrap%NState_RofExp, is_local%wrap%rofcntr, "med_to_rof", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_RofExp,'cpl2rof',is_local%wrap%mpicom,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_RofImp,'cpl2rof',is_local%wrap%mpicom,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
+      call med_connectors_diagnose(is_local%wrap%NState_RofExp, is_local%wrap%rofcntr, "med_to_rof", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_RofExp,'cpl2rof',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      call shr_nuopc_methods_CopyInfodataToState(infodata,is_local%wrap%NState_RofImp,'cpl2rof',is_local%wrap%mpicom,rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     case('default')
       rc = ESMF_Failure
       call ESMF_LogWrite(trim(subname)//trim(type)//" unsupported", ESMF_LOGMSG_INFO, rc=dbrc)

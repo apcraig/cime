@@ -97,7 +97,7 @@ module dice_comp_mod
   real(R8),parameter  :: ax_vsdr = ai_vsdr*(1.0_R8-snwfrac) + as_vsdr*snwfrac
 
   integer(IN) :: kswvdr,kswndr,kswvdf,kswndf,kq,kz,kua,kva,kptem,kshum,kdens,ktbot
-  integer(IN) :: kiFrac,kt,kavsdr,kanidr,kavsdf,kanidf,kswnet,kmelth,kmeltw
+  integer(IN) :: km,kiFrac,kt,kavsdr,kanidr,kavsdf,kanidf,kswnet,kmelth,kmeltw
   integer(IN) :: ksen,klat,klwup,kevap,ktauxa,ktauya,ktref,kqref,kswpen,ktauxo,ktauyo,ksalt
   integer(IN) :: ksalinity
 
@@ -441,6 +441,7 @@ subroutine dice_comp_init( EClock, cdata, x2i, i2x, NLFilename )
     call mct_aVect_init(i2x, rList=seq_flds_i2x_fields, lsize=lsize)
     call mct_aVect_zero(i2x)
 
+    km     = mct_aVect_indexRA(i2x,'Si_imask')
     kiFrac = mct_aVect_indexRA(i2x,'Si_ifrac')
     kt     = mct_aVect_indexRA(i2x,'Si_t')
     ktref  = mct_aVect_indexRA(i2x,'Si_tref')
@@ -826,6 +827,7 @@ subroutine dice_comp_run( EClock, cdata,  x2i, i2x)
       ! compute ice/oce surface fluxes (except melth & meltw, see above)
       !----------------------------------------------------------------------------
       do n=1,lsize
+         i2x%rAttr(km,n) = imask(n)
          if (iMask(n) == 0) then
             i2x%rAttr(kswpen,n) = spval
             i2x%rAttr(kmelth,n) = spval

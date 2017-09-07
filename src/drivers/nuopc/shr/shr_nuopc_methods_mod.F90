@@ -67,6 +67,7 @@ module shr_nuopc_methods_mod
   public shr_nuopc_methods_FB_FieldRegrid
   public shr_nuopc_methods_FB_FieldMerge
   public shr_nuopc_methods_FB_GetFldPtr
+  public shr_nuopc_methods_FB_getName
   public shr_nuopc_methods_State_reset
   public shr_nuopc_methods_State_diagnose
   public shr_nuopc_methods_State_GeomPrint
@@ -93,7 +94,6 @@ module shr_nuopc_methods_mod
   private shr_nuopc_methods_FB_GeomPrint
   private shr_nuopc_methods_FB_GeomWrite
   private shr_nuopc_methods_FB_RWFields
-  private shr_nuopc_methods_FB_getName
   private shr_nuopc_methods_FB_getFieldN
   private shr_nuopc_methods_FB_getFieldName
   private shr_nuopc_methods_FB_clean
@@ -253,6 +253,7 @@ module shr_nuopc_methods_mod
     !--- decide which map files to generate.
     !--- check fldlist mapping types.
     !--- if there are no fldlists, then generate them all.
+    !--- if a filename is passed in, generate that one too.
     !--- but only for mapfiles that are passed into the subroutine.
     !---------------------------------------------------
 
@@ -270,6 +271,12 @@ module shr_nuopc_methods_mod
       do_patch = .false.
       do_fcopy = .false.
     endif
+
+    if (present(bilnrfn)) do_bilnr = .true.
+    if (present(consffn)) do_consf = .true.
+    if (present(consdfn)) do_consd = .true.
+    if (present(patchfn)) do_patch = .true.
+    if (present(fcopyfn)) do_fcopy = .true.
 
     if (present(fldlist1)) then
       do n = 1,fldlist1%num

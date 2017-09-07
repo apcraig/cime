@@ -482,6 +482,7 @@ contains
        gbuf => gbuf_wav
        ncomp = 7
     end select
+
     if(model.eq.'rof') then
        do nf=1,nflds_d2x
           do n=1,lsize
@@ -514,10 +515,19 @@ contains
           enddo
        enddo
     endif
+
     selectcase(model)
     case('ice')
        ki = mct_aVect_indexRA(d2x,"Si_ifrac",perrWith=subname)
        d2x%rAttr(ki,:) = min(1.0_R8,max(0.0_R8,d2x%rAttr(ki,:)))
+       ki = mct_aVect_indexRA(d2x,"Si_imask",perrWith=subname)
+       d2x%rAttr(ki,:) = float(nint(min(1.0_R8,max(0.0_R8,d2x%rAttr(ki,:)))))
+    case('ocn')
+       ki = mct_aVect_indexRA(d2x,"So_omask",perrWith=subname)
+       d2x%rAttr(ki,:) = float(nint(min(1.0_R8,max(0.0_R8,d2x%rAttr(ki,:)))))
+    case('lnd')
+       ki = mct_aVect_indexRA(d2x,"Sl_lfrin",perrWith=subname)
+       d2x%rAttr(ki,:) = 1.0_R8
     case('glc')
        ki = mct_aVect_indexRA(d2x,"Sg_icemask",perrWith=subname)
        d2x%rAttr(ki,:) = 1.0_R8

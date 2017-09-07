@@ -1105,6 +1105,14 @@ module seq_flds_mod
      call metadata_set(attname, longname, stdname, units)
 
      ! Surface friction velocity in land (land/atm only)
+     call seq_flds_add(l2x_states,"Sl_lfrin")
+     longname = 'Surface fraction in land'
+     stdname  = 'land_fraction_from_land'
+     units    = '1'
+     attname  = 'Sl_lfrin'
+     call metadata_set(attname, longname, stdname, units)
+
+     ! Surface friction velocity in land (land/atm only)
      call seq_flds_add(l2x_states,"Sl_fv")
      call seq_flds_add(x2a_states,"Sl_fv")
      longname = 'Surface fraction velocity in land'
@@ -1374,6 +1382,14 @@ module seq_flds_mod
      !-----------------------------
 
      ! Fractional ice coverage wrt ocean
+     call seq_flds_add(i2x_states,"Si_imask")
+     longname = 'Sea Ice mask'
+     stdname  = 'sea_ice_mask'
+     units    = '1'
+     attname  = 'Si_imask'
+     call metadata_set(attname, longname, stdname, units)
+
+     ! Fractional ice coverage wrt ocean
      call seq_flds_add(i2x_states,"Si_ifrac")
      call seq_flds_add(x2o_states,"Si_ifrac")
      call seq_flds_add(x2w_states,"Si_ifrac")
@@ -1479,7 +1495,15 @@ module seq_flds_mod
      attname  = 'Fioi_flxdst'
      call metadata_set(attname, longname, stdname, units)
 
-     ! Sea surface  salinity
+     ! Sea surface mask
+     call seq_flds_add(o2x_states,"So_omask")
+     longname = 'Sea surface mask'
+     stdname  = 'sea_surface_mask'
+     units    = '1'
+     attname  = 'So_omask'
+     call metadata_set(attname, longname, stdname, units)
+
+     ! Sea surface salinity
      call seq_flds_add(o2x_states,"So_s")
      call seq_flds_add(x2i_states,"So_s")
      longname = 'Sea surface salinity'

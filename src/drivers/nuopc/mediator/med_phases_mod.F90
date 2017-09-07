@@ -10,6 +10,8 @@ module med_phases_mod
   use shr_nuopc_methods_mod
   use med_internalstate_mod
   use med_constants_mod
+  use med_fraction_mod
+  use med_merge_mod
 
   implicit none
   
@@ -60,7 +62,8 @@ module med_phases_mod
     real(ESMF_KIND_R8), pointer :: ifrac_ap(:), ifrac_apr(:)  ! ice fraction on atm grid patch map
     real(ESMF_KIND_R8), pointer :: ocnwgt(:),icewgt(:),customwgt(:)
     integer                     :: i,j,n
-    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_atm)'
+    logical,save                :: first_call = .true.
+    character(len=*),parameter  :: subname='(med_phases_prep_atm)'
     
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -330,7 +333,7 @@ module med_phases_mod
             else
               call ESMF_LogWrite(trim(subname)//": mapping name error "//trim(fldsFrIce%mapping(n)), ESMF_LOGMSG_INFO, rc=rc)
               rc=ESMF_FAILURE
-              return
+              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
             endif
           endif
         enddo
@@ -408,10 +411,18 @@ module med_phases_mod
     !--- custom calculations to atm
     !---------------------------------------
 
+    call med_merge_auto(is_local%wrap%FBforAtm, &
+                    is_local%wrap%FBOcn_a   , is_local%wrap%FBfrac_a, 'ofrac', &
+                    is_local%wrap%FBAtmOcn_a, is_local%wrap%FBfrac_a, 'ofrac', &
+                    is_local%wrap%FBIce_a   , is_local%wrap%FBfrac_a, 'ifrac', &
+                    is_local%wrap%FBLnd_a   , is_local%wrap%FBfrac_a, 'lfrac', &
+                    document=first_call, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
+
 #if (1 == 0)
     !---  ocn and ice fraction for merges
 
-    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', icewgt, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_a, 'Si_ifrac', icewgt, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     allocate(ocnwgt(lbound(icewgt,1):ubound(icewgt,1),lbound(icewgt,2):ubound(icewgt,2)))
     do j=lbound(icewgt,2),ubound(icewgt,2)
@@ -419,22 +430,6 @@ module med_phases_mod
       ocnwgt = 1.0_ESMF_KIND_R8 - icewgt
     enddo
     enddo
-
-    !--- fill land mask every coupling from initial computation
-
-    if (generate_landmask) then
-      call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBforAtm, 'land_mask', dataPtr3, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      do j=lbound(dataPtr3,2),ubound(dataPtr3,2)
-      do i=lbound(dataPtr3,1),ubound(dataPtr3,1)
-        dataPtr3(i,j) = land_mask(i,j)
-      enddo
-      enddo
-    else
-      call ESMF_LogWrite(trim(subname)//": ERROR generate_landmask must be true ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
-      rc = ESMF_FAILURE
-      return
-    endif
 
     !--- merges
 
@@ -523,6 +518,8 @@ module med_phases_mod
     !--- clean up
     !---------------------------------------
 
+    first_call = .false.
+
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
@@ -545,7 +542,8 @@ module med_phases_mod
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
     integer                     :: i,j,n
-    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_ice)'
+    logical,save                :: first_call = .true.
+    character(len=*),parameter  :: subname='(med_phases_prep_ice)'
     
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -615,6 +613,8 @@ module med_phases_mod
     !--- clean up
     !---------------------------------------
 
+    first_call = .false.
+
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
@@ -638,7 +638,8 @@ module med_phases_mod
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
     integer                     :: i,j,n
-    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_lnd)'
+    logical,save                :: first_call = .true.
+    character(len=*),parameter  :: subname='(med_phases_prep_lnd)'
     
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -708,6 +709,8 @@ module med_phases_mod
     !--- clean up
     !---------------------------------------
 
+    first_call = .false.
+
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
@@ -731,7 +734,8 @@ module med_phases_mod
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
     integer                     :: i,j,n
-    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_rof)'
+    logical,save                :: first_call = .true.
+    character(len=*),parameter  :: subname='(med_phases_prep_rof)'
     
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -801,6 +805,8 @@ module med_phases_mod
     !--- clean up
     !---------------------------------------
 
+    first_call = .false.
+
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
@@ -824,7 +830,8 @@ module med_phases_mod
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
     integer                     :: i,j,n
-    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_wav)'
+    logical,save                :: first_call = .true.
+    character(len=*),parameter  :: subname='(med_phases_prep_wav)'
     
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -894,6 +901,8 @@ module med_phases_mod
     !--- clean up
     !---------------------------------------
 
+    first_call = .false.
+
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
@@ -917,7 +926,8 @@ module med_phases_mod
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
     integer                     :: i,j,n
-    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_glc)'
+    logical,save                :: first_call = .true.
+    character(len=*),parameter  :: subname='(med_phases_prep_glc)'
     
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -987,6 +997,8 @@ module med_phases_mod
     !--- clean up
     !---------------------------------------
 
+    first_call = .false.
+
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
@@ -1011,7 +1023,8 @@ module med_phases_mod
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:)
     real(ESMF_KIND_R8), pointer :: atmwgt(:),icewgt(:),customwgt(:)
     logical                     :: checkOK, checkOK1, checkOK2
-    character(len=*),parameter  :: subname='(module_MEDIATOR:med_phases_prep_ocn)'
+    logical,save                :: first_call = .true.
+    character(len=*),parameter  :: subname='(med_phases_prep_ocn)'
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -1344,6 +1357,8 @@ module med_phases_mod
     !--- clean up
     !---------------------------------------
 
+    first_call = .false.
+
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
@@ -1364,7 +1379,8 @@ module med_phases_mod
     type(ESMF_State)            :: importState, exportState
     type(InternalState)         :: is_local
     integer                     :: i,j,n
-    character(len=*),parameter :: subname='(module_MEDIATOR:med_phases_accum_fast)'
+    logical,save                :: first_call = .true.
+    character(len=*),parameter :: subname='(med_phases_accum_fast)'
     
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -1472,6 +1488,8 @@ module med_phases_mod
     !---------------------------------------
     !--- clean up
     !---------------------------------------
+
+    first_call = .false.
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)

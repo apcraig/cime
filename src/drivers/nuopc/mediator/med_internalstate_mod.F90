@@ -60,32 +60,41 @@ module med_internalstate_mod
     type(ESMF_FieldBundle):: FBaccumWav  ! accumulator of wav export data
     type(ESMF_FieldBundle):: FBaccumGlc  ! accumulator of glc export data
     type(ESMF_FieldBundle):: FBaccumAtmOcn  ! accumulator of atm export data
+
     type(ESMF_FieldBundle):: FBAtm_a     ! Atm export data on atm grid
     type(ESMF_FieldBundle):: FBAtm_o     ! Atm export data mapped to ocn grid
     type(ESMF_FieldBundle):: FBAtm_i     ! Atm export data mapped to ice grid
     type(ESMF_FieldBundle):: FBAtm_l     ! Atm export data mapped to lnd grid
     type(ESMF_FieldBundle):: FBAtm_r     ! Atm export data mapped to rof grid
+
     type(ESMF_FieldBundle):: FBOcn_a     ! Ocn export data mapped to atm grid
     type(ESMF_FieldBundle):: FBOcn_o     ! Ocn export data on ocn grid
     type(ESMF_FieldBundle):: FBOcn_i     ! Ocn export data mapped to ice grid
     type(ESMF_FieldBundle):: FBOcn_w     ! Ocn export data mapped to wav grid
+
     type(ESMF_FieldBundle):: FBIce_a     ! Ice export data mapped to atm grid
     type(ESMF_FieldBundle):: FBIce_o     ! Ice export data mapped to ocn grid
     type(ESMF_FieldBundle):: FBIce_i     ! Ice export data on ice grid
     type(ESMF_FieldBundle):: FBIce_if    ! Ice export data on ice grid multiplied by ice fraction
+
     type(ESMF_FieldBundle):: FBLnd_a     ! Lnd export data mapped to atm grid
     type(ESMF_FieldBundle):: FBLnd_l     ! Lnd export on lnd grid
     type(ESMF_FieldBundle):: FBLnd_r     ! Lnd export data mapped to rof grid
     type(ESMF_FieldBundle):: FBLnd_g     ! Lnd export data mapped to glc grid
+
     type(ESMF_FieldBundle):: FBRof_l     ! Rof export data mapped to lnd grid
     type(ESMF_FieldBundle):: FBRof_o     ! Rof export data mapped to ocn grid
     type(ESMF_FieldBundle):: FBRof_r     ! Rof export on rof grid
+
     type(ESMF_FieldBundle):: FBWav_w     ! Wav export on wav grid
     type(ESMF_FieldBundle):: FBWav_o     ! Wav export data mapped to ocn grid
+
     type(ESMF_FieldBundle):: FBGlc_g     ! Glc export on glc grid
     type(ESMF_FieldBundle):: FBGlc_l     ! Glc export data mapped to lnd grid
+
     type(ESMF_FieldBundle):: FBAtmOcn_o  ! Atm/Ocn flux fields on ocn grid
     type(ESMF_FieldBundle):: FBAtmOcn_a  ! Atm/Ocn flux fields on atm grid
+
     type(ESMF_FieldBundle):: FBforAtm    ! data storage for atm import
     type(ESMF_FieldBundle):: FBforOcn    ! data storage for ocn import
     type(ESMF_FieldBundle):: FBforIce    ! data storage for ice import
@@ -93,6 +102,14 @@ module med_internalstate_mod
     type(ESMF_FieldBundle):: FBforRof    ! data storage for rof import
     type(ESMF_FieldBundle):: FBforWav    ! data storage for wav import
     type(ESMF_FieldBundle):: FBforGlc    ! data storage for glc import
+
+    type(ESMF_FieldBundle):: FBfrac_a    ! Fractions on atm grid
+    type(ESMF_FieldBundle):: FBfrac_o    ! Fractions on ocn grid
+    type(ESMF_FieldBundle):: FBfrac_i    ! Fractions on ice grid
+    type(ESMF_FieldBundle):: FBfrac_l    ! Fractions on lnd grid
+    type(ESMF_FieldBundle):: FBfrac_r    ! Fractions on rof grid
+    type(ESMF_FieldBundle):: FBfrac_g    ! Fractions on glc grid
+    type(ESMF_FieldBundle):: FBfrac_w    ! Fractions on wav grid
 
     type(ESMF_RouteHandle):: RH_a2o_bilnr  ! atm to ocn bilinear
     type(ESMF_RouteHandle):: RH_o2a_bilnr  ! ocn to atm
@@ -155,6 +172,15 @@ module med_internalstate_mod
     type(ESMF_RouteHandle):: RH_r2l_fcopy  ! rof to lnd
 !   type(ESMF_RouteHandle):: RH_r2o_fcopy  ! rof to ocn
 
+    logical               :: atm_present
+    logical               :: lnd_present
+    logical               :: ocn_present
+    logical               :: ice_present
+    logical               :: rof_present
+    logical               :: wav_present
+    logical               :: glc_present
+    logical               :: med_present
+
     logical               :: a2o_active
     logical               :: o2a_active
     logical               :: a2i_active
@@ -189,14 +215,6 @@ module med_internalstate_mod
   type (shr_nuopc_fldList_Type) :: fldsFrGlc
   type (shr_nuopc_fldList_Type) :: fldsAtmOcn
 
-  ! The following flags determine if a component is prognostic
-  logical :: medToAtm
-  logical :: medToOcn
-  logical :: medToIce
-  logical :: medToLnd
-  logical :: medToRof
-  logical :: medToWav
-  logical :: medToGlc
   !-----------------------------------------------------------------------------
 
 end module med_internalstate_mod
