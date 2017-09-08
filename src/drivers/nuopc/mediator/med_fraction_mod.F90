@@ -171,10 +171,11 @@ module med_fraction_mod
     if (is_local%wrap%rof_present) then
       call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac_r, 'rfrac', dataPtr1, rc=rc)
       if (.not. shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) then
-        call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBrof_r , 'frac' , dataPtr2, rc=rc)
-        if (.not. shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) then
-          dataPtr1 = dataPtr2
-        endif
+         dataPtr1 = 1.0_ESMF_KIND_R8
+!        call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBrof_r , 'frac' , dataPtr2, rc=rc)
+!        if (.not. shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) then
+!          dataPtr1 = dataPtr2
+!        endif
       endif
     endif
 

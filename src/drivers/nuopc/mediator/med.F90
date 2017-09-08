@@ -1283,7 +1283,6 @@ module MED
     type(ESMF_Field)            :: fieldArea
     type(ESMF_Grid)             :: grid
     type(InternalState)         :: is_local
-    integer                     :: fieldCount
     real(ESMF_KIND_R8), pointer :: factorList(:)
     character(ESMF_MAXSTR)      :: name
     character(ESMF_MAXSTR) ,pointer  :: fieldNameList(:)
@@ -1295,7 +1294,6 @@ module MED
     integer(ESMF_KIND_I4), pointer :: dataPtr_arrayOcn(:), dataPtr_arrayIce(:)
     real(ESMF_KIND_R8), pointer :: dataPtr_fieldOcn(:), dataPtr_fieldAtm(:)
     character(len=*),parameter  :: maprcfile = "seq_maps.rc"
-    character(len=512)          :: fmapfile, smapfile, vmapfile, rmapfile, rimapfile, rlmapfile
     character(len=*),parameter  :: subname='(module_MEDIATOR:InitializeIPDv03p5)'
 
     if (dbug_flag > 5) then
@@ -1433,581 +1431,6 @@ module MED
     call shr_nuopc_methods_State_GeomWrite(is_local%wrap%NState_GlcExp, 'array_med_glc', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    !----------------------------------------------------------
-    ! NOW allocate other Mediator datatypes
-    !----------------------------------------------------------
-
-    ! Get the internal state from Component.
-    nullify(is_local%wrap)
-    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !----------------------------------------------------------
-    ! Initialize FB for each model import states on each grid
-    !----------------------------------------------------------
-
-    !--- atm
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_a, STgeom=is_local%wrap%NState_AtmImp, &
-      STflds=is_local%wrap%NState_AtmImp, name='FBAtm_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_o, STgeom=is_local%wrap%NState_OcnExp, &
-      STflds=is_local%wrap%NState_AtmImp, name='FBAtm_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_i, STgeom=is_local%wrap%NState_IceExp, &
-      STflds=is_local%wrap%NState_AtmImp, name='FBAtm_i', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_l, STgeom=is_local%wrap%NState_LndExp, &
-      STflds=is_local%wrap%NState_AtmImp, name='FBAtm_l', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_r, STgeom=is_local%wrap%NState_RofExp, &
-      STflds=is_local%wrap%NState_AtmImp, name='FBAtm_r', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !--- ocn
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBOcn_a, STgeom=is_local%wrap%NState_AtmExp, &
-      STflds=is_local%wrap%NState_OcnImp, name='FBOcn_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBOcn_o, STgeom=is_local%wrap%NState_OcnImp, &
-      STflds=is_local%wrap%NState_OcnImp, name='FBOcn_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBOcn_i, STgeom=is_local%wrap%NState_IceExp, &
-      STflds=is_local%wrap%NState_OcnImp, name='FBOcn_i', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !--- ice
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_a, STgeom=is_local%wrap%NState_AtmExp, &
-      STflds=is_local%wrap%NState_IceImp, name='FBIce_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_o, STgeom=is_local%wrap%NState_OcnExp, &
-      STflds=is_local%wrap%NState_IceImp, name='FBIce_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_i, STgeom=is_local%wrap%NState_IceImp, &
-      STflds=is_local%wrap%NState_IceImp, name='FBIce_i', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_if, STgeom=is_local%wrap%NState_IceImp, &
-      STflds=is_local%wrap%NState_IceImp, name='FBIce_if', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !--- lnd
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBLnd_a, STgeom=is_local%wrap%NState_AtmExp, &
-      STflds=is_local%wrap%NState_LndImp, name='FBLnd_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBLnd_l, STgeom=is_local%wrap%NState_LndImp, &
-      STflds=is_local%wrap%NState_LndImp, name='FBLnd_l', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBLnd_r, STgeom=is_local%wrap%NState_RofExp, &
-      STflds=is_local%wrap%NState_LndImp, name='FBLnd_r', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !--- rof
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_l, STgeom=is_local%wrap%NState_LndExp, &
-      STflds=is_local%wrap%NState_RofImp, name='FBRof_l', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_o, STgeom=is_local%wrap%NState_OCNExp, &
-      STflds=is_local%wrap%NState_RofImp, name='FBRof_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_r, STgeom=is_local%wrap%NState_RofImp, &
-      STflds=is_local%wrap%NState_RofImp, name='FBRof_r', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !----------------------------------------------------------
-    ! Initialize Accumulators
-    !----------------------------------------------------------
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumAtm, STgeom=is_local%wrap%NState_AtmImp, &
-      STflds=is_local%wrap%NState_AtmImp, name='FBaccumAtm', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumOcn, STgeom=is_local%wrap%NState_OcnImp, &
-      STflds=is_local%wrap%NState_OcnImp, name='FBaccumOcn', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumIce, STgeom=is_local%wrap%NState_IceImp, &
-      STflds=is_local%wrap%NState_IceImp, name='FBaccumIce', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumLnd, STgeom=is_local%wrap%NState_LndImp, &
-      STflds=is_local%wrap%NState_LndImp, name='FBaccumLnd', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumRof, STgeom=is_local%wrap%NState_RofImp, &
-      STflds=is_local%wrap%NState_RofImp, name='FBaccumRof', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumWav, STgeom=is_local%wrap%NState_WavImp, &
-      STflds=is_local%wrap%NState_WavImp, name='FBaccumWav', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumGlc, STgeom=is_local%wrap%NState_GlcImp, &
-      STflds=is_local%wrap%NState_GlcImp, name='FBaccumGlc', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !----------------------------------------------------------
-    ! Initialize AtmOcn FBs
-    !----------------------------------------------------------
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBAtmOcn_o, STgeom=is_local%wrap%NState_OcnExp, &
-      fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBAtmOcn_a, STgeom=is_local%wrap%NState_AtmExp, &
-      fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumAtmOcn, STgeom=is_local%wrap%NState_OcnExp, &
-      fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBaccumAtmOcn', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !----------------------------------------------------------
-    ! Initialize Frac FBs
-    !----------------------------------------------------------
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_a, STgeom=is_local%wrap%NState_AtmExp, &
-      fieldnamelist=fraclist_a, name='FBFrac_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_o, STgeom=is_local%wrap%NState_OcnExp, &
-      fieldnamelist=fraclist_o, name='FBFrac_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_i, STgeom=is_local%wrap%NState_IceExp, &
-      fieldnamelist=fraclist_i, name='FBFrac_i', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_l, STgeom=is_local%wrap%NState_LndExp, &
-      fieldnamelist=fraclist_l, name='FBFrac_l', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_g, STgeom=is_local%wrap%NState_GlcExp, &
-      fieldnamelist=fraclist_g, name='FBFrac_g', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_r, STgeom=is_local%wrap%NState_RofExp, &
-      fieldnamelist=fraclist_r, name='FBFrac_r', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_w, STgeom=is_local%wrap%NState_WavExp, &
-      fieldnamelist=fraclist_w, name='FBFrac_w', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-
-    !----------------------------------------------------------
-    ! Initialize FB for export to models
-    !----------------------------------------------------------
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBforAtm, &
-      STgeom=is_local%wrap%NState_AtmExp, name='FBforAtm', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBforOcn, &
-      STgeom=is_local%wrap%NState_OcnExp, name='FBforOcn', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBforIce, &
-      STgeom=is_local%wrap%NState_IceExp, name='FBforIce', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBforLnd, &
-      STgeom=is_local%wrap%NState_LndExp, name='FBforLnd', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBforRof, &
-      STgeom=is_local%wrap%NState_RofExp, name='FBforRof', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBforWav, &
-      STgeom=is_local%wrap%NState_WavExp, name='FBforWav', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBforGlc, &
-      STgeom=is_local%wrap%NState_GlcExp, name='FBforGlc', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !----------------------------------------------------------
-    !--- Check for active regrid directions
-    !----------------------------------------------------------
-
-    ! initialize
-    is_local%wrap%a2o_active = .false.
-    is_local%wrap%a2i_active = .false.
-    is_local%wrap%a2l_active = .false.
-    is_local%wrap%o2a_active = .false.
-    is_local%wrap%o2i_active = .false.
-    is_local%wrap%i2a_active = .false.
-    is_local%wrap%i2o_active = .false.
-    is_local%wrap%l2a_active = .false.
-    is_local%wrap%l2r_active = .false.
-    is_local%wrap%r2l_active = .false.
-    is_local%wrap%r2o_active = .false.
-
-    ! a2o, a2i, a2l
-    call ESMF_FieldBundleGet(is_local%wrap%FBAtm_a, fieldCount=fieldCount, rc=rc) ! Atmosphere Export Field Count
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (fieldCount > 0) then
-      call ESMF_FieldBundleGet(is_local%wrap%FBforOcn, fieldCount=fieldCount, rc=rc) ! Ocean Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (fieldCount > 0) then
-        is_local%wrap%a2o_active = .true.
-      endif
-      call ESMF_FieldBundleGet(is_local%wrap%FBforIce, fieldCount=fieldCount, rc=rc) ! Ice Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (fieldCount > 0) then
-        is_local%wrap%a2i_active = .true.
-      endif
-      call ESMF_FieldBundleGet(is_local%wrap%FBforLnd, fieldCount=fieldCount, rc=rc) ! Land Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (fieldCount > 0) then
-        is_local%wrap%a2l_active = .true.
-      endif
-    endif
-
-    ! o2a, o2i
-    call ESMF_FieldBundleGet(is_local%wrap%FBOcn_o, fieldCount=fieldCount, rc=rc) ! Ocean Export Field Count
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (fieldCount > 0) then
-      call ESMF_FieldBundleGet(is_local%wrap%FBforAtm, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (fieldCount > 0) then
-        is_local%wrap%o2a_active = .true.
-      endif
-      call ESMF_FieldBundleGet(is_local%wrap%FBforIce, fieldCount=fieldCount, rc=rc) ! Ice Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (fieldCount > 0) then
-        is_local%wrap%o2i_active = .true.
-      endif
-    endif
-
-    ! i2a, i2o
-    call ESMF_FieldBundleGet(is_local%wrap%FBIce_i, fieldCount=fieldCount, rc=rc) ! Ice Export Field Count
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (fieldCount > 0) then
-      call ESMF_FieldBundleGet(is_local%wrap%FBforAtm, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (fieldCount > 0) then
-        is_local%wrap%i2a_active = .true.
-      endif
-      call ESMF_FieldBundleGet(is_local%wrap%FBforOcn, fieldCount=fieldCount, rc=rc) ! Ocean Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (fieldCount > 0) then
-        is_local%wrap%i2o_active = .true.
-      endif
-    endif
-
-    ! l2a, l2r
-    call ESMF_FieldBundleGet(is_local%wrap%FBLnd_l, fieldCount=fieldCount, rc=rc) ! Land Export Field Count
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (fieldCount > 0) then
-      call ESMF_FieldBundleGet(is_local%wrap%FBforAtm, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (fieldCount > 0) then
-        is_local%wrap%l2a_active = .true.
-      endif
-      call ESMF_FieldBundleGet(is_local%wrap%FBforRof, fieldCount=fieldCount, rc=rc) ! Rof Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (fieldCount > 0) then
-        is_local%wrap%l2r_active = .true.
-      endif
-    endif
-
-    ! r2l, r2o
-    call ESMF_FieldBundleGet(is_local%wrap%FBRof_r, fieldCount=fieldCount, rc=rc) ! Rof Export Field Count
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (fieldCount > 0) then
-      call ESMF_FieldBundleGet(is_local%wrap%FBforLnd, fieldCount=fieldCount, rc=rc) ! Land Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (fieldCount > 0) then
-        is_local%wrap%r2l_active = .true.
-      endif
-      call ESMF_FieldBundleGet(is_local%wrap%FBforOCN, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (fieldCount > 0) then
-        is_local%wrap%r2o_active = .true.
-      endif
-    endif
-
-    write(msgString,*) is_local%wrap%a2o_active
-    call ESMF_LogWrite(trim(subname)//": a2o active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-    write(msgString,*) is_local%wrap%a2i_active
-    call ESMF_LogWrite(trim(subname)//": a2i active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-    write(msgString,*) is_local%wrap%a2l_active
-    call ESMF_LogWrite(trim(subname)//": a2l active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(msgString,*) is_local%wrap%o2a_active
-    call ESMF_LogWrite(trim(subname)//": o2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-    write(msgString,*) is_local%wrap%o2i_active
-    call ESMF_LogWrite(trim(subname)//": o2i active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(msgString,*) is_local%wrap%i2a_active
-    call ESMF_LogWrite(trim(subname)//": i2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-    write(msgString,*) is_local%wrap%i2o_active
-    call ESMF_LogWrite(trim(subname)//": i2o active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(msgString,*) is_local%wrap%l2a_active
-    call ESMF_LogWrite(trim(subname)//": l2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-    write(msgString,*) is_local%wrap%l2r_active
-    call ESMF_LogWrite(trim(subname)//": l2r active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    write(msgString,*) is_local%wrap%r2l_active
-    call ESMF_LogWrite(trim(subname)//": r2l active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-    write(msgString,*) is_local%wrap%r2o_active
-    call ESMF_LogWrite(trim(subname)//": r2o active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    !----------------------------------------------------------
-    !--- Initialize route handles
-    !----------------------------------------------------------
-
-    if (dbug_flag > 1) then
-      call ESMF_LogWrite("Starting to initialize RHs", ESMF_LOGMSG_INFO)
-      call ESMF_LogFlush()
-    endif
-
-    if (is_local%wrap%a2o_active) then
-      call NUOPC_CompAttributeGet(gcomp, name="atm2ocn_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call NUOPC_CompAttributeGet(gcomp, name="atm2ocn_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call ESMF_LogWrite(" fmapname a2o "//trim(fmapfile), ESMF_LOGMSG_INFO)
-      call ESMF_LogWrite(" smapname a2o "//trim(smapfile), ESMF_LOGMSG_INFO)
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_o, &
-        bilnrmap=is_local%wrap%RH_a2o_bilnr, &
-        consfmap=is_local%wrap%RH_a2o_consf, &
-        consdmap=is_local%wrap%RH_a2o_consd, &
-        patchmap=is_local%wrap%RH_a2o_patch, &
-        fcopymap=is_local%wrap%RH_a2o_fcopy, &
-        dstMaskValue=0, &
-        fldlist1=FldsFrAtm, string='a2o_weights', &
-        bilnrfn=trim(smapfile), &
-        consffn=trim(fmapfile), &
-        rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    if (is_local%wrap%a2i_active) then
-      call NUOPC_CompAttributeGet(gcomp, name="atm2ice_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call NUOPC_CompAttributeGet(gcomp, name="atm2ice_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call ESMF_LogWrite(" fmapname a2i "//trim(fmapfile), ESMF_LOGMSG_INFO)
-      call ESMF_LogWrite(" smapname a2i "//trim(smapfile), ESMF_LOGMSG_INFO)
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_i, &
-        bilnrmap=is_local%wrap%RH_a2i_bilnr, &
-        consfmap=is_local%wrap%RH_a2i_consf, &
-        consdmap=is_local%wrap%RH_a2i_consd, &
-        patchmap=is_local%wrap%RH_a2i_patch, &
-        fcopymap=is_local%wrap%RH_a2i_fcopy, &
-        dstMaskValue=0, &
-        fldlist1=FldsFrAtm, string='a2i_weights', &
-        bilnrfn=trim(smapfile), &
-        consffn=trim(fmapfile), &
-        rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    if (is_local%wrap%a2l_active) then
-      call NUOPC_CompAttributeGet(gcomp, name="atm2lnd_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call NUOPC_CompAttributeGet(gcomp, name="atm2lnd_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call ESMF_LogWrite(" fmapname a2l "//trim(fmapfile), ESMF_LOGMSG_INFO)
-      call ESMF_LogWrite(" smapname a2l "//trim(smapfile), ESMF_LOGMSG_INFO)
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_l, &
-        bilnrmap=is_local%wrap%RH_a2l_bilnr, &
-        consfmap=is_local%wrap%RH_a2l_consf, &
-        consdmap=is_local%wrap%RH_a2l_consd, &
-        patchmap=is_local%wrap%RH_a2l_patch, &
-        fcopymap=is_local%wrap%RH_a2l_fcopy, &
-        fldlist1=FldsFrAtm, string='a2l_weights', &
-        bilnrfn=trim(smapfile), &
-        consffn=trim(fmapfile), &
-        rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    if (is_local%wrap%o2a_active) then
-      call NUOPC_CompAttributeGet(gcomp, name="ocn2atm_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call NUOPC_CompAttributeGet(gcomp, name="ocn2atm_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call ESMF_LogWrite(" fmapname o2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
-      call ESMF_LogWrite(" smapname o2a "//trim(smapfile), ESMF_LOGMSG_INFO)
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBOcn_o, FBdst=is_local%wrap%FBOcn_a, &
-        bilnrmap=is_local%wrap%RH_o2a_bilnr, &
-        consfmap=is_local%wrap%RH_o2a_consf, &
-        consdmap=is_local%wrap%RH_o2a_consd, &
-        patchmap=is_local%wrap%RH_o2a_patch, &
-        fcopymap=is_local%wrap%RH_o2a_fcopy, &
-        srcMaskValue=0, &
-        fldlist1=FldsFrOcn, fldlist2=FldsAtmOcn, string='o2a_weights', &
-        bilnrfn=trim(smapfile), &
-        consffn=trim(fmapfile), &
-        rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    if (is_local%wrap%o2i_active) then
-      fmapfile = "idmap"
-      smapfile = "idmap"
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBOcn_o, FBdst=is_local%wrap%FBOcn_i, &
-        bilnrmap=is_local%wrap%RH_o2i_bilnr, &
-        consfmap=is_local%wrap%RH_o2i_consf, &
-        consdmap=is_local%wrap%RH_o2i_consd, &
-        patchmap=is_local%wrap%RH_o2i_patch, &
-        fcopymap=is_local%wrap%RH_o2i_fcopy, &
-        srcMaskValue=0, dstMaskValue=0, &
-        fldlist1=FldsFrOcn, string='o2i_weights', &
-        bilnrfn=trim(smapfile), &
-        consffn=trim(fmapfile), &
-        rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    if (is_local%wrap%i2a_active) then
-      call NUOPC_CompAttributeGet(gcomp, name="ice2atm_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call NUOPC_CompAttributeGet(gcomp, name="ice2atm_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call ESMF_LogWrite(" fmapname i2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
-      call ESMF_LogWrite(" smapname i2a "//trim(smapfile), ESMF_LOGMSG_INFO)
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBIce_i, FBdst=is_local%wrap%FBIce_a, &
-        bilnrmap=is_local%wrap%RH_i2a_bilnr, &
-        consfmap=is_local%wrap%RH_i2a_consf, &
-        consdmap=is_local%wrap%RH_i2a_consd, &
-        patchmap=is_local%wrap%RH_i2a_patch, &
-        fcopymap=is_local%wrap%RH_i2a_fcopy, &
-        srcMaskValue=0, &
-        fldlist1=FldsFrIce, string='i2a_weights', &
-        bilnrfn=trim(smapfile), &
-        consffn=trim(fmapfile), &
-        rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    if (is_local%wrap%i2o_active) then
-      fmapfile = "idmap"
-      smapfile = "idmap"
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBIce_i, FBdst=is_local%wrap%FBIce_o, &
-        bilnrmap=is_local%wrap%RH_i2o_bilnr, &
-        consfmap=is_local%wrap%RH_i2o_consf, &
-        consdmap=is_local%wrap%RH_i2o_consd, &
-        patchmap=is_local%wrap%RH_i2o_patch, &
-        fcopymap=is_local%wrap%RH_i2o_fcopy, &
-        srcMaskValue=0, dstMaskValue=0, &
-        fldlist1=FldsFrIce, string='i2o_weights', &
-        bilnrfn=trim(smapfile), &
-        consffn=trim(fmapfile), &
-        rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    if (is_local%wrap%l2a_active) then
-      call NUOPC_CompAttributeGet(gcomp, name="lnd2atm_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call NUOPC_CompAttributeGet(gcomp, name="lnd2atm_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call ESMF_LogWrite(" fmapname l2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
-      call ESMF_LogWrite(" smapname l2a "//trim(smapfile), ESMF_LOGMSG_INFO)
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_a, &
-        bilnrmap=is_local%wrap%RH_l2a_bilnr, &
-        consfmap=is_local%wrap%RH_l2a_consf, &
-        consdmap=is_local%wrap%RH_l2a_consd, &
-        patchmap=is_local%wrap%RH_l2a_patch, &
-        fcopymap=is_local%wrap%RH_l2a_fcopy, &
-        fldlist1=FldsFrLnd, string='l2a_weights', &
-        bilnrfn=trim(smapfile), &
-        consffn=trim(fmapfile), &
-        rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    if (is_local%wrap%l2r_active) then
-! tcx note bilinear is set to conserv to get past initialization.  the subroutine thinks it'll
-! need bilinear mapping weights but it won't for l2r.
-      call NUOPC_CompAttributeGet(gcomp, name="lnd2rof_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call ESMF_LogWrite(" fmapname l2r "//trim(fmapfile), ESMF_LOGMSG_INFO)
-      !call NUOPC_CompAttributeGet(gcomp, name="lnd2rof_smapname", value=smapfile, rc=rc)
-      !if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      !call ESMF_LogWrite(" smapname l2a "//trim(smapfile), ESMF_LOGMSG_INFO)
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_r, &
-        bilnrmap=is_local%wrap%RH_l2r_bilnr, &
-        consfmap=is_local%wrap%RH_l2r_consf, &
-        consdmap=is_local%wrap%RH_l2r_consd, &
-        patchmap=is_local%wrap%RH_l2r_patch, &
-        fcopymap=is_local%wrap%RH_l2r_fcopy, &
-        fldlist1=FldsFrLnd, string='l2r_weights', &
-        bilnrfn=trim(fmapfile), &
-        consffn=trim(fmapfile), &
-        rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    if (is_local%wrap%r2o_active) then
-      call NUOPC_CompAttributeGet(gcomp, name="rof2ocn_liq_rmapname", value=rlmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call ESMF_LogWrite(" rlmapname  r2o"//trim(rlmapfile), ESMF_LOGMSG_INFO)
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_o, &
-!       bilnrmap=is_local%wrap%RH_r2o_bilnr, &
-        consfmap=is_local%wrap%RH_r2ol_consf, &
-!       consdmap=is_local%wrap%RH_r2o_consd, &
-!       patchmap=is_local%wrap%RH_r2o_patch, &
-!       fcopymap=is_local%wrap%RH_r2o_fcopy, &
-        fldlist1=FldsFrRof, string='r2ol_weights', &
-!       bilnrfn=trim(rimapfile), &
-        consffn=trim(rlmapfile), &
-        rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-      call NUOPC_CompAttributeGet(gcomp, name="rof2ocn_ice_rmapname", value=rimapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call ESMF_LogWrite(" rimapname  r2o"//trim(rlmapfile), ESMF_LOGMSG_INFO)
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_o, &
-!       bilnrmap=is_local%wrap%RH_r2o_bilnr, &
-        consfmap=is_local%wrap%RH_r2oi_consf, &
-!       consdmap=is_local%wrap%RH_r2o_consd, &
-!       patchmap=is_local%wrap%RH_r2o_patch, &
-!       fcopymap=is_local%wrap%RH_r2o_fcopy, &
-        fldlist1=FldsFrRof, string='r2oi_weights', &
-!       bilnrfn=trim(rimapfile), &
-        consffn=trim(rimapfile), &
-        rc=rc)
-    endif
-
-    if (is_local%wrap%r2l_active) then
-! tcx note bilinear is set to conserv to get past initialization.  the subroutine thinks it'll
-! need bilinear mapping weights but it won't for l2r.
-      call NUOPC_CompAttributeGet(gcomp, name="rof2lnd_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call ESMF_LogWrite(" fmapname r2l "//trim(fmapfile), ESMF_LOGMSG_INFO)
-      call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_l, &
-        bilnrmap=is_local%wrap%RH_r2l_bilnr, &
-        consfmap=is_local%wrap%RH_r2l_consf, &
-        consdmap=is_local%wrap%RH_r2l_consd, &
-        patchmap=is_local%wrap%RH_r2l_patch, &
-        fcopymap=is_local%wrap%RH_r2l_fcopy, &
-        fldlist1=FldsFrRof, string='r2l_weights', &
-        bilnrfn=trim(fmapfile), &
-        consffn=trim(fmapfile), &
-        rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
@@ -2080,6 +1503,8 @@ module MED
     type(ESMF_StateItem_Flag)   :: itemType
     logical                     :: atCorrectTime, allDone, connected
     type(InternalState)         :: is_local
+    integer                     :: fieldCount
+    character(len=512)          :: fmapfile, smapfile, vmapfile, rmapfile, rimapfile, rlmapfile
     character(len=128)          :: value
     integer                     :: n
     character(len=*), parameter :: subname='(module_MEDIATOR:DataInitialize)'
@@ -2104,62 +1529,6 @@ module MED
     ! get the current time out of the clock
     call ESMF_ClockGet(clock, currTime=time, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    
-    call ESMF_AttributeGet(gcomp, name="atm_present", value=value, defaultValue="false", &
-      convention="NUOPC", purpose="Instance", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    is_local%wrap%atm_present = (value == "true")
-    write(msgString,'(A,L4)') trim(subname)//' atm_present = ',is_local%wrap%atm_present
-    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    call ESMF_AttributeGet(gcomp, name="lnd_present", value=value, defaultValue="false", &
-      convention="NUOPC", purpose="Instance", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    is_local%wrap%lnd_present = (value == "true")
-    write(msgString,'(A,L4)') trim(subname)//' lnd_present = ',is_local%wrap%lnd_present
-    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    call ESMF_AttributeGet(gcomp, name="ocn_present", value=value, defaultValue="false", &
-      convention="NUOPC", purpose="Instance", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    is_local%wrap%ocn_present = (value == "true")
-    write(msgString,'(A,L4)') trim(subname)//' ocn_present = ',is_local%wrap%ocn_present
-    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    call ESMF_AttributeGet(gcomp, name="ice_present", value=value, defaultValue="false", &
-      convention="NUOPC", purpose="Instance", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    is_local%wrap%ice_present = (value == "true")
-    write(msgString,'(A,L4)') trim(subname)//' ice_present = ',is_local%wrap%ice_present
-    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    call ESMF_AttributeGet(gcomp, name="rof_present", value=value, defaultValue="false", &
-      convention="NUOPC", purpose="Instance", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    is_local%wrap%rof_present = (value == "true")
-    write(msgString,'(A,L4)') trim(subname)//' rof_present = ',is_local%wrap%rof_present
-    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    call ESMF_AttributeGet(gcomp, name="wav_present", value=value, defaultValue="false", &
-      convention="NUOPC", purpose="Instance", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    is_local%wrap%wav_present = (value == "true")
-    write(msgString,'(A,L4)') trim(subname)//' wav_present = ',is_local%wrap%wav_present
-    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    call ESMF_AttributeGet(gcomp, name="glc_present", value=value, defaultValue="false", &
-      convention="NUOPC", purpose="Instance", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    is_local%wrap%glc_present = (value == "true")
-    write(msgString,'(A,L4)') trim(subname)//' glc_present = ',is_local%wrap%glc_present
-    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    call ESMF_AttributeGet(gcomp, name="med_present", value=value, defaultValue="false", &
-      convention="NUOPC", purpose="Instance", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    is_local%wrap%med_present = (value == "true")
-    write(msgString,'(A,L4)') trim(subname)//' med_present = ',is_local%wrap%med_present
-    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! initialze cumulative flag
     allDone = .true.  ! reset if an item is found that is not done
@@ -2197,6 +1566,728 @@ module MED
       ! to the driver that this Component has fully initialized its data
       call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      ! initialize the present flags in the mediator
+    
+      call ESMF_AttributeGet(gcomp, name="atm_present", value=value, defaultValue="false", &
+        convention="NUOPC", purpose="Instance", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      is_local%wrap%atm_present = (value == "true")
+      write(msgString,'(A,L4)') trim(subname)//' atm_present = ',is_local%wrap%atm_present
+      call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      call ESMF_AttributeGet(gcomp, name="lnd_present", value=value, defaultValue="false", &
+        convention="NUOPC", purpose="Instance", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      is_local%wrap%lnd_present = (value == "true")
+      write(msgString,'(A,L4)') trim(subname)//' lnd_present = ',is_local%wrap%lnd_present
+      call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      call ESMF_AttributeGet(gcomp, name="ocn_present", value=value, defaultValue="false", &
+        convention="NUOPC", purpose="Instance", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      is_local%wrap%ocn_present = (value == "true")
+      write(msgString,'(A,L4)') trim(subname)//' ocn_present = ',is_local%wrap%ocn_present
+      call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      call ESMF_AttributeGet(gcomp, name="ice_present", value=value, defaultValue="false", &
+        convention="NUOPC", purpose="Instance", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      is_local%wrap%ice_present = (value == "true")
+      write(msgString,'(A,L4)') trim(subname)//' ice_present = ',is_local%wrap%ice_present
+      call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      call ESMF_AttributeGet(gcomp, name="rof_present", value=value, defaultValue="false", &
+        convention="NUOPC", purpose="Instance", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      is_local%wrap%rof_present = (value == "true")
+      write(msgString,'(A,L4)') trim(subname)//' rof_present = ',is_local%wrap%rof_present
+      call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      call ESMF_AttributeGet(gcomp, name="wav_present", value=value, defaultValue="false", &
+        convention="NUOPC", purpose="Instance", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      is_local%wrap%wav_present = (value == "true")
+      write(msgString,'(A,L4)') trim(subname)//' wav_present = ',is_local%wrap%wav_present
+      call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      call ESMF_AttributeGet(gcomp, name="glc_present", value=value, defaultValue="false", &
+        convention="NUOPC", purpose="Instance", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      is_local%wrap%glc_present = (value == "true")
+      write(msgString,'(A,L4)') trim(subname)//' glc_present = ',is_local%wrap%glc_present
+      call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      call ESMF_AttributeGet(gcomp, name="med_present", value=value, defaultValue="false", &
+        convention="NUOPC", purpose="Instance", rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      is_local%wrap%med_present = (value == "true")
+      write(msgString,'(A,L4)') trim(subname)//' med_present = ',is_local%wrap%med_present
+      call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      !----------------------------------------------------------
+      ! NOW allocate other Mediator datatypes
+      !----------------------------------------------------------
+
+      ! Get the internal state from Component.
+      nullify(is_local%wrap)
+      call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !----------------------------------------------------------
+      ! Initialize FB for each model import states on each grid
+      !----------------------------------------------------------
+
+      !--- atm
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_a, STgeom=is_local%wrap%NState_AtmImp, &
+        STflds=is_local%wrap%NState_AtmImp, name='FBAtm_a', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_o, STgeom=is_local%wrap%NState_OcnExp, &
+        STflds=is_local%wrap%NState_AtmImp, name='FBAtm_o', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_i, STgeom=is_local%wrap%NState_IceExp, &
+        STflds=is_local%wrap%NState_AtmImp, name='FBAtm_i', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_l, STgeom=is_local%wrap%NState_LndExp, &
+        STflds=is_local%wrap%NState_AtmImp, name='FBAtm_l', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_r, STgeom=is_local%wrap%NState_RofExp, &
+        STflds=is_local%wrap%NState_AtmImp, name='FBAtm_r', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !--- ocn
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBOcn_a, STgeom=is_local%wrap%NState_AtmExp, &
+        STflds=is_local%wrap%NState_OcnImp, name='FBOcn_a', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBOcn_o, STgeom=is_local%wrap%NState_OcnImp, &
+        STflds=is_local%wrap%NState_OcnImp, name='FBOcn_o', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBOcn_i, STgeom=is_local%wrap%NState_IceExp, &
+        STflds=is_local%wrap%NState_OcnImp, name='FBOcn_i', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !--- ice
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_a, STgeom=is_local%wrap%NState_AtmExp, &
+        STflds=is_local%wrap%NState_IceImp, name='FBIce_a', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_o, STgeom=is_local%wrap%NState_OcnExp, &
+        STflds=is_local%wrap%NState_IceImp, name='FBIce_o', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_i, STgeom=is_local%wrap%NState_IceImp, &
+        STflds=is_local%wrap%NState_IceImp, name='FBIce_i', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_if, STgeom=is_local%wrap%NState_IceImp, &
+        STflds=is_local%wrap%NState_IceImp, name='FBIce_if', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !--- lnd
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBLnd_a, STgeom=is_local%wrap%NState_AtmExp, &
+        STflds=is_local%wrap%NState_LndImp, name='FBLnd_a', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBLnd_l, STgeom=is_local%wrap%NState_LndImp, &
+        STflds=is_local%wrap%NState_LndImp, name='FBLnd_l', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBLnd_r, STgeom=is_local%wrap%NState_RofExp, &
+        STflds=is_local%wrap%NState_LndImp, name='FBLnd_r', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !--- rof
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_l, STgeom=is_local%wrap%NState_LndExp, &
+        STflds=is_local%wrap%NState_RofImp, name='FBRof_l', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_o, STgeom=is_local%wrap%NState_OCNExp, &
+        STflds=is_local%wrap%NState_RofImp, name='FBRof_o', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_r, STgeom=is_local%wrap%NState_RofImp, &
+        STflds=is_local%wrap%NState_RofImp, name='FBRof_r', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !----------------------------------------------------------
+      ! Initialize Accumulators
+      !----------------------------------------------------------
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumAtm, STgeom=is_local%wrap%NState_AtmImp, &
+        STflds=is_local%wrap%NState_AtmImp, name='FBaccumAtm', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumOcn, STgeom=is_local%wrap%NState_OcnImp, &
+        STflds=is_local%wrap%NState_OcnImp, name='FBaccumOcn', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumIce, STgeom=is_local%wrap%NState_IceImp, &
+        STflds=is_local%wrap%NState_IceImp, name='FBaccumIce', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumLnd, STgeom=is_local%wrap%NState_LndImp, &
+        STflds=is_local%wrap%NState_LndImp, name='FBaccumLnd', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumRof, STgeom=is_local%wrap%NState_RofImp, &
+        STflds=is_local%wrap%NState_RofImp, name='FBaccumRof', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumWav, STgeom=is_local%wrap%NState_WavImp, &
+        STflds=is_local%wrap%NState_WavImp, name='FBaccumWav', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumGlc, STgeom=is_local%wrap%NState_GlcImp, &
+        STflds=is_local%wrap%NState_GlcImp, name='FBaccumGlc', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !----------------------------------------------------------
+      ! Initialize AtmOcn FBs
+      !----------------------------------------------------------
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBAtmOcn_o, STgeom=is_local%wrap%NState_OcnExp, &
+        fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_o', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBAtmOcn_a, STgeom=is_local%wrap%NState_AtmExp, &
+        fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_a', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumAtmOcn, STgeom=is_local%wrap%NState_OcnExp, &
+        fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBaccumAtmOcn', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !----------------------------------------------------------
+      ! Initialize Frac FBs
+      !----------------------------------------------------------
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_a, STgeom=is_local%wrap%NState_AtmExp, &
+        fieldnamelist=fraclist_a, name='FBFrac_a', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_o, STgeom=is_local%wrap%NState_OcnExp, &
+        fieldnamelist=fraclist_o, name='FBFrac_o', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_i, STgeom=is_local%wrap%NState_IceExp, &
+        fieldnamelist=fraclist_i, name='FBFrac_i', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_l, STgeom=is_local%wrap%NState_LndExp, &
+        fieldnamelist=fraclist_l, name='FBFrac_l', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_g, STgeom=is_local%wrap%NState_GlcExp, &
+        fieldnamelist=fraclist_g, name='FBFrac_g', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_r, STgeom=is_local%wrap%NState_RofExp, &
+        fieldnamelist=fraclist_r, name='FBFrac_r', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBFrac_w, STgeom=is_local%wrap%NState_WavExp, &
+        fieldnamelist=fraclist_w, name='FBFrac_w', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+
+      !----------------------------------------------------------
+      ! Initialize FB for export to models
+      !----------------------------------------------------------
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBforAtm, &
+        STgeom=is_local%wrap%NState_AtmExp, name='FBforAtm', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBforOcn, &
+        STgeom=is_local%wrap%NState_OcnExp, name='FBforOcn', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBforIce, &
+        STgeom=is_local%wrap%NState_IceExp, name='FBforIce', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBforLnd, &
+        STgeom=is_local%wrap%NState_LndExp, name='FBforLnd', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBforRof, &
+        STgeom=is_local%wrap%NState_RofExp, name='FBforRof', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBforWav, &
+        STgeom=is_local%wrap%NState_WavExp, name='FBforWav', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      call shr_nuopc_methods_FB_init(is_local%wrap%FBforGlc, &
+        STgeom=is_local%wrap%NState_GlcExp, name='FBforGlc', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !----------------------------------------------------------
+      !--- Check for active regrid directions
+      !----------------------------------------------------------
+
+      ! initialize
+      is_local%wrap%a2o_active = .false.
+      is_local%wrap%a2i_active = .false.
+      is_local%wrap%a2l_active = .false.
+      is_local%wrap%o2a_active = .false.
+      is_local%wrap%o2i_active = .false.
+      is_local%wrap%i2a_active = .false.
+      is_local%wrap%i2o_active = .false.
+      is_local%wrap%l2a_active = .false.
+      is_local%wrap%l2r_active = .false.
+      is_local%wrap%r2l_active = .false.
+      is_local%wrap%r2o_active = .false.
+
+      ! a2o, a2i, a2l
+      call ESMF_FieldBundleGet(is_local%wrap%FBAtm_a, fieldCount=fieldCount, rc=rc) ! Atmosphere Export Field Count
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (fieldCount > 0) then
+        call ESMF_FieldBundleGet(is_local%wrap%FBforOcn, fieldCount=fieldCount, rc=rc) ! Ocean Import Field Count
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (fieldCount > 0) then
+          is_local%wrap%a2o_active = .true.
+        endif
+        call ESMF_FieldBundleGet(is_local%wrap%FBforIce, fieldCount=fieldCount, rc=rc) ! Ice Import Field Count
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (fieldCount > 0) then
+          is_local%wrap%a2i_active = .true.
+        endif
+        call ESMF_FieldBundleGet(is_local%wrap%FBforLnd, fieldCount=fieldCount, rc=rc) ! Land Import Field Count
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (fieldCount > 0) then
+          is_local%wrap%a2l_active = .true.
+        endif
+      endif
+
+      ! o2a, o2i
+      call ESMF_FieldBundleGet(is_local%wrap%FBOcn_o, fieldCount=fieldCount, rc=rc) ! Ocean Export Field Count
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (fieldCount > 0) then
+        call ESMF_FieldBundleGet(is_local%wrap%FBforAtm, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (fieldCount > 0) then
+          is_local%wrap%o2a_active = .true.
+        endif
+        call ESMF_FieldBundleGet(is_local%wrap%FBforIce, fieldCount=fieldCount, rc=rc) ! Ice Import Field Count
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (fieldCount > 0) then
+          is_local%wrap%o2i_active = .true.
+        endif
+      endif
+
+      ! i2a, i2o
+      call ESMF_FieldBundleGet(is_local%wrap%FBIce_i, fieldCount=fieldCount, rc=rc) ! Ice Export Field Count
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (fieldCount > 0) then
+        call ESMF_FieldBundleGet(is_local%wrap%FBforAtm, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (fieldCount > 0) then
+          is_local%wrap%i2a_active = .true.
+        endif
+        call ESMF_FieldBundleGet(is_local%wrap%FBforOcn, fieldCount=fieldCount, rc=rc) ! Ocean Import Field Count
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (fieldCount > 0) then
+          is_local%wrap%i2o_active = .true.
+        endif
+      endif
+
+      ! l2a, l2r
+      call ESMF_FieldBundleGet(is_local%wrap%FBLnd_l, fieldCount=fieldCount, rc=rc) ! Land Export Field Count
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (fieldCount > 0) then
+        call ESMF_FieldBundleGet(is_local%wrap%FBforAtm, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (fieldCount > 0) then
+          is_local%wrap%l2a_active = .true.
+        endif
+        call ESMF_FieldBundleGet(is_local%wrap%FBforRof, fieldCount=fieldCount, rc=rc) ! Rof Import Field Count
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (fieldCount > 0) then
+          is_local%wrap%l2r_active = .true.
+        endif
+      endif
+
+      ! r2l, r2o
+      call ESMF_FieldBundleGet(is_local%wrap%FBRof_r, fieldCount=fieldCount, rc=rc) ! Rof Export Field Count
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (fieldCount > 0) then
+        call ESMF_FieldBundleGet(is_local%wrap%FBforLnd, fieldCount=fieldCount, rc=rc) ! Land Import Field Count
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (fieldCount > 0) then
+          is_local%wrap%r2l_active = .true.
+        endif
+        call ESMF_FieldBundleGet(is_local%wrap%FBforOCN, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (fieldCount > 0) then
+          is_local%wrap%r2o_active = .true.
+        endif
+      endif
+
+      write(msgString,*) is_local%wrap%a2o_active
+      call ESMF_LogWrite(trim(subname)//": a2o active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+      write(msgString,*) is_local%wrap%a2i_active
+      call ESMF_LogWrite(trim(subname)//": a2i active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+      write(msgString,*) is_local%wrap%a2l_active
+      call ESMF_LogWrite(trim(subname)//": a2l active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      write(msgString,*) is_local%wrap%o2a_active
+      call ESMF_LogWrite(trim(subname)//": o2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+      write(msgString,*) is_local%wrap%o2i_active
+      call ESMF_LogWrite(trim(subname)//": o2i active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      write(msgString,*) is_local%wrap%i2a_active
+      call ESMF_LogWrite(trim(subname)//": i2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+      write(msgString,*) is_local%wrap%i2o_active
+      call ESMF_LogWrite(trim(subname)//": i2o active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      write(msgString,*) is_local%wrap%l2a_active
+      call ESMF_LogWrite(trim(subname)//": l2a active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+      write(msgString,*) is_local%wrap%l2r_active
+      call ESMF_LogWrite(trim(subname)//": l2r active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      write(msgString,*) is_local%wrap%r2l_active
+      call ESMF_LogWrite(trim(subname)//": r2l active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+      write(msgString,*) is_local%wrap%r2o_active
+      call ESMF_LogWrite(trim(subname)//": r2o active: " // trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+      !----------------------------------------------------------
+      !--- Initialize route handles
+      !----------------------------------------------------------
+
+      if (dbug_flag > 1) then
+        call ESMF_LogWrite("Starting to initialize RHs", ESMF_LOGMSG_INFO)
+        call ESMF_LogFlush()
+      endif
+
+      if (is_local%wrap%a2o_active) then
+        call NUOPC_CompAttributeGet(gcomp, name="atm2ocn_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeGet(gcomp, name="atm2ocn_smapname", value=smapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname a2o "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call ESMF_LogWrite(" smapname a2o "//trim(smapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_o, &
+          bilnrmap=is_local%wrap%RH_a2o_bilnr, &
+          consfmap=is_local%wrap%RH_a2o_consf, &
+          consdmap=is_local%wrap%RH_a2o_consd, &
+          patchmap=is_local%wrap%RH_a2o_patch, &
+          fcopymap=is_local%wrap%RH_a2o_fcopy, &
+          dstMaskValue=0, &
+          fldlist1=FldsFrAtm, string='a2o_weights', &
+          bilnrfn=trim(smapfile), &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      elseif (is_local%wrap%atm_present .and. is_local%wrap%ocn_present) then
+        call NUOPC_CompAttributeGet(gcomp, name="atm2ocn_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname a2o "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBfrac_a, FBdst=is_local%wrap%FBfrac_o, &
+          consfmap=is_local%wrap%RH_a2o_consf, &
+          dstMaskValue=0, &
+          string='a2o_weights_for_fraction', &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+
+      if (is_local%wrap%a2i_active) then
+        call NUOPC_CompAttributeGet(gcomp, name="atm2ice_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeGet(gcomp, name="atm2ice_smapname", value=smapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname a2i "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call ESMF_LogWrite(" smapname a2i "//trim(smapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_i, &
+          bilnrmap=is_local%wrap%RH_a2i_bilnr, &
+          consfmap=is_local%wrap%RH_a2i_consf, &
+          consdmap=is_local%wrap%RH_a2i_consd, &
+          patchmap=is_local%wrap%RH_a2i_patch, &
+          fcopymap=is_local%wrap%RH_a2i_fcopy, &
+          dstMaskValue=0, &
+          fldlist1=FldsFrAtm, string='a2i_weights', &
+          bilnrfn=trim(smapfile), &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      elseif (is_local%wrap%atm_present .and. is_local%wrap%ice_present) then
+        call NUOPC_CompAttributeGet(gcomp, name="atm2ice_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname a2i "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBfrac_a, FBdst=is_local%wrap%FBfrac_i, &
+          consfmap=is_local%wrap%RH_a2i_consf, &
+          dstMaskValue=0, &
+          string='a2i_weights_for_fraction', &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+
+      if (is_local%wrap%a2l_active) then
+        call NUOPC_CompAttributeGet(gcomp, name="atm2lnd_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeGet(gcomp, name="atm2lnd_smapname", value=smapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname a2l "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call ESMF_LogWrite(" smapname a2l "//trim(smapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_l, &
+          bilnrmap=is_local%wrap%RH_a2l_bilnr, &
+          consfmap=is_local%wrap%RH_a2l_consf, &
+          consdmap=is_local%wrap%RH_a2l_consd, &
+          patchmap=is_local%wrap%RH_a2l_patch, &
+          fcopymap=is_local%wrap%RH_a2l_fcopy, &
+          fldlist1=FldsFrAtm, string='a2l_weights', &
+          bilnrfn=trim(smapfile), &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      elseif (is_local%wrap%atm_present .and. is_local%wrap%lnd_present) then
+        call NUOPC_CompAttributeGet(gcomp, name="atm2lnd_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname a2l "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBfrac_a, FBdst=is_local%wrap%FBfrac_l, &
+          consfmap=is_local%wrap%RH_a2l_consf, &
+          dstMaskValue=0, &
+          string='a2l_weights_for_fraction', &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+
+      if (is_local%wrap%o2a_active) then
+        call NUOPC_CompAttributeGet(gcomp, name="ocn2atm_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeGet(gcomp, name="ocn2atm_smapname", value=smapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname o2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call ESMF_LogWrite(" smapname o2a "//trim(smapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBOcn_o, FBdst=is_local%wrap%FBOcn_a, &
+          bilnrmap=is_local%wrap%RH_o2a_bilnr, &
+          consfmap=is_local%wrap%RH_o2a_consf, &
+          consdmap=is_local%wrap%RH_o2a_consd, &
+          patchmap=is_local%wrap%RH_o2a_patch, &
+          fcopymap=is_local%wrap%RH_o2a_fcopy, &
+          srcMaskValue=0, &
+          fldlist1=FldsFrOcn, fldlist2=FldsAtmOcn, string='o2a_weights', &
+          bilnrfn=trim(smapfile), &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      elseif (is_local%wrap%atm_present .and. is_local%wrap%ocn_present) then
+        call NUOPC_CompAttributeGet(gcomp, name="ocn2atm_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname o2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBfrac_o, FBdst=is_local%wrap%FBfrac_a, &
+          consfmap=is_local%wrap%RH_o2a_consf, &
+          srcMaskValue=0, &
+          string='o2a_weights_for_fraction', &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+
+      if (is_local%wrap%o2i_active) then
+        fmapfile = "idmap"
+        smapfile = "idmap"
+        call ESMF_LogWrite(" fmapname o2i "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call ESMF_LogWrite(" smapname o2i "//trim(smapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBOcn_o, FBdst=is_local%wrap%FBOcn_i, &
+          bilnrmap=is_local%wrap%RH_o2i_bilnr, &
+          consfmap=is_local%wrap%RH_o2i_consf, &
+          consdmap=is_local%wrap%RH_o2i_consd, &
+          patchmap=is_local%wrap%RH_o2i_patch, &
+          fcopymap=is_local%wrap%RH_o2i_fcopy, &
+          srcMaskValue=0, dstMaskValue=0, &
+          fldlist1=FldsFrOcn, string='o2i_weights', &
+          bilnrfn=trim(smapfile), &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+
+      if (is_local%wrap%i2a_active) then
+        call NUOPC_CompAttributeGet(gcomp, name="ice2atm_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeGet(gcomp, name="ice2atm_smapname", value=smapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname i2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call ESMF_LogWrite(" smapname i2a "//trim(smapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBIce_i, FBdst=is_local%wrap%FBIce_a, &
+          bilnrmap=is_local%wrap%RH_i2a_bilnr, &
+          consfmap=is_local%wrap%RH_i2a_consf, &
+          consdmap=is_local%wrap%RH_i2a_consd, &
+          patchmap=is_local%wrap%RH_i2a_patch, &
+          fcopymap=is_local%wrap%RH_i2a_fcopy, &
+          srcMaskValue=0, &
+          fldlist1=FldsFrIce, string='i2a_weights', &
+          bilnrfn=trim(smapfile), &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      elseif (is_local%wrap%atm_present .and. is_local%wrap%ice_present) then
+        call NUOPC_CompAttributeGet(gcomp, name="ice2atm_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname i2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBfrac_i, FBdst=is_local%wrap%FBfrac_a, &
+          consfmap=is_local%wrap%RH_i2a_consf, &
+          srcMaskValue=0, &
+          string='i2a_weights_for_fraction', &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+
+      if (is_local%wrap%i2o_active) then
+        fmapfile = "idmap"
+        smapfile = "idmap"
+        call ESMF_LogWrite(" fmapname i2o "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call ESMF_LogWrite(" smapname i2o "//trim(smapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBIce_i, FBdst=is_local%wrap%FBIce_o, &
+          bilnrmap=is_local%wrap%RH_i2o_bilnr, &
+          consfmap=is_local%wrap%RH_i2o_consf, &
+          consdmap=is_local%wrap%RH_i2o_consd, &
+          patchmap=is_local%wrap%RH_i2o_patch, &
+          fcopymap=is_local%wrap%RH_i2o_fcopy, &
+          srcMaskValue=0, dstMaskValue=0, &
+          fldlist1=FldsFrIce, string='i2o_weights', &
+          bilnrfn=trim(smapfile), &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      elseif (is_local%wrap%ocn_present .and. is_local%wrap%ice_present) then
+        fmapfile = "idmap"
+        call ESMF_LogWrite(" fmapname i2o "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBfrac_i, FBdst=is_local%wrap%FBfrac_o, &
+          consfmap=is_local%wrap%RH_i2o_consf, &
+          srcMaskValue=0, dstMaskValue=0, &
+          string='i2o_weights_for_fraction', &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+
+      if (is_local%wrap%l2a_active) then
+        call NUOPC_CompAttributeGet(gcomp, name="lnd2atm_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeGet(gcomp, name="lnd2atm_smapname", value=smapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname l2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call ESMF_LogWrite(" smapname l2a "//trim(smapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_a, &
+          bilnrmap=is_local%wrap%RH_l2a_bilnr, &
+          consfmap=is_local%wrap%RH_l2a_consf, &
+          consdmap=is_local%wrap%RH_l2a_consd, &
+          patchmap=is_local%wrap%RH_l2a_patch, &
+          fcopymap=is_local%wrap%RH_l2a_fcopy, &
+          fldlist1=FldsFrLnd, string='l2a_weights', &
+          bilnrfn=trim(smapfile), &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      elseif (is_local%wrap%atm_present .and. is_local%wrap%lnd_present) then
+        call NUOPC_CompAttributeGet(gcomp, name="lnd2atm_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname l2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBfrac_l, FBdst=is_local%wrap%FBfrac_a, &
+          consfmap=is_local%wrap%RH_l2a_consf, &
+          string='l2a_weights_for_fraction', &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+
+      if (is_local%wrap%l2r_active) then
+! tcx note bilinear is set to conserv to get past initialization.  the subroutine thinks it'll
+! need bilinear mapping weights but it won't for l2r.
+        call NUOPC_CompAttributeGet(gcomp, name="lnd2rof_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname l2r "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        !call NUOPC_CompAttributeGet(gcomp, name="lnd2rof_smapname", value=smapfile, rc=rc)
+        !if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        !call ESMF_LogWrite(" smapname l2a "//trim(smapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_r, &
+          bilnrmap=is_local%wrap%RH_l2r_bilnr, &
+          consfmap=is_local%wrap%RH_l2r_consf, &
+          consdmap=is_local%wrap%RH_l2r_consd, &
+          patchmap=is_local%wrap%RH_l2r_patch, &
+          fcopymap=is_local%wrap%RH_l2r_fcopy, &
+          fldlist1=FldsFrLnd, string='l2r_weights', &
+          bilnrfn=trim(fmapfile), &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      elseif (is_local%wrap%lnd_present .and. is_local%wrap%rof_present) then
+        call NUOPC_CompAttributeGet(gcomp, name="lnd2rof_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname l2r "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBfrac_l, FBdst=is_local%wrap%FBfrac_r, &
+          consfmap=is_local%wrap%RH_l2r_consf, &
+          string='l2r_weights_for_fraction', &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+
+      if (is_local%wrap%r2o_active) then
+        call NUOPC_CompAttributeGet(gcomp, name="rof2ocn_liq_rmapname", value=rlmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" rlmapname  r2o"//trim(rlmapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_o, &
+!         bilnrmap=is_local%wrap%RH_r2o_bilnr, &
+          consfmap=is_local%wrap%RH_r2ol_consf, &
+!         consdmap=is_local%wrap%RH_r2o_consd, &
+!         patchmap=is_local%wrap%RH_r2o_patch, &
+!         fcopymap=is_local%wrap%RH_r2o_fcopy, &
+          fldlist1=FldsFrRof, string='r2ol_weights', &
+!         bilnrfn=trim(rimapfile), &
+          consffn=trim(rlmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+        call NUOPC_CompAttributeGet(gcomp, name="rof2ocn_ice_rmapname", value=rimapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" rimapname  r2o"//trim(rlmapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_o, &
+!         bilnrmap=is_local%wrap%RH_r2o_bilnr, &
+          consfmap=is_local%wrap%RH_r2oi_consf, &
+!         consdmap=is_local%wrap%RH_r2o_consd, &
+!         patchmap=is_local%wrap%RH_r2o_patch, &
+!         fcopymap=is_local%wrap%RH_r2o_fcopy, &
+          fldlist1=FldsFrRof, string='r2oi_weights', &
+!         bilnrfn=trim(rimapfile), &
+          consffn=trim(rimapfile), &
+          rc=rc)
+      endif
+
+      if (is_local%wrap%r2l_active) then
+! tcx note bilinear is set to conserv to get past initialization.  the subroutine thinks it'll
+! need bilinear mapping weights but it won't for l2r.
+        call NUOPC_CompAttributeGet(gcomp, name="rof2lnd_fmapname", value=fmapfile, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_LogWrite(" fmapname r2l "//trim(fmapfile), ESMF_LOGMSG_INFO)
+        call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_l, &
+          bilnrmap=is_local%wrap%RH_r2l_bilnr, &
+          consfmap=is_local%wrap%RH_r2l_consf, &
+          consdmap=is_local%wrap%RH_r2l_consd, &
+          patchmap=is_local%wrap%RH_r2l_patch, &
+          fcopymap=is_local%wrap%RH_r2l_fcopy, &
+          fldlist1=FldsFrRof, string='r2l_weights', &
+          bilnrfn=trim(fmapfile), &
+          consffn=trim(fmapfile), &
+          rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
 
       ! gjt: The above code ensures that the MED has initial conditions from ATM.
 
