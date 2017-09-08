@@ -2,7 +2,7 @@ module MED
 
   !-----------------------------------------------------------------------------
   ! Mediator Component.
-  ! This mediator operates on two timescales and keeps two internal Clocks to 
+  ! This mediator operates on two timescales and keeps two internal Clocks to
   ! do so.
   !-----------------------------------------------------------------------------
 
@@ -20,9 +20,10 @@ module MED
 
   use shr_kind_mod          , only: SHR_KIND_CL
   use seq_flds_mod
-  use seq_infodata_mod      , only: infodata=>seq_infodata_infodata
+  use med_infodata_mod      , only: med_infodata_CopyStateToInfodata
+  use med_infodata_mod      , only: infodata=>med_infodata
 
-  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Zero 
+  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Zero
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_fromseqflds
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Add
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Realize
@@ -36,7 +37,6 @@ module MED
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_GeomPrint
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_GeomWrite
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_reset
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_CopyStateToInfodata
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_clock_timeprint
 
@@ -101,9 +101,9 @@ module MED
   use med_constants_mod     , only: med_constants_ispval_mask 
 
   implicit none
-  
+
   private
-  
+
   integer            :: dbug_flag = med_constants_dbug_flag
   integer            :: dbrc
   integer            :: stat
@@ -118,7 +118,7 @@ module MED
     __FILE__
 
   public SetServices
-  
+
   !-----------------------------------------------------------------------------
   contains
   !-----------------------------------------------------------------------------
@@ -126,16 +126,16 @@ module MED
   subroutine SetServices(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-    
+
     rc = ESMF_SUCCESS
-    
+
     !------------------
     ! the NUOPC model component mediator_routine_SS will register the generic methods
     !------------------
 
     call NUOPC_CompDerive(gcomp, mediator_routine_SS, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !------------------
     ! set entry point for methods that require specific implementation
     ! Provide InitializeP0 to switch from default IPDv00 to IPDv03
@@ -143,7 +143,7 @@ module MED
 
     call ESMF_GridCompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       InitializeP0, phase=0, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! IPDv03p1: advertise Fields
@@ -156,7 +156,7 @@ module MED
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv03p1"/), userRoutine=InitializeIPDv03p1, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! IPDv03p3: realize connected Fields with transfer action "provide"
@@ -164,7 +164,7 @@ module MED
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv03p3"/), userRoutine=InitializeIPDv03p3, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! IPDv03p4: optionally modify the decomp/distr of transferred Grid/Mesh
@@ -172,7 +172,7 @@ module MED
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv03p4"/), userRoutine=InitializeIPDv03p4, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! IPDv03p5: realize all Fields with transfer action "accept"
@@ -180,7 +180,7 @@ module MED
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
       phaseLabelList=(/"IPDv03p5"/), userRoutine=InitializeIPDv03p5, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! attach specializing method for DataInitialize
@@ -188,7 +188,7 @@ module MED
 
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_DataInitialize, &
       specRoutine=DataInitialize, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! setup various mediator phases
@@ -197,10 +197,10 @@ module MED
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_phases_accum_fast"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_phases_accum_fast", specRoutine=med_phases_accum_fast, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_fraction_set"/), &
@@ -217,114 +217,114 @@ module MED
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_prep_med2atm"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_prep_med2atm", specRoutine=med_connectors_prep_med2atm, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_post_atm2med"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_post_atm2med", specRoutine=med_connectors_post_atm2med, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_prep_med2ocn"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_prep_med2ocn", specRoutine=med_connectors_prep_med2ocn, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_post_ocn2med"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_post_ocn2med", specRoutine=med_connectors_post_ocn2med, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_prep_med2ice"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_prep_med2ice", specRoutine=med_connectors_prep_med2ice, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_post_ice2med"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_post_ice2med", specRoutine=med_connectors_post_ice2med, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_prep_med2lnd"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_prep_med2lnd", specRoutine=med_connectors_prep_med2lnd, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_post_lnd2med"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_post_lnd2med", specRoutine=med_connectors_post_lnd2med, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_prep_med2rof"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_prep_med2rof", specRoutine=med_connectors_prep_med2rof, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_post_rof2med"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_post_rof2med", specRoutine=med_connectors_post_rof2med, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_prep_med2wav"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_prep_med2wav", specRoutine=med_connectors_prep_med2wav, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_post_wav2med"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_post_wav2med", specRoutine=med_connectors_post_wav2med, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_prep_med2glc"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_prep_med2glc", specRoutine=med_connectors_prep_med2glc, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_connectors_post_glc2med"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_connectors_post_glc2med", specRoutine=med_connectors_post_glc2med, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! prep routines for model imports
@@ -333,58 +333,58 @@ module MED
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_phases_prep_atm"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_phases_prep_atm", specRoutine=med_phases_prep_atm, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_phases_prep_ocn"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_phases_prep_ocn", specRoutine=med_phases_prep_ocn, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_phases_prep_ice"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_phases_prep_ice", specRoutine=med_phases_prep_ice, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_phases_prep_lnd"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_phases_prep_lnd", specRoutine=med_phases_prep_lnd, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_phases_prep_rof"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_phases_prep_rof", specRoutine=med_phases_prep_rof, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_phases_prep_wav"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_phases_prep_wav", specRoutine=med_phases_prep_wav, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
       phaseLabelList=(/"med_phases_prep_glc"/), &
       userRoutine=mediator_routine_Run, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
       specPhaseLabel="med_phases_prep_glc", specRoutine=med_phases_prep_glc, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! attach specializing method(s)
@@ -392,10 +392,10 @@ module MED
     !------------------
 
     call ESMF_MethodRemove(gcomp, mediator_label_CheckImport, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_CheckImport, &
       specRoutine=NUOPC_NoOp, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! attach specializing method(s)
@@ -403,13 +403,13 @@ module MED
     !------------------
 
     call ESMF_MethodRemove(gcomp, mediator_label_SetRunClock, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_SetRunClock, &
       specRoutine=SetRunClock, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
   end subroutine SetServices
-  
+
   !-----------------------------------------------------------------------------
 
   subroutine InitializeP0(gcomp, importState, exportState, clock, rc)
@@ -426,10 +426,10 @@ module MED
 
     call ESMF_AttributeGet(gcomp, name="Verbosity", value=value, defaultValue="max", &
       convention="NUOPC", purpose="Instance", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     dbug_flag = ESMF_UtilString2Int(value, &
       specialStringList=(/"min","max","high"/), specialValueList=(/0,255,255/), rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     write(msgString,'(A,i6)') trim(subname)//' dbug_flag = ',dbug_flag
     call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -440,7 +440,7 @@ module MED
     ! Switch to IPDv03 by filtering all other phaseMap entries
     call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, &
       acceptStringList=(/"IPDv03p"/), rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -460,16 +460,16 @@ module MED
     type(ESMF_Clock)     :: clock
     integer, intent(out) :: rc
 
-    ! local variables    
+    ! local variables
     integer :: n
     type(InternalState)        :: is_local
     character(len=*),parameter :: subname='(module_MEDIATOR:InitializeIPDv03p1)'
-    
+
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
     rc = ESMF_SUCCESS
-    
+
     !------------------
     ! Allocate memory for the internal state and set it in the Component.
     !------------------
@@ -481,15 +481,15 @@ module MED
       file=u_FILE_u)) &
       return  ! bail out
     call ESMF_GridCompSetInternalState(gcomp, is_local, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-      
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !------------------
     ! add a namespace (i.e. nested state)  for each import and export component state in the mediator's InternalState
     !------------------
 
     ! Namespaces are implemented via nested states. This creates a nested state inside of
     ! state. The nested state is returned as nestedState. nestedStateName will be used to name the
-    ! newly created nested state. 
+    ! newly created nested state.
 
     call NUOPC_AddNamespace(importState, namespace="ATM", nestedStateName="NestedState-AtmImp", nestedState=is_local%wrap%NState_AtmImp, rc=rc)
     call NUOPC_AddNamespace(importState, namespace="OCN", nestedStateName="NestedState-OcnImp", nestedState=is_local%wrap%NState_OcnImp, rc=rc)
@@ -533,225 +533,225 @@ module MED
     ! Create fldsToAtm
     !------------------
     call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_states, "cannot provide", subname//":seq_flds_x2a_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     !    call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_fluxes, "cannot provide", subname//":seq_flds_x2a_fluxes", "conservefrac", rc=rc)
-    !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_fluxes, "cannot provide", subname//":seq_flds_x2a_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsToAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFrAtm
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_states, "cannot provide", subname//":seq_flds_a2x_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !    call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_fluxes, "cannot provide", subname//":seq_flds_a2x_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_fluxes, "cannot provide", subname//":seq_flds_a2x_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsFrAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsToOcn
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_states, "cannot provide", subname//":seq_flds_x2o_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !    call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_fluxes, "cannot provide", subname//":seq_flds_x2o_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_fluxes, "cannot provide", subname//":seq_flds_x2o_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsToOcn, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFrOcn
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_states, "cannot provide", subname//":seq_flds_o2x_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !    call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_fluxes, "cannot provide", subname//":seq_flds_o2x_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_fluxes, "cannot provide", subname//":seq_flds_o2x_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsFrOcn, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsToIce
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_states, "cannot provide", subname//":seq_flds_x2i_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !    call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_fluxes, "cannot provide", subname//":seq_flds_x2i_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_fluxes, "cannot provide", subname//":seq_flds_x2i_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsToIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFrIce
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_states, "cannot provide", subname//":seq_flds_i2x_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !    call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_fluxes, "cannot provide", subname//":seq_flds_i2x_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_fluxes, "cannot provide", subname//":seq_flds_i2x_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsFrIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsToLnd
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToLnd, seq_flds_x2l_states, "cannot provide", subname//":seq_flds_x2l_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !    call shr_nuopc_fldList_fromseqflds(fldsToLnd, seq_flds_x2l_fluxes, "cannot provide", subname//":seq_flds_x2l_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_fromseqflds(fldsToLnd, seq_flds_x2l_fluxes, "cannot provide", subname//":seq_flds_x2l_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsToLnd, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFrLnd
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrLnd, seq_flds_l2x_states, "cannot provide", subname//":seq_flds_l2x_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !    call shr_nuopc_fldList_fromseqflds(fldsFrLnd, seq_flds_l2x_fluxes, "cannot provide", subname//":seq_flds_l2x_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_fromseqflds(fldsFrLnd, seq_flds_l2x_fluxes, "cannot provide", subname//":seq_flds_l2x_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsFrLnd, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsToRof
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_states, "cannot provide", subname//":seq_flds_x2r_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !    call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsToRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFrRof
     !------------------
 
     call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_states, "cannot provide", subname//":seq_flds_r2x_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !    call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsFrRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsToWav
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2r_states, "cannot provide", subname//":seq_flds_x2r_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-!    call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2w_states, "cannot provide", subname//":seq_flds_x2w_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+!    call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2w_fluxes, "cannot provide", subname//":seq_flds_x2w_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2w_fluxes, "cannot provide", subname//":seq_flds_x2w_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsToWav, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFrWav
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_r2x_states, "cannot provide", subname//":seq_flds_r2x_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-!    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_w2x_states, "cannot provide", subname//":seq_flds_w2x_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+!    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_w2x_fluxes, "cannot provide", subname//":seq_flds_w2x_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_w2x_fluxes, "cannot provide", subname//":seq_flds_rwx_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsFrWav, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsToGlc
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2r_states, "cannot provide", subname//":seq_flds_x2r_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-!    call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2r_fluxes, "cannot provide", subname//":seq_flds_x2r_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2g_states, "cannot provide", subname//":seq_flds_x2g_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+!    call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2g_fluxes, "cannot provide", subname//":seq_flds_x2g_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2g_fluxes, "cannot provide", subname//":seq_flds_x2g_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsToGlc, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFrGlc
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_r2x_states, "cannot provide", subname//":seq_flds_r2x_states", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-!    call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "conservefrac", rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_r2x_fluxes, "cannot provide", subname//":seq_flds_r2x_fluxes", "bilinear", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_g2x_states, "cannot provide", subname//":seq_flds_g2x_states", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+!    call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_g2x_fluxes, "cannot provide", subname//":seq_flds_g2x_fluxes", "conservefrac", rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_g2x_fluxes, "cannot provide", subname//":seq_flds_g2x_fluxes", "bilinear", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Add(fldsFrGlc, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Mediator advertisement
     !------------------
 
-    ! Call NUOPC_Advertise from the mediator for each entry in the flds[Fr,To]XXX 
+    ! Call NUOPC_Advertise from the mediator for each entry in the flds[Fr,To]XXX
 
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_AtmImp, fldsFrAtm, subname//':FrAtm', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_LndImp, fldsFrLnd, subname//':FrLnd', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_OcnImp, fldsFrOcn, subname//':FrOcn', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_IceImp, fldsFrIce, subname//':FrIce', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_RofImp, fldsFrRof, subname//':FrRof', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_WavImp, fldsFrWav, subname//':FrWav', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_GlcImp, fldsFrGlc, subname//':FrGlc', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_AtmExp, fldsToAtm, subname//':ToAtm', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_LndExp, fldsToLnd, subname//':ToLnd', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_OcnExp, fldsToOcn, subname//':ToOcn', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_IceExp, fldsToIce, subname//':ToIce', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_RofExp, fldsToRof, subname//':ToRof', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_WavExp, fldsToWav, subname//':ToWav', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Advertise(is_local%wrap%NState_GlcExp, fldsToGlc, subname//':ToGlc', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
   end subroutine InitializeIPDv03p1
-  
+
   !-----------------------------------------------------------------------------
 
   subroutine InitializeIPDv03p3(gcomp, importState, exportState, clock, rc)
@@ -762,8 +762,8 @@ module MED
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
     integer, intent(out) :: rc
-    
-    ! local variables    
+
+    ! local variables
     integer                         :: i, j
     real(kind=ESMF_KIND_R8),pointer :: lonPtr(:), latPtr(:)
     type(ESMF_VM)                   :: vm
@@ -775,25 +775,25 @@ module MED
 !    type(ESMF_Field)               :: fieldX, fieldA, fieldO
 !    type(ESMF_XGrid)               :: xgrid
     integer                         :: n
-    character(SHR_KIND_CL)          :: cvalue  
+    character(SHR_KIND_CL)          :: cvalue
     logical                         :: connected
     character(len=*),parameter      :: subname='(module_MEDIATOR:InitializeIPDv03p3)'
-    
+
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
     rc = ESMF_SUCCESS
-    
+
     ! Get the internal state from Component.
     nullify(is_local%wrap)
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      
+
     ! Initialize the internal state members
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_VMGet(vm, mpiCommunicator=lmpicom, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call MPI_Comm_Dup(lmpicom, is_local%wrap%mpicom, stat)
 
     is_local%wrap%atmcntr = 0
@@ -817,17 +817,17 @@ module MED
 !      minCornerCoord=(/0._ESMF_KIND_R8, -90._ESMF_KIND_R8/), &
 !      maxCornerCoord=(/360._ESMF_KIND_R8, 90._ESMF_KIND_R8/), &
 !      staggerLocList=(/ESMF_STAGGERLOC_CENTER/), rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
 !    gridLnd = NUOPC_GridCreateSimpleSph(0._ESMF_KIND_R8, -85._ESMF_KIND_R8, &
 !      360._ESMF_KIND_R8, 85._ESMF_KIND_R8, nx_med, ny_med, &
 !      scheme=ESMF_REGRID_SCHEME_FULL3D, rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
 !    gridRof = NUOPC_GridCreateSimpleSph(0._ESMF_KIND_R8, -85._ESMF_KIND_R8, &
 !      360._ESMF_KIND_R8, 85._ESMF_KIND_R8, nx_med, ny_med, &
 !      scheme=ESMF_REGRID_SCHEME_FULL3D, rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--- Generate RouteHandles
 ! tcx Xgrid
@@ -835,7 +835,7 @@ module MED
 ! add error checking code
 
 !    xgrid = ESMF_XGridCreate(sideAGrid=(/gridatm/), sideBGrid=(/gridocn/), rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !    fieldX = ESMF_FieldCreate(xgrid  , typekind=ESMF_TYPEKIND_R8, rc=rc)
 !    fieldA = ESMF_FieldCreate(gridAtm, typekind=ESMF_TYPEKIND_R8, rc=rc)
 !    fieldO = ESMF_FieldCreate(gridAtm, typekind=ESMF_TYPEKIND_R8, rc=rc)
@@ -849,41 +849,41 @@ module MED
 !    call ESMF_XGridDestroy(xgrid, rc=rc)
 
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_AtmImp, fldlist=fldsFrAtm, tag=subname//':FrAtm', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_LndImp, fldlist=fldsFrLnd, tag=subname//':FrLnd', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_OcnImp, fldlist=fldsFrOcn, tag=subname//':FrOcn', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_IceImp, fldlist=fldsFrIce, tag=subname//':FrIce', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_RofImp, fldlist=fldsFrRof, tag=subname//':FrRof', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_WavImp, fldlist=fldsFrWav, tag=subname//':FrWav', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_GlcImp, fldlist=fldsFrGlc, tag=subname//':FrGlc', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_AtmExp, fldlist=fldsToAtm, tag=subname//':ToAtm', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_LndExp, fldlist=fldsToLnd, tag=subname//':ToLnd', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_OcnExp, fldlist=fldsToOcn, tag=subname//':ToOcn', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_IceExp, fldlist=fldsToIce, tag=subname//':ToIce', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_RofExp, fldlist=fldsToRof, tag=subname//':ToRof', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_WavExp, fldlist=fldsToWav, tag=subname//':ToWav', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_fldList_Realize(is_local%wrap%NState_GlcExp, fldlist=fldsToGlc, tag=subname//':ToGlc', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
   end subroutine InitializeIPDv03p3
-  
+
   !-----------------------------------------------------------------------------
 
   subroutine InitializeIPDv03p4(gcomp, importState, exportState, clock, rc)
@@ -894,7 +894,7 @@ module MED
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
     integer, intent(out) :: rc
-    
+
     ! local variables
     type(InternalState)        :: is_local
 !    type(ESMF_Field)              :: field
@@ -907,13 +907,13 @@ module MED
 !    integer, allocatable          :: minIndexPTile(:,:), maxIndexPTile(:,:)
 !    integer, allocatable          :: regDecompPTile(:,:)
 !    integer                       :: i, j, n, n1
-    
+
     character(len=*),parameter :: subname='(module_MEDIATOR:InitializeIPDv03p4)'
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
-    
+
     rc = ESMF_SUCCESS
 
     ! Get the internal state from the mediator gridded component.
@@ -921,48 +921,47 @@ module MED
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-
     call realizeConnectedGrid(is_local%wrap%NState_atmImp, 'AtmImp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_atmExp, 'AtmExp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_ocnImp, 'OcnImp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_ocnExp, 'OcnExp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_iceImp, 'IceImp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_iceExp, 'IceExp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_lndImp, 'LndImp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_lndExp, 'LndExp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_rofImp, 'RofImp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_rofExp, 'RofExp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_wavImp, 'WavImp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_wavExp, 'WavExp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_glcImp, 'GlcImp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call realizeConnectedGrid(is_local%wrap%NState_glcExp, 'GlcExp', rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -975,7 +974,7 @@ module MED
       type(ESMF_State)   , intent(inout) :: State
       character(len=*)   , intent(in)    :: string
       integer            , intent(out)   :: rc
-    
+
       ! local variables
       type(ESMF_Field)              :: field
       type(ESMF_Grid)               :: grid
@@ -992,12 +991,12 @@ module MED
       integer                       :: i, j, n, n1, fieldCount, nxg, i1, i2
       type(ESMF_GeomType_Flag)      :: geomtype
       character(ESMF_MAXSTR),allocatable :: fieldNameList(:)
-      type(ESMF_FieldStatus_Flag)   :: fieldStatus 
+      type(ESMF_FieldStatus_Flag)   :: fieldStatus
       character(len=*),parameter :: subname='(module_MEDIATOR:realizeConnectedGrid)'
 
       !NOTE: All fo the Fields that set their TransferOfferGeomObject Attribute
       !NOTE: to "cannot provide" should now have the accepted Grid available.
-      !NOTE: Go and pull out this Grid for one of a representative Field and 
+      !NOTE: Go and pull out this Grid for one of a representative Field and
       !NOTE: modify the decomposition and distribution of the Grid to match the
       !NOTE: Mediator PETs.
 
@@ -1010,32 +1009,35 @@ module MED
       rc = ESMF_Success
 
       call ESMF_StateGet(State, itemCount=fieldCount, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
       allocate(fieldNameList(fieldCount))
       call ESMF_StateGet(State, itemNameList=fieldNameList, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-!      do n=1, fieldCount
+!     do n=1, fieldCount
       do n=1, min(fieldCount,1)
 
         call ESMF_StateGet(State, field=field, itemName=fieldNameList(n), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-        call ESMF_FieldGet(field, status=fieldStatus, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        if (fieldStatus==ESMF_FIELDSTATUS_GRIDSET) then 
+        call ESMF_FieldGet(field, status=fieldStatus, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+        if (fieldStatus==ESMF_FIELDSTATUS_GRIDSET) then
+
           ! while this is still an empty field, it does now hold a Grid with DistGrid
           call ESMF_FieldGet(field, geomtype=geomtype, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
           if (geomtype == ESMF_GEOMTYPE_GRID) then
 
             call shr_nuopc_methods_Field_GeomPrint(field,trim(fieldNameList(n))//'_orig',rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
             call ESMF_AttributeGet(field, name="ArbDimCount", value=arbDimCount, &
               convention="NUOPC", purpose="Instance", rc=rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
             ! make decision on whether the incoming Grid is arbDistr or not
             if (arbDimCount>0) then
@@ -1061,21 +1063,21 @@ module MED
                 call ESMF_AttributeGet(field, name="MinIndex", &
                   valueList=minIndexPTile(:,1), &
                   convention="NUOPC", purpose="Instance", rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                 call ESMF_AttributeGet(field, name="MaxIndex", &
                   valueList=maxIndexPTile(:,1), &
                   convention="NUOPC", purpose="Instance", rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                 ! create default regDecomp DistGrid
                 distgrid = ESMF_DistGridCreate(minIndexPTile=minIndexPTile, &
                  maxIndexPTile=maxIndexPTile, connectionList=connectionList, rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                 ! Create default regDecomp Grid
                 grid = ESMF_GridCreate(distgrid, rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                 ! swap out the transferred grid for the newly created one
                 call ESMF_FieldEmptySet(field, grid=grid, rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                 do i1 = 1,arbDimCount
                   write(msgString,'(A,3i8)') trim(subname)//':PTile =',i1,minIndexPTile(i1,1),maxIndexPTile(i1,1)
                   call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
@@ -1098,7 +1100,7 @@ module MED
 
                 call ESMF_LogWrite(trim(subname)//trim(string)//": ERROR grid_arbopt setting = "//trim(grid_arbopt), ESMF_LOGMSG_INFO, rc=rc)
                 rc = ESMF_FAILURE
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
               endif  ! grid_arbopt
 
@@ -1113,33 +1115,33 @@ module MED
               endif
 
               call ESMF_FieldGet(field, grid=grid, rc=rc)
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
               call ESMF_GridGet(grid, localDeCount=localDeCount, distgrid=distgrid, rc=rc)
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-              ! Create a custom DistGrid, based on the minIndex, maxIndex of the 
+              ! Create a custom DistGrid, based on the minIndex, maxIndex of the
               ! accepted DistGrid, but with a default regDecomp for the current VM
               ! that leads to 1DE/PET.
 
               ! get dimCount and tileCount
               call ESMF_DistGridGet(distgrid, dimCount=dimCount, tileCount=tileCount, &
                 connectionCount=connectionCount, rc=rc)
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
               ! allocate minIndexPTile and maxIndexPTile accord. to dimCount and tileCount
               allocate(minIndexPTile(dimCount, tileCount), &
                        maxIndexPTile(dimCount, tileCount))
               allocate(connectionList(connectionCount))
-    
+
               ! get minIndex and maxIndex arrays, and connectionList
               call ESMF_DistGridGet(distgrid, minIndexPTile=minIndexPTile, &
                 maxIndexPTile=maxIndexPTile, connectionList=connectionList, rc=rc)
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
               ! construct a default regDecompPTile -> TODO: move this into ESMF as default
               call ESMF_GridCompGet(gcomp, petCount=petCount, rc=rc)
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
               allocate(regDecompPTile(dimCount, tileCount))
               deCountPTile = petCount/tileCount
@@ -1168,10 +1170,10 @@ module MED
 !              nxg = maxIndexPTile(1,1) - minIndexPTile(1,1) + 1
 !              write(msgstring,*) trim(subname)//trim(string),': connlist nxg = ',nxg
 !              call ESMF_LogWrite(trim(msgstring), ESMF_LOGMSG_INFO, rc=rc)
-!              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !              call ESMF_DistGridConnectionSet(connectionList(1), tileIndexA=1, &
 !                tileIndexB=1, positionVector=(/nxg, 0/), rc=rc)
-!              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
               ! create the new DistGrid with the same minIndexPTile and maxIndexPTile,
               ! but with a default regDecompPTile
@@ -1181,27 +1183,27 @@ module MED
                 distgrid = ESMF_DistGridCreate(minIndexPTile=minIndexPTile, &
                   maxIndexPTile=maxIndexPTile, regDecompPTile=regDecompPTile, &
                   connectionList=connectionList, rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                 if (dbug_flag > 1) then
                   call ESMF_LogWrite(trim(subname)//trim(string)//': distgrid with dimcount=2', ESMF_LOGMSG_INFO, rc=rc)
-                  if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                  if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                 endif
                 ! Create a new Grid on the new DistGrid and swap it in the Field
                 grid = ESMF_GridCreate(distgrid, &
                   gridEdgeLWidth=(/0,0/), gridEdgeUWidth=(/0,1/), rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
               else
                 distgrid = ESMF_DistGridCreate(minIndexPTile=minIndexPTile, &
                   maxIndexPTile=maxIndexPTile, regDecompPTile=regDecompPTile, rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                 if (dbug_flag > 1) then
                   call ESMF_LogWrite(trim(subname)//trim(string)//': distgrid with dimcount=1', ESMF_LOGMSG_INFO, rc=rc)
-                  if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                  if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                 endif
                 ! Create a new Grid on the new DistGrid and swap it in the Field
                 grid = ESMF_GridCreate(distgrid, &
                   gridEdgeLWidth=(/0/), gridEdgeUWidth=(/0/), rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
               endif
 
               ! local clean-up
@@ -1216,21 +1218,21 @@ module MED
             do n1=1, fieldCount
               ! access a field in the State and set the Grid
               call ESMF_StateGet(State, field=field, itemName=fieldNameList(n1), rc=rc)
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-              call ESMF_FieldEmptySet(field, grid=grid, rc=rc)    
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+              call ESMF_FieldEmptySet(field, grid=grid, rc=rc)
+              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
               if (dbug_flag > 1) then
                 call ESMF_LogWrite(trim(subname)//trim(string)//": attach grid for "//trim(fieldNameList(n1)), ESMF_LOGMSG_INFO, rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
               endif
               call shr_nuopc_methods_Field_GeomPrint(field,trim(fieldNameList(n))//'_new',rc)
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
             enddo
 
           elseif (geomtype == ESMF_GEOMTYPE_MESH) then
 
             call shr_nuopc_methods_Field_GeomPrint(field,trim(fieldNameList(n))//'_orig',rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
           else  ! geomtype
 
@@ -1240,9 +1242,13 @@ module MED
 
           endif ! geomtype
 
-        elseif (fieldStatus==ESMF_FIELDSTATUS_EMPTY) then 
+        elseif (fieldStatus==ESMF_FIELDSTATUS_EMPTY) then
 
           call ESMF_LogWrite(trim(subname)//trim(string)//": provide grid for "//trim(fieldNameList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+
+        elseif (fieldStatus==ESMF_FIELDSTATUS_COMPLETE) then
+
+          call ESMF_LogWrite(trim(subname)//trim(string)//": no grid provided for "//trim(fieldNameList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
 
         else
 
@@ -1263,7 +1269,7 @@ module MED
     end subroutine realizeConnectedGrid
 
   end subroutine InitializeIPDv03p4
-  
+
   !-----------------------------------------------------------------------------
 
   subroutine InitializeIPDv03p5(gcomp, importState, exportState, clock, rc)
@@ -1271,7 +1277,7 @@ module MED
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
     integer, intent(out) :: rc
-    
+
     ! local variables
     type(ESMF_Field)            :: field, field1, field2
     type(ESMF_Field)            :: fieldArea
@@ -1284,7 +1290,7 @@ module MED
     integer                     :: i,j
     type(ESMF_Field)            :: fieldAtm, fieldOcn
     type(ESMF_Array)            :: arrayOcn, arrayIce
-    type(ESMF_RouteHandle)      :: RH_mapmask  ! unmasked conservative remapping 
+    type(ESMF_RouteHandle)      :: RH_mapmask  ! unmasked conservative remapping
     type(ESMF_Grid)             :: gridAtmCoord, gridOcnCoord
     integer(ESMF_KIND_I4), pointer :: dataPtr_arrayOcn(:), dataPtr_arrayIce(:)
     real(ESMF_KIND_R8), pointer :: dataPtr_fieldOcn(:), dataPtr_fieldAtm(:)
@@ -1295,7 +1301,7 @@ module MED
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
-    
+
     rc = ESMF_SUCCESS
 
     ! Get the internal state from Component.
@@ -1308,124 +1314,124 @@ module MED
     !----------------------------------------------------------
 
     call completeFieldInitialization(is_local%wrap%NState_atmImp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_atmImp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_atmExp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_atmExp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_ocnImp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_ocnImp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_ocnExp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_ocnExp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_iceImp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_iceImp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_iceExp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_iceExp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_lndImp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_lndImp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_lndExp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_lndExp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_rofImp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_rofImp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_rofExp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_rofExp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_wavImp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_wavImp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_wavExp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_wavExp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_glcImp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_glcImp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call completeFieldInitialization(is_local%wrap%NState_glcExp, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_State_reset(is_local%wrap%NState_glcExp, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !----------------------------------------------------------
     !--- Diagnose Grid Info
     !----------------------------------------------------------
 
     call shr_nuopc_methods_State_GeomPrint(is_local%wrap%NState_atmExp,'gridAtmExp',rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomPrint(is_local%wrap%NState_ocnExp,'gridOcnExp',rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomPrint(is_local%wrap%NState_iceExp,'gridIceExp',rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomPrint(is_local%wrap%NState_lndExp,'gridLndExp',rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomPrint(is_local%wrap%NState_rofExp,'gridRofExp',rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomPrint(is_local%wrap%NState_wavExp,'gridWavExp',rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomPrint(is_local%wrap%NState_glcExp,'gridGlcExp',rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !----------------------------------------------------------
-    ! dump the Grid coordinate arrays for reference      
+    ! dump the Grid coordinate arrays for reference
     !----------------------------------------------------------
 
     call shr_nuopc_methods_State_GeomWrite(is_local%wrap%NState_AtmExp, 'array_med_atm', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomWrite(is_local%wrap%NState_OcnExp, 'array_med_ocn', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomWrite(is_local%wrap%NState_IceExp, 'array_med_ice', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomWrite(is_local%wrap%NState_LndExp, 'array_med_lnd', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomWrite(is_local%wrap%NState_RofExp, 'array_med_rof', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomWrite(is_local%wrap%NState_WavExp, 'array_med_wav', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_State_GeomWrite(is_local%wrap%NState_GlcExp, 'array_med_glc', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !----------------------------------------------------------
     ! NOW allocate other Mediator datatypes
@@ -1434,7 +1440,7 @@ module MED
     ! Get the internal state from Component.
     nullify(is_local%wrap)
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !----------------------------------------------------------
     ! Initialize FB for each model import states on each grid
@@ -1444,83 +1450,83 @@ module MED
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_a, STgeom=is_local%wrap%NState_AtmImp, &
       STflds=is_local%wrap%NState_AtmImp, name='FBAtm_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_o, STgeom=is_local%wrap%NState_OcnExp, &
       STflds=is_local%wrap%NState_AtmImp, name='FBAtm_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_i, STgeom=is_local%wrap%NState_IceExp, &
       STflds=is_local%wrap%NState_AtmImp, name='FBAtm_i', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_l, STgeom=is_local%wrap%NState_LndExp, &
       STflds=is_local%wrap%NState_AtmImp, name='FBAtm_l', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBAtm_r, STgeom=is_local%wrap%NState_RofExp, &
       STflds=is_local%wrap%NState_AtmImp, name='FBAtm_r', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--- ocn
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBOcn_a, STgeom=is_local%wrap%NState_AtmExp, &
       STflds=is_local%wrap%NState_OcnImp, name='FBOcn_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBOcn_o, STgeom=is_local%wrap%NState_OcnImp, &
       STflds=is_local%wrap%NState_OcnImp, name='FBOcn_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBOcn_i, STgeom=is_local%wrap%NState_IceExp, &
       STflds=is_local%wrap%NState_OcnImp, name='FBOcn_i', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--- ice
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_a, STgeom=is_local%wrap%NState_AtmExp, &
       STflds=is_local%wrap%NState_IceImp, name='FBIce_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_o, STgeom=is_local%wrap%NState_OcnExp, &
       STflds=is_local%wrap%NState_IceImp, name='FBIce_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_i, STgeom=is_local%wrap%NState_IceImp, &
       STflds=is_local%wrap%NState_IceImp, name='FBIce_i', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBIce_if, STgeom=is_local%wrap%NState_IceImp, &
       STflds=is_local%wrap%NState_IceImp, name='FBIce_if', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--- lnd
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBLnd_a, STgeom=is_local%wrap%NState_AtmExp, &
       STflds=is_local%wrap%NState_LndImp, name='FBLnd_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBLnd_l, STgeom=is_local%wrap%NState_LndImp, &
       STflds=is_local%wrap%NState_LndImp, name='FBLnd_l', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBLnd_r, STgeom=is_local%wrap%NState_RofExp, &
       STflds=is_local%wrap%NState_LndImp, name='FBLnd_r', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--- rof
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_l, STgeom=is_local%wrap%NState_LndExp, &
       STflds=is_local%wrap%NState_RofImp, name='FBRof_l', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_o, STgeom=is_local%wrap%NState_OCNExp, &
       STflds=is_local%wrap%NState_RofImp, name='FBRof_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBRof_r, STgeom=is_local%wrap%NState_RofImp, &
       STflds=is_local%wrap%NState_RofImp, name='FBRof_r', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !----------------------------------------------------------
     ! Initialize Accumulators
@@ -1528,31 +1534,31 @@ module MED
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumAtm, STgeom=is_local%wrap%NState_AtmImp, &
       STflds=is_local%wrap%NState_AtmImp, name='FBaccumAtm', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumOcn, STgeom=is_local%wrap%NState_OcnImp, &
       STflds=is_local%wrap%NState_OcnImp, name='FBaccumOcn', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumIce, STgeom=is_local%wrap%NState_IceImp, &
       STflds=is_local%wrap%NState_IceImp, name='FBaccumIce', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumLnd, STgeom=is_local%wrap%NState_LndImp, &
       STflds=is_local%wrap%NState_LndImp, name='FBaccumLnd', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumRof, STgeom=is_local%wrap%NState_RofImp, &
       STflds=is_local%wrap%NState_RofImp, name='FBaccumRof', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumWav, STgeom=is_local%wrap%NState_WavImp, &
       STflds=is_local%wrap%NState_WavImp, name='FBaccumWav', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumGlc, STgeom=is_local%wrap%NState_GlcImp, &
       STflds=is_local%wrap%NState_GlcImp, name='FBaccumGlc', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !----------------------------------------------------------
     ! Initialize AtmOcn FBs
@@ -1560,15 +1566,15 @@ module MED
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBAtmOcn_o, STgeom=is_local%wrap%NState_OcnExp, &
       fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBAtmOcn_a, STgeom=is_local%wrap%NState_AtmExp, &
       fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumAtmOcn, STgeom=is_local%wrap%NState_OcnExp, &
       fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBaccumAtmOcn', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !----------------------------------------------------------
     ! Initialize Frac FBs
@@ -1608,36 +1614,36 @@ module MED
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBforAtm, &
       STgeom=is_local%wrap%NState_AtmExp, name='FBforAtm', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBforOcn, &
       STgeom=is_local%wrap%NState_OcnExp, name='FBforOcn', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBforIce, &
       STgeom=is_local%wrap%NState_IceExp, name='FBforIce', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBforLnd, &
       STgeom=is_local%wrap%NState_LndExp, name='FBforLnd', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBforRof, &
       STgeom=is_local%wrap%NState_RofExp, name='FBforRof', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBforWav, &
       STgeom=is_local%wrap%NState_WavExp, name='FBforWav', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBforGlc, &
       STgeom=is_local%wrap%NState_GlcExp, name='FBforGlc', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !----------------------------------------------------------
     !--- Check for active regrid directions
     !----------------------------------------------------------
-    
+
     ! initialize
     is_local%wrap%a2o_active = .false.
     is_local%wrap%a2i_active = .false.
@@ -1653,68 +1659,68 @@ module MED
 
     ! a2o, a2i, a2l
     call ESMF_FieldBundleGet(is_local%wrap%FBAtm_a, fieldCount=fieldCount, rc=rc) ! Atmosphere Export Field Count
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (fieldCount > 0) then
       call ESMF_FieldBundleGet(is_local%wrap%FBforOcn, fieldCount=fieldCount, rc=rc) ! Ocean Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (fieldCount > 0) then
         is_local%wrap%a2o_active = .true.
       endif
       call ESMF_FieldBundleGet(is_local%wrap%FBforIce, fieldCount=fieldCount, rc=rc) ! Ice Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (fieldCount > 0) then
         is_local%wrap%a2i_active = .true.
       endif
       call ESMF_FieldBundleGet(is_local%wrap%FBforLnd, fieldCount=fieldCount, rc=rc) ! Land Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (fieldCount > 0) then
         is_local%wrap%a2l_active = .true.
       endif
     endif
-    
+
     ! o2a, o2i
     call ESMF_FieldBundleGet(is_local%wrap%FBOcn_o, fieldCount=fieldCount, rc=rc) ! Ocean Export Field Count
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (fieldCount > 0) then
       call ESMF_FieldBundleGet(is_local%wrap%FBforAtm, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (fieldCount > 0) then
         is_local%wrap%o2a_active = .true.
       endif
       call ESMF_FieldBundleGet(is_local%wrap%FBforIce, fieldCount=fieldCount, rc=rc) ! Ice Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (fieldCount > 0) then
         is_local%wrap%o2i_active = .true.
       endif
     endif
-    
+
     ! i2a, i2o
     call ESMF_FieldBundleGet(is_local%wrap%FBIce_i, fieldCount=fieldCount, rc=rc) ! Ice Export Field Count
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (fieldCount > 0) then
       call ESMF_FieldBundleGet(is_local%wrap%FBforAtm, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (fieldCount > 0) then
         is_local%wrap%i2a_active = .true.
       endif
       call ESMF_FieldBundleGet(is_local%wrap%FBforOcn, fieldCount=fieldCount, rc=rc) ! Ocean Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (fieldCount > 0) then
         is_local%wrap%i2o_active = .true.
       endif
     endif
-    
+
     ! l2a, l2r
     call ESMF_FieldBundleGet(is_local%wrap%FBLnd_l, fieldCount=fieldCount, rc=rc) ! Land Export Field Count
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (fieldCount > 0) then
       call ESMF_FieldBundleGet(is_local%wrap%FBforAtm, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (fieldCount > 0) then
         is_local%wrap%l2a_active = .true.
       endif
       call ESMF_FieldBundleGet(is_local%wrap%FBforRof, fieldCount=fieldCount, rc=rc) ! Rof Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (fieldCount > 0) then
         is_local%wrap%l2r_active = .true.
       endif
@@ -1722,15 +1728,15 @@ module MED
 
     ! r2l, r2o
     call ESMF_FieldBundleGet(is_local%wrap%FBRof_r, fieldCount=fieldCount, rc=rc) ! Rof Export Field Count
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (fieldCount > 0) then
       call ESMF_FieldBundleGet(is_local%wrap%FBforLnd, fieldCount=fieldCount, rc=rc) ! Land Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (fieldCount > 0) then
         is_local%wrap%r2l_active = .true.
       endif
       call ESMF_FieldBundleGet(is_local%wrap%FBforOCN, fieldCount=fieldCount, rc=rc) ! Atmosphere Import Field Count
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (fieldCount > 0) then
         is_local%wrap%r2o_active = .true.
       endif
@@ -1774,9 +1780,9 @@ module MED
 
     if (is_local%wrap%a2o_active) then
       call NUOPC_CompAttributeGet(gcomp, name="atm2ocn_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call NUOPC_CompAttributeGet(gcomp, name="atm2ocn_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(" fmapname a2o "//trim(fmapfile), ESMF_LOGMSG_INFO)
       call ESMF_LogWrite(" smapname a2o "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_o, &
@@ -1790,14 +1796,14 @@ module MED
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (is_local%wrap%a2i_active) then
       call NUOPC_CompAttributeGet(gcomp, name="atm2ice_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call NUOPC_CompAttributeGet(gcomp, name="atm2ice_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(" fmapname a2i "//trim(fmapfile), ESMF_LOGMSG_INFO)
       call ESMF_LogWrite(" smapname a2i "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_i, &
@@ -1811,14 +1817,14 @@ module MED
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (is_local%wrap%a2l_active) then
       call NUOPC_CompAttributeGet(gcomp, name="atm2lnd_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call NUOPC_CompAttributeGet(gcomp, name="atm2lnd_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(" fmapname a2l "//trim(fmapfile), ESMF_LOGMSG_INFO)
       call ESMF_LogWrite(" smapname a2l "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBAtm_a, FBdst=is_local%wrap%FBAtm_l, &
@@ -1831,14 +1837,14 @@ module MED
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (is_local%wrap%o2a_active) then
       call NUOPC_CompAttributeGet(gcomp, name="ocn2atm_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call NUOPC_CompAttributeGet(gcomp, name="ocn2atm_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(" fmapname o2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
       call ESMF_LogWrite(" smapname o2a "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBOcn_o, FBdst=is_local%wrap%FBOcn_a, &
@@ -1852,7 +1858,7 @@ module MED
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (is_local%wrap%o2i_active) then
@@ -1869,14 +1875,14 @@ module MED
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (is_local%wrap%i2a_active) then
       call NUOPC_CompAttributeGet(gcomp, name="ice2atm_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call NUOPC_CompAttributeGet(gcomp, name="ice2atm_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(" fmapname i2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
       call ESMF_LogWrite(" smapname i2a "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBIce_i, FBdst=is_local%wrap%FBIce_a, &
@@ -1890,7 +1896,7 @@ module MED
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (is_local%wrap%i2o_active) then
@@ -1907,14 +1913,14 @@ module MED
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (is_local%wrap%l2a_active) then
       call NUOPC_CompAttributeGet(gcomp, name="lnd2atm_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call NUOPC_CompAttributeGet(gcomp, name="lnd2atm_smapname", value=smapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(" fmapname l2a "//trim(fmapfile), ESMF_LOGMSG_INFO)
       call ESMF_LogWrite(" smapname l2a "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_a, &
@@ -1927,17 +1933,17 @@ module MED
         bilnrfn=trim(smapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (is_local%wrap%l2r_active) then
 ! tcx note bilinear is set to conserv to get past initialization.  the subroutine thinks it'll
 ! need bilinear mapping weights but it won't for l2r.
       call NUOPC_CompAttributeGet(gcomp, name="lnd2rof_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(" fmapname l2r "//trim(fmapfile), ESMF_LOGMSG_INFO)
       !call NUOPC_CompAttributeGet(gcomp, name="lnd2rof_smapname", value=smapfile, rc=rc)
-      !if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      !if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       !call ESMF_LogWrite(" smapname l2a "//trim(smapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBLnd_l, FBdst=is_local%wrap%FBLnd_r, &
         bilnrmap=is_local%wrap%RH_l2r_bilnr, &
@@ -1949,12 +1955,12 @@ module MED
         bilnrfn=trim(fmapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (is_local%wrap%r2o_active) then
       call NUOPC_CompAttributeGet(gcomp, name="rof2ocn_liq_rmapname", value=rlmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(" rlmapname  r2o"//trim(rlmapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_o, &
 !       bilnrmap=is_local%wrap%RH_r2o_bilnr, &
@@ -1966,10 +1972,10 @@ module MED
 !       bilnrfn=trim(rimapfile), &
         consffn=trim(rlmapfile), &
         rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       call NUOPC_CompAttributeGet(gcomp, name="rof2ocn_ice_rmapname", value=rimapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(" rimapname  r2o"//trim(rlmapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_o, &
 !       bilnrmap=is_local%wrap%RH_r2o_bilnr, &
@@ -1987,7 +1993,7 @@ module MED
 ! tcx note bilinear is set to conserv to get past initialization.  the subroutine thinks it'll
 ! need bilinear mapping weights but it won't for l2r.
       call NUOPC_CompAttributeGet(gcomp, name="rof2lnd_fmapname", value=fmapfile, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(" fmapname r2l "//trim(fmapfile), ESMF_LOGMSG_INFO)
       call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBRof_r, FBdst=is_local%wrap%FBRof_l, &
         bilnrmap=is_local%wrap%RH_r2l_bilnr, &
@@ -1999,7 +2005,7 @@ module MED
         bilnrfn=trim(fmapfile), &
         consffn=trim(fmapfile), &
         rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (dbug_flag > 5) then
@@ -2012,10 +2018,10 @@ module MED
 
       type(ESMF_State)   , intent(inout) :: State
       integer            , intent(out)   :: rc
-    
+
       integer                     :: n, fieldCount
       character(ESMF_MAXSTR),allocatable :: fieldNameList(:)
-      type(ESMF_FieldStatus_Flag) :: fieldStatus 
+      type(ESMF_FieldStatus_Flag) :: fieldStatus
       character(len=*),parameter  :: subname='(module_MEDIATOR:completeFieldInitialization)'
 
       if (dbug_flag > 5) then
@@ -2025,30 +2031,30 @@ module MED
       rc = ESMF_Success
 
       call ESMF_StateGet(State, itemCount=fieldCount, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       allocate(fieldNameList(fieldCount))
       call ESMF_StateGet(State, itemNameList=fieldNameList, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       do n=1, fieldCount
 
         call ESMF_StateGet(State, field=field, itemName=fieldNameList(n), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-        call ESMF_FieldGet(field, status=fieldStatus, rc=rc) 
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call ESMF_FieldGet(field, status=fieldStatus, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        if (fieldStatus==ESMF_FIELDSTATUS_GRIDSET) then 
+        if (fieldStatus==ESMF_FIELDSTATUS_GRIDSET) then
           if (dbug_flag > 1) then
             call ESMF_LogWrite(subname//" is allocating field memory for field "//trim(fieldNameList(n)), &
               ESMF_LOGMSG_INFO, rc=rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           endif
           call ESMF_FieldEmptyComplete(field, typekind=ESMF_TYPEKIND_R8, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif   ! fieldStatus
 
         call shr_nuopc_methods_Field_GeomPrint(field, trim(subname)//':'//trim(fieldNameList(n)), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       enddo
 
@@ -2059,13 +2065,13 @@ module MED
     end subroutine completeFieldInitialization
 
   end subroutine InitializeIPDv03p5
-  
+
   !-----------------------------------------------------------------------------
 
   subroutine DataInitialize(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-    
+
     ! local variables
     type(ESMF_Clock)            :: clock
     type(ESMF_State)            :: importState, exportState
@@ -2088,12 +2094,12 @@ module MED
 
     ! query the Component for its clock, importState and exportState
     call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, exportState=exportState, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! Get the internal state from Component.
     nullify(is_local%wrap)
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! get the current time out of the clock
     call ESMF_ClockGet(clock, currTime=time, rc=rc)
@@ -2161,23 +2167,23 @@ module MED
     ! check that all imported fields from ATM show correct timestamp
     do n = 1,fldsFrAtm%num
       call ESMF_StateGet(is_local%wrap%NState_AtmImp, itemName=fldsFrAtm%shortname(n), itemType=itemType, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (itemType /= ESMF_STATEITEM_NOTFOUND) then
         connected = NUOPC_IsConnected(is_local%wrap%NState_AtmImp, fieldName=fldsFrAtm%shortname(n), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (connected) then
           call ESMF_StateGet(is_local%wrap%NState_AtmImp, itemName=fldsFrAtm%shortname(n), field=field, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           atCorrectTime = NUOPC_IsAtTime(field, time, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           if (.not.atCorrectTime) then
             call ESMF_LogWrite("MED - Initialize-Data-Dependency NOT YET SATISFIED!!!", ESMF_LOGMSG_INFO, rc=rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
             allDone = .false.
             exit  ! break out of the loop when first not satisfied found
           else
             call ESMF_LogWrite("MED - Initialize-Data-Dependency SATISFIED!!!", ESMF_LOGMSG_INFO, rc=rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           endif
         endif
       endif
@@ -2190,77 +2196,78 @@ module MED
       ! -> set InitializeDataComplete Component Attribute to "true", indicating
       ! to the driver that this Component has fully initialized its data
       call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       ! gjt: The above code ensures that the MED has initial conditions from ATM.
-    
+
       ! TODO - For the real case this should probably use the fields from the
       ! importState and do something with it as a sensible starting point
       ! for the accumulation field so that the OCN receives a meaningful
       ! fields during its first time step. However, here for testing
       ! I simply initialize to zero.
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_atmImp,infodata,'atm2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_atmImp,infodata,'atm2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
 !      call shr_nuopc_methods_State_reset(is_local%wrap%NState_atmImp, value=spval_init, rc=rc)
 !      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_ocnImp,infodata,'ocn2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_ocnImp,infodata,'ocn2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !      call shr_nuopc_methods_State_reset(is_local%wrap%NState_ocnImp, value=spval_init, rc=rc)
 !      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_iceImp,infodata,'ice2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_iceImp,infodata,'ice2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !      call shr_nuopc_methods_State_reset(is_local%wrap%NState_iceImp, value=spval_init, rc=rc)
 !      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_lndImp,infodata,'lnd2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_lndImp,infodata,'lnd2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !      call shr_nuopc_methods_State_reset(is_local%wrap%NState_lndImp, value=spval_init, rc=rc)
 !      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_rofImp,infodata,'rof2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_rofImp,infodata,'rof2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !      call shr_nuopc_methods_State_reset(is_local%wrap%NState_rofImp, value=spval_init, rc=rc)
 !      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_wavImp,infodata,'wav2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_wavImp,infodata,'wav2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !      call shr_nuopc_methods_State_reset(is_local%wrap%NState_wavImp, value=spval_init, rc=rc)
 !      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
-      call shr_nuopc_methods_CopyStateToInfodata(is_local%wrap%NState_glcImp,infodata,'glc2cpli',is_local%wrap%mpicom,rc)
+      call med_infodata_CopyStateToInfodata(is_local%wrap%NState_glcImp,infodata,'glc2cpli',is_local%wrap%mpicom,rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !      call shr_nuopc_methods_State_reset(is_local%wrap%NState_glcImp, value=spval_init, rc=rc)
 !      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
 
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumAtm, value=czero, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       is_local%wrap%accumcntAtm = 0
 
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumOcn, value=czero, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       is_local%wrap%accumcntOcn = 0
 
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumIce, value=czero, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       is_local%wrap%accumcntIce = 0
 
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumLnd, value=czero, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       is_local%wrap%accumcntLnd = 0
 
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumRof, value=czero, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       is_local%wrap%accumcntRof = 0
 
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumWav, value=czero, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       is_local%wrap%accumcntWav = 0
 
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumGlc, value=czero, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       is_local%wrap%accumcntGlc = 0
 
       call shr_nuopc_methods_FB_copy(is_local%wrap%FBAtm_a, is_local%wrap%NState_AtmImp, rc=rc)
@@ -2289,17 +2296,17 @@ module MED
       !---tcraig, turn if on to force no mediator restarts for testing
       !if (.not.coldstart) then
         call Mediator_restart(gcomp,'read','mediator',rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       !endif
 
       ! default initialize s_surf to work around limitations of current initialization sequence
       call ESMF_StateGet(is_local%wrap%NState_IceExp, itemName='s_surf', itemType=itemType, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (itemType /= ESMF_STATEITEM_NOTFOUND) then
         if (NUOPC_IsConnected(is_local%wrap%NState_IceExp,'s_surf',rc=rc)) then
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call State_SetFldPtr(is_local%wrap%NState_IceExp, 's_surf', 34.0_ESMF_KIND_R8, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
 
       endif
@@ -2334,7 +2341,7 @@ module MED
     ! query the Mediator for clocks
     call NUOPC_MediatorGet(gcomp, mediatorClock=mediatorClock, &
       driverClock=driverClock, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 1) then
        call shr_nuopc_methods_Clock_TimePrint(driverClock  ,trim(subname)//'driver clock1',rc)
@@ -2343,9 +2350,9 @@ module MED
 
     ! set the mediatorClock to have the current start time as the driverClock
     call ESMF_ClockGet(driverClock, currTime=currTime, timeStep=timeStep, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_ClockSet(mediatorClock, currTime=currTime, timeStep=timeStep, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 1) then
        call shr_nuopc_methods_Clock_TimePrint(driverClock  ,trim(subname)//'driver clock2',rc)
@@ -2354,7 +2361,7 @@ module MED
 
     ! check and set the component clock against the driver clock
     call NUOPC_CompCheckSetClock(gcomp, driverClock, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -2394,99 +2401,99 @@ module MED
     ! Get the internal state from Component.
     nullify(is_local%wrap)
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     fname = trim(bfname)//'_FBaccumAtm_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumAtm,read_rest_FBaccumAtm,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     fname = trim(bfname)//'_FBaccumOcn_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumOcn,read_rest_FBaccumOcn,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     fname = trim(bfname)//'_FBaccumIce_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumIce,read_rest_FBaccumIce,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     fname = trim(bfname)//'_FBaccumLnd_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumLnd,read_rest_FBaccumLnd,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     fname = trim(bfname)//'_FBaccumRof_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumRof,read_rest_FBaccumRof,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     fname = trim(bfname)//'_FBaccumWav_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumWav,read_rest_FBaccumWav,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     fname = trim(bfname)//'_FBaccumGlc_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumGlc,read_rest_FBaccumGlc,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     fname = trim(bfname)//'_FBaccumAtmOcn_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBaccumAtmOcn,read_rest_FBaccumAtmOcn,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     fname = trim(bfname)//'_FBAtm_a_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBAtm_a,read_rest_FBAtm_a,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (mode == 'read') then
       call shr_nuopc_methods_FB_copy(is_local%wrap%NState_AtmImp, is_local%wrap%FBAtm_a, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     fname = trim(bfname)//'_FBIce_i_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBIce_i,read_rest_FBIce_i,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (mode == 'read') then
       call shr_nuopc_methods_FB_copy(is_local%wrap%NState_IceImp, is_local%wrap%FBIce_i, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     fname = trim(bfname)//'_FBOcn_o_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBOcn_o,read_rest_FBOCN_o,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (mode == 'read') then
       call shr_nuopc_methods_FB_copy(is_local%wrap%NState_OcnImp, is_local%wrap%FBOcn_o, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     fname = trim(bfname)//'_FBLnd_l_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBLnd_l,read_rest_FBLnd_l,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (mode == 'read') then
       call shr_nuopc_methods_FB_copy(is_local%wrap%NState_LndImp, is_local%wrap%FBLnd_l, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     fname = trim(bfname)//'_FBRof_r_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBRof_r,read_rest_FBRof_r,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (mode == 'read') then
       call shr_nuopc_methods_FB_copy(is_local%wrap%NState_RofImp, is_local%wrap%FBRof_r, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     fname = trim(bfname)//'_FBWav_r_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBWav_r,read_rest_FBWav_r,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (mode == 'read') then
       call shr_nuopc_methods_FB_copy(is_local%wrap%NState_WavImp, is_local%wrap%FBWav_r, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     fname = trim(bfname)//'_FBGlc_r_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBGlc_r,read_rest_FBGlc_r,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (mode == 'read') then
       call shr_nuopc_methods_FB_copy(is_local%wrap%NState_GlcImp, is_local%wrap%FBGlc_r, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     fname = trim(bfname)//'_FBAtmOcn_o_restart.nc'
     call FieldBundle_RWFields(mode,fname,is_local%wrap%FBAtmOcn_o,read_rest_FBAtmOcn_o,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     funit = 1101
     fname = trim(bfname)//'_scalars_restart.txt'
@@ -2548,4 +2555,3 @@ module MED
   !-----------------------------------------------------------------------------
 
 end module MED
-

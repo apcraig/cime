@@ -1,6 +1,5 @@
 module shr_nuopc_methods_mod
 
-#ifdef NUOPC_INTERFACE
   !-----------------------------------------------------------------------------
   ! Generic operation methods used by the Mediator Component.
   !-----------------------------------------------------------------------------
@@ -9,11 +8,10 @@ module shr_nuopc_methods_mod
   use NUOPC
   use shr_nuopc_fldList_mod, only : shr_nuopc_fldList_Type
   use seq_flds_mod
-  use seq_infodata_mod, only: seq_infodata_type, seq_infodata_getdata, seq_infodata_putdata
   use mpi
- 
+
   implicit none
-  
+
   private
 
   interface shr_nuopc_methods_FB_accum ; module procedure &
@@ -80,8 +78,6 @@ module shr_nuopc_methods_mod
   public shr_nuopc_methods_Clock_TimePrint
   public shr_nuopc_methods_Grid_CopyCoord
   public shr_nuopc_methods_Grid_CopyItem
-  public shr_nuopc_methods_CopyStateToInfodata
-  public shr_nuopc_methods_CopyInfodataToState
   public shr_nuopc_methods_RH_init
   public shr_nuopc_methods_UpdateTimestamp
   public shr_nuopc_methods_ChkErr
@@ -143,25 +139,25 @@ module shr_nuopc_methods_mod
     if (mode == 'write') then
       call ESMF_LogWrite(trim(subname)//": write "//trim(fname), ESMF_LOGMSG_INFO, rc=dbrc)
       call ESMF_FieldBundleWrite(FB, fname, &
-        singleFile=.true., status=ESMF_FILESTATUS_REPLACE, iofmt=ESMF_IOFMT_NETCDF, rc=rc)  
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        singleFile=.true., status=ESMF_FILESTATUS_REPLACE, iofmt=ESMF_IOFMT_NETCDF, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_FB_diagnose(FB, 'write '//trim(fname), rc)
     elseif (mode == 'read') then
       inquire(file=fname,exist=fexists)
       if (fexists) then
         call ESMF_LogWrite(trim(subname)//": read "//trim(fname), ESMF_LOGMSG_INFO, rc=dbrc)
 !-----------------------------------------------------------------------------------------------------
-! tcraig, ESMF_FieldBundleRead fails if a field is not on the field bundle, but we really want to just 
+! tcraig, ESMF_FieldBundleRead fails if a field is not on the field bundle, but we really want to just
 ! ignore that field and read the rest, so instead read each field one at a time through ESMF_FieldRead
 !        call ESMF_FieldBundleRead (FB, fname, &
-!          singleFile=.true., iofmt=ESMF_IOFMT_NETCDF, rc=rc)  
-!        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!          singleFile=.true., iofmt=ESMF_IOFMT_NETCDF, rc=rc)
+!        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 !-----------------------------------------------------------------------------------------------------
         call ESMF_FieldBundleGet(FB, fieldCount=fieldCount, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         do n = 1,fieldCount
           call shr_nuopc_methods_FB_getFieldName(FB, name, field, rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_FieldRead (field, fname, iofmt=ESMF_IOFMT_NETCDF, rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=u_FILE_u)) call ESMF_LogWrite(trim(subname)//' WARNING missing field '//trim(name),rc=dbrc)
@@ -330,10 +326,10 @@ module shr_nuopc_methods_mod
     !---------------------------------------------------
 
     call shr_nuopc_methods_FB_getFieldN(FBsrc, 1, fldsrc, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_FB_getFieldN(FBdst, 1, flddst, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !---------------------------------------------------
     !--- bilinear
@@ -344,23 +340,23 @@ module shr_nuopc_methods_mod
         if (trim(bilnrfn) == "idmap") then
           call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=bilnrmap, &
             ignoreUnmatchedIndices = .true., rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         else
           call ESMF_FieldSMMStore(fldsrc, flddst, bilnrfn, routehandle=bilnrmap, &
             ignoreUnmatchedIndices=.true., &
             srcTermProcessing=srcTermProcessing_Value, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       else
         if(debug_mesh) then
           call ESMF_FieldGet(fldsrc, mesh=srcmesh, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_MeshWrite(srcmesh, "med_srcmesh", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_FieldGet(flddst, mesh=dstmesh, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_MeshWrite(dstmesh, "med_dstmesh", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
 
         call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=bilnrmap, &
@@ -370,12 +366,12 @@ module shr_nuopc_methods_mod
           srcTermProcessing=srcTermProcessing_Value, &
           factorList=factorList, ignoreDegenerate=.true., &
           unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (rhprint_flag) then
           call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_bilnr.nc", rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_RouteHandlePrint(bilnrmap, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       endif
       if (ESMF_RouteHandleIsCreated(bilnrmap, rc=rc)) then
@@ -384,7 +380,7 @@ module shr_nuopc_methods_mod
         call ESMF_LogWrite(trim(subname)//trim(lstring)//": failed   RH bilnr", ESMF_LOGMSG_INFO, rc=dbrc)
       endif
     endif
-      
+
     !---------------------------------------------------
     !--- conservative frac
     !---------------------------------------------------
@@ -394,12 +390,12 @@ module shr_nuopc_methods_mod
         if (trim(consffn) == "idmap") then
           call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=consfmap, &
             ignoreUnmatchedIndices = .true., rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         else
           call ESMF_FieldSMMStore(fldsrc, flddst, consffn, routehandle=consfmap, &
             ignoreUnmatchedIndices=.true., &
             srcTermProcessing=srcTermProcessing_Value, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       else
         call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=consfmap, &
@@ -409,12 +405,12 @@ module shr_nuopc_methods_mod
           srcTermProcessing=srcTermProcessing_Value, &
           factorList=factorList, ignoreDegenerate=.true., &
           unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (rhprint_flag) then
           call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_consf.nc", rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_RouteHandlePrint(consfmap, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       endif
       if (ESMF_RouteHandleIsCreated(consfmap, rc=rc)) then
@@ -423,7 +419,7 @@ module shr_nuopc_methods_mod
         call ESMF_LogWrite(trim(subname)//trim(lstring)//": failed   RH consf", ESMF_LOGMSG_INFO, rc=dbrc)
       endif
      endif
-      
+
     !---------------------------------------------------
     !--- conservative dst
     !---------------------------------------------------
@@ -433,12 +429,12 @@ module shr_nuopc_methods_mod
         if (trim(consdfn) == "idmap") then
           call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=consdmap, &
             ignoreUnmatchedIndices = .true., rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         else
           call ESMF_FieldSMMStore(fldsrc, flddst, consdfn, routehandle=consdmap, &
             ignoreUnmatchedIndices=.true., &
             srcTermProcessing=srcTermProcessing_Value, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       else
         call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=consdmap, &
@@ -448,12 +444,12 @@ module shr_nuopc_methods_mod
           srcTermProcessing=srcTermProcessing_Value, &
           factorList=factorList, ignoreDegenerate=.true., &
           unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (rhprint_flag) then
           call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_consd.nc", rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_RouteHandlePrint(consdmap, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       endif
       if (ESMF_RouteHandleIsCreated(consdmap, rc=rc)) then
@@ -462,7 +458,7 @@ module shr_nuopc_methods_mod
         call ESMF_LogWrite(trim(subname)//trim(lstring)//": failed   RH consd", ESMF_LOGMSG_INFO, rc=dbrc)
       endif
      endif
-      
+
     !---------------------------------------------------
     !--- patch
     !---------------------------------------------------
@@ -472,12 +468,12 @@ module shr_nuopc_methods_mod
         if (trim(patchfn) == "idmap") then
           call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=patchmap, &
             ignoreUnmatchedIndices = .true., rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         else
           call ESMF_FieldSMMStore(fldsrc, flddst, patchfn, routehandle=patchmap, &
             ignoreUnmatchedIndices=.true., &
             srcTermProcessing=srcTermProcessing_Value, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       else
         call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=patchmap, &
@@ -487,12 +483,12 @@ module shr_nuopc_methods_mod
           srcTermProcessing=srcTermProcessing_Value, &
           factorList=factorList, ignoreDegenerate=.true., &
           unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (rhprint_flag) then
           call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_patch.nc", rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_RouteHandlePrint(patchmap, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       endif
       if (ESMF_RouteHandleIsCreated(patchmap, rc=rc)) then
@@ -510,10 +506,10 @@ module shr_nuopc_methods_mod
       call ESMF_FieldRedistStore(fldsrc, flddst, &
         routehandle=fcopymap, &
         ignoreUnmatchedIndices=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (rhprint_flag) then
         call ESMF_RouteHandlePrint(fcopymap, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       endif
       if (ESMF_RouteHandleIsCreated(fcopymap, rc=rc)) then
         call ESMF_LogWrite(trim(subname)//trim(lstring)//": computed RH fcopy", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -558,12 +554,12 @@ module shr_nuopc_methods_mod
     call ESMF_LogWrite(trim(subname)//": tcxA", ESMF_LOGMSG_INFO, rc=dbrc)
 
     call ESMF_GridGet(gridold, dimCount=dimCount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     allocate(gridEdgeLWidth(dimCount),gridEdgeUWidth(dimCount))
     call ESMF_GridGet(gridold,distgrid=distgrid, coordSys=coordSys, indexflag=indexflag, dimCount=dimCount, &
        gridEdgeLWidth=gridEdgeLWidth, gridEdgeUWidth=gridEdgeUWidth, localDECount=localDECount, rc=rc)
 !       localDECount=localDECount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_LogWrite(trim(subname)//": tcxB", ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -583,46 +579,46 @@ module shr_nuopc_methods_mod
     gridnew = ESMF_GridCreate(distgrid=distgrid, coordSys=coordSys, indexflag=indexflag, &
        gridEdgeLWidth=gridEdgeLWidth, gridEdgeUWidth=gridEdgeUWidth, rc=rc)
 !       rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     deallocate(gridEdgeLWidth, gridEdgeUWidth)
 
-    call ESMF_GridAddCoord(gridnew, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc) 
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    call ESMF_GridAddCoord(gridnew, staggerLoc=ESMF_STAGGERLOC_CORNER, rc=rc) 
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    call ESMF_GridAddCoord(gridnew, staggerLoc=ESMF_STAGGERLOC_CENTER, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_GridAddCoord(gridnew, staggerLoc=ESMF_STAGGERLOC_CORNER, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     do localDE = 0,localDeCount-1
 
       call ESMF_GridGetCoord(gridold, coordDim=1, localDE=localDE,  &
         staggerLoc=ESMF_STAGGERLOC_CENTER, farrayPtr=dataPtr1, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_GridGetCoord(gridnew, coordDim=1, localDE=localDE,  &
         staggerLoc=ESMF_STAGGERLOC_CENTER, farrayPtr=dataPtr2, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       dataPtr2 = dataPtr1
 
       call ESMF_GridGetCoord(gridold, coordDim=2, localDE=localDE,  &
         staggerLoc=ESMF_STAGGERLOC_CENTER, farrayPtr=dataPtr1, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_GridGetCoord(gridnew, coordDim=2, localDE=localDE,  &
         staggerLoc=ESMF_STAGGERLOC_CENTER, farrayPtr=dataPtr2, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       dataPtr2 = dataPtr1
 
       call ESMF_GridGetCoord(gridold, coordDim=1, localDE=localDE,  &
         staggerLoc=ESMF_STAGGERLOC_CORNER, farrayPtr=dataPtr1, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_GridGetCoord(gridnew, coordDim=1, localDE=localDE,  &
         staggerLoc=ESMF_STAGGERLOC_CORNER, farrayPtr=dataPtr2, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       dataPtr2 = dataPtr1
 
       call ESMF_GridGetCoord(gridold, coordDim=2, localDE=localDE,  &
         staggerLoc=ESMF_STAGGERLOC_CORNER, farrayPtr=dataPtr1, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_GridGetCoord(gridnew, coordDim=2, localDE=localDE,  &
         staggerLoc=ESMF_STAGGERLOC_CORNER, farrayPtr=dataPtr2, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       dataPtr2 = dataPtr1
 
     enddo
@@ -694,10 +690,10 @@ module shr_nuopc_methods_mod
 
     if (present(FBgeom)) then
       call ESMF_FieldBundleGet(FBgeom, fieldCount=fieldCountGeom, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     elseif (present(STgeom)) then
       call ESMF_StateGet(STgeom, itemCount=fieldCountGeom, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
       call ESMF_LogWrite(trim(subname)//": ERROR FBgeom or STgeom must be passed", ESMF_LOGMSG_INFO, rc=rc)
       rc = ESMF_FAILURE
@@ -713,31 +709,31 @@ module shr_nuopc_methods_mod
       call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from argument", ESMF_LOGMSG_INFO, rc=rc)
     elseif (present(FBflds)) then
       call ESMF_FieldBundleGet(FBflds, fieldCount=fieldCount, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       allocate(lfieldNameList(fieldCount))
       call ESMF_FieldBundleGet(FBflds, fieldNameList=lfieldNameList, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from FBflds", ESMF_LOGMSG_INFO, rc=rc)
     elseif (present(STflds)) then
       call ESMF_StateGet(STflds, itemCount=fieldCount, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       allocate(lfieldNameList(fieldCount))
       call ESMF_StateGet(STflds, itemNameList=lfieldNameList, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from STflds", ESMF_LOGMSG_INFO, rc=rc)
     elseif (present(FBgeom)) then
       call ESMF_FieldBundleGet(FBgeom, fieldCount=fieldCount, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       allocate(lfieldNameList(fieldCount))
       call ESMF_FieldBundleGet(FBgeom, fieldNameList=lfieldNameList, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from FBgeom", ESMF_LOGMSG_INFO, rc=rc)
     elseif (present(STgeom)) then
       call ESMF_StateGet(STgeom, itemCount=fieldCount, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       allocate(lfieldNameList(fieldCount))
       call ESMF_StateGet(STgeom, itemNameList=lfieldNameList, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from STflds", ESMF_LOGMSG_INFO, rc=rc)
     else
       call ESMF_LogWrite(trim(subname)//": ERROR fieldNameList, FBflds, STflds, FBgeom, or STgeom must be passed", ESMF_LOGMSG_INFO, rc=rc)
@@ -767,11 +763,11 @@ module shr_nuopc_methods_mod
 
       if (present(FBgeom)) then
         call shr_nuopc_methods_FB_getFieldN(FBgeom, 1, lfield, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" grid/mesh from FBgeom", ESMF_LOGMSG_INFO, rc=rc)
       elseif (present(STgeom)) then
         call shr_nuopc_methods_State_getFieldN(STgeom, 1, lfield, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" grid/mesh from STgeom", ESMF_LOGMSG_INFO, rc=rc)
       else
         call ESMF_LogWrite(trim(subname)//": ERROR FBgeom or STgeom must be passed", ESMF_LOGMSG_INFO, rc=rc)
@@ -788,7 +784,7 @@ module shr_nuopc_methods_mod
       endif
 
       call ESMF_FieldGet(lfield, geomtype=geomtype, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (geomtype == ESMF_GEOMTYPE_GRID) then
         call ESMF_FieldGet(lfield, grid=lgrid, staggerloc=staggerloc, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -808,24 +804,24 @@ module shr_nuopc_methods_mod
     !--- create FBout
 
     FBout = ESMF_FieldBundleCreate(name=trim(lname), rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (fieldcountgeom > 0) then
 
       do n = 1, fieldCount
         if (geomtype == ESMF_GEOMTYPE_GRID) then
           field = ESMF_FieldCreate(lgrid, ESMF_TYPEKIND_R8, staggerloc=staggerloc, name=lfieldNameList(n), rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         elseif (geomtype == ESMF_GEOMTYPE_MESH) then
           field = ESMF_FieldCreate(lmesh, ESMF_TYPEKIND_R8, meshloc=meshloc, name=lfieldNameList(n), rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         else  ! geomtype
           call ESMF_LogWrite(trim(subname)//": ERROR no grid/mesh for field ", ESMF_LOGMSG_INFO, rc=rc)
           rc = ESMF_FAILURE
           return
         endif
         call ESMF_FieldBundleAdd(FBout, (/field/), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (dbug_flag > 1) then
           call ESMF_LogWrite(trim(subname)//":"//trim(lname)//":add  "//trim(lfieldNameList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
         endif
@@ -836,7 +832,7 @@ module shr_nuopc_methods_mod
     deallocate(lfieldNameList)
 
     call shr_nuopc_methods_FB_reset(FBout, value=spval_init, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 10) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -867,7 +863,7 @@ module shr_nuopc_methods_mod
     fieldname = ' '
 
     call ESMF_FieldBundleGet(FB, fieldCount=fieldCount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (fieldnum > fieldCount) then
       call ESMF_LogWrite(trim(subname)//": ERROR fieldnum > fieldCount ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
@@ -877,7 +873,7 @@ module shr_nuopc_methods_mod
 
     allocate(lfieldnamelist(fieldCount))
     call ESMF_FieldBundleGet(FB, fieldNameList=lfieldnamelist, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     fieldname = lfieldnamelist(fieldnum)
 
@@ -910,10 +906,10 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call shr_nuopc_methods_FB_getName(FB, fieldnum, name, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_FieldBundleGet(FB, fieldName=name, field=field, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 10) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -941,7 +937,7 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call ESMF_FieldBundleGet(FB, fieldName=fieldname, field=field, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 10) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -973,7 +969,7 @@ module shr_nuopc_methods_mod
     fieldname = ' '
 
     call ESMF_StateGet(State, itemCount=fieldCount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (fieldnum > fieldCount) then
       call ESMF_LogWrite(trim(subname)//": ERROR fieldnum > fieldCount ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
@@ -983,7 +979,7 @@ module shr_nuopc_methods_mod
 
     allocate(lfieldnamelist(fieldCount))
     call ESMF_StateGet(State, itemNameList=lfieldnamelist, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     fieldname = lfieldnamelist(fieldnum)
 
@@ -1016,10 +1012,10 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call shr_nuopc_methods_State_getName(State, fieldnum, name, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_StateGet(State, itemName=name, field=field, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 10) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -1047,7 +1043,7 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call ESMF_StateGet(State, itemName=fieldname, field=field, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 10) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -1077,18 +1073,18 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call ESMF_FieldBundleGet(FB, fieldCount=fieldCount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     allocate(lfieldnamelist(fieldCount))
     call ESMF_FieldBundleGet(FB, fieldNameList=lfieldnamelist, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     do n = 1, fieldCount
       call ESMF_FieldBundleGet(FB, fieldName=lfieldnamelist(n), field=field, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_FieldDestroy(field, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     enddo
     call ESMF_FieldBundleDestroy(FB, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     deallocate(lfieldnamelist)
 
     if (dbug_flag > 10) then
@@ -1126,14 +1122,14 @@ module shr_nuopc_methods_mod
     endif
 
     call ESMF_FieldBundleGet(FB, fieldCount=fieldCount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     allocate(lfieldnamelist(fieldCount))
     call ESMF_FieldBundleGet(FB, fieldNameList=lfieldnamelist, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     do n = 1, fieldCount
       call shr_nuopc_methods_FB_SetFldPtr(FB, lfieldnamelist(n), lvalue, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     enddo
 
     deallocate(lfieldnamelist)
@@ -1173,9 +1169,9 @@ module shr_nuopc_methods_mod
         shr_nuopc_methods_FB_FldChk(FBout, trim(fldout), rc=rc)) then
 
       call shr_nuopc_methods_FB_GetFldPtr(FBin, trim(fldin), dataPtrIn1, dataPtrIn2, lrankIn, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_FB_GetFldPtr(FBout, trim(fldout), dataPtrOut1, dataPtrOut2, lrankOut, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       if (lrankIn /= lrankOut) then
         call ESMF_LogWrite(trim(subname)//": ERROR FBin and FBout different rank", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
@@ -1290,7 +1286,7 @@ module shr_nuopc_methods_mod
         if (dbug_flag > 1) then
           call ESMF_LogWrite(trim(subname)//trim(lstring)//": skip : fld="//trim(fldlist%shortname(n)), ESMF_LOGMSG_INFO, rc=dbrc)
         endif
-   
+
       elseif (shr_nuopc_methods_FB_FldChk(FBin , fldlist%shortname(n), rc=rc) .and. &
               shr_nuopc_methods_FB_FldChk(FBout, fldlist%shortname(n), rc=rc)) then
 
@@ -1309,7 +1305,7 @@ module shr_nuopc_methods_mod
           call shr_nuopc_methods_FB_FieldRegrid(FBin,fldlist%shortname(n), &
                                        FBout,fldlist%shortname(n), &
                                        bilnrmap,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         elseif (fldlist%mapping(n) == "conservefrac") then
           if (.not. okconsf) then
@@ -1321,7 +1317,7 @@ module shr_nuopc_methods_mod
           call shr_nuopc_methods_FB_FieldRegrid(FBin ,fldlist%shortname(n), &
                                        FBout,fldlist%shortname(n), &
                                        consfmap, rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         elseif (fldlist%mapping(n) == "conservedst") then
           if (.not. okconsd) then
@@ -1333,7 +1329,7 @@ module shr_nuopc_methods_mod
           call shr_nuopc_methods_FB_FieldRegrid(FBin ,fldlist%shortname(n), &
                                        FBout,fldlist%shortname(n), &
                                        consdmap, rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         elseif (fldlist%mapping(n) == 'patch') then
           if (.not. okpatch) then
@@ -1345,7 +1341,7 @@ module shr_nuopc_methods_mod
           call shr_nuopc_methods_FB_FieldRegrid(FBin ,fldlist%shortname(n), &
                                        FBout,fldlist%shortname(n), &
                                        patchmap,rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         elseif (fldlist%mapping(n) == 'copy') then
           !-------------------------------------------
@@ -1364,13 +1360,13 @@ module shr_nuopc_methods_mod
               call shr_nuopc_methods_FB_FieldRegrid(FBin ,fldlist%shortname(n), &
                                            FBout,fldlist%shortname(n), &
                                            consfmap,rc)
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
             endif
           else
             call shr_nuopc_methods_FB_FieldRegrid(FBin ,fldlist%shortname(n), &
                                          FBout,fldlist%shortname(n), &
                                          fcopymap,rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           endif
 
         else
@@ -1419,13 +1415,13 @@ module shr_nuopc_methods_mod
         shr_nuopc_methods_FB_FldChk(FBout, trim(fldout), rc=rc)) then
 
       call shr_nuopc_methods_FB_GetFieldName(FBin, trim(fldin), field1, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_FB_GetFieldName(FBout, trim(fldout), field2, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       call ESMF_FieldRegrid(field1, field2, routehandle=RH, &
         termorderflag=ESMF_TERMORDER_SRCSEQ, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
 
       if (dbug_flag > 1) then
@@ -1489,7 +1485,7 @@ module shr_nuopc_methods_mod
     endif
 !tcraig, needs to be extended to 1d/2d
     call shr_nuopc_methods_FB_GetFldPtr(FBout, trim(fnameout), fldptr2=dataOut, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     lb1 = lbound(dataOut,1)
     ub1 = ubound(dataOut,1)
     lb2 = lbound(dataOut,2)
@@ -1539,7 +1535,7 @@ module shr_nuopc_methods_mod
       if (n == 1 .and. present(FBinA)) then
         FBinfound = .true.
         call shr_nuopc_methods_FB_GetFldPtr(FBinA, trim(fnameA), fldptr2=dataPtr, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (present(wgtA)) then
           wgtfound = .true.
           wgt => wgtA
@@ -1548,7 +1544,7 @@ module shr_nuopc_methods_mod
       elseif (n == 2 .and. present(FBinB)) then
         FBinfound = .true.
         call shr_nuopc_methods_FB_GetFldPtr(FBinB, trim(fnameB), fldptr2=dataPtr, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (present(wgtB)) then
           wgtfound = .true.
           wgt => wgtB
@@ -1557,7 +1553,7 @@ module shr_nuopc_methods_mod
       elseif (n == 3 .and. present(FBinC)) then
         FBinfound = .true.
         call shr_nuopc_methods_FB_GetFldPtr(FBinC, trim(fnameC), fldptr2=dataPtr, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (present(wgtC)) then
           wgtfound = .true.
           wgt => wgtC
@@ -1566,7 +1562,7 @@ module shr_nuopc_methods_mod
       elseif (n == 4 .and. present(FBinD)) then
         FBinfound = .true.
         call shr_nuopc_methods_FB_GetFldPtr(FBinD, trim(fnameD), fldptr2=dataPtr, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (present(wgtD)) then
           wgtfound = .true.
           wgt => wgtD
@@ -1575,7 +1571,7 @@ module shr_nuopc_methods_mod
       elseif (n == 5 .and. present(FBinE)) then
         FBinfound = .true.
         call shr_nuopc_methods_FB_GetFldPtr(FBinE, trim(fnameE), fldptr2=dataPtr, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (present(wgtE)) then
           wgtfound = .true.
           wgt => wgtE
@@ -1647,14 +1643,14 @@ module shr_nuopc_methods_mod
     endif
 
     call ESMF_StateGet(State, itemCount=fieldCount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     allocate(lfieldnamelist(fieldCount))
     call ESMF_StateGet(State, itemNameList=lfieldnamelist, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     do n = 1, fieldCount
       call shr_nuopc_methods_State_SetFldPtr(State, lfieldnamelist(n), lvalue, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     enddo
 
     deallocate(lfieldnamelist)
@@ -1693,18 +1689,18 @@ module shr_nuopc_methods_mod
       call ESMF_LogWrite(trim(subname)//": WARNING count is 0", ESMF_LOGMSG_INFO, rc=dbrc)
 !      call ESMF_LogWrite(trim(subname)//": WARNING count is 0 set avg to spval", ESMF_LOGMSG_INFO, rc=dbrc)
 !      call shr_nuopc_methods_FB_reset(FB, value=spval, rc=rc)
-!      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+!      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     else
 
       call ESMF_FieldBundleGet(FB, fieldCount=fieldCount, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       allocate(lfieldnamelist(fieldCount))
       call ESMF_FieldBundleGet(FB, fieldNameList=lfieldnamelist, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       do n = 1, fieldCount
         call shr_nuopc_methods_FB_GetFldPtr(FB, lfieldnamelist(n), dataPtr1, dataPtr2, lrank, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (lrank == 0) then
           ! no local data
@@ -1764,13 +1760,13 @@ module shr_nuopc_methods_mod
     endif
 
     call ESMF_FieldBundleGet(FB, fieldCount=fieldCount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     allocate(lfieldnamelist(fieldCount))
     call ESMF_FieldBundleGet(FB, fieldNameList=lfieldnamelist, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     do n = 1, fieldCount
       call shr_nuopc_methods_FB_GetFldPtr(FB, lfieldnamelist(n), dataPtr1, dataPtr2, lrank, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (lrank == 0) then
         ! no local data
       elseif (lrank == 1) then
@@ -1833,7 +1829,7 @@ module shr_nuopc_methods_mod
     endif
 
     call ESMF_ArrayGet(Array, farrayPtr=dataPtr, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     write(msgString,'(A,3g14.7)') trim(subname)//' '//trim(lstring), &
         minval(dataPtr),maxval(dataPtr),sum(dataPtr)
     call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
@@ -1874,13 +1870,13 @@ module shr_nuopc_methods_mod
     endif
 
     call ESMF_StateGet(State, itemCount=fieldCount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     allocate(lfieldnamelist(fieldCount))
     call ESMF_StateGet(State, itemNameList=lfieldnamelist, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     do n = 1, fieldCount
       call shr_nuopc_methods_State_GetFldPtr(State, lfieldnamelist(n), dataPtr1, dataPtr2, lrank, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (lrank == 0) then
         ! no local data
       elseif (lrank == 1) then
@@ -1932,7 +1928,7 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call shr_nuopc_methods_FB_accum(FBout, FBin, copy=.true., rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 10) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -1958,7 +1954,7 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call shr_nuopc_methods_FB_accum(STout, FBin, copy=.true., rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 10) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -1984,7 +1980,7 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call shr_nuopc_methods_FB_accum(FBout, STin, copy=.true., rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 10) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -2025,19 +2021,19 @@ module shr_nuopc_methods_mod
     endif
 
     call ESMF_FieldBundleGet(FBout, fieldCount=fieldCount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     allocate(lfieldnamelist(fieldCount))
     call ESMF_FieldBundleGet(FBout, fieldNameList=lfieldnamelist, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     do n = 1, fieldCount
       call ESMF_FieldBundleGet(FBin, fieldName=lfieldnamelist(n), isPresent=exists, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (exists) then
         call shr_nuopc_methods_FB_GetFldPtr(FBin,  lfieldnamelist(n), dataPtri1, dataPtri2, lranki, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call shr_nuopc_methods_FB_GetFldPtr(FBout, lfieldnamelist(n), dataPtro1, dataPtro2, lranko, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (lranki == 1 .and. lranko == 1) then
 
@@ -2136,13 +2132,13 @@ module shr_nuopc_methods_mod
     call ESMF_FieldBundleGet(FBout, fieldNameList=lfieldnamelist, rc=rc)
     do n = 1, fieldCount
       call ESMF_StateGet(STin, itemName=lfieldnamelist(n), itemType=itemType, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (itemType /= ESMF_STATEITEM_NOTFOUND) then
 
         call shr_nuopc_methods_State_GetFldPtr(STin, lfieldnamelist(n), dataPtrS1, dataPtrS2, lrankS, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call shr_nuopc_methods_FB_GetFldPtr(FBout, lfieldnamelist(n), dataPtrB1, dataPtrB2, lrankB, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (lrankB == 0 .and. lrankS == 0) then
 
@@ -2246,13 +2242,13 @@ module shr_nuopc_methods_mod
     call ESMF_FieldBundleGet(FBin, fieldNameList=lfieldnamelist, rc=rc)
     do n = 1, fieldCount
       call ESMF_StateGet(STout, itemName=lfieldnamelist(n), itemType=itemType, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (itemType /= ESMF_STATEITEM_NOTFOUND) then
 
         call shr_nuopc_methods_FB_GetFldPtr(FBin, lfieldnamelist(n), dataPtrB1, dataPtrB2, lrankB, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call shr_nuopc_methods_State_GetFldPtr(STout, lfieldnamelist(n), dataPtrS1, dataPtrS2, lrankS, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (lrankB == 0 .and. lrankS == 0) then
 
@@ -2337,7 +2333,7 @@ module shr_nuopc_methods_mod
     shr_nuopc_methods_FB_FldChk = .false.
 
     call ESMF_FieldBundleGet(FB, fieldName=trim(fldname), isPresent=isPresent, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (isPresent) then
        shr_nuopc_methods_FB_FldChk = .true.
     endif
@@ -2404,13 +2400,13 @@ module shr_nuopc_methods_mod
 
       if (geomtype == ESMF_GEOMTYPE_GRID) then
         call ESMF_FieldGet(field, rank=lrank, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       elseif (geomtype == ESMF_GEOMTYPE_MESH) then
         lrank = 1
         call ESMF_FieldGet(field, mesh=lmesh, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call ESMF_MeshGet(lmesh, numOwnedNodes=nnodes, numOwnedElements=nelements, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (nnodes == 0 .and. nelements == 0) lrank = 0
       else  ! geomtype
         call ESMF_LogWrite(trim(subname)//": ERROR geomtype not supported ", ESMF_LOGMSG_INFO, rc=rc)
@@ -2427,7 +2423,7 @@ module shr_nuopc_methods_mod
           return
         endif
         call ESMF_FieldGet(field, farrayPtr=fldptr1, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       elseif (lrank == 2) then
         if (.not.present(fldptr2)) then
           call ESMF_LogWrite(trim(subname)//": ERROR missing rank=2 array ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
@@ -2435,7 +2431,7 @@ module shr_nuopc_methods_mod
           return
         endif
         call ESMF_FieldGet(field, farrayPtr=fldptr2, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       else
         call ESMF_LogWrite(trim(subname)//": ERROR in rank ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
         rc = ESMF_FAILURE
@@ -2488,10 +2484,10 @@ module shr_nuopc_methods_mod
     endif
 
     call ESMF_FieldBundleGet(FB, fieldName=trim(fldname), field=lfield, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_Field_GetFldPtr(lfield, fldptr1, fldptr2, lrank, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (present(rank)) then
       rank = lrank
@@ -2524,7 +2520,7 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call shr_nuopc_methods_FB_GetFldPtr(FB, fldname, fldptr1, fldptr2, lrank, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (lrank == 0) then
       ! no local data
@@ -2576,10 +2572,10 @@ module shr_nuopc_methods_mod
        call ESMF_LogWrite(trim(subname)//": fldname ="//trim(fldname), ESMF_LOGMSG_INFO,rc=dbrc)
     endif
 !    call ESMF_StatePrint(ST,rc=dbrc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_nuopc_methods_Field_GetFldPtr(lfield, fldptr1, fldptr2, lrank, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (present(rank)) then
       rank = lrank
@@ -2612,7 +2608,7 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call shr_nuopc_methods_State_GetFldPtr(ST, fldname, fldptr1, fldptr2, lrank, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (lrank == 0) then
       ! no local data
@@ -2652,7 +2648,7 @@ module shr_nuopc_methods_mod
     if (lbound(fldptr2,1) /= lbound(fldptr1,1) .or. &
         ubound(fldptr2,1) /= ubound(fldptr1,1)) then
       call ESMF_LogWrite(trim(subname)//": ERROR in data size "//trim(cstring), ESMF_LOGMSG_ERROR, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       write(msgString,*) trim(subname)//': fldptr1 ',lbound(fldptr1),ubound(fldptr1)
       call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
       write(msgString,*) trim(subname)//': fldptr2 ',lbound(fldptr2),ubound(fldptr2)
@@ -2689,7 +2685,7 @@ module shr_nuopc_methods_mod
         ubound(fldptr2,2) /= ubound(fldptr1,2) .or. &
         ubound(fldptr2,1) /= ubound(fldptr1,1)) then
       call ESMF_LogWrite(trim(subname)//": ERROR in data size "//trim(cstring), ESMF_LOGMSG_ERROR, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       write(msgString,*) trim(subname)//': fldptr2 ',lbound(fldptr2),ubound(fldptr2)
       call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
       write(msgString,*) trim(subname)//': fldptr1 ',lbound(fldptr1),ubound(fldptr1)
@@ -2726,9 +2722,9 @@ module shr_nuopc_methods_mod
 
     if (fieldCount > 0) then
       call shr_nuopc_methods_State_GetFieldN(state, 1, lfield, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Field_GeomPrint(lfield, string, rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
       call ESMF_LogWrite(trim(subname)//":"//trim(string)//": no fields", ESMF_LOGMSG_INFO, rc=dbrc)
     endif  ! fieldCount > 0
@@ -2762,7 +2758,7 @@ module shr_nuopc_methods_mod
     if (fieldCount > 0) then
 
       call shr_nuopc_methods_Field_GeomPrint(lfield, string, rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
       call ESMF_LogWrite(trim(subname)//":"//trim(string)//": no fields", ESMF_LOGMSG_INFO, rc=dbrc)
     endif  ! fieldCount > 0
@@ -2802,36 +2798,36 @@ module shr_nuopc_methods_mod
     endif
 
     call ESMF_FieldGet(field, geomtype=geomtype, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (geomtype == ESMF_GEOMTYPE_GRID) then
       call ESMF_FieldGet(field, grid=lgrid, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Grid_Print(lgrid, string, rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     elseif (geomtype == ESMF_GEOMTYPE_MESH) then
       call ESMF_FieldGet(field, mesh=lmesh, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Mesh_Print(lmesh, string, rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     call shr_nuopc_methods_Field_GetFldPtr(field, dataPtr1, dataPtr2, lrank, abort=.false., rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (lrank == 0) then
       ! no local data
     elseif (lrank == 1) then
       write (msgString,*) trim(subname)//":"//trim(string)//": dataptr bounds dim=1 ",lbound(dataptr1,1),ubound(dataptr1,1)
       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     elseif (lrank == 2) then
       write (msgString,*) trim(subname)//":"//trim(string)//": dataptr bounds dim=1 ",lbound(dataptr2,1),ubound(dataptr2,1)
       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       write (msgString,*) trim(subname)//":"//trim(string)//": dataptr bounds dim=2 ",lbound(dataptr2,2),ubound(dataptr2,2)
       call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     elseif (lrank == 0) then
       ! means data allocation does not exist yet
       continue
@@ -2855,7 +2851,7 @@ module shr_nuopc_methods_mod
     character(len=*), intent(in)  :: string
     integer         , intent(out) :: rc
 
-    type(ESMF_Distgrid)         :: distgrid  
+    type(ESMF_Distgrid)         :: distgrid
     integer                     :: pdim, sdim, nnodes, nelements
     integer                     :: localDeCount
     integer                     :: DeCount
@@ -2871,8 +2867,8 @@ module shr_nuopc_methods_mod
     ! access localDeCount to show this is a real Grid
     call ESMF_MeshGet(mesh, parametricDim=pdim, spatialDim=sdim, elementDistgrid=distgrid, &
       numOwnedNodes=nnodes, numOwnedElements=nelements, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-   
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     write (msgString,*) trim(subname)//":"//trim(string)//": parametricDim=", pdim
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
     write (msgString,*) trim(subname)//":"//trim(string)//": spatialDim=", sdim
@@ -2881,40 +2877,40 @@ module shr_nuopc_methods_mod
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
     write (msgString,*) trim(subname)//":"//trim(string)//": numOwnedElements=", nelements
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     ! get dimCount and tileCount
     call ESMF_DistGridGet(distgrid, dimCount=dimCount, tileCount=tileCount, deCount=deCount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     write (msgString,*) trim(subname)//":"//trim(string)//": dimCount=", dimCount
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     write (msgString,*) trim(subname)//":"//trim(string)//": tileCount=", tileCount
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     write (msgString,*) trim(subname)//":"//trim(string)//": deCount=", deCount
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! allocate minIndexPTile and maxIndexPTile accord. to dimCount and tileCount
     allocate(minIndexPTile(dimCount, tileCount), &
              maxIndexPTile(dimCount, tileCount))
-    
+
     ! get minIndex and maxIndex arrays
     call ESMF_DistGridGet(distgrid, minIndexPTile=minIndexPTile, &
        maxIndexPTile=maxIndexPTile, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-      
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     write (msgString,*) trim(subname)//":"//trim(string)//": minIndexPTile=", minIndexPTile
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     write (msgString,*) trim(subname)//":"//trim(string)//": maxIndexPTile=", maxIndexPTile
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     deallocate(minIndexPTile, maxIndexPTile)
 
@@ -2932,7 +2928,7 @@ module shr_nuopc_methods_mod
     character(len=*), intent(in)  :: string
     integer         , intent(out) :: rc
 
-    type(ESMF_Distgrid) :: distgrid  
+    type(ESMF_Distgrid) :: distgrid
     integer                     :: localDeCount
     integer                     :: DeCount
     integer                     :: dimCount, tileCount
@@ -2946,44 +2942,44 @@ module shr_nuopc_methods_mod
 
     ! access localDeCount to show this is a real Grid
     call ESMF_GridGet(grid, localDeCount=localDeCount, distgrid=distgrid, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-   
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     write (msgString,*) trim(subname)//":"//trim(string)//": localDeCount=", localDeCount
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     ! get dimCount and tileCount
     call ESMF_DistGridGet(distgrid, dimCount=dimCount, tileCount=tileCount, deCount=deCount, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-    
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     write (msgString,*) trim(subname)//":"//trim(string)//": dimCount=", dimCount
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     write (msgString,*) trim(subname)//":"//trim(string)//": tileCount=", tileCount
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     write (msgString,*) trim(subname)//":"//trim(string)//": deCount=", deCount
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! allocate minIndexPTile and maxIndexPTile accord. to dimCount and tileCount
     allocate(minIndexPTile(dimCount, tileCount), &
              maxIndexPTile(dimCount, tileCount))
-    
+
     ! get minIndex and maxIndex arrays
     call ESMF_DistGridGet(distgrid, minIndexPTile=minIndexPTile, &
        maxIndexPTile=maxIndexPTile, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
-      
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     write (msgString,*) trim(subname)//":"//trim(string)//": minIndexPTile=", minIndexPTile
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     write (msgString,*) trim(subname)//":"//trim(string)//": maxIndexPTile=", maxIndexPTile
     call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     deallocate(minIndexPTile, maxIndexPTile)
 
@@ -3019,27 +3015,27 @@ module shr_nuopc_methods_mod
     endif
 
     call ESMF_ClockGet(clock,currtime=time,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_TimeGet(time,timestring=timestr,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite(trim(lstring)//": currtime = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call ESMF_ClockGet(clock,starttime=time,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_TimeGet(time,timestring=timestr,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite(trim(lstring)//": startime = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call ESMF_ClockGet(clock,stoptime=time,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_TimeGet(time,timestring=timestr,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite(trim(lstring)//": stoptime = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call ESMF_ClockGet(clock,timestep=timestep,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_TimeIntervalGet(timestep,timestring=timestr,rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite(trim(lstring)//": timestep = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     if (dbug_flag > 5) then
@@ -3054,8 +3050,8 @@ module shr_nuopc_methods_mod
     type(ESMF_Mesh) ,intent(in)  :: mesh
     character(len=*),intent(in)  :: string
     integer         ,intent(out) :: rc
-  
-    ! local 
+
+    ! local
     integer  :: n,l,i,lsize,ndims
     character(len=64) :: name
     type(ESMF_DISTGRID)         :: distgrid
@@ -3090,9 +3086,9 @@ module shr_nuopc_methods_mod
       array = ESMF_ArrayCreate(distgrid, farrayPtr=coord, name=name, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Array_diagnose(array,trim(string)//"_"//trim(name), rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_ArrayWrite(array, trim(string)//"_"//trim(name)//".nc", overwrite=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     enddo
     enddo
 
@@ -3118,9 +3114,9 @@ module shr_nuopc_methods_mod
       array = ESMF_ArrayCreate(distgrid, farrayPtr=coord, name=name, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Array_diagnose(array,trim(string)//"_"//trim(name), rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_ArrayWrite(array, trim(string)//"_"//trim(name)//".nc", overwrite=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     enddo
     enddo
 
@@ -3157,9 +3153,9 @@ module shr_nuopc_methods_mod
 
     if (fieldCount > 0) then
       call shr_nuopc_methods_State_getFieldN(state, 1, lfield, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Field_GeomWrite(lfield, string, rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
       call ESMF_LogWrite(trim(subname)//":"//trim(string)//": no fields", ESMF_LOGMSG_INFO, rc=dbrc)
     endif  ! fieldCount > 0
@@ -3192,9 +3188,9 @@ module shr_nuopc_methods_mod
 
     if (fieldCount > 0) then
       call shr_nuopc_methods_FB_getFieldN(FB, 1, lfield, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Field_GeomWrite(lfield, string, rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
       call ESMF_LogWrite(trim(subname)//":"//trim(string)//": no fields", ESMF_LOGMSG_INFO, rc=dbrc)
     endif  ! fieldCount > 0
@@ -3231,18 +3227,18 @@ module shr_nuopc_methods_mod
     endif
 
     call ESMF_FieldGet(field, geomtype=geomtype, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (geomtype == ESMF_GEOMTYPE_GRID) then
       call ESMF_FieldGet(field, grid=lgrid, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Grid_Write(lgrid, string, rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     elseif (geomtype == ESMF_GEOMTYPE_MESH) then
       call ESMF_FieldGet(field, mesh=lmesh, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Mesh_Write(lmesh, string, rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (dbug_flag > 10) then
@@ -3257,8 +3253,8 @@ module shr_nuopc_methods_mod
     type(ESMF_Grid) ,intent(in)  :: grid
     character(len=*),intent(in)  :: string
     integer         ,intent(out) :: rc
-  
-    ! local 
+
+    ! local
     type(ESMF_Array)            :: array
     character(len=64)           :: name
     character(len=*),parameter  :: subname='(shr_nuopc_methods_Grid_Write)'
@@ -3271,54 +3267,54 @@ module shr_nuopc_methods_mod
     ! -- centers --
 
     call ESMF_GridGetCoord(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, isPresent=isPresent, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (isPresent) then
       name = "lon_center"
       call ESMF_GridGetCoord(grid, coordDim=1, staggerLoc=ESMF_STAGGERLOC_CENTER, array=array, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_ArraySet(array, name=name, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Array_diagnose(array,trim(string)//"_"//trim(name), rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_ArrayWrite(array, trim(string)//"_"//trim(name)//".nc", overwrite=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       name = "lat_center"
       call ESMF_GridGetCoord(grid, coordDim=2, staggerLoc=ESMF_STAGGERLOC_CENTER, array=array, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_ArraySet(array, name=name, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Array_diagnose(array,trim(string)//"_"//trim(name), rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_ArrayWrite(array, trim(string)//"_"//trim(name)//".nc", overwrite=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     ! -- corners --
 
     call ESMF_GridGetCoord(grid, staggerLoc=ESMF_STAGGERLOC_CORNER, isPresent=isPresent, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (isPresent) then
       name = "lon_corner"
       call ESMF_GridGetCoord(grid, coordDim=1, staggerLoc=ESMF_STAGGERLOC_CORNER, array=array, rc=rc)
       if (.not. ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) then
         call ESMF_ArraySet(array, name=name, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call shr_nuopc_methods_Array_diagnose(array,trim(string)//"_"//trim(name), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call ESMF_ArrayWrite(array, trim(string)//"_"//trim(name)//".nc", overwrite=.true., rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       endif
 
       name = "lat_corner"
       call ESMF_GridGetCoord(grid, coordDim=2, staggerLoc=ESMF_STAGGERLOC_CORNER, array=array, rc=rc)
       if (.not. ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) then
         call ESMF_ArraySet(array, name=name, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call shr_nuopc_methods_Array_diagnose(array,trim(string)//"_"//trim(name), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call ESMF_ArrayWrite(array, trim(string)//"_"//trim(name)//".nc", overwrite=.true., rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       endif
     endif
 
@@ -3326,32 +3322,32 @@ module shr_nuopc_methods_mod
 
     name = "mask"
     call ESMF_GridGetItem(grid, itemflag=ESMF_GRIDITEM_MASK, staggerLoc=ESMF_STAGGERLOC_CENTER, isPresent=isPresent, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (isPresent) then
       call ESMF_GridGetItem(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, itemflag=ESMF_GRIDITEM_MASK, array=array, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_ArraySet(array, name=name, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Array_diagnose(array,trim(string)//"_"//trim(name), rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_ArrayWrite(array, trim(string)//"_"//trim(name)//".nc", overwrite=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     ! -- area --
 
     name = "area"
     call ESMF_GridGetItem(grid, itemflag=ESMF_GRIDITEM_AREA, staggerLoc=ESMF_STAGGERLOC_CENTER, isPresent=isPresent, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (isPresent) then
       call ESMF_GridGetItem(grid, staggerLoc=ESMF_STAGGERLOC_CENTER, itemflag=ESMF_GRIDITEM_AREA, array=array, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_ArraySet(array, name=name, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call shr_nuopc_methods_Array_diagnose(array,trim(string)//trim(name), rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_ArrayWrite(array, trim(string)//"_"//trim(name)//".nc", overwrite=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     if (dbug_flag > 10) then
@@ -3386,11 +3382,11 @@ module shr_nuopc_methods_mod
 
     call ESMF_DistGridGet(distGrid1, &
       dimCount=dimCount1, tileCount=tileCount1, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_DistGridGet(distGrid2, &
       dimCount=dimCount2, tileCount=tileCount2, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if ( dimCount1 /= dimCount2) then
       shr_nuopc_methods_Distgrid_Match = .false.
@@ -3419,13 +3415,13 @@ module shr_nuopc_methods_mod
       elementCountPTile=elementCountPTile1, &
       minIndexPTile=minIndexPTile1, &
       maxIndexPTile=maxIndexPTile1, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_DistGridGet(distGrid2, &
       elementCountPTile=elementCountPTile2, &
       minIndexPTile=minIndexPTile2, &
       maxIndexPTile=maxIndexPTile2, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if ( ANY((elementCountPTile1 - elementCountPTile2) .NE. 0) ) then
       shr_nuopc_methods_Distgrid_Match = .false.
@@ -3523,12 +3519,12 @@ module shr_nuopc_methods_mod
     call ESMF_GridGet(gridSrc, distGrid=distGridSrc, &
       dimCount=dimCountSrc, coordTypeKind=coordTypeKindSrc, &
       coordSys=coordSysSrc, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_GridGet(gridDst, distGrid=distGridDst, &
       dimCount=dimCountDst, coordTypeKind=coordTypeKindDst, &
       coordSys=coordSysDst, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (.NOT. shr_nuopc_methods_Distgrid_Match(distGrid1=distGridSrc, distGrid2=distGridDst, rc=rc)) then
       call ESMF_LogSetError(ESMF_RC_ARG_BAD, &
@@ -3562,20 +3558,20 @@ module shr_nuopc_methods_mod
     do staggerlocIndex=1, size(staggerloc)
       call ESMF_GridGetCoord(gridSrc, staggerloc=staggerloc(staggerlocIndex), &
         isPresent=isPresentSrc, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if(isPresentSrc) then
         call ESMF_GridGetCoord(gridSrc, coordDim=dimIndex, &
           staggerloc=staggerloc(staggerlocIndex), &
           array=coordArraySrc, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call ESMF_GridGetCoord(gridDst, &
           staggerloc=staggerloc(staggerlocIndex), &
           isPresent=isPresentDst, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if(.NOT.isPresentDst) then
           call ESMF_GridAddCoord(gridDst, &
             staggerLoc=staggerloc(staggerlocIndex), rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         else
           if(l_compare .EQV. .TRUE.) then
             ! TODO: Compare existing coordinates
@@ -3588,12 +3584,12 @@ module shr_nuopc_methods_mod
         call ESMF_GridGetCoord(gridDst, coordDim=dimIndex, &
           staggerloc=staggerloc(staggerlocIndex), &
           array=coordArrayDst, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call ESMF_ArrayGet(coordArraySrc, distGrid=distGridSrc, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call ESMF_ArrayGet(coordArrayDst, distGrid=distGridDst, &
           dimCount=dimCountDst, deCount=deCountDst, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (.NOT. shr_nuopc_methods_Distgrid_Match(distGrid1=distGridSrc, distGrid2=distGridDst, rc=rc)) then
         call ESMF_LogSetError(ESMF_RC_ARG_BAD, &
           msg=subname//": Unable to redistribute coordinates. DistGrids do not match.", &
@@ -3603,19 +3599,19 @@ module shr_nuopc_methods_mod
 
         if ( ANY( l_invert == dimIndex )) then
           call ESMF_GridCompGet(gridcomp, vm=vm, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
           call ESMF_VMGet(vm, localPet=localPet, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
           if (localPet == 0) then
             call ESMF_DistGridGet(distGridDst, deCount=deCountDst, rc=rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
             allocate(elementCountPDeDst(deCountDst))
             call ESMF_DistGridGet(distGridDst, &
               elementCountPDe=elementCountPDeDst, rc=rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
             sumElementCountPDeDst = SUM(elementCountPDeDst)
             if (dbug_flag >= 2) then
@@ -3635,7 +3631,7 @@ module shr_nuopc_methods_mod
               write (msgString, "(A)") "Src=>Dst: "//trim(adjustl(numString))//"=>"
               write (numString, "(I10)") factorIndexList(2,1)
               write (msgString, "(A)") trim(msgString)//trim(adjustl(numString))
-              write (numString, "(I10)") factorIndexList(1,sumElementCountPDeDst) 
+              write (numString, "(I10)") factorIndexList(1,sumElementCountPDeDst)
               write (msgString, "(A)") trim(msgString)//" "//trim(adjustl(numString))//"=>"
               write (numString, "(I10)") factorIndexList(2,sumElementCountPDEDst)
      	      write (msgString, "(A)") trim(msgString)//trim(adjustl(numString))
@@ -3645,29 +3641,29 @@ module shr_nuopc_methods_mod
             call ESMF_ArraySMMStore(srcArray=coordArraySrc, dstArray=coordArrayDst, &
               routehandle=routehandle, factorList=factorList, &
               factorIndexList=factorIndexList, rc=rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
             deallocate(elementCountPDeDst)
             deallocate(factorList)
             deallocate(factorIndexList)
           else
             call ESMF_ArraySMMStore(srcArray=coordArraySrc, dstArray=coordArrayDst, &
               routehandle=routehandle, rc=rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           endif
 
           call ESMF_ArraySMM(srcArray=coordArraySrc, dstArray=coordArrayDst, &
             routehandle=routehandle, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_ArraySMMRelease(routehandle=routehandle, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         else
           call ESMF_ArrayRedistStore(coordArraySrc, coordArrayDst, routehandle=routehandle, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_ArrayRedist(coordArraySrc, coordArrayDst, routehandle=routehandle, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_ArrayRedistRelease(routehandle=routehandle, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       else
         call ESMF_LogSetError(ESMF_RC_ARG_BAD, &
@@ -3737,12 +3733,12 @@ module shr_nuopc_methods_mod
     call ESMF_GridGet(gridSrc, distGrid=distGridSrc, &
       dimCount=dimCountSrc, coordTypeKind=coordTypeKindSrc, &
       coordSys=coordSysSrc, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_GridGet(gridDst, distGrid=distGridDst, &
       dimCount=dimCountDst, coordTypeKind=coordTypeKindDst, &
       coordSys=coordSysDst, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (.NOT. shr_nuopc_methods_Distgrid_Match(distGrid1=distGridSrc, distGrid2=distGridDst, rc=rc)) then
       call ESMF_LogSetError(ESMF_RC_ARG_BAD, &
@@ -3775,18 +3771,18 @@ module shr_nuopc_methods_mod
     do itemIndex=1, size(item)
       call ESMF_GridGetItem(gridSrc, itemflag=item(itemIndex), &
         staggerloc=l_staggerloc, isPresent=isPresentSrc, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if(isPresentSrc) then
         call ESMF_GridGetItem(gridSrc, itemflag=item(itemIndex), &
           staggerloc=l_staggerloc, array=itemArraySrc, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call ESMF_GridGetItem(gridDst, itemflag=item(itemIndex), &
           staggerloc=l_staggerloc, isPresent=isPresentDst, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if(.NOT.isPresentDst) then
           call ESMF_GridAddItem(gridDst, itemflag=item(itemIndex), &
             staggerLoc=l_staggerloc, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         else
           if(l_compare .EQV. .TRUE.) then
             ! TODO: Compare existing coordinates
@@ -3798,11 +3794,11 @@ module shr_nuopc_methods_mod
         endif
         call ESMF_GridGetItem(gridDst, itemflag=item(itemIndex), &
           staggerloc=l_staggerloc, array=itemArrayDst, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call ESMF_ArrayGet(itemArraySrc, distGrid=distGridSrc, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call ESMF_ArrayGet(itemArrayDst, distGrid=distGridDst, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (.NOT. shr_nuopc_methods_Distgrid_Match(distGrid1=distGridSrc, distGrid2=distGridDst, rc=rc)) then
           call ESMF_LogSetError(ESMF_RC_ARG_BAD, &
             msg=subname//": Unable to redistribute coordinates. DistGrids do not match.", &
@@ -3818,11 +3814,11 @@ module shr_nuopc_methods_mod
               return  ! bail out
         else
           call ESMF_ArrayRedistStore(itemArraySrc, itemArrayDst, routehandle=routehandle, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_ArrayRedist(itemArraySrc, itemArrayDst, routehandle=routehandle, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_ArrayRedistRelease(routehandle=routehandle, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       else
         call ESMF_LogSetError(ESMF_RC_ARG_BAD, &
@@ -3839,244 +3835,6 @@ module shr_nuopc_methods_mod
     endif
 
   end subroutine shr_nuopc_methods_Grid_CopyItem
-
-!================================================================================
-
-  subroutine shr_nuopc_methods_CopyStateToInfodata(State, infodata, type, mpicom, rc)
-    ! ----------------------------------------------
-    ! Copy scalar data from State to local data on root then broadcast data
-    ! to all PETs in component.
-    ! ----------------------------------------------
-    type(ESMF_State),  intent(in)     :: State
-    type(seq_infodata_type),intent(inout)  :: infodata
-    character(len=*),  intent(in)     :: type
-    integer,           intent(in)     :: mpicom
-    integer,           intent(inout)  :: rc
-
-    ! local variables
-    integer :: mytask, ierr, len
-    character(MPI_MAX_ERROR_STRING) :: lstring
-    type(ESMF_Field) :: field
-    type(ESMF_StateItem_Flag)   :: itemType
-    real(ESMF_KIND_R8), pointer :: farrayptr(:,:)
-    real(ESMF_KIND_R8) :: data(seq_flds_scalar_num)
-    logical :: dead_comps
-    character(len=*), parameter :: subname='(shr_nuopc_methods_CopyStateToInfodata)'
-
-    rc = ESMF_SUCCESS
-
-    call MPI_COMM_RANK(mpicom, mytask, rc)
-    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), itemType=itemType, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    if (itemType == ESMF_STATEITEM_NOTFOUND) then
-      call ESMF_LogWrite(trim(subname)//": "//trim(seq_flds_scalar_name)//" not found", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
-    else
-      call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-      if (mytask == 0) then
-        call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-        if (size(data) < seq_flds_scalar_num .or. size(farrayptr) < seq_flds_scalar_num) then
-          call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
-          rc = ESMF_FAILURE
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-        endif
-        data(1:seq_flds_scalar_num) = farrayptr(1,1:seq_flds_scalar_num)
-      endif
-
-      call MPI_BCAST(data, seq_flds_scalar_num, MPI_REAL8, 0, mpicom, rc)
-      if (rc /= MPI_SUCCESS) then
-        call MPI_ERROR_STRING(rc,lstring,len,ierr)
-        call ESMF_LogWrite(trim(subname)//": ERROR "//trim(lstring), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
-        rc = ESMF_FAILURE
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      endif
-
-      if (type == 'atm2cpli') then
-        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny)), &
-           (nint(data(seq_flds_scalar_index_present))/=0),(nint(data(seq_flds_scalar_index_prognostic))/=0)
-        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call seq_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,atm_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           atm_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           atm_present=(nint(data(seq_flds_scalar_index_present))/=0), &
-                                           atm_prognostic=(nint(data(seq_flds_scalar_index_prognostic))/=0), &
-                                           atm_aero=(nint(data(seq_flds_scalar_index_prognostic))/=0), &
-                                           dead_comps=dead_comps, &
-                                           nextsw_cday=data(seq_flds_scalar_index_nextsw_cday))
-      elseif (type == 'ocn2cpli') then
-        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny)), &
-           (nint(data(seq_flds_scalar_index_present))/=0),(nint(data(seq_flds_scalar_index_prognostic))/=0)
-        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call seq_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,ocn_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           ocn_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           ocn_present=(nint(data(seq_flds_scalar_index_present))/=0), &
-                                           ocn_prognostic=(nint(data(seq_flds_scalar_index_prognostic))/=0), &
-                                           precip_fact=data(seq_flds_scalar_index_precip_fact), &
-                                           dead_comps=dead_comps)
-      elseif (type == 'ice2cpli') then
-        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny)), &
-           (nint(data(seq_flds_scalar_index_present))/=0),(nint(data(seq_flds_scalar_index_prognostic))/=0)
-        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call seq_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,ice_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           ice_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           ice_present=(nint(data(seq_flds_scalar_index_present))/=0), &
-                                           ice_prognostic=(nint(data(seq_flds_scalar_index_prognostic))/=0), &
-                                           dead_comps=dead_comps)
-      elseif (type == 'lnd2cpli') then
-        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny)), &
-           (nint(data(seq_flds_scalar_index_present))/=0),(nint(data(seq_flds_scalar_index_prognostic))/=0)
-        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call seq_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,lnd_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           lnd_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           lnd_present=(nint(data(seq_flds_scalar_index_present))/=0), &
-                                           lnd_prognostic=(nint(data(seq_flds_scalar_index_prognostic))/=0), &
-                                           dead_comps=dead_comps)
-      elseif (type == 'rof2cpli') then
-        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny)), &
-           (nint(data(seq_flds_scalar_index_present))/=0),(nint(data(seq_flds_scalar_index_prognostic))/=0)
-        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call seq_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,rof_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           rof_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           rof_present=(nint(data(seq_flds_scalar_index_present))/=0), &
-                                           rof_prognostic=(nint(data(seq_flds_scalar_index_prognostic))/=0), &
-                                           dead_comps=dead_comps)
-      elseif (type == 'wav2cpli') then
-        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny)), &
-           (nint(data(seq_flds_scalar_index_present))/=0),(nint(data(seq_flds_scalar_index_prognostic))/=0)
-        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call seq_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,wav_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           wav_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           wav_present=(nint(data(seq_flds_scalar_index_present))/=0), &
-                                           wav_prognostic=(nint(data(seq_flds_scalar_index_prognostic))/=0), &
-                                           dead_comps=dead_comps)
-      elseif (type == 'glc2cpli') then
-        write(msgString,'(2i8,2l4)') nint(data(seq_flds_scalar_index_nx)),nint(data(seq_flds_scalar_index_ny)), &
-           (nint(data(seq_flds_scalar_index_present))/=0),(nint(data(seq_flds_scalar_index_prognostic))/=0)
-        call ESMF_LogWrite(trim(subname)//":"//trim(type)//":"//trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-        call seq_infodata_getData(infodata,dead_comps=dead_comps)
-        if (dead_comps .or. nint(data(seq_flds_scalar_index_dead_comps))/=0) dead_comps = .true.
-        call seq_infodata_putData(infodata,glc_nx=nint(data(seq_flds_scalar_index_nx)), &
-                                           glc_ny=nint(data(seq_flds_scalar_index_ny)), &
-                                           glc_present=(nint(data(seq_flds_scalar_index_present))/=0), &
-                                           glc_prognostic=(nint(data(seq_flds_scalar_index_prognostic))/=0), &
-                                           dead_comps=dead_comps)
-      elseif (type == 'atm2cpl') then
-        call seq_infodata_putData(infodata,nextsw_cday=data(seq_flds_scalar_index_nextsw_cday))
-      elseif (type == 'ocn2cpl') then
-        call seq_infodata_putData(infodata,precip_fact=data(seq_flds_scalar_index_precip_fact))
-      elseif (type == 'ice2cpl') then
-        ! nothing
-      elseif (type == 'lnd2cpl') then
-        ! nothing
-      elseif (type == 'rof2cpl') then
-        ! nothing
-      elseif (type == 'wav2cpl') then
-        ! nothing
-      elseif (type == 'glc2cpl') then
-        ! nothing
-      else
-        call ESMF_LogWrite(trim(subname)//": ERROR in type = "//trim(type), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
-        rc = ESMF_FAILURE
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      endif
-
-    endif
-
-  end subroutine shr_nuopc_methods_CopyStateToInfodata
-
-!================================================================================
-
-  subroutine shr_nuopc_methods_CopyInfodataToState(infodata, State, type, mpicom, rc)
-    ! ----------------------------------------------
-    ! Copy local scalar data into State, root only, 
-    ! but called on all PETs in component
-    ! ----------------------------------------------
-    type(seq_infodata_type),intent(in):: infodata
-    type(ESMF_State),  intent(inout)  :: State
-    character(len=*),  intent(in)     :: type
-    integer,           intent(in)     :: mpicom
-    integer,           intent(inout)  :: rc
-
-    ! local variables
-    integer :: mytask
-    type(ESMF_Field) :: field
-    type(ESMF_StateItem_Flag) :: ItemType
-    real(ESMF_KIND_R8), pointer :: farrayptr(:,:)
-    integer :: phase
-    logical :: dead_comps, glc_g2lupdate
-    real(ESMF_KIND_R8) :: nextsw_cday, precip_fact
-    character(len=*), parameter :: subname='(shr_nuopc_methods_CopyInfodataToState)'
-
-    rc = ESMF_SUCCESS
-
-    call MPI_COMM_RANK(mpicom, mytask, rc)
-
-    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), itemType=itemType, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    if (itemType == ESMF_STATEITEM_NOTFOUND) then
-      call ESMF_LogWrite(trim(subname)//": "//trim(seq_flds_scalar_name)//" not found", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
-    else
-      call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      if (mytask == 0) then
-        call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-        if (size(farrayptr) < seq_flds_scalar_num) then
-          call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
-          rc = ESMF_FAILURE
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-        endif
-
-        call seq_infodata_getData(infodata, nextsw_cday=nextsw_cday, &
-                                            precip_fact=precip_fact, dead_comps=dead_comps, &
-                                            glc_g2lupdate=glc_g2lupdate)
-        if (type == 'cpl2atm') then
-          call seq_infodata_getData(infodata,atm_phase=phase)
-        elseif (type == 'cpl2ocn') then
-          call seq_infodata_getData(infodata,ocn_phase=phase)
-        elseif (type == 'cpl2ice') then
-          call seq_infodata_getData(infodata,ice_phase=phase)
-        elseif (type == 'cpl2lnd') then
-          call seq_infodata_getData(infodata,lnd_phase=phase)
-        elseif (type == 'cpl2rof') then
-          call seq_infodata_getData(infodata,rof_phase=phase)
-        elseif (type == 'cpl2wav') then
-          call seq_infodata_getData(infodata,wav_phase=phase)
-        elseif (type == 'cpl2glc') then
-          call seq_infodata_getData(infodata,glc_phase=phase)
-        else
-          call ESMF_LogWrite(trim(subname)//": ERROR in type = "//trim(type), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
-          rc = ESMF_FAILURE
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-        endif
-
-        farrayptr(1,seq_flds_scalar_index_phase) = phase
-        farrayptr(1,seq_flds_scalar_index_nextsw_cday) = nextsw_cday
-        farrayptr(1,seq_flds_scalar_index_precip_fact) = precip_fact
-        farrayptr(1,seq_flds_scalar_index_dead_comps) = 0._ESMF_KIND_R8
-        farrayptr(1,seq_flds_scalar_index_g2lupdate) = 0._ESMF_KIND_R8
-        if (dead_comps) farrayptr(1,seq_flds_scalar_index_dead_comps) = 1._ESMF_KIND_R8
-        if (glc_g2lupdate) farrayptr(1,seq_flds_scalar_index_g2lupdate) = 1._ESMF_KIND_R8
-
-      endif
-    endif
-
-  end subroutine shr_nuopc_methods_CopyInfodataToState
 
 !================================================================================
 
@@ -4111,9 +3869,9 @@ module shr_nuopc_methods_mod
         rc = ESMF_FAILURE
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
       endif
-      value = farrayptr(1,scalar_id)  
+      value = farrayptr(1,scalar_id)
     endif
- 
+
     call MPI_BCAST(value, 1, MPI_REAL8, 0, mpicom, rc)
     if (rc /= MPI_SUCCESS) then
       call MPI_ERROR_STRING(rc,lstring,len,ierr)
@@ -4159,7 +3917,7 @@ module shr_nuopc_methods_mod
       endif
       farrayptr(1,scalar_id) = value
     endif
- 
+
   end subroutine shr_nuopc_methods_State_SetScalar
 
   !-----------------------------------------------------------------------------
@@ -4177,13 +3935,13 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call NUOPC_GetStateMemberLists(state, fieldList=fieldList, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     do i=1, size(fieldList)
       call shr_nuopc_methods_Field_UpdateTimestamp(fieldList(i), time, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     enddo
-    
+
   end subroutine shr_nuopc_methods_State_UpdateTimestamp
 
   !-----------------------------------------------------------------------------
@@ -4198,15 +3956,15 @@ module shr_nuopc_methods_mod
     character(len=*), parameter :: subname='(shr_nuopc_methods_Field_UpdateTimestamp)'
 
     rc = ESMF_SUCCESS
-    
+
     call ESMF_TimeGet(time, yy=yy, mm=mm, dd=dd, h=h, m=m, s=s, ms=ms, us=us, &
       ns=ns, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_AttributeSet(field, &
       name="TimeStamp", valueList=(/yy,mm,dd,h,m,s,ms,us,ns/), &
       convention="NUOPC", purpose="Instance", &
       attnestflag=ESMF_ATTNEST_ON, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return 
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
   end subroutine shr_nuopc_methods_Field_UpdateTimestamp
 
@@ -4227,7 +3985,5 @@ module shr_nuopc_methods_mod
   end function shr_nuopc_methods_ChkErr
 
   !-----------------------------------------------------------------------------
-#endif
 
 end module shr_nuopc_methods_mod
-

@@ -1,8 +1,6 @@
 !================================================================================
 module shr_nuopc_fldList_mod
 
-#ifdef NUOPC_INTERFACE 
-
   use shr_kind_mod,only : r8 => shr_kind_r8
   use shr_kind_mod,only : CL => SHR_KIND_CL, CX => SHR_KIND_CX, CS => SHR_KIND_CS
   use shr_sys_mod, only : shr_sys_abort
@@ -333,7 +331,7 @@ contains
     character(ESMF_MAXSTR), pointer :: NameSpaceList(:)
     character(ESMF_MAXSTR), pointer :: itemNameList(:)
     character(len=*),parameter  :: subname='(shr_nuopc_fldList_Realize)'
- 
+
     rc = ESMF_SUCCESS
 
     if (present(grid) .and. present(mesh)) then
@@ -543,6 +541,5 @@ contains
   end subroutine shr_nuopc_fldList_CopyScalarToState
 
 !================================================================================
-#endif
 
 end module shr_nuopc_fldList_mod
