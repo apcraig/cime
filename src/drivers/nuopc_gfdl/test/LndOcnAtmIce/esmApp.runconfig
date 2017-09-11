@@ -5,15 +5,20 @@
 # Encoding a simple run sequence
 runSeq::
     @1800             # 30min time step 
-      MED
+      MED generate_xgrid
+      MED sfc_boundary_layer
       MED -> ATM
       MED -> OCN
       MED -> LND
+      MED -> ICE
       ATM
       OCN
       LND
+      ICE
+      ICE -> OCN
       ATM -> MED
       OCN -> MED
+      OCN -> ICE
     @
 ::
 

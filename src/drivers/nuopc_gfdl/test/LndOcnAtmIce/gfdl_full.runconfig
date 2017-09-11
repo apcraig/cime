@@ -19,7 +19,7 @@ runSeq::
       ICE_SLOW -> ICE_FAST                  # exchange_slow_to_fast_ice
       ICE_FAST set_ice_surface_fields       #
       MED generate_xgrid                    # generate xgrid
-      MED send_ice_mask_sic
+      #MED send_ice_mask_sic
       @600                                  # 10 min time step
         ATM atmos_tracer_driver_gather_data # if do_atmos
         MED sfc_boundary_layer              # flux_calculation run phase
@@ -27,10 +27,12 @@ runSeq::
         # ATM serial radiation
         ATM update_atmos_model_down         # atmos_down run phase
         ATM -> MED                          # flux_down_from_atmos
+        MED flux_down_from_atmos
         LND update_land_model_fast          # land_fast run phase
         LND -> MED                          # 
         ICE update_ice_model_fast           # ice_fast run phase
         ICE -> MED                          # 
+        MED flux_up_to_atmos
         MED -> ATM                          # flux_up_to_atmos
         ATM update_atmos_model_up           # atmos_up run phase
         MED flux_atmos_to_ocean

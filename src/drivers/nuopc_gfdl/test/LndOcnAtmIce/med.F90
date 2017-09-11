@@ -8,9 +8,12 @@ module MED
   use NUOPC
   use NUOPC_Mediator, only: &
     mediator_routine_SS            => SetServices, &
+    mediator_routine_Run           => routine_Run, &
     mediator_label_CheckImport     => label_CheckImport, &
     mediator_label_DataInitialize  => label_DataInitialize, &
-    mediator_label_Advance         => label_Advance
+    mediator_label_SetRunClock     => label_SetRunClock, &
+    mediator_label_Advance         => label_Advance, &
+    NUOPC_MediatorGet
   
   implicit none
   
@@ -22,6 +25,16 @@ module MED
   type(ESMF_State), save  :: frICE, toICE
   
   public SetServices
+  integer                 :: debug_level = 10
+  integer, parameter      :: num_run_phases=6
+  character(len=23)       :: run_phases(num_run_phases)=(/ &
+                              "generate_xgrid         ", &
+                              "sfc_boundary_layer     ", &
+                              "flux_down_from_atmos   ", &
+                              "flux_up_to_atmos       ", &
+                              "flux_atmos_to_ocean    ", &
+                              "send_ice_mask_sic      " /)
+
   
   !-----------------------------------------------------------------------------
   contains
@@ -96,6 +109,87 @@ module MED
       file=__FILE__)) &
       return  ! bail out
 
+    ! Register all the run phases
+    call NUOPC_CompSetEntryPoint(mediator, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"generate_xgrid"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompSpecialize(mediator, specLabel=mediator_label_Advance, &
+      specPhaseLabel="generate_xgrid", specRoutine=generate_xgrid, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompSetEntryPoint(mediator, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"sfc_boundary_layer"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompSpecialize(mediator, specLabel=mediator_label_Advance, &
+      specPhaseLabel="sfc_boundary_layer", specRoutine=sfc_boundary_layer, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompSetEntryPoint(mediator, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"flux_down_from_atmos"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompSpecialize(mediator, specLabel=mediator_label_Advance, &
+      specPhaseLabel="flux_down_from_atmos", specRoutine=flux_down_from_atmos, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompSetEntryPoint(mediator, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"flux_up_to_atmos"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompSpecialize(mediator, specLabel=mediator_label_Advance, &
+      specPhaseLabel="flux_up_to_atmos", specRoutine=flux_up_to_atmos, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompSetEntryPoint(mediator, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"flux_atmos_to_ocean"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompSpecialize(mediator, specLabel=mediator_label_Advance, &
+      specPhaseLabel="flux_atmos_to_ocean", specRoutine=flux_atmos_to_ocean, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompSetEntryPoint(mediator, ESMF_METHOD_RUN, &
+      phaseLabelList=(/"send_ice_mask_sic"/), &
+      userRoutine=mediator_routine_Run, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompSpecialize(mediator, specLabel=mediator_label_Advance, &
+      specPhaseLabel="send_ice_mask_sic", specRoutine=send_ice_mask_sic, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! Handle the clocks when multiple run phases exist
     call ESMF_MethodRemove(mediator, mediator_label_CheckImport, rc=rc) 
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, & 
       line=__LINE__, file=__FILE__)) return  ! bail out 
@@ -103,6 +197,15 @@ module MED
       specRoutine=NUOPC_NoOp, rc=rc) 
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, & 
       line=__LINE__, file=__FILE__)) return  ! bail out
+
+    call ESMF_MethodRemove(mediator, mediator_label_SetRunClock, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    call NUOPC_CompSpecialize(mediator, specLabel=mediator_label_SetRunClock, &
+      specRoutine=SetRunClock, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+
     
   end subroutine
   
@@ -860,5 +963,224 @@ module MED
       return  ! bail out
 
   end subroutine
+
+  subroutine generate_xgrid(mediator, rc) 
+    type(ESMF_GridComp)  :: mediator 
+    integer, intent(out) :: rc 
+     
+    ! local variables 
+    type(ESMF_Clock)            :: clock 
+    type(ESMF_Time)             :: time 
+    character(len=64)           :: timestr 
+    type(ESMF_State)            :: importState, exportState 
+    character(len=*),parameter  :: subname='(generate_xgrid)' 
+     
+    if (debug_level > 5) then 
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=rc) 
+    endif
+    rc = ESMF_SUCCESS
+
+  end subroutine
+
+  subroutine sfc_boundary_layer(mediator, rc) 
+    type(ESMF_GridComp)  :: mediator 
+    integer, intent(out) :: rc 
+     
+    ! local variables 
+    type(ESMF_Clock)            :: clock 
+    type(ESMF_Time)             :: time 
+    character(len=64)           :: timestr 
+    type(ESMF_State)            :: importState, exportState 
+    character(len=*),parameter  :: subname='(sfc_boundary_layer)' 
+     
+    if (debug_level > 5) then 
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=rc) 
+    endif
+    rc = ESMF_SUCCESS
+
+  end subroutine
+
+  subroutine flux_down_from_atmos(mediator, rc) 
+    type(ESMF_GridComp)  :: mediator 
+    integer, intent(out) :: rc 
+     
+    ! local variables 
+    type(ESMF_Clock)            :: clock 
+    type(ESMF_Time)             :: time 
+    character(len=64)           :: timestr 
+    type(ESMF_State)            :: importState, exportState 
+    character(len=*),parameter  :: subname='(flux_down_from_atmos)' 
+     
+    if (debug_level > 5) then 
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=rc) 
+    endif
+    rc = ESMF_SUCCESS
+
+  end subroutine
+
+  subroutine flux_up_to_atmos(mediator, rc) 
+    type(ESMF_GridComp)  :: mediator 
+    integer, intent(out) :: rc 
+     
+    ! local variables 
+    type(ESMF_Clock)            :: clock 
+    type(ESMF_Time)             :: time 
+    character(len=64)           :: timestr 
+    type(ESMF_State)            :: importState, exportState 
+    character(len=*),parameter :: subname='(flux_up_to_atmos)' 
+     
+    if (debug_level > 5) then 
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=rc) 
+    endif
+    rc = ESMF_SUCCESS
+
+  end subroutine
+
+  subroutine flux_atmos_to_ocean(mediator, rc) 
+    type(ESMF_GridComp)  :: mediator 
+    integer, intent(out) :: rc 
+     
+    ! local variables 
+    type(ESMF_Clock)            :: clock 
+    type(ESMF_Time)             :: time 
+    character(len=64)           :: timestr 
+    type(ESMF_State)            :: importState, exportState 
+    character(len=*),parameter  :: subname='(flux_atmos_to_ocean)' 
+     
+    if (debug_level > 5) then 
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=rc) 
+    endif
+    rc = ESMF_SUCCESS
+
+  end subroutine
+
+  subroutine send_ice_mask_sic(mediator, rc) 
+    type(ESMF_GridComp)  :: mediator 
+    integer, intent(out) :: rc 
+     
+    ! local variables 
+    type(ESMF_Clock)            :: clock 
+    type(ESMF_Time)             :: time 
+    character(len=64)           :: timestr 
+    type(ESMF_State)            :: importState, exportState 
+    character(len=*),parameter  :: subname='(send_ice_mask_sic)' 
+     
+    if (debug_level > 5) then 
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=rc) 
+    endif
+    rc = ESMF_SUCCESS
+
+  end subroutine
+
+  subroutine SetRunClock(gcomp, rc)
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+
+    ! local variables
+    type(ESMF_Clock)           :: mediatorClock, driverClock
+    type(ESMF_Time)            :: currTime
+    type(ESMF_TimeInterval)    :: timeStep
+    character(len=*),parameter :: subname='(module_MEDIATOR:SetRunClock)'
+
+    rc = ESMF_SUCCESS
+
+    if (debug_level > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=rc)
+    endif
+
+    ! query the Mediator for clocks
+    call NUOPC_MediatorGet(gcomp, mediatorClock=mediatorClock, &
+      driverClock=driverClock, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+
+    if (debug_level > 5) then
+       call ClockTimePrint(driverClock  ,trim(subname)//'driver clock1',rc)
+       call ClockTimePrint(mediatorClock,trim(subname)//'mediat clock1',rc)
+    endif
+
+    ! set the mediatorClock to have the current start time as the driverClock
+    call ESMF_ClockGet(driverClock, currTime=currTime, timeStep=timeStep, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    call ESMF_ClockSet(mediatorClock, currTime=currTime, timeStep=timeStep, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    if (debug_level > 5) then
+       call ClockTimePrint(driverClock  ,trim(subname)//'driver clock2',rc)
+       call ClockTimePrint(mediatorClock,trim(subname)//'mediat clock2',rc)
+    endif
+
+    ! check and set the component clock against the driver clock
+    call NUOPC_CompCheckSetClock(gcomp, driverClock, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+
+    if (debug_level > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=rc)
+    endif
+
+  end subroutine SetRunClock
+
+  subroutine ClockTimePrint(clock,string,rc)
+
+    type(ESMF_Clock),intent(in)          :: clock
+    character(len=*),intent(in),optional :: string
+    integer, intent(out)                 :: rc
+
+    type(ESMF_Time)                      :: time
+    type(ESMF_TimeInterval)              :: timeStep
+    character(len=64)                    :: timestr
+    character(len=512)                   :: lstring
+    character(len=*),parameter           :: subname='(med::ClockTimePrint)'
+
+    rc = ESMF_SUCCESS
+
+    if (debug_level > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=rc)
+    endif
+
+    if (present(string)) then
+      lstring = trim(subname)//":"//trim(string)
+    else
+      lstring = trim(subname)
+    endif
+
+    call ESMF_ClockGet(clock,currtime=time,rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    call ESMF_TimeGet(time,timestring=timestr,rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    call ESMF_LogWrite(trim(lstring)//": currtime = "//trim(timestr), ESMF_LOGMSG_INFO, rc=rc)
+    call ESMF_ClockGet(clock,starttime=time,rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    call ESMF_TimeGet(time,timestring=timestr,rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    call ESMF_LogWrite(trim(lstring)//": startime = "//trim(timestr), ESMF_LOGMSG_INFO, rc=rc)
+
+    call ESMF_ClockGet(clock,stoptime=time,rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    call ESMF_TimeGet(time,timestring=timestr,rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    call ESMF_LogWrite(trim(lstring)//": stoptime = "//trim(timestr), ESMF_LOGMSG_INFO, rc=rc)
+
+    call ESMF_ClockGet(clock,timestep=timestep,rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    call ESMF_TimeIntervalGet(timestep,timestring=timestr,rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    call ESMF_LogWrite(trim(lstring)//": timestep = "//trim(timestr), ESMF_LOGMSG_INFO, rc=rc)
+
+    if (debug_level > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=rc)
+    endif
+
+  end subroutine ClockTimePrint
 
 end module

@@ -128,17 +128,30 @@ module OCN
     
     rc = ESMF_SUCCESS
     
-    ! create a Grid object for Fields
-    gridIn = tripolar_grid(rc)
+!    ! turned off to speed up run sequence debugging
+!    ! create a Grid object for Fields
+!    gridIn = tripolar_grid(rc)
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+!      line=__LINE__, &
+!      file=__FILE__)) &
+!      return  ! bail out
+!    gridOut = gridIn ! for now out same as in
+
+    gridIn = ESMF_GridCreate1PeriDimUfrm( &
+       maxIndex=(/90,50/), &
+       minCornerCoord=(/0.0_ESMF_KIND_R8,-90.0_ESMF_KIND_R8/), &
+       maxCornerCoord=(/360.0_ESMF_KIND_R8,90.0_ESMF_KIND_R8/), &
+       staggerLocList=(/ESMF_STAGGERLOC_CORNER, ESMF_STAGGERLOC_CENTER/), &
+       rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=__FILE__)) &
-      return  ! bail out
-    gridOut = gridIn ! for now out same as in
+    gridOut = gridIn
 
 #ifdef WITHIMPORTFIELDS
     ! importable field: air_pressure_at_sea_level
