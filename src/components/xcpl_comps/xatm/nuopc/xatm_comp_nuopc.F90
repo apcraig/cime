@@ -2,9 +2,6 @@ module xatm_comp_nuopc
 
 !----------------------------------------------------------------------------
 ! This is the NUOPC cap
-! It follows the conventions of NUOPC and couples into the data
-! model using the old mct interfaces.  Tranlation between NUOPC/ESMF
-! datatypes and mct datatypes is implemented via share code.
 !----------------------------------------------------------------------------
 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
@@ -17,6 +14,7 @@ module xatm_comp_nuopc
   use shr_nuopc_fldList_mod
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint, shr_nuopc_methods_chkerr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Print_FieldExchInfo
   use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
   use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
   use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
@@ -36,7 +34,6 @@ module xatm_comp_nuopc
 
   use dead_data_mod , only : dead_grid_lat, dead_grid_lon, dead_grid_index
   use dead_nuopc_mod, only : dead_init_nuopc, dead_run_nuopc, dead_final_nuopc
-  use perf_mod
 
   implicit none
 
@@ -69,7 +66,7 @@ module xatm_comp_nuopc
   integer, parameter         :: dbug = 10
   integer                    :: dbrc
   logical                    :: atm_prognostic
-  integer(IN)                :: compid               ! component id (needed for MCT) - temporary
+  integer(IN)                :: compid               ! component id
 
   type (shr_nuopc_fldList_Type) :: fldsToAtm
   type (shr_nuopc_fldList_Type) :: fldsFrAtm
@@ -196,7 +193,6 @@ module xatm_comp_nuopc
     type(ESMF_VM) :: vm
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
-    integer(IN)   :: MCTID
     logical       :: exists
     integer(IN)   :: lsize       ! local array size
     integer(IN)   :: ierr        ! error code
@@ -229,7 +225,7 @@ module xatm_comp_nuopc
     call mpi_comm_rank(mpicom, my_task, ierr)
 
     !----------------------------------------------------------------------------
-    ! get MCT compid
+    ! get compid
     !----------------------------------------------------------------------------
 
     call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
@@ -237,13 +233,12 @@ module xatm_comp_nuopc
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    read(cvalue,*) MCTID  ! convert from string to integer
+    read(cvalue,*) compid  ! convert from string to integer
 
     !----------------------------------------------------------------------------
     ! determine instance information
     !----------------------------------------------------------------------------
 
-    compid = MCTID
     inst_name   = seq_comm_name(compid)
     inst_index  = seq_comm_inst(compid)
     inst_suffix = seq_comm_suffix(compid)
@@ -286,7 +281,7 @@ module xatm_comp_nuopc
 
     gindex(:) = gbuf(:,dead_grid_index)
     lat(:)    = gbuf(:,dead_grid_lat)
-    lat(:)    = gbuf(:,dead_grid_lon)
+    lon(:)    = gbuf(:,dead_grid_lon)
 
     if (nxg == 0 .and. nyg == 0) then
        atm_present = .false.
@@ -295,8 +290,6 @@ module xatm_comp_nuopc
        atm_present = .true.
        atm_prognostic=.true.
     end if
-    write(6,*)'DEBUG: atm_present = ',atm_present
-    write(6,*)'DEBUG: atm_prognostic = ',atm_prognostic
 
     !--------------------------------
     ! create import fields list
@@ -415,7 +408,7 @@ module xatm_comp_nuopc
     ! grid_option specifies grid or mesh
     !--------------------------------
 
-    call shr_nuopc_grid_MeshInit(nxg, nyg, mpicom, compid, gindex, lon, lat, Emesh, rc)
+    call shr_nuopc_grid_MeshInit(gcomp, nxg, nyg, mpicom, compid, gindex, lon, lat, Emesh, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
@@ -468,9 +461,12 @@ module xatm_comp_nuopc
     !--------------------------------
 
     if (dbug > 1) then
-      !call mct_aVect_info(2, d2x, istr=subname//':AV') TODO - need to re-implement this without mct
-      call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+       if (my_task == master_task) then
+          call shr_nuopc_methods_Print_FieldExchInfo(flag=2, values=d2x, logunit=logunit, &
+               fldlist=seq_flds_a2x_fields, nflds=nflds_d2x, istr="InitializeRealize: atm->mediator")
+       end if
+       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     endif
 
 #ifdef USE_ESMF_METADATA
@@ -634,10 +630,12 @@ module xatm_comp_nuopc
     !--------------------------------
 
     if (dbug > 1) then
-      ! TODO: this needs to be refactored without MCT functionality
-      !call mct_aVect_info(2, d2x, istr=subname//':AV')
-      call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+       if (my_task == master_task) then
+          call shr_nuopc_methods_Print_FieldExchInfo(flag=2, values=d2x, logunit=logunit, &
+               fldlist=seq_flds_a2x_fields, nflds=nflds_d2x, istr="ModelAdvance: atm->mediator")
+       end if
+       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     endif
 
     call ESMF_ClockPrint(clock, options="currTime", &
@@ -770,7 +768,5 @@ module xatm_comp_nuopc
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine ModelFinalize
-
-  !===============================================================================
 
 end module xatm_comp_nuopc

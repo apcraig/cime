@@ -2,9 +2,6 @@ module xice_comp_nuopc
 
 !----------------------------------------------------------------------------
 ! This is the NUOPC cap
-! It follows the conventions of NUOPC and couples into the data
-! model using the old mct interfaces.  Tranlation between NUOPC/ESMF
-! datatypes and mct datatypes is implemented via share code.
 !----------------------------------------------------------------------------
 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
@@ -16,13 +13,15 @@ module xice_comp_nuopc
   use seq_timemgr_mod       , only: seq_timemgr_EClockGetData
   use shr_nuopc_fldList_mod
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint, shr_nuopc_methods_chkerr
-  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_gridinit
-  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_AvectToState
-  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_StateToAvect
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Print_FieldExchInfo
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
   use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
   use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
   use shr_file_mod          , only: shr_file_setIO, shr_file_getUnit
+  use shr_string_mod        , only: shr_string_listGetNum
 
   use ESMF
   use NUOPC
@@ -33,9 +32,8 @@ module xice_comp_nuopc
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Finalize  => label_Finalize
 
-  use dead_mct_mod, only : dead_init_mct, dead_run_mct, dead_final_mct
-  use perf_mod
-  use mct_mod
+  use dead_data_mod , only : dead_grid_lat, dead_grid_lon, dead_grid_index
+  use dead_nuopc_mod, only : dead_init_nuopc, dead_run_nuopc, dead_final_nuopc
 
   implicit none
 
@@ -47,13 +45,14 @@ module xice_comp_nuopc
   ! Private module data
   !--------------------------------------------------------------------------
 
-  type(mct_gsMap), target    :: gsMap_target
-  type(mct_gGrid), target    :: ggrid_target
-  type(mct_gsMap), pointer   :: gsMap
-  type(mct_gGrid), pointer   :: ggrid
-  real(r8)       , pointer   :: gbuf(:,:)            ! model grid
-  type(mct_aVect)            :: x2d
-  type(mct_aVect)            :: d2x
+  real(r8), pointer          :: gbuf(:,:)            ! model info
+  real(r8), pointer          :: lat(:)
+  real(r8), pointer          :: lon(:)
+  integer , allocatable      :: gindex(:)
+  real(r8), allocatable      :: x2d(:,:)
+  real(r8), allocatable      :: d2x(:,:)
+  integer                    :: nflds_d2x
+  integer                    :: nflds_x2d
   integer(IN)                :: nxg                  ! global dim i-direction
   integer(IN)                :: nyg                  ! global dim j-direction
   integer(IN)                :: mpicom               ! mpi communicator
@@ -62,13 +61,13 @@ module xice_comp_nuopc
   character(len=16)          :: inst_name            ! fullname of current instance (ie. "lnd_0001")
   character(len=16)          :: inst_suffix = ""     ! char string associated with instance (ie. "_0001" or "")
   integer(IN)                :: logunit              ! logging unit number
-  integer(IN)                :: compid               ! mct comp id
   integer(IN),parameter      :: master_task=0        ! task number of master task
   character(len=*),parameter :: grid_option = "mesh" ! grid_de, grid_arb, grid_reg, mesh
   integer, parameter         :: dbug = 10
   integer                    :: dbrc
   logical                    :: ice_prognostic
   logical                    :: iceberg_prognostic
+  integer(IN)                :: compid               ! component id
 
   type (shr_nuopc_fldList_Type) :: fldsToIce
   type (shr_nuopc_fldList_Type) :: fldsFrIce
@@ -194,8 +193,8 @@ module xice_comp_nuopc
     type(ESMF_VM) :: vm
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
-    integer(IN)   :: MCTID
     logical       :: exists
+    integer(IN)   :: lsize       ! local array size
     integer(IN)   :: ierr        ! error code
     integer(IN)   :: shrlogunit  ! original log unit
     integer(IN)   :: shrloglev   ! original log level
@@ -226,7 +225,7 @@ module xice_comp_nuopc
     call mpi_comm_rank(mpicom, my_task, ierr)
 
     !----------------------------------------------------------------------------
-    ! get MCT compid
+    ! get compid
     !----------------------------------------------------------------------------
 
     call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
@@ -234,13 +233,12 @@ module xice_comp_nuopc
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    read(cvalue,*) MCTID  ! convert from string to integer
+    read(cvalue,*) compid  ! convert from string to integer
 
     !----------------------------------------------------------------------------
     ! determine instance information
     !----------------------------------------------------------------------------
 
-    compid = MCTID
     inst_name   = seq_comm_name(compid)
     inst_index  = seq_comm_inst(compid)
     inst_suffix = seq_comm_suffix(compid)
@@ -266,16 +264,24 @@ module xice_comp_nuopc
     call shr_file_setLogUnit (logunit)
 
     !----------------------------------------------------------------------------
-    ! Read input parms
+    ! Initialize xice
     !----------------------------------------------------------------------------
 
-    gsmap => gsmap_target
-    ggrid => ggrid_target
+    call dead_init_nuopc('ice', mpicom, my_task, master_task, &
+         inst_index, inst_suffix, inst_name, logunit, lsize, gbuf, nxg, nyg)
 
-    call dead_init_mct('ice', clock, x2d, d2x, &
-         seq_flds_x2i_fields, seq_flds_i2x_fields, &
-         gsmap, ggrid, gbuf, mpicom, compid, my_task, master_task, &
-         inst_index, inst_suffix, inst_name, logunit, nxg, nyg)
+    nflds_d2x = shr_string_listGetNum(seq_flds_i2x_fields)
+    nflds_x2d = shr_string_listGetNum(seq_flds_x2i_fields)
+
+    allocate(gindex(lsize))
+    allocate(lon(lsize))
+    allocate(lat(lsize))
+    allocate(d2x(nflds_d2x,lsize))
+    allocate(x2d(nflds_x2d,lsize))
+
+    gindex(:) = gbuf(:,dead_grid_index)
+    lat(:)    = gbuf(:,dead_grid_lat)
+    lon(:)    = gbuf(:,dead_grid_lon)
 
     if (nxg == 0 .and. nyg == 0) then
        ice_present = .true.
@@ -354,7 +360,6 @@ module xice_comp_nuopc
     integer, intent(out) :: rc
 
     ! local variables
-    integer(IN)            :: MCTID
     character(CL)          :: NLFilename, cvalue
     integer(IN)            :: phase, lmpicom, ierr
     character(ESMF_MAXSTR) :: convCIM, purpComp
@@ -396,17 +401,17 @@ module xice_comp_nuopc
                 call shr_sys_abort("Ice prognostic .true. requires connection for " // trim(fldsToIce%shortname(n)))
              end if
           end do
-          call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
+          call shr_nuopc_grid_StateToArray(importState, x2d, seq_flds_x2i_fields, grid_option, rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
        end if
     endif
 
     !--------------------------------
-    ! generate the grid or mesh from the gsmap and ggrid
+    ! generate the mesh
     ! grid_option specifies grid or mesh
     !--------------------------------
 
-    call shr_nuopc_dmodel_gridinit(nxg, nyg, mpicom, gsMap, ggrid, grid_option, EGrid, Emesh, rc)
+    call shr_nuopc_grid_MeshInit(gcomp, nxg, nyg, mpicom, compid, gindex, lon, lat, Emesh, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
@@ -437,7 +442,7 @@ module xice_comp_nuopc
     ! Set the coupling scalars
     !--------------------------------
 
-    call shr_nuopc_dmodel_AvectToState(d2x, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x, seq_flds_i2x_fields, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     call shr_nuopc_methods_State_SetScalar(dble(nyg),seq_flds_scalar_index_nx, exportState, mpicom, rc)
@@ -462,9 +467,12 @@ module xice_comp_nuopc
     !--------------------------------
 
     if (dbug > 1) then
-      call mct_aVect_info(2, d2x, istr=subname//':AV')
-      call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+       if (my_task == master_task) then
+          call shr_nuopc_methods_Print_FieldExchInfo(flag=2, values=d2x, logunit=logunit, &
+               fldlist=seq_flds_i2x_fields, nflds=nflds_d2x, istr="InitializeRealize: ice->mediator")
+       end if
+       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     endif
 
 #ifdef USE_ESMF_METADATA
@@ -603,21 +611,20 @@ module xice_comp_nuopc
     ! Unpack export state
     !--------------------------------
 
-    call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
+    call shr_nuopc_grid_StateToArray(importState, x2d, seq_flds_x2i_fields, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
     ! Run model
     !--------------------------------
 
-    call dead_run_mct('ice', clock, x2d, d2x, &
-       gsmap, ggrid, gbuf, mpicom, compid, my_task, master_task, logunit)
+    call dead_run_nuopc('ice', clock, x2d, d2x, gbuf, seq_flds_i2x_fields, my_task, master_task, logunit)
 
     !--------------------------------
     ! Pack export state
     !--------------------------------
 
-    call shr_nuopc_dmodel_AvectToState(d2x, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x, seq_flds_i2x_fields, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
@@ -625,9 +632,12 @@ module xice_comp_nuopc
     !--------------------------------
 
     if (dbug > 1) then
-      call mct_aVect_info(2, d2x, istr=subname//':AV')
-      call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+       if (my_task == master_task) then
+          call shr_nuopc_methods_Print_FieldExchInfo(flag=2, values=d2x, logunit=logunit, &
+               fldlist=seq_flds_i2x_fields, nflds=nflds_d2x, istr="ModelAdvance: ice->mediator")
+       end if
+       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     endif
 
     call ESMF_ClockPrint(clock, options="currTime", &
@@ -755,7 +765,7 @@ module xice_comp_nuopc
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
 
-    call dead_final_mct('ice', my_task, master_task, logunit)
+    call dead_final_nuopc('ice', my_task, master_task, logunit)
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 

@@ -73,6 +73,7 @@ def build_xcpl_lib(argv, compclass):
         with open('Filepath', 'w') as out:
             out.write(os.path.join(caseroot, "SourceMods", "src.{}", compname) + "\n")
             out.write(os.path.join(cimeroot, "src", "components", "xcpl_comps", "xshare") + "\n")
+            out.write(os.path.join(cimeroot, "src", "components", "xcpl_comps", "xshare", driver) + "\n")
             out.write(os.path.join(cimeroot, "src", "components", "xcpl_comps", compname, driver) + "\n")
 
         # Build the component

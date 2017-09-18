@@ -8,7 +8,6 @@ module shr_nuopc_grid_mod
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_reset
   use ESMF
   use NUOPC
-  use mct_mod
 
   implicit none
   save
@@ -93,12 +92,13 @@ contains
 
   !-----------------------------------------------------------------------------
 
-  subroutine shr_nuopc_grid_DEInit(nx_global, ny_global, mpicom, compid, gindex, Egrid, rc)
+  subroutine shr_nuopc_grid_DEInit(gcomp, nx_global, ny_global, mpicom, compid, gindex, Egrid, rc)
 
     !-----------------------------------------
     ! create a Egrid object for Fields
     !-----------------------------------------
 
+    type(ESMF_GridComp)             :: gcomp
     integer         , intent(in)    :: nx_global
     integer         , intent(in)    :: ny_global
     integer         , intent(in)    :: mpicom
@@ -108,30 +108,42 @@ contains
     integer         , intent(inout) :: rc
 
     !--- local ---
-    integer                  :: n,n1,n2,ig,jg,cnt
-    integer                  :: de,decount,dimcount
-    integer                  :: iam,ierr
-    integer                  :: lsize,gsize,nblocks_tot,ngseg
-    integer                  :: lbnd(2),ubnd(2)
-    integer                  :: global_index
-    integer, pointer         :: indexList(:)
-    integer, pointer         :: deBlockList(:,:,:)
-    integer, pointer         :: petMap(:)
-    real(r8),pointer         :: falon(:),falat(:)
-    real(r8),pointer         :: famask(:),faarea(:)
-    integer, pointer         :: iarray2(:,:)
-    real(r8),pointer         :: farray2(:,:)
-    type(ESMF_DELayout)      :: delayout
-    type(ESMF_DistGrid)      :: distgrid
-    type(mct_gsMap), pointer :: gsMap
+    integer             :: n,n1,n2,ig,jg,cnt
+    integer             :: de,decount,dimcount
+    integer             :: iam,ierr
+    integer             :: lsize,gsize,nblocks_tot,ngseg
+    integer             :: lbnd(2),ubnd(2)
+    integer             :: global_index
+    integer, pointer    :: indexList(:)
+    integer, pointer    :: deBlockList(:,:,:)
+    integer, pointer    :: petMap(:)
+    real(r8),pointer    :: falon(:),falat(:)
+    real(r8),pointer    :: famask(:),faarea(:)
+    integer, pointer    :: iarray2(:,:)
+    real(r8),pointer    :: farray2(:,:)
+    type(ESMF_DELayout) :: delayout
+    type(ESMF_DistGrid) :: distgrid
+    integer ,pointer    :: pes_local(:)
+    integer ,pointer    :: pes_global(:)
+    type(ESMF_VM)       :: vm
+    integer             :: petCount
     type(ESMF_DistGridConnection), allocatable :: connectionList(:)
     character(len=*),parameter :: subname='(shr_nuopc_grid_DEInit)'
     !--------------------------------------------------------------
+
+    call MPI_COMM_RANK(mpicom, iam, ierr)
+
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u))  return  ! bail out
+
+    call ESMF_VMGet(vm, petCount=petCount, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     ! 1 gridcell per DE
 
     lsize = size(gindex)
     gsize = nx_global * ny_global
+
     write(tmpstr,'(a,4i8)') subname//' nx,ny,lsize = ',nx_global,ny_global,lsize,gsize
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -143,33 +155,39 @@ contains
     write(tmpstr,'(a,1i8)') subname//' nblocks = ',nblocks_tot
     call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
-    ! create an MCT gsmap
-    call mct_gsMap_init( gsMap, gindex, mpicom, compid, lsize, gsize )
+    allocate(pes_local(gsize))
+    allocate(pes_global(gsize))
+
+    pes_local(:) = 0
+    do n = 1,lsize
+       pes_local(gindex(n)) = iam
+    end do
+
+    call ESMF_VMAllReduce(vm, sendData=pes_local, recvData=pes_global, count=nx_global*ny_global, &
+         reduceflag=ESMF_REDUCE_SUM, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u))  return  ! bail out
 
     ! Note that below this is a global search overall all the points - not just the ones
     ! passed in my gindex(:)
     n = 0
-    do n1 = 1,gsmap%ngseg
-       do n2 = 1,gsmap%length(n1)
-          n = n + 1
-          global_index = gsmap%start(n1) + n2 - 1
-          ig = mod(global_index-1,nx_global) + 1
-          jg = (global_index-1)/nx_global + 1
-          deBlockList(1,1,n) = ig
-          deBlockList(1,2,n) = ig
-          deBlockList(2,1,n) = jg
-          deBlockList(2,2,n) = jg
-          petMap(n) = gsmap%pe_Loc(n1)
-          ! write(tmpstr,'(a,2i8)') subname//' IDs  = ',n,petMap(n)
-          ! call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
-          ! write(tmpstr,'(a,3i8)') subname//' iglo = ',n,deBlockList(1,1,n),deBlockList(1,2,n)
-          ! call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
-          ! write(tmpstr,'(a,3i8)') subname//' jglo = ',n,deBlockList(2,1,n),deBlockList(2,2,n)
-          ! call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
-       enddo
+    do global_index = 1,gsize
+       ig = mod(global_index-1,nx_global) + 1
+       jg = (global_index-1)/nx_global + 1
+       deBlockList(1,1,n) = ig
+       deBlockList(1,2,n) = ig
+       deBlockList(2,1,n) = jg
+       deBlockList(2,2,n) = jg
+       petMap(global_index) = pes_global(global_index)
+       ! write(tmpstr,'(a,2i8)') subname//' IDs  = ',n,petMap(n)
+       ! call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+       ! write(tmpstr,'(a,3i8)') subname//' iglo = ',n,deBlockList(1,1,n),deBlockList(1,2,n)
+       ! call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+       ! write(tmpstr,'(a,3i8)') subname//' jglo = ',n,deBlockList(2,1,n),deBlockList(2,2,n)
+       ! call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
     enddo
 
-    call mct_gsmap_clean(gsmap)
+    deallocate(pes_local)
+    deallocate(pes_global)
 
     delayout = ESMF_DELayoutCreate(petMap, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
@@ -317,12 +335,13 @@ contains
 
   !-----------------------------------------------------------------------------
 
-  subroutine shr_nuopc_grid_MeshInit(nx_global, ny_global, mpicom, compid, gindex, lon, lat, Emesh, rc)
+  subroutine shr_nuopc_grid_MeshInit(gcomp, nx_global, ny_global, mpicom, compid, gindex, lon, lat, Emesh, rc)
 
     !-----------------------------------------
     ! create an Emesh object for Fields
     !-----------------------------------------
 
+    type(ESMF_GridComp)               :: gcomp
     integer           , intent(in)    :: nx_global
     integer           , intent(in)    :: ny_global
     integer           , intent(in)    :: mpicom
@@ -334,28 +353,30 @@ contains
     integer           , intent(inout) :: rc
 
     !--- local ---
-    integer                  :: n,n1,n2,ig,jg,cnt,de,decount,dimcount
-    integer                  :: iam,ierr
-    integer                  :: lsize
-    integer                  :: numTotElems, numNodes, numConn, nodeindx
-    integer                  :: iur,iul,ill,ilr
-    integer                  :: xid, yid, xid0, yid0
-    integer                  :: klon, klat
-    integer                  :: klonG, klatG
-    real(r8)                 :: lonur, lonul, lonll, lonlr
-    integer, pointer         :: iurpts(:)
-    integer, pointer         :: elemIds(:)
-    integer, pointer         :: elemTypes(:)
-    integer, pointer         :: elemConn(:)
-    real(r8),pointer         :: elemCoords(:)
-    integer, pointer         :: nodeIds(:)
-    integer, pointer         :: nodeOwners(:)
-    real(r8),pointer         :: nodeCoords(:)
-    type(mct_gsMap), target  :: gsMap_target
-    type(mct_gsMap), pointer :: gsMap
-    type(mct_gGrid), target  :: ggrid_target
-    type(mct_gGrid), pointer :: ggrid
-    type(mct_gGrid)          :: ggridG
+    integer          :: n,n1,n2,de
+    integer          :: iam,ierr
+    integer          :: lsize
+    integer          :: numTotElems, numNodes, numConn, nodeindx
+    integer          :: iur,iul,ill,ilr
+    integer          :: xid, yid, xid0, yid0
+    real(r8)         :: lonur, lonul, lonll, lonlr
+    integer, pointer :: iurpts(:)
+    integer, pointer :: elemIds(:)
+    integer, pointer :: elemTypes(:)
+    integer, pointer :: elemConn(:)
+    real(r8),pointer :: elemCoords(:)
+    integer, pointer :: nodeIds(:)
+    integer, pointer :: nodeOwners(:)
+    real(r8),pointer :: nodeCoords(:)
+    real(r8),pointer :: latG(:)
+    real(r8),pointer :: lonG(:)
+    integer ,pointer :: pes_local(:)
+    integer ,pointer :: pes_global(:)
+    integer, pointer :: recvOffsets(:)
+    integer, pointer :: recvCounts(:)
+    integer          :: sendData(1)
+    type(ESMF_VM)    :: vm
+    integer          :: petCount
     character(len=*),parameter :: subname='(shr_nuopc_grid_MeshInit)'
     !--------------------------------------------------------------
 
@@ -364,22 +385,40 @@ contains
     call MPI_COMM_RANK(mpicom, iam, ierr)
     call ESMF_LogWrite(subname, ESMF_LOGMSG_INFO, rc=dbrc)
 
-    ! create an MCT gsmap and ggrid
-    gsmap => gsmap_target
-    ggrid => ggrid_target
-
     lsize = size(gindex)
-    call mct_gsMap_init( gsMap, gindex, mpicom, compid, lsize, nx_global*ny_global )
-    call mct_gGrid_init( GGrid=ggrid, CoordChars='lat:lon', lsize=lsize)
-    call mct_gGrid_importRAttr(ggrid,"lat",lat,lsize)
-    call mct_gGrid_importRAttr(ggrid,"lon",lon,lsize)
-    call mct_ggrid_gather(ggrid, ggridG, gsmap, 0, mpicom)
-    call mct_ggrid_bcast(ggridG, 0, mpicom)
 
-    klat  = mct_aVect_indexRA(ggrid%data ,'lat')
-    klon  = mct_aVect_indexRA(ggrid%data ,'lon')
-    klatG = mct_aVect_indexRA(ggridG%data,'lat')
-    klonG = mct_aVect_indexRA(ggridG%data,'lon')
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u))  return  ! bail out
+
+    call ESMF_VMGet(vm, petCount=petCount, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+
+    allocate(latG(nx_global*ny_global))
+    allocate(lonG(nx_global*ny_global))
+
+    allocate(recvoffsets(petCount))
+    allocate(recvCounts(petCount))
+
+    sendData(1) = lsize
+    call ESMF_VMGather(vm, sendData=sendData, recvData=recvCounts, count=1, rootPet=0, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+
+    call ESMF_VMBroadCast(vm, bcstData=recvCounts, count=petCount, rootPet=0, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+
+    recvoffsets(1) = 0
+    do n = 2,petCount
+       recvoffsets(n) = recvoffsets(n-1) + recvCounts(n-1)
+    end do
+
+    call ESMF_VMAllGatherV(vm, lat, lsize, latG, recvCounts, recvOffsets, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u))  return  ! bail out
+
+    call ESMF_VMAllGatherV(vm, lon, lsize, lonG, recvCounts, recvOffsets, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u))  return  ! bail out
+
+    deallocate(recvoffsets)
+    deallocate(recvCounts)
 
     ! assumes quadrilaterals for each gridcell (element)
     ! element index matches gsmap index value
@@ -407,8 +446,8 @@ contains
 
     do n = 1,numTotElems
        elemTypes(n) = ESMF_MESHELEMTYPE_QUAD
-       elemCoords(2*n-1) = ggrid%data%rAttr(klon,n)
-       elemCoords(2*n)   = ggrid%data%rAttr(klat,n)
+       elemCoords(2*n-1) = lon(n)
+       elemCoords(2*n)   = lat(n)
 
        do n1 = 1,4
 
@@ -459,14 +498,15 @@ contains
        yid = max(min(yid0-1,ny_global),1)
        ilr = (yid-1) * nx_global + xid
 
-       !        write(tmpstr,'(2a,8i6)') subname,' nodecoord = ',n,nodeIds(n),xid0,yid0,iur,iul,ill,ilr
-       !        call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+       ! write(tmpstr,'(2a,8i6)') subname,' nodecoord = ',n,nodeIds(n),xid0,yid0,iur,iul,ill,ilr
+       ! call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
        ! need to normalize lon values to same 360 degree setting, use lonur as reference value
-       lonur = ggridG%data%rAttr(klonG,iur)
-       lonul = ggridG%data%rAttr(klonG,iul)
-       lonll = ggridG%data%rAttr(klonG,ill)
-       lonlr = ggridG%data%rAttr(klonG,ilr)
+       lonur = lonG(iur)
+       lonul = lonG(iul)
+       lonll = lonG(ill)
+       lonlr = lonG(ilr)
+
        if (abs(lonul + 360._r8 - lonur) < abs(lonul - lonur)) lonul = lonul + 360._r8
        if (abs(lonul - 360._r8 - lonur) < abs(lonul - lonur)) lonul = lonul - 360._r8
        if (abs(lonll + 360._r8 - lonur) < abs(lonll - lonur)) lonll = lonll + 360._r8
@@ -475,17 +515,30 @@ contains
        if (abs(lonlr - 360._r8 - lonur) < abs(lonlr - lonur)) lonlr = lonlr - 360._r8
 
        nodeCoords(2*n-1) = 0.25_r8 * (lonur + lonul + lonll + lonlr)
-       nodeCoords(2*n)   = 0.25_r8 * (ggridG%data%rAttr(klatG,iur) + ggridG%data%rAttr(klatG,iul) + &
-                                      ggridG%data%rAttr(klatG,ill) + ggridG%data%rAttr(klatG,ilr))
-
+       nodeCoords(2*n)   = 0.25_r8 * (latG(iur) + latG(iul) + latG(ill) + latG(ilr))
     enddo
 
-    call mct_gsmap_pelocs(gsmap,numNodes,iurpts,nodeOwners)
-    deallocate(iurpts)
+    deallocate(lonG)
+    deallocate(latG)
 
-    call mct_ggrid_clean(ggridG)
-    call mct_ggrid_clean(ggrid)
-    call mct_gsmap_clean(gsmap)
+    ! Determine the pes that own each index of iurpts (nodeOwners)
+
+    allocate(pes_local(nx_global*ny_global))
+    allocate(pes_global(nx_global*ny_global))
+    pes_local(:) = 0
+    do n = 1,lsize
+       pes_local(gindex(n)) = iam
+    end do
+
+    call ESMF_VMAllReduce(vm, sendData=pes_local, recvData=pes_global, count=nx_global*ny_global, &
+         reduceflag=ESMF_REDUCE_SUM, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u))  return  ! bail out
+
+    do n = 1,numNodes
+       nodeOwners(n) = pes_global(iurpts(n))
+    end do
+    deallocate(pes_local)
+    deallocate(pes_global)
 
     ! do n = 1,numtotelems
     !   write(tmpstr,'(2a,2i8,2g13.6)') subname,' elemA = ',n,elemIds(n),elemCoords(2*n-1:2*n)
@@ -499,15 +552,20 @@ contains
     !   call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
     ! enddo
 
-    Emesh=ESMF_MeshCreate(parametricDim=2, spatialDim=2, &
+    Emesh = ESMF_MeshCreate(parametricDim=2, &
+         spatialDim=2, &
          coordSys=ESMF_COORDSYS_SPH_DEG, &
-         nodeIds=nodeIds(1:numNodes), nodeCoords=nodeCoords, &
-         nodeOwners=nodeOwners, elementIds=elemIds,&
-         elementTypes=elemTypes, elementConn=elemConn, &
+         nodeIds=nodeIds(1:numNodes), &
+         nodeCoords=nodeCoords, &
+         nodeOwners=nodeOwners, &
+         elementIds=elemIds,&
+         elementTypes=elemTypes, &
+         elementConn=elemConn, &
          elementCoords=elemCoords, &
          rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
+    deallocate(iurpts)
     deallocate(nodeIds, nodeCoords, nodeOwners)
     deallocate(elemIds, elemTypes, elemConn, elemCoords)
 
