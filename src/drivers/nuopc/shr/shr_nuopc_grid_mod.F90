@@ -440,7 +440,6 @@ contains
     nodeIds = -99
 
     elemIds(:) = gindex(:)
-
     numNodes = 0
     numConn = 0
 
@@ -471,6 +470,7 @@ contains
           elemConn(numConn) = nodeindx
        enddo
     enddo
+
 
     allocate(nodeCoords(2*numNodes))
     allocate(nodeOwners(numNodes))
@@ -575,7 +575,7 @@ contains
 
   subroutine shr_nuopc_grid_ArrayToState(array, rList, state, grid_option, rc)
 
-    ! copy avect data to state fields
+    ! copy array data to state fields
 
     implicit none
 
@@ -647,7 +647,7 @@ contains
 
   subroutine shr_nuopc_grid_StateToArray(state, array, rList, grid_option, rc)
 
-    ! copy state fields to avect data
+    ! copy state fields to array data
 
     implicit none
 
@@ -665,7 +665,7 @@ contains
     real(ESMF_KIND_R8), pointer :: farray2(:,:)
     real(ESMF_KIND_R8), pointer :: farray1(:)
 
-    character(*),parameter :: subName = "(shr_nuopc_grdi_ArrayToAvect)"
+    character(*),parameter :: subName = "(shr_nuopc_grid_StateToArray)"
     !----------------------------------------------------------
 
     rc = ESMF_SUCCESS

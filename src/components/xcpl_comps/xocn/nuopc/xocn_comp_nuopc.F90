@@ -58,7 +58,7 @@ module xocn_comp_nuopc
   integer(IN)                :: mpicom               ! mpi communicator
   integer(IN)                :: my_task              ! my task in mpi communicator mpicom
   integer                    :: inst_index           ! number of current instance (ie. 1)
-  character(len=16)          :: inst_name            ! fullname of current instance (ie. "lnd_0001")
+  character(len=16)          :: inst_name            ! fullname of current instance (ie. "ocn_0001")
   character(len=16)          :: inst_suffix = ""     ! char string associated with instance (ie. "_0001" or "")
   integer(IN)                :: logunit              ! logging unit number
   integer(IN),parameter      :: master_task=0        ! task number of master task
@@ -201,6 +201,7 @@ module xocn_comp_nuopc
     integer(IN)   :: shrloglev   ! original log level
     logical       :: ocn_present ! if true, component is present
     character(len=*),parameter :: subname=trim(modName)//':(InitializeAdvertise) '
+    integer :: n
     !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
@@ -283,6 +284,8 @@ module xocn_comp_nuopc
     gindex(:) = gbuf(:,dead_grid_index)
     lat(:)    = gbuf(:,dead_grid_lat)
     lon(:)    = gbuf(:,dead_grid_lon)
+    d2x(:,:)  = 0._r8
+    x2d(:,:)  = 0._r8
 
     if (nxg == 0 .and. nyg == 0) then
        ocn_present = .false.
@@ -372,7 +375,7 @@ module xocn_comp_nuopc
     integer(IN)            :: n
     logical                :: connected                 ! is field connected?
     real(R8)               :: scalar                    ! temporary
-    character(len=*),parameter :: subname=trim(modName)//':(InitializeRealize) '
+    character(len=*),parameter :: subname=trim(modName)//':(InitializeRealize: xocn) '
     !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS

@@ -4,7 +4,7 @@ module dead_nuopc_mod
   use shr_kind_mod    , only : IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod     , only : shr_sys_abort, shr_sys_flush
   use shr_const_mod   , only : shr_const_pi
-  use shr_string_mod  , only : shr_string_listGetNum, shr_string_listGetIndex
+  use shr_string_mod  , only : shr_string_listGetIndexF
   use dead_data_mod   , only : dead_grid_lat, dead_grid_lon, dead_grid_area
   use dead_data_mod   , only : dead_grid_mask, dead_grid_frac, dead_grid_index
   use dead_mod        , only : dead_setnewgrid, dead_read_inparms
@@ -100,7 +100,7 @@ contains
     integer(IN)             :: CurrentTOD        ! model sec into model date
     integer(IN)             :: n                 ! index
     integer(IN)             :: nf                ! fields loop index
-    integer(IN)             :: ki                ! index of ifrac
+    integer(IN)             :: ki                ! index
     integer(IN)             :: lsize             ! size of AttrVect
     real(R8)                :: lat               ! latitude
     real(R8)                :: lon               ! longitude
@@ -179,15 +179,31 @@ contains
     selectcase(model)
     case('ice')
 
-       call shr_string_listGetIndex(flds_d2x, "Si_ifrac", ki)
+       ki = shr_string_listGetIndexF(flds_d2x, "Si_ifrac")
        d2x(ki,:) = min(1.0_R8,max(0.0_R8,d2x(ki,:)))
+
+       ki = shr_string_listGetIndexF(flds_d2x, "Si_imask")
+       d2x(ki,:) = float(nint(min(1.0_R8,max(0.0_R8,d2x(ki,:)))))
+
+    case('ocn')
+
+       ki = shr_string_listGetIndexF(flds_d2x, "So_omask")
+       d2x(ki,:) = float(nint(min(1.0_R8,max(0.0_R8,d2x(ki,:)))))
+
+    case('lnd')
+
+       ki = shr_string_listGetIndexF(flds_d2x, "Sl_lfrin")
+       d2x(ki,:) = 1.0_R8
 
     case('glc')
 
-       call shr_string_listGetIndex(flds_d2x, "Sg_icemask_coupled_fluxes", ki)
+       ki = shr_string_listGetIndexF(flds_d2x, "Sg_icemask")
        d2x(ki,:) = 1.0_R8
 
-       call shr_string_listGetIndex(flds_d2x, "Sg_ice_covered", ki)
+       ki = shr_string_listGetIndexF(flds_d2x, "Sg_icemask_coupled_fluxes")
+       d2x(ki,:) = 1.0_R8
+
+       ki = shr_string_listGetIndexF(flds_d2x, "Sg_ice_covered")
        d2x(ki,:) = 1.0_R8
 
     end select

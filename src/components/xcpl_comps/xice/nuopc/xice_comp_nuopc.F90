@@ -282,6 +282,8 @@ module xice_comp_nuopc
     gindex(:) = gbuf(:,dead_grid_index)
     lat(:)    = gbuf(:,dead_grid_lat)
     lon(:)    = gbuf(:,dead_grid_lon)
+    d2x(:,:)  = 0._r8
+    x2d(:,:)  = 0._r8
 
     if (nxg == 0 .and. nyg == 0) then
        ice_present = .true.

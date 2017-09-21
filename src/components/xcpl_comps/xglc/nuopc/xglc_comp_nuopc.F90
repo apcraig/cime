@@ -58,7 +58,7 @@ module xglc_comp_nuopc
   integer(IN)                :: mpicom               ! mpi communicator
   integer(IN)                :: my_task              ! my task in mpi communicator mpicom
   integer                    :: inst_index           ! number of current instance (ie. 1)
-  character(len=16)          :: inst_name            ! fullname of current instance (ie. "lnd_0001")
+  character(len=16)          :: inst_name            ! fullname of current instance (ie. "glc_0001")
   character(len=16)          :: inst_suffix = ""     ! char string associated with instance (ie. "_0001" or "")
   integer(IN)                :: logunit              ! logging unit number
   integer(IN),parameter      :: master_task=0        ! task number of master task
@@ -270,7 +270,7 @@ module xglc_comp_nuopc
     ! Initialize xglc
     !----------------------------------------------------------------------------
 
-    call dead_init_nuopc('ocn', mpicom, my_task, master_task, &
+    call dead_init_nuopc('glc', mpicom, my_task, master_task, &
          inst_index, inst_suffix, inst_name, logunit, lsize, gbuf, nxg, nyg)
 
     nflds_d2x = shr_string_listGetNum(seq_flds_g2x_fields)
@@ -285,6 +285,8 @@ module xglc_comp_nuopc
     gindex(:) = gbuf(:,dead_grid_index)
     lat(:)    = gbuf(:,dead_grid_lat)
     lon(:)    = gbuf(:,dead_grid_lon)
+    d2x(:,:)  = 0._r8
+    x2d(:,:)  = 0._r8
 
     if (nxg == 0 .and. nyg == 0) then
        glc_present = .false.
@@ -640,7 +642,7 @@ module xglc_comp_nuopc
     ! Run model
     !--------------------------------
 
-    call dead_run_nuopc('ocn', clock, x2d, d2x, gbuf, seq_flds_g2x_fields, my_task, master_task, logunit)
+    call dead_run_nuopc('glc', clock, x2d, d2x, gbuf, seq_flds_g2x_fields, my_task, master_task, logunit)
 
     !--------------------------------
     ! Pack export state
