@@ -21,6 +21,7 @@ module med_infodata_mod
   use seq_flds_mod, only: seq_flds_scalar_index_nextsw_cday
   use seq_flds_mod, only: seq_flds_scalar_index_atm_aero
   use seq_flds_mod, only: seq_flds_scalar_index_dead_comps
+  use shr_nuopc_methods_mod, only: shr_nuopc_methods_chkErr
 
   implicit none
 
@@ -169,21 +170,22 @@ CONTAINS
 
     call MPI_COMM_RANK(mpicom, mytask, rc)
     call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), itemType=itemType, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (itemType == ESMF_STATEITEM_NOTFOUND) then
       call ESMF_LogWrite(trim(subname)//": "//trim(seq_flds_scalar_name)//" not found", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
     else
       call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
       if (mytask == 0) then
         call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (size(data) < seq_flds_scalar_num .or. size(farrayptr) < seq_flds_scalar_num) then
           call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
         data(1:seq_flds_scalar_num) = farrayptr(1,1:seq_flds_scalar_num)
       endif
@@ -193,7 +195,7 @@ CONTAINS
         call MPI_ERROR_STRING(rc,lstring,len,ierr)
         call ESMF_LogWrite(trim(subname)//": ERROR "//trim(lstring), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
         rc = ESMF_FAILURE
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       endif
 
       if (type == 'atm2cpli') then
@@ -262,7 +264,7 @@ CONTAINS
       else
         call ESMF_LogWrite(trim(subname)//": ERROR in type = "//trim(type), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
         rc = ESMF_FAILURE
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       endif
 
     endif
@@ -298,7 +300,7 @@ CONTAINS
     call MPI_COMM_RANK(mpicom, mytask, rc)
 
     call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), itemType=itemType, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (itemType == ESMF_STATEITEM_NOTFOUND) then
 
@@ -307,16 +309,16 @@ CONTAINS
     else
 
       call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       if (mytask == 0) then
         call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (size(farrayptr) < seq_flds_scalar_num) then
           call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
 
         nextsw_cday = infodata%nextsw_cday
@@ -340,7 +342,7 @@ CONTAINS
         else
           call ESMF_LogWrite(trim(subname)//": ERROR in type = "//trim(type), ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
 
         farrayptr(1,seq_flds_scalar_index_phase) = phase
