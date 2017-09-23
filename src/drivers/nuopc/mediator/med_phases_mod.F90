@@ -96,15 +96,6 @@ module med_phases_mod
     !--- regrid field bundles
     !---------------------------------------
 
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compocn,compatm), value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(complnd,compatm), value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBAtmOcn_a, value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
     if (is_local%wrap%med_coupling_active(compocn,compatm)) then
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compocn,compatm), value=czero, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -115,6 +106,10 @@ module med_phases_mod
          patchmap=is_local%wrap%RH(compocn,compatm,mappatch), &
          string='o2a', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (dbug_flag > 1) then
+        call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compocn,compatm), trim(subname)//' FBImp(compocn,compatm) ', rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
 
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBAtmOcn_a, value=czero, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -125,9 +120,15 @@ module med_phases_mod
          patchmap=is_local%wrap%RH(compocn,compatm,mappatch), &
          string='o2aatmocn', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (dbug_flag > 1) then
+        call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtmOcn_a            , trim(subname)//' FBAtmOcn_a ', rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
     endif
 
     if (is_local%wrap%med_coupling_active(compice,compatm)) then
+      call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), rc=rc)) then
 
         !--- tcraig, need to weight the ice2atm regrid by the ice fraction
@@ -253,6 +254,10 @@ module med_phases_mod
            string='i2a', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       endif
+      if (dbug_flag > 1) then
+        call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compice,compatm), trim(subname)//' FBImp(compice,compatm) ', rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
     endif
 
     if (is_local%wrap%med_coupling_active(complnd,compatm)) then
@@ -265,13 +270,10 @@ module med_phases_mod
          patchmap=is_local%wrap%RH(complnd,compatm,mappatch), &
          string='l2a', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compocn,compatm), trim(subname)//' FBImp(compocn,compatm) ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compice,compatm), trim(subname)//' FBImp(compice,compatm) ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(complnd,compatm), trim(subname)//' FBImp(complnd,compatm) ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtmOcn_a            , trim(subname)//' FBAtmOcn_a ', rc=rc)
+      if (dbug_flag > 1) then
+        call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(complnd,compatm), trim(subname)//' FBImp(complnd,compatm) ', rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
     endif
 
     if (dbug_flag > 7 .and. statewrite_flag) then
@@ -829,6 +831,7 @@ module med_phases_mod
 
     if (dbug_flag > 7) then
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExpAccum(compocn), trim(subname)//' FBaccO_B4avg ', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     call shr_nuopc_methods_FB_average(is_local%wrap%FBExpAccum(compocn), is_local%wrap%FBExpAccumCnt(compocn), rc=rc)
@@ -836,6 +839,7 @@ module med_phases_mod
 
     if (dbug_flag > 5) then
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExpAccum(compocn), trim(subname)//' FBaccO_avg ', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     !---------------------------------------
@@ -855,6 +859,7 @@ module med_phases_mod
 
     if (dbug_flag > 5) then
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExpAccum(compocn), trim(subname)//' FBaccO_AFzero ', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     !---------------------------------------
@@ -1044,6 +1049,7 @@ module med_phases_mod
 
     if (dbug_flag > 1) then
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExp(compocn), trim(subname)//' FB4ocn_AFmrg ', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
     
 #endif
@@ -1058,6 +1064,7 @@ module med_phases_mod
 
     if (dbug_flag > 1) then
       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExpAccum(compocn), trim(subname)//' FBaccOcn_AFaccum ', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     !---------------------------------------

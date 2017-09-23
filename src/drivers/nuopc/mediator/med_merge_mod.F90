@@ -71,9 +71,15 @@ module med_merge_mod
     do n = 1,cnt
 
        if (present(FB1)) then
+       if (ESMF_FieldBundleIsCreated(FB1,rc=rc)) then
          if (present(FB1w) .and. present(fldw1)) then
-           call med_merge_fbx(FBout, n, FB1, FB1w, fldw1, document=ldocument, string=trim(lstring), rc=rc)
-           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           if (.not.ESMF_FieldBundleIsCreated(FB1w,rc=rc)) then
+             call ESMF_LogWrite(trim(subname)//": error FB1w not created", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+             rc = ESMF_FAILURE
+           else
+             call med_merge_fbx(FBout, n, FB1, FB1w, fldw1, document=ldocument, string=trim(lstring), rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           endif
          elseif ((present(FB1w) .and. .not.present(fldw1)) .or. &
                  (.not.present(FB1w) .and. present(fldw1))) then
            call ESMF_LogWrite(trim(subname)//": error FB1w and fldw1 both required", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
@@ -84,11 +90,18 @@ module med_merge_mod
            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
          endif
        endif
+       endif
 
        if (present(FB2)) then
+       if (ESMF_FieldBundleIsCreated(FB2,rc=rc)) then
          if (present(FB2w) .and. present(fldw2)) then
-           call med_merge_fbx(FBout, n, FB2, FB2w, fldw2, document=ldocument, string=trim(lstring), rc=rc)
-           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           if (.not.ESMF_FieldBundleIsCreated(FB2w,rc=rc)) then
+             call ESMF_LogWrite(trim(subname)//": error FB2w not created", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+             rc = ESMF_FAILURE
+           else
+             call med_merge_fbx(FBout, n, FB2, FB2w, fldw2, document=ldocument, string=trim(lstring), rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           endif
          elseif ((present(FB2w) .and. .not.present(fldw2)) .or. &
                  (.not.present(FB2w) .and. present(fldw2))) then
            call ESMF_LogWrite(trim(subname)//": error FB2w and fldw2 both required", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
@@ -99,11 +112,18 @@ module med_merge_mod
            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
          endif
        endif
+       endif
 
        if (present(FB3)) then
+       if (ESMF_FieldBundleIsCreated(FB3,rc=rc)) then
          if (present(FB3w) .and. present(fldw3)) then
-           call med_merge_fbx(FBout, n, FB3, FB3w, fldw3, document=ldocument, string=trim(lstring), rc=rc)
-           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           if (.not.ESMF_FieldBundleIsCreated(FB3w,rc=rc)) then
+             call ESMF_LogWrite(trim(subname)//": error FB3w not created", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+             rc = ESMF_FAILURE
+           else
+             call med_merge_fbx(FBout, n, FB3, FB3w, fldw3, document=ldocument, string=trim(lstring), rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           endif
          elseif ((present(FB3w) .and. .not.present(fldw3)) .or. &
                  (.not.present(FB3w) .and. present(fldw3))) then
            call ESMF_LogWrite(trim(subname)//": error FB3w and fldw3 both required", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
@@ -114,11 +134,18 @@ module med_merge_mod
            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
          endif
        endif
+       endif
 
        if (present(FB4)) then
+       if (ESMF_FieldBundleIsCreated(FB4,rc=rc)) then
          if (present(FB4w) .and. present(fldw4)) then
-           call med_merge_fbx(FBout, n, FB4, FB4w, fldw4, document=ldocument, string=trim(lstring), rc=rc)
-           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           if (.not.ESMF_FieldBundleIsCreated(FB4w,rc=rc)) then
+             call ESMF_LogWrite(trim(subname)//": error FB4w not created", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+             rc = ESMF_FAILURE
+           else
+             call med_merge_fbx(FBout, n, FB4, FB4w, fldw4, document=ldocument, string=trim(lstring), rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           endif
          elseif ((present(FB4w) .and. .not.present(fldw4)) .or. &
                  (.not.present(FB4w) .and. present(fldw4))) then
            call ESMF_LogWrite(trim(subname)//": error FB4w and fldw4 both required", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
@@ -129,11 +156,18 @@ module med_merge_mod
            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
          endif
        endif
+       endif
 
        if (present(FB5)) then
+       if (ESMF_FieldBundleIsCreated(FB5,rc=rc)) then
          if (present(FB5w) .and. present(fldw5)) then
-           call med_merge_fbx(FBout, n, FB5, FB5w, fldw5, document=ldocument, string=trim(lstring), rc=rc)
-           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           if (.not.ESMF_FieldBundleIsCreated(FB5w,rc=rc)) then
+             call ESMF_LogWrite(trim(subname)//": error FB5w not created", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+             rc = ESMF_FAILURE
+           else
+             call med_merge_fbx(FBout, n, FB5, FB5w, fldw5, document=ldocument, string=trim(lstring), rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           endif
          elseif ((present(FB5w) .and. .not.present(fldw5)) .or. &
                  (.not.present(FB5w) .and. present(fldw5))) then
            call ESMF_LogWrite(trim(subname)//": error FB5w and fldw5 both required", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
@@ -144,11 +178,18 @@ module med_merge_mod
            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
          endif
        endif
+       endif
 
        if (present(FB6)) then
+       if (ESMF_FieldBundleIsCreated(FB6,rc=rc)) then
          if (present(FB6w) .and. present(fldw6)) then
-           call med_merge_fbx(FBout, n, FB6, FB6w, fldw6, document=ldocument, string=trim(lstring), rc=rc)
-           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           if (.not.ESMF_FieldBundleIsCreated(FB6w,rc=rc)) then
+             call ESMF_LogWrite(trim(subname)//": error FB6w not created", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+             rc = ESMF_FAILURE
+           else
+             call med_merge_fbx(FBout, n, FB6, FB6w, fldw6, document=ldocument, string=trim(lstring), rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           endif
          elseif ((present(FB6w) .and. .not.present(fldw6)) .or. &
                  (.not.present(FB6w) .and. present(fldw6))) then
            call ESMF_LogWrite(trim(subname)//": error FB6w and fldw6 both required", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
@@ -158,6 +199,7 @@ module med_merge_mod
            call med_merge_fbx(FBout, n, FB6, document=ldocument, string=trim(lstring), rc=rc)
            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
          endif
+       endif
        endif
 
     enddo

@@ -105,7 +105,7 @@ module med_fraction_mod
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr(:)
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    integer                     :: i,j,n
+    integer                     :: i,j,n,n1
     character(len=*),parameter  :: subname='(med_fraction_init)'
     
     if (dbug_flag > 5) then
@@ -127,6 +127,14 @@ module med_fraction_mod
     !--- zero out FBfracs
     !---------------------------------------
 
+    do n1 = 1,ncomps
+      if (ESMF_FieldBundleIsCreated(is_local%wrap%FBfrac(n1),rc=rc)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBfrac(n1), value=czero, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+    enddo
+
+#if (1 == 0)
     call shr_nuopc_methods_FB_reset(is_local%wrap%FBfrac(compatm), value=czero, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_FB_reset(is_local%wrap%FBfrac(compocn), value=czero, rc=rc)
@@ -141,6 +149,7 @@ module med_fraction_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_FB_reset(is_local%wrap%FBfrac(compwav), value=czero, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+#endif
 
     !---------------------------------------
     !--- Initialize fractions on atm grid/decomp
@@ -342,20 +351,12 @@ module med_fraction_mod
     !--- check fractions
     !---------------------------------------
 
-    call med_fraction_check(is_local%wrap%FBfrac(compatm), 'atmfrac init', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call med_fraction_check(is_local%wrap%FBfrac(complnd), 'lndfrac init', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call med_fraction_check(is_local%wrap%FBfrac(compocn), 'ocnfrac init', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call med_fraction_check(is_local%wrap%FBfrac(compice), 'icefrac init', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call med_fraction_check(is_local%wrap%FBfrac(comprof), 'roffrac init', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call med_fraction_check(is_local%wrap%FBfrac(compglc), 'glcfrac init', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call med_fraction_check(is_local%wrap%FBfrac(compwav), 'wavfrac init', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    do n1 = 1,ncomps
+      if (ESMF_FieldBundleIsCreated(is_local%wrap%FBfrac(n1),rc=rc)) then
+        call med_fraction_check(is_local%wrap%FBfrac(n1), compname(n1)//'frac init', rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+    enddo
 
     !---------------------------------------
     !--- clean up

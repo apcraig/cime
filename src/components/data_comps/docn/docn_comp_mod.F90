@@ -83,9 +83,9 @@ module docn_comp_mod
 
   character(12),parameter  :: avofld(1:ktrans) = &
        (/ "Si_ifrac    ","Sa_pslv     ","So_duu10n   ","Foxx_taux   ","Foxx_tauy   ", &
-       "Foxx_swnet  ","Foxx_lat    ","Foxx_sen    ","Foxx_lwup   ","Faxa_lwdn   ", &
-       "Fioi_melth  ","Fioi_salt   ","Faxa_prec   ","Faxa_snow   ","Faxa_rain   ", &
-       "Foxx_evap   ","Fioi_meltw  ","Foxx_rofl   ","Foxx_rofi   ",                &
+       "Foxx_swnet  ","Foxx_lat    ","Foxx_sen    ","Foxx_lwup   ","Foxx_lwdn   ", &
+       "Foxx_melth  ","Foxx_salt   ","Foxx_prec   ","Foxx_snow   ","Foxx_rain   ", &
+       "Foxx_evap   ","Foxx_meltw  ","Foxx_rofl   ","Foxx_rofi   ",                &
        "So_t        ","So_u        ","So_v        ","So_dhdx     ","So_dhdy     ", &
        "So_s        ","Fioo_q      ","strm_h      ","strm_qbot   ","So_fswpen   "  /)
   !--------------------------------------------------------------------------
@@ -256,11 +256,11 @@ CONTAINS
 
     kswnet = mct_aVect_indexRA(x2o,'Foxx_swnet')
     klwup  = mct_aVect_indexRA(x2o,'Foxx_lwup')
-    klwdn  = mct_aVect_indexRA(x2o,'Faxa_lwdn')
+    klwdn  = mct_aVect_indexRA(x2o,'Foxx_lwdn')
     ksen   = mct_aVect_indexRA(x2o,'Foxx_sen')
     klat   = mct_aVect_indexRA(x2o,'Foxx_lat')
-    kmelth = mct_aVect_indexRA(x2o,'Fioi_melth')
-    ksnow  = mct_aVect_indexRA(x2o,'Faxa_snow')
+    kmelth = mct_aVect_indexRA(x2o,'Foxx_melth')
+    ksnow  = mct_aVect_indexRA(x2o,'Foxx_snow')
     krofi  = mct_aVect_indexRA(x2o,'Foxx_rofi')
 
     call mct_aVect_init(avstrm, rList=flds_strm, lsize=lsize)
