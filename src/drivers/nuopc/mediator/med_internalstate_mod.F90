@@ -43,16 +43,17 @@ module med_internalstate_mod
       'wav', &
       'glc' /)
 
+  ! tcraig, turned off glc2ocn and glc2ice for time being
   logical, parameter :: med_coupling_allowed(ncomps,ncomps) = &
    (/ .false., .false., .false., .false., .false., .false., .false., .false., &  ! med
       .false., .false., .true. , .true. , .true. , .false., .false., .false., &  ! atm
       .false., .true. , .false., .false., .false., .true. , .false., .true. , &  ! lnd
-      .false., .true. , .false., .false., .true. , .true. , .true. , .true. , &  ! ocn
-      .false., .true. , .false., .true. , .false., .true. , .false., .true. , &  ! ice
+      .false., .true. , .false., .false., .true. , .true. , .true. , .false., &  ! ocn
+      .false., .true. , .false., .true. , .false., .true. , .false., .false., &  ! ice
       .false., .false., .true. , .false., .false., .false., .false., .false., &  ! rof
       .false., .true. , .false., .true. , .true. , .false., .false., .false., &  ! wav
       .false., .false., .true. , .false., .false., .false., .false., .false.  /) ! glc
-!       med      atm      lnd      ocn      ice      rof      wav      gl
+!       med      atm      lnd      ocn      ice      rof      wav      glc
 
   !--- RH arrays ---
   integer, parameter :: nmappers=5

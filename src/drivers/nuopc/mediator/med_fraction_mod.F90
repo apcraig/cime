@@ -134,23 +134,6 @@ module med_fraction_mod
       endif
     enddo
 
-#if (1 == 0)
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBfrac(compatm), value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBfrac(compocn), value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBfrac(compice), value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBfrac(complnd), value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBfrac(comprof), value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBfrac(compglc), value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBfrac(compwav), value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-#endif
-
     !---------------------------------------
     !--- Initialize fractions on atm grid/decomp
     !---------------------------------------
