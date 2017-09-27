@@ -1,0 +1,34 @@
+###############################################
+####  esmApp Run-Time Configuration File  #####
+###############################################
+
+# Encoding a simple run sequence
+runSeq::
+    @3600             # 30min time step 
+      MED generate_xgrid
+      MED sfc_boundary_layer
+      MED -> ATM
+      MED -> OCN
+      MED -> LND
+      MED -> ICE
+      ATM
+      OCN
+      LND
+      ICE
+      ICE -> OCN
+      ATM -> MED
+      OCN -> MED
+      OCN -> ICE
+    @
+::
+
+# Attributes for components
+
+driverAttributes::
+  Verbosity = 0
+  Profiling = 1
+::
+
+ocnAttributes::
+  Verbosity = 0
+::
