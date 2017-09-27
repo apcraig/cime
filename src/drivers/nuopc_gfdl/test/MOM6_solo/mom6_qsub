@@ -15,7 +15,7 @@ export ESMF_RUNTIME_COMPLIANCECHECK=OFF
 
 source /etc/profile
 module use /scratch4/NCEPDEV/nems/save/Gerhard.Theurich/Modulefiles
-module load intel impi/5.1.1.109 netcdf esmf/7.1.0bs07-g-IMPI5.1.1.109
+module load intel impi/5.1.1.109 netcdf esmf/7.1.0bs29-IMPI5.1.1.109-PNetCDF1.5.0
 module list
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/apps/hdf5/1.8.14-intel/lib/
 
@@ -23,8 +23,9 @@ pwd
 
 echo "Model started:  " `date`
 
-#cp -r /scratch3/NCEPDEV/stmp1/Jiande.Wang/SIS2-GSM-MOM6-CFSv3-INPUT/INPUT_1x1/* ~/scratch/testrun4/
-#cp -r ~/scratch/testrun3 ~/scratch/testrun4
+rm -rf ~/scratch/testrun4/
+mkdir ~/scratch/testrun4/
+cp -r /scratch3/NCEPDEV/stmp1/Jiande.Wang/SIS2-GSM-MOM6-CFSv3-INPUT/INPUT_1x1/* ~/scratch/testrun4/
 cp /scratch4/NCEPDEV/ocean/noscrub/Fei.Liu/esmftest/xgrid/test2/MOM6_solo/esmApp ~/scratch/testrun4
 cp /scratch4/NCEPDEV/ocean/noscrub/Fei.Liu/esmftest/xgrid/test2/MOM6_solo/esmApp.runconfig ~/scratch/testrun4
 cd ~/scratch/testrun4

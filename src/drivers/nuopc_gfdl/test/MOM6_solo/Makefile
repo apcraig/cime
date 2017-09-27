@@ -53,7 +53,7 @@ esmApp: esmApp.o esm.o atm.o lnd.o ice.o med.o
 
 # module dependencies:
 esmApp.o: esm.o
-esm.o: atm.o ocn.o lnd.o ice.o med.o
+esm.o: atm.o lnd.o ice.o med.o
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------

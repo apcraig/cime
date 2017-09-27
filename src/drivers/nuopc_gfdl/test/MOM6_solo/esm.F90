@@ -192,7 +192,7 @@ module ESM
       
     ! SetServices for OCN
     call NUOPC_DriverAddComp(driver, "OCN", ocnSS, comp=child, &
-      petlist=(/4,5,6,7/), rc=rc)
+      rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -291,7 +291,7 @@ module ESM
 
     ! SetServices for MED
     call NUOPC_DriverAddComp(driver, "MED", medSS, comp=child, &
-      petlist=(/0,1,2,3/), rc=rc)
+      rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -411,19 +411,32 @@ module ESM
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-!    ! SetServices for lnd2med
-!    call NUOPC_DriverAddComp(driver, srcCompLabel="LND", dstCompLabel="MED", &
-!      compSetServicesRoutine=cplSS, comp=connector, rc=rc)
-!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!      line=__LINE__, &
-!      file=__FILE__)) &
-!      return  ! bail out
-!    call NUOPC_CompAttributeSet(connector, name="Verbosity", value="high", &
-!      rc=rc)
-!    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-!      line=__LINE__, &
-!      file=__FILE__)) &
-!      return  ! bail out
+    ! SetServices for lnd2med
+    call NUOPC_DriverAddComp(driver, srcCompLabel="LND", dstCompLabel="MED", &
+      compSetServicesRoutine=cplSS, comp=connector, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompAttributeSet(connector, name="Verbosity", value="high", &
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    ! SetServices for ice2med
+    call NUOPC_DriverAddComp(driver, srcCompLabel="ICE", dstCompLabel="MED", &
+      compSetServicesRoutine=cplSS, comp=connector, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompAttributeSet(connector, name="Verbosity", value="high", &
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
     ! SetServices for med2ocn
     call NUOPC_DriverAddComp(driver, srcCompLabel="MED", dstCompLabel="OCN", &
       compSetServicesRoutine=cplSS, comp=connector, rc=rc)
@@ -476,6 +489,19 @@ module ESM
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
+    ! SetServices for lnd2ice
+    call NUOPC_DriverAddComp(driver, srcCompLabel="LND", dstCompLabel="ICE", &
+      compSetServicesRoutine=cplSS, comp=connector, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
+    call NUOPC_CompAttributeSet(connector, name="Verbosity", value="high", &
+      rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      file=__FILE__)) &
+      return  ! bail out
     ! SetServices for ocn2ice
     call NUOPC_DriverAddComp(driver, srcCompLabel="OCN", dstCompLabel="ICE", &
       compSetServicesRoutine=cplSS, comp=connector, rc=rc)
@@ -511,13 +537,13 @@ module ESM
       file=__FILE__)) &
       return  ! bail out
 
-    call ESMF_TimeSet(startTime, yy=1, mm=1, dd=1, h=0, m=0, rc=rc)
+    call ESMF_TimeSet(startTime, yy=2010, mm=6, dd=1, h=0, m=0, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
 
-    call ESMF_TimeSet(stopTime, yy=1, mm=1, dd=2, h=0, m=0, rc=rc)
+    call ESMF_TimeSet(stopTime, yy=2010, mm=6, dd=6, h=0, m=0, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -600,7 +626,7 @@ module ESM
     integer, intent(out) :: rc
     
     rc = ESMF_SUCCESS
-
+  
     if (.not.NUOPC_FieldDictionaryHasEntry( &
       "air_density_height_lowest")) then
       call NUOPC_FieldDictionaryAddEntry( &

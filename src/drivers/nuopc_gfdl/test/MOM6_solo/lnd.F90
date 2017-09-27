@@ -9,6 +9,7 @@ module LND
   use NUOPC_Model, &
     model_routine_SS            => SetServices, &
     model_label_Advance         => label_Advance, &
+    model_label_CheckImport     => label_CheckImport, &
     model_label_SetRunClock     => label_SetRunClock, &
     model_routine_Run           => routine_Run
   
@@ -90,6 +91,13 @@ module LND
     call NUOPC_CompSpecialize(model, specLabel=model_label_SetRunClock, &
       specRoutine=SetRunClock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return  ! bail out
+    call ESMF_MethodRemove(model, model_label_CheckImport, rc=rc) 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, & 
+      line=__LINE__, file=__FILE__)) return  ! bail out 
+    call NUOPC_CompSpecialize(model, specLabel=model_label_CheckImport, & 
+      specRoutine=NUOPC_NoOp, rc=rc) 
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, & 
       line=__LINE__, file=__FILE__)) return  ! bail out
 
   end subroutine
