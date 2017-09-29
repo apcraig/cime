@@ -23,7 +23,9 @@ module med_phases_mod
   real(ESMF_KIND_R8), parameter :: spval       = med_constants_spval
   real(ESMF_KIND_R8), parameter :: czero       = med_constants_czero
   integer           , parameter :: ispval_mask = med_constants_ispval_mask
+  character(len=*)  , parameter :: ice_fraction_name = 'Si_ifrac'
   integer            :: dbrc
+  type(ESMF_FieldBundle) :: FBtmp1,FBtmp2
   character(*),parameter :: u_FILE_u = &
     __FILE__
 
@@ -55,13 +57,13 @@ module med_phases_mod
     type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    real(ESMF_KIND_R8), pointer :: ifrac_i(:)                   ! ice fraction on ice grid
+    real(ESMF_KIND_R8), pointer :: ifrac_i(:)                 ! ice fraction on ice grid
     real(ESMF_KIND_R8), pointer :: ifrac_af(:), ifrac_afr(:)  ! ice fraction on atm grid consf map
     real(ESMF_KIND_R8), pointer :: ifrac_ad(:), ifrac_adr(:)  ! ice fraction on atm grid consd map
     real(ESMF_KIND_R8), pointer :: ifrac_ab(:), ifrac_abr(:)  ! ice fraction on atm grid bilnr map
     real(ESMF_KIND_R8), pointer :: ifrac_ap(:), ifrac_apr(:)  ! ice fraction on atm grid patch map
     real(ESMF_KIND_R8), pointer :: ocnwgt(:),icewgt(:),customwgt(:)
-    integer                     :: i,j,n
+    integer                     :: i,j,n,n1,n2
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_atm)'
     
@@ -80,12 +82,6 @@ module med_phases_mod
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    !---------------------------------------
-
-    is_local%wrap%atmcntr = is_local%wrap%atmcntr + 1
-
-    !---------------------------------------
-
     call ESMF_ClockGet(clock,currtime=time,rc=rc)
     call ESMF_TimeGet(time,timestring=timestr)
     if (dbug_flag > 1) then
@@ -97,332 +93,206 @@ module med_phases_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !---------------------------------------
-    !--- this is fast, no accumulator needed
+    !--- mapping
     !---------------------------------------
 
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_FB_reset(is_local%wrap%FBAtm_a, value=czero, rc=rc)
-      call shr_nuopc_methods_FB_reset(is_local%wrap%FBOcn_o, value=czero, rc=rc)
-      call shr_nuopc_methods_FB_reset(is_local%wrap%FBIce_i, value=czero, rc=rc)
-      call shr_nuopc_methods_FB_reset(is_local%wrap%FBLnd_l, value=czero, rc=rc)
-      call shr_nuopc_methods_FB_reset(is_local%wrap%FBRof_r, value=czero, rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtm_a, trim(subname)//' FBAtm_a zero', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBOcn_o, trim(subname)//' FBOcn_o zero', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBIce_i, trim(subname)//' FBIce_i zero', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBLnd_l, trim(subname)//' FBLnd_l zero', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBRof_r, trim(subname)//' FBrof_r zero', rc=rc)
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_AtmImp, trim(subname)//' AtmImp ', rc=rc)
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_OcnImp, trim(subname)//' OcnImp ', rc=rc)
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_IceImp, trim(subname)//' IceImp ', rc=rc)
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_LndImp, trim(subname)//' LndImp ', rc=rc)
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_RofImp, trim(subname)//' RofImp ', rc=rc)
-    endif
+!tcraig, turn this off for ice2atm, use ice frac weighted mapping below
+    do n1 = 1,ncomps
+      n2 = compatm
+      if (n1/=compice .and. is_local%wrap%med_coupling_active(n1,n2)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), is_local%wrap%FBImp(n1,n1), is_local%wrap%FBImp(n1,n2), &
+           consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+           consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
+           bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
+           patchmap=is_local%wrap%RH(n1,n2,mappatch), &
+           string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (dbug_flag > 1) then
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        endif
+      endif
+    enddo
 
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBAtm_a, is_local%wrap%NState_AtmImp, rc=rc)
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBOcn_o, is_local%wrap%NState_OcnImp, rc=rc)
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBIce_i, is_local%wrap%NState_IceImp, rc=rc)
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBLnd_l, is_local%wrap%NState_LndImp, rc=rc)
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBRof_r, is_local%wrap%NState_RofImp, rc=rc)
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtm_a, trim(subname)//' FBAtm_a ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBOcn_o, trim(subname)//' FBOcn_o ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBIce_i, trim(subname)//' FBIce_i ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBLnd_l, trim(subname)//' FBLnd_l ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBRof_r, trim(subname)//' FBRof_r ', rc=rc)
-    endif
-
-    ! Regrid Full Field Bundles conservatively
-
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBOcn_a, value=czero, rc=rc)
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBIce_a, value=czero, rc=rc)
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBIce_if, value=czero, rc=rc)
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBLnd_a, value=czero, rc=rc)
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBAtmOcn_a, value=czero, rc=rc)
-
-    if (is_local%wrap%o2a_active) then
-      call shr_nuopc_methods_FB_Regrid(fldsFrOcn, is_local%wrap%FBOcn_o, is_local%wrap%FBOcn_a, &
-         consfmap=is_local%wrap%RH_o2a_consf, &
-         consdmap=is_local%wrap%RH_o2a_consd, &
-         bilnrmap=is_local%wrap%RH_o2a_bilnr, &
-         patchmap=is_local%wrap%RH_o2a_patch, &
-         string='o2a', rc=rc)
+    ! map FBAtmOcn_o to FBAtmOcn_a
+    if (is_local%wrap%med_coupling_active(compocn,compatm)) then
+      call shr_nuopc_methods_FB_reset(is_local%wrap%FBAtmOcn_a, value=czero, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
       call shr_nuopc_methods_FB_Regrid(fldsAtmOcn, is_local%wrap%FBAtmOcn_o, is_local%wrap%FBAtmOcn_a, &
-         consfmap=is_local%wrap%RH_o2a_consf, &
-         consdmap=is_local%wrap%RH_o2a_consd, &
-         bilnrmap=is_local%wrap%RH_o2a_bilnr, &
-         patchmap=is_local%wrap%RH_o2a_patch, &
+         consfmap=is_local%wrap%RH(compocn,compatm,mapconsf), &
+         consdmap=is_local%wrap%RH(compocn,compatm,mapconsd), &
+         bilnrmap=is_local%wrap%RH(compocn,compatm,mapbilnr), &
+         patchmap=is_local%wrap%RH(compocn,compatm,mappatch), &
          string='o2aatmocn', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (dbug_flag > 1) then
+        call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtmOcn_a            , trim(subname)//' FBAtmOcn_a ', rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
     endif
 
-    if (is_local%wrap%i2a_active) then
-      if (shr_nuopc_methods_FB_FldChk(is_local%wrap%FBIce_i, 'ice_fraction', rc=rc) .and. &
-          shr_nuopc_methods_FB_FldChk(is_local%wrap%FBIce_a, 'ice_fraction', rc=rc)) then
+    !---------------------------------------
+    !--- map ice to ocean with frac weighting
+    !---------------------------------------
+
+    if (is_local%wrap%med_coupling_active(compice,compatm)) then
+      call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), rc=rc)) then
+
         !--- tcraig, need to weight the ice2atm regrid by the ice fraction
         !--- need to compute weight by the frac mapped with the correct mapping
         !--- first compute the ice fraction on the atm grid for all active mappings
 
-        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_i, 'ice_fraction', fldptr1=dataPtr1, rc=rc)
+        call med_phases_map_frac(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), &
+                                 is_local%wrap%FBImp(compice,compatm), trim(ice_fraction_name), &
+                                 is_local%wrap%RH(compice,compatm,mapconsf), ifrac_af, ifrac_afr, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        allocate(ifrac_i (lbound(dataPtr1,1):ubound(dataPtr1,1)))
 
-        !--- conservative frac
-        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH_i2a_consf, rc=rc)) then
-          call shr_nuopc_methods_FB_FieldRegrid(is_local%wrap%FBIce_i,'ice_fraction', &
-                                       is_local%wrap%FBIce_a,'ice_fraction', &
-                                       is_local%wrap%RH_i2a_consf, rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call med_phases_map_frac(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), &
+                                 is_local%wrap%FBImp(compice,compatm), trim(ice_fraction_name), &
+                                 is_local%wrap%RH(compice,compatm,mapconsd), ifrac_ad, ifrac_adr, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          !--- copy out the ifrac on ice grid and ifrac on atm grid
-          call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', fldptr1=dataPtr2, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call med_phases_map_frac(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), &
+                                 is_local%wrap%FBImp(compice,compatm), trim(ice_fraction_name), &
+                                 is_local%wrap%RH(compice,compatm,mapbilnr), ifrac_ab, ifrac_abr, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          allocate(ifrac_afr(lbound(dataptr2,1):ubound(dataptr2,1)))
-          allocate(ifrac_af (lbound(dataptr2,1):ubound(dataptr2,1)))
+        call med_phases_map_frac(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), &
+                                 is_local%wrap%FBImp(compice,compatm), trim(ice_fraction_name), &
+                                 is_local%wrap%RH(compice,compatm,mappatch), ifrac_ap, ifrac_apr, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          do i=lbound(dataptr1,1),ubound(dataptr1,1)
-            ifrac_i(i) = dataPtr1(i)
-          enddo
+        !--- multiply FBImp(compice,compice) by ice_fraction
 
-          do i=lbound(dataptr2,1),ubound(dataptr2,1)
-            !--- compute ice fraction on atm grid and reciprocal
-            ifrac_af(i) = dataPtr2(i)
-            if (dataPtr2(i) == 0._ESMF_KIND_R8) then
-              ifrac_afr(i) = 1.0_ESMF_KIND_R8
-            else
-              ifrac_afr(i) = 1.0_ESMF_KIND_R8/dataPtr2(i)
+        call shr_nuopc_methods_FB_init(FBtmp1, fbgeom=is_local%wrap%FBImp(compice,compice), &
+          fbflds=is_local%wrap%FBImp(compice,compice), name='FBtmp1_ice_x_frac', rc=rc)
+        if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+        call shr_nuopc_methods_FB_reset(FBtmp1, value=czero, rc=rc)
+        if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+
+        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), fldptr1=dataPtr1, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        do n = 1,fldsFr(compice)%num
+          if (fldsFr(compice)%shortname(n) /= trim(ice_fraction_name) .and. &
+              shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compice), fldsFr(compice)%shortname(n), rc=rc) .and. &
+              shr_nuopc_methods_FB_FldChk(FBtmp1                              , fldsFr(compice)%shortname(n), rc=rc)) then
+            call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compice) , fldsFr(compice)%shortname(n), dataPtr3, rc=rc)
+            call shr_nuopc_methods_FB_GetFldPtr(FBtmp1                               , fldsFr(compice)%shortname(n), dataPtr4, rc=rc)
+            ! avoid non array fields like the scalars
+            if (lbound(dataptr1,1) == lbound(dataptr3,1) .and. ubound(dataptr1,1) == ubound(dataptr3,1)) then
+              do i=lbound(dataptr3,1),ubound(dataptr3,1)
+                dataPtr4(i) = dataPtr3(i) * dataPtr1(i)
+              enddo
             endif
-          enddo
-        endif
-
-        !--- conservative dst
-        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH_i2a_consd, rc=rc)) then
-          call shr_nuopc_methods_FB_FieldRegrid(is_local%wrap%FBIce_i,'ice_fraction', &
-                                       is_local%wrap%FBIce_a,'ice_fraction', &
-                                       is_local%wrap%RH_i2a_consd, rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          !--- copy out the ifrac on ice grid and ifrac on atm grid
-          call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', dataPtr2, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          allocate(ifrac_adr(lbound(dataptr2,1):ubound(dataptr2,1)))
-          allocate(ifrac_ad (lbound(dataptr2,1):ubound(dataptr2,1)))
-
-          do i=lbound(dataptr1,1),ubound(dataptr1,1)
-            ifrac_i(i) = dataPtr1(i)
-          enddo
-
-          do i=lbound(dataptr2,1),ubound(dataptr2,1)
-            !--- compute ice fraction on atm grid and reciprocal
-            ifrac_ad(i) = dataPtr2(i)
-            if (dataPtr2(i) == 0._ESMF_KIND_R8) then
-              ifrac_adr(i) = 1.0_ESMF_KIND_R8
-            else
-              ifrac_adr(i) = 1.0_ESMF_KIND_R8/dataPtr2(i)
-            endif
-          enddo
-        endif
-
-        !--- bilinear
-        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH_i2a_bilnr, rc=rc)) then
-          call shr_nuopc_methods_FB_FieldRegrid(is_local%wrap%FBIce_i,'ice_fraction', &
-                                       is_local%wrap%FBIce_a,'ice_fraction', &
-                                       is_local%wrap%RH_i2a_bilnr, rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          !--- copy out the ifrac on ice grid and ifrac on atm grid
-          call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', dataPtr2, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          allocate(ifrac_abr(lbound(dataptr2,1):ubound(dataptr2,1)))
-          allocate(ifrac_ab (lbound(dataptr2,1):ubound(dataptr2,1)))
-
-          do i=lbound(dataptr1,1),ubound(dataptr1,1)
-            ifrac_i(i) = dataPtr1(i)
-          enddo
-
-          do i=lbound(dataptr2,1),ubound(dataptr2,1)
-            !--- compute ice fraction on atm grid and reciprocal
-            ifrac_ab(i) = dataPtr2(i)
-            if (dataPtr2(i) == 0._ESMF_KIND_R8) then
-              ifrac_abr(i) = 1.0_ESMF_KIND_R8
-            else
-              ifrac_abr(i) = 1.0_ESMF_KIND_R8/dataPtr2(i)
-            endif
-          enddo
-        endif
-
-        !--- patch
-        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH_i2a_patch, rc=rc)) then
-          call shr_nuopc_methods_FB_FieldRegrid(is_local%wrap%FBIce_i,'ice_fraction', &
-                                       is_local%wrap%FBIce_a,'ice_fraction', &
-                                       is_local%wrap%RH_i2a_patch, rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          !--- copy out the ifrac on ice grid and ifrac on atm grid
-          call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', dataPtr2, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          allocate(ifrac_apr(lbound(dataptr2,1):ubound(dataptr2,1)))
-          allocate(ifrac_ap (lbound(dataptr2,1):ubound(dataptr2,1)))
-
-          do i=lbound(dataptr1,1),ubound(dataptr1,1)
-            ifrac_i(i) = dataPtr1(i)
-          enddo
-
-          do i=lbound(dataptr2,1),ubound(dataptr2,1)
-            !--- compute ice fraction on atm grid and reciprocal
-            ifrac_ap(i) = dataPtr2(i)
-            if (dataPtr2(i) == 0._ESMF_KIND_R8) then
-              ifrac_apr(i) = 1.0_ESMF_KIND_R8
-            else
-              ifrac_apr(i) = 1.0_ESMF_KIND_R8/dataPtr2(i)
-            endif
-          enddo
-        endif
-
-        !--- multiply FBIce_i by ifrac_i
-
-        do n = 1,fldsFrIce%num
-          if (shr_nuopc_methods_FB_FldChk(is_local%wrap%FBIce_i, fldsFrIce%shortname(n), rc=rc) .and. &
-              shr_nuopc_methods_FB_FldChk(is_local%wrap%FBIce_if,fldsFrIce%shortname(n), rc=rc)) then
-            call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_i , fldsFrIce%shortname(n), dataPtr3, rc=rc)
-            call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_if, fldsFrIce%shortname(n), dataPtr4, rc=rc)
-            do i=lbound(dataptr3,1),ubound(dataptr3,1)
-              dataPtr4(i) = dataPtr3(i) * ifrac_i(i)
-            enddo
           endif
         enddo
 
-        !--- regrid FBIce_if, fields with fraction multiplied
+        !--- regrid FBtmp1 = FBImp(compice,compice)*frac, fields with fraction multiplied
 
-        call shr_nuopc_methods_FB_Regrid(fldsFrIce, is_local%wrap%FBIce_if, is_local%wrap%FBIce_a, &
-           consfmap=is_local%wrap%RH_i2a_consf, &
-           consdmap=is_local%wrap%RH_i2a_consd, &
-           bilnrmap=is_local%wrap%RH_i2a_bilnr, &
-           patchmap=is_local%wrap%RH_i2a_patch, &
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call shr_nuopc_methods_FB_Regrid(fldsFr(compice), FBtmp1, is_local%wrap%FBImp(compice,compatm), &
+           consfmap=is_local%wrap%RH(compice,compatm,mapconsf), &
+           consdmap=is_local%wrap%RH(compice,compatm,mapconsd), &
+           bilnrmap=is_local%wrap%RH(compice,compatm,mapbilnr), &
+           patchmap=is_local%wrap%RH(compice,compatm,mappatch), &
            string='i2a', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call shr_nuopc_methods_FB_clean(FBtmp1, rc=rc)
+        if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
 
-        !--- divide FBIce_a by ifrac_a, interpolated ice fraction
-        !--- actually multiply by reciprocal of ifrac_a, ifrac_ar
+        !--- divide FBImp(compice,compatm) by ice_fraction, interpolated ice fraction
 
-        do n = 1,fldsFrIce%num
-          if (shr_nuopc_methods_FB_FldChk(is_local%wrap%FBIce_a, fldsFrIce%shortname(n), rc=rc)) then
-            call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_a, fldsFrIce%shortname(n), dataPtr3, rc=rc)
-            if (fldsFrIce%mapping(n) == "conservefrac") then
-              do i=lbound(dataptr3,1),ubound(dataptr3,1)
-                dataPtr3(i) = dataPtr3(i) * ifrac_afr(i)
-              enddo
-            elseif (fldsFrIce%mapping(n) == "conservedst") then
-              do i=lbound(dataptr3,1),ubound(dataptr3,1)
-                dataPtr3(i) = dataPtr3(i) * ifrac_adr(i)
-              enddo
-            elseif (fldsFrIce%mapping(n) == 'bilinear') then
-              do i=lbound(dataptr3,1),ubound(dataptr3,1)
-                dataPtr3(i) = dataPtr3(i) * ifrac_abr(i)
-              enddo
-            elseif (fldsFrIce%mapping(n) == 'patch') then
-              do i=lbound(dataptr3,1),ubound(dataptr3,1)
-                dataPtr3(i) = dataPtr3(i) * ifrac_apr(i)
-              enddo
-            else
-              call ESMF_LogWrite(trim(subname)//": mapping name error "//trim(fldsFrIce%mapping(n)), ESMF_LOGMSG_INFO, rc=rc)
-              rc=ESMF_FAILURE
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        do n = 1,fldsFr(compice)%num
+          if (fldsFr(compice)%shortname(n) /= trim(ice_fraction_name) .and. &
+              shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compatm), fldsFr(compice)%shortname(n), rc=rc)) then
+            call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compatm), fldsFr(compice)%shortname(n), dataPtr3, rc=rc)
+            ! avoid non array fields like the scalars
+            if (lbound(dataptr1,1) == lbound(dataptr3,1) .and. ubound(dataptr1,1) == ubound(dataptr3,1)) then
+              if (fldsFr(compice)%mapping(n) == "conservefrac") then
+                do i=lbound(dataptr3,1),ubound(dataptr3,1)
+                  dataPtr3(i) = dataPtr3(i) * ifrac_afr(i)
+                enddo
+              elseif (fldsFr(compice)%mapping(n) == "conservedst") then
+                do i=lbound(dataptr3,1),ubound(dataptr3,1)
+                  dataPtr3(i) = dataPtr3(i) * ifrac_adr(i)
+                enddo
+              elseif (fldsFr(compice)%mapping(n) == 'bilinear') then
+                do i=lbound(dataptr3,1),ubound(dataptr3,1)
+                  dataPtr3(i) = dataPtr3(i) * ifrac_abr(i)
+                enddo
+              elseif (fldsFr(compice)%mapping(n) == 'patch') then
+                do i=lbound(dataptr3,1),ubound(dataptr3,1)
+                  dataPtr3(i) = dataPtr3(i) * ifrac_apr(i)
+                enddo
+              else
+                call ESMF_LogWrite(trim(subname)//": mapping name error "//trim(fldsFr(compice)%mapping(n)), ESMF_LOGMSG_INFO, rc=rc)
+                rc=ESMF_FAILURE
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+              endif
             endif
           endif
         enddo
-        !--- make sure ifrac_a in the mapped bundle is correct
-        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_a, 'ice_fraction', dataPtr3, rc=rc)
-        do i=lbound(dataptr3,1),ubound(dataptr3,1)
-          dataPtr3(i) = ifrac_af(i)
-        enddo
 
-        deallocate(ifrac_i)
-        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH_i2a_consf, rc=rc)) &
+        !--- make sure ifrac_a in the mapped bundle is correct
+        !--- this is handled by ice_fraction_name check in the mult/divide phases to avoid ice_fraction weighting
+!        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compatm), trim(ice_fraction_name), dataPtr3, rc=rc)
+!        do i=lbound(dataptr3,1),ubound(dataptr3,1)
+!          dataPtr3(i) = ifrac_af(i)
+!        enddo
+
+        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH(compice,compatm,mapconsf), rc=rc)) &
           deallocate(ifrac_af, ifrac_afr)
-        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH_i2a_consd, rc=rc)) &
+        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH(compice,compatm,mapconsd), rc=rc)) &
           deallocate(ifrac_ad, ifrac_adr)
-        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH_i2a_bilnr, rc=rc)) &
+        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH(compice,compatm,mapbilnr), rc=rc)) &
           deallocate(ifrac_ab, ifrac_abr)
-        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH_i2a_patch, rc=rc)) &
+        if (ESMF_RouteHandleIsCreated(is_local%wrap%RH(compice,compatm,mappatch), rc=rc)) &
           deallocate(ifrac_ap, ifrac_apr)
 
       else
-        call shr_nuopc_methods_FB_Regrid(fldsFrIce, is_local%wrap%FBIce_i, is_local%wrap%FBIce_a, &
-           consfmap=is_local%wrap%RH_i2a_consf, &
-           consdmap=is_local%wrap%RH_i2a_consd, &
-           bilnrmap=is_local%wrap%RH_i2a_bilnr, &
-           patchmap=is_local%wrap%RH_i2a_patch, &
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call shr_nuopc_methods_FB_Regrid(fldsFr(compice), is_local%wrap%FBImp(compice,compice), is_local%wrap%FBImp(compice,compatm), &
+           consfmap=is_local%wrap%RH(compice,compatm,mapconsf), &
+           consdmap=is_local%wrap%RH(compice,compatm,mapconsd), &
+           bilnrmap=is_local%wrap%RH(compice,compatm,mapbilnr), &
+           patchmap=is_local%wrap%RH(compice,compatm,mappatch), &
            string='i2a', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       endif
-    endif
-
-    if (is_local%wrap%l2a_active) then
-      call shr_nuopc_methods_FB_Regrid(fldsFrLnd, is_local%wrap%FBLnd_l, is_local%wrap%FBLnd_a, &
-         consfmap=is_local%wrap%RH_l2a_consf, &
-         consdmap=is_local%wrap%RH_l2a_consd, &
-         bilnrmap=is_local%wrap%RH_l2a_bilnr, &
-         patchmap=is_local%wrap%RH_l2a_patch, &
-         string='l2a', rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBOcn_a, trim(subname)//' FBOcn_a ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBIce_a, trim(subname)//' FBIce_a ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBLnd_a, trim(subname)//' FBLnd_a ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtmOcn_a, trim(subname)//' FBAtmOcn_a ', rc=rc)
-    endif
-
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBforAtm, is_local%wrap%FBOcn_a, rc=rc)
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBforAtm, is_local%wrap%FBIce_a, rc=rc)
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBforAtm, is_local%wrap%FBLnd_a, rc=rc)
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBforAtm, is_local%wrap%FBAtmOcn_a, rc=rc)
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBforAtm, trim(subname)//' FBforAtm ', rc=rc)
-    endif
-
-    if (statewrite_flag) then
-      ! write the fields imported from ocn to file
-      if (is_local%wrap%o2a_active) then
-        call ESMF_FieldBundleWrite(is_local%wrap%FBOcn_a, 'fields_med_ocn_a.nc', &
-          singleFile=.true., overwrite=.true., timeslice=is_local%wrap%atmcntr, &
-          iofmt=ESMF_IOFMT_NETCDF, rc=rc)  
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      endif
-
-      if (is_local%wrap%i2a_active) then
-        call ESMF_FieldBundleWrite(is_local%wrap%FBIce_a, 'fields_med_ice_a.nc', &
-          singleFile=.true., overwrite=.true., timeslice=is_local%wrap%atmcntr, &
-          iofmt=ESMF_IOFMT_NETCDF, rc=rc)  
+      if (dbug_flag > 1) then
+        call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compice,compatm), trim(subname)//' FBImp(compice,compatm) ', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       endif
     endif
 
     !---------------------------------------
-    !--- custom calculations to atm
+    !--- auto merges 
     !---------------------------------------
 
-    call med_merge_auto(is_local%wrap%FBforAtm, &
-                    is_local%wrap%FBOcn_a   , is_local%wrap%FBfrac_a, 'ofrac', &
-                    is_local%wrap%FBAtmOcn_a, is_local%wrap%FBfrac_a, 'ofrac', &
-                    is_local%wrap%FBIce_a   , is_local%wrap%FBfrac_a, 'ifrac', &
-                    is_local%wrap%FBLnd_a   , is_local%wrap%FBfrac_a, 'lfrac', &
-                    document=first_call, rc=rc)
+    call shr_nuopc_methods_FB_reset(is_local%wrap%FBExp(compatm), value=czero, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
+    call med_merge_auto(is_local%wrap%FBExp(compatm), &
+                    is_local%wrap%FBImp(compocn,compatm)   , is_local%wrap%FBfrac(compatm), 'ofrac', &
+                    is_local%wrap%FBAtmOcn_a, is_local%wrap%FBfrac(compatm), 'ofrac', &
+                    is_local%wrap%FBImp(compice,compatm)   , is_local%wrap%FBfrac(compatm), 'ifrac', &
+                    is_local%wrap%FBImp(complnd,compatm)   , is_local%wrap%FBfrac(compatm), 'lfrac', &
+                    document=first_call, string=subname, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
+
+    !---------------------------------------
+    !--- custom calculations 
+    !---------------------------------------
 
 #if (1 == 0)
     !---  ocn and ice fraction for merges
 
-    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_a, 'Si_ifrac', icewgt, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compatm), 'Si_ifrac', icewgt, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     allocate(ocnwgt(lbound(icewgt,1):ubound(icewgt,1),lbound(icewgt,2):ubound(icewgt,2)))
     do j=lbound(icewgt,2),ubound(icewgt,2)
@@ -433,39 +303,9 @@ module med_phases_mod
 
     !--- merges
 
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforAtm  ,'surface_temperature' , & 
-                                  is_local%wrap%FBOcn_a   ,'sea_surface_temperature',ocnwgt, &
-                                  is_local%wrap%FBIce_a   ,'sea_ice_temperature',icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforAtm  ,'mean_sensi_heat_flx' , & 
-                                  is_local%wrap%FBAtmOcn_a,'mean_sensi_heat_flx_atm_into_ocn',ocnwgt, &
-                                  is_local%wrap%FBIce_a   ,'mean_sensi_heat_flx_atm_into_ice',icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforAtm  ,'mean_laten_heat_flx' , & 
-                                  is_local%wrap%FBAtmOcn_a,'mean_laten_heat_flx_atm_into_ocn',ocnwgt, &
-                                  is_local%wrap%FBIce_a   ,'mean_laten_heat_flx_atm_into_ice',icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforAtm  ,'mean_up_lw_flx' , & 
-                                  is_local%wrap%FBAtmOcn_a,'mean_up_lw_flx_ocn',ocnwgt, &
-                                  is_local%wrap%FBIce_a   ,'mean_up_lw_flx_ice',icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforAtm  ,'mean_evap_rate' , & 
-                                  is_local%wrap%FBAtmOcn_a,'mean_evap_rate_atm_into_ocn',ocnwgt, &
-                                  is_local%wrap%FBIce_a   ,'mean_evap_rate_atm_into_ice',icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforAtm  ,'mean_zonal_moment_flx' , & 
-                                  is_local%wrap%FBAtmOcn_a,'stress_on_air_ocn_zonal',ocnwgt, &
-                                  is_local%wrap%FBIce_a   ,'stress_on_air_ice_zonal',icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforAtm  ,'mean_merid_moment_flx' , & 
-                                  is_local%wrap%FBAtmOcn_a,'stress_on_air_ocn_merid',ocnwgt, &
-                                  is_local%wrap%FBIce_a   ,'stress_on_air_ice_merid',icewgt, rc=rc)
+    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBExp(compatm)  ,'surface_temperature' , & 
+                                  is_local%wrap%FBImp(compocn,compatm)   ,'sea_surface_temperature',ocnwgt, &
+                                  is_local%wrap%FBImp(compice,compatm)   ,'sea_ice_temperature',icewgt, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     deallocate(ocnwgt)
@@ -475,45 +315,8 @@ module med_phases_mod
     !--- update local scalar data
     !---------------------------------------
 
-#if (1 == 0)
-! tcraig test data
-    is_local%wrap%scalar_data(1) = 100._r8 + is_local%wrap%atmcntr
-    is_local%wrap%scalar_data(2) = 110._r8 + is_local%wrap%atmcntr
-#endif
+    !is_local%wrap%scalar_data(1) = 
 
-    !---------------------------------------
-    !--- set export State to special value for testing
-    !---------------------------------------
-
-    call shr_nuopc_methods_State_reset(is_local%wrap%NState_AtmExp, value=spval, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_AtmExp, trim(subname)//' AtmExp_99 ', rc=rc)
-    endif
-
-    !---------------------------------------
-    !--- copy into export state
-    !---------------------------------------
-
-    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_AtmExp, is_local%wrap%FBforAtm, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-#if (1 == 0)
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_AtmExp, trim(subname)//' AtmExp_final ', rc=rc)
-    endif
-
-    if (statewrite_flag) then
-      ! write the fields exported to atm to file
-      call NUOPC_Write(is_local%wrap%NState_AtmExp, &
-        fldsToAtm%shortname(1:fldsToAtm%num), &
-        "field_med_to_atm_", timeslice=is_local%wrap%atmcntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-#endif
-    
     !---------------------------------------
     !--- clean up
     !---------------------------------------
@@ -541,7 +344,7 @@ module med_phases_mod
     type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    integer                     :: i,j,n
+    integer                     :: i,j,n,n1,n2
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_ice)'
     
@@ -560,12 +363,6 @@ module med_phases_mod
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    !---------------------------------------
-
-    is_local%wrap%icecntr = is_local%wrap%icecntr + 1
-
-    !---------------------------------------
-
     call ESMF_ClockGet(clock,currtime=time,rc=rc)
     call ESMF_TimeGet(time,timestring=timestr)
     if (dbug_flag > 1) then
@@ -577,38 +374,52 @@ module med_phases_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !---------------------------------------
-    !--- set export State to special value for testing
+    !--- mapping
     !---------------------------------------
 
-    call shr_nuopc_methods_State_reset(is_local%wrap%NState_IceExp, value=spval, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_IceExp, trim(subname)//' IceExp_99 ', rc=rc)
-    endif
+    do n1 = 1,ncomps
+      n2 = compice
+      if (is_local%wrap%med_coupling_active(n1,n2)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), is_local%wrap%FBImp(n1,n1), is_local%wrap%FBImp(n1,n2), &
+           consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+           consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
+           bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
+           patchmap=is_local%wrap%RH(n1,n2,mappatch), &
+           string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (dbug_flag > 1) then
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        endif
+      endif
+    enddo
 
     !---------------------------------------
-    !--- copy into export state
+    !--- auto merges 
     !---------------------------------------
 
-    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_IceExp, is_local%wrap%FBforIce, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_reset(is_local%wrap%FBExp(compice), value=czero, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
+    call med_merge_auto(is_local%wrap%FBExp(compice), &
+                    FB1=is_local%wrap%FBImp(compocn,compice), FB1w=is_local%wrap%FBfrac(compice), fldw1='ofrac', &
+                    FB2=is_local%wrap%FBImp(compatm,compice), FB2w=is_local%wrap%FBfrac(compice), fldw2='afrac', &
+                    FB3=is_local%wrap%FBImp(compglc,compice), &
+                    FB4=is_local%wrap%FBImp(comprof,compice), &
+                    document=first_call, string=subname, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
 
-#if (1 == 0)
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_IceExp, trim(subname)//' IceExp_final ', rc=rc)
-    endif
+    !---------------------------------------
+    !--- custom calculations 
+    !---------------------------------------
 
-    if (statewrite_flag) then
-      ! write the fields exported to ice to file
-      call NUOPC_Write(is_local%wrap%NState_IceExp, &
-        fldsToIce%shortname(1:fldsToIce%num), &
-        "field_med_to_ice_", timeslice=is_local%wrap%icecntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-#endif
-    
+    !---------------------------------------
+    !--- update local scalar data
+    !---------------------------------------
+
+    !is_local%wrap%scalar_data(1) = 
+
     !---------------------------------------
     !--- clean up
     !---------------------------------------
@@ -637,7 +448,7 @@ module med_phases_mod
     type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    integer                     :: i,j,n
+    integer                     :: i,j,n,n1,n2
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_lnd)'
     
@@ -656,12 +467,6 @@ module med_phases_mod
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    !---------------------------------------
-
-    is_local%wrap%lndcntr = is_local%wrap%lndcntr + 1
-
-    !---------------------------------------
-
     call ESMF_ClockGet(clock,currtime=time,rc=rc)
     call ESMF_TimeGet(time,timestring=timestr)
     if (dbug_flag > 1) then
@@ -673,38 +478,51 @@ module med_phases_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !---------------------------------------
-    !--- set export State to special value for testing
+    !--- mapping
     !---------------------------------------
 
-    call shr_nuopc_methods_State_reset(is_local%wrap%NState_LndExp, value=spval, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_LndExp, trim(subname)//' LndExp_99 ', rc=rc)
-    endif
+    do n1 = 1,ncomps
+      n2 = complnd
+      if (is_local%wrap%med_coupling_active(n1,n2)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), is_local%wrap%FBImp(n1,n1), is_local%wrap%FBImp(n1,n2), &
+           consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+           consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
+           bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
+           patchmap=is_local%wrap%RH(n1,n2,mappatch), &
+           string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (dbug_flag > 1) then
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        endif
+      endif
+    enddo
 
     !---------------------------------------
-    !--- copy into export state
+    !--- auto merges 
     !---------------------------------------
 
-    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_LndExp, is_local%wrap%FBforLnd, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_reset(is_local%wrap%FBExp(complnd), value=czero, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
+    call med_merge_auto(is_local%wrap%FBExp(complnd), &
+                    FB1=is_local%wrap%FBImp(compatm,complnd), FB1w=is_local%wrap%FBfrac(complnd), fldw1='afrac', &
+                    FB2=is_local%wrap%FBImp(compglc,complnd), &
+                    FB3=is_local%wrap%FBImp(comprof,complnd), &
+                    document=first_call, string=subname, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
 
-#if (1 == 0)
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_LndExp, trim(subname)//' LndExp_final ', rc=rc)
-    endif
+    !---------------------------------------
+    !--- custom calculations 
+    !---------------------------------------
 
-    if (statewrite_flag) then
-      ! write the fields exported to lnd to file
-      call NUOPC_Write(is_local%wrap%NState_LndExp, &
-        fldsToLnd%shortname(1:fldsToLnd%num), &
-        "field_med_to_lnd_", timeslice=is_local%wrap%lndcntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-#endif
-    
+    !---------------------------------------
+    !--- update local scalar data
+    !---------------------------------------
+
+    !is_local%wrap%scalar_data(1) = 
+
     !---------------------------------------
     !--- clean up
     !---------------------------------------
@@ -733,7 +551,7 @@ module med_phases_mod
     type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    integer                     :: i,j,n
+    integer                     :: i,j,n,n1,n2
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_rof)'
     
@@ -752,12 +570,6 @@ module med_phases_mod
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    !---------------------------------------
-
-    is_local%wrap%rofcntr = is_local%wrap%rofcntr + 1
-
-    !---------------------------------------
-
     call ESMF_ClockGet(clock,currtime=time,rc=rc)
     call ESMF_TimeGet(time,timestring=timestr)
     if (dbug_flag > 1) then
@@ -769,38 +581,49 @@ module med_phases_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !---------------------------------------
-    !--- set export State to special value for testing
+    !--- mapping
     !---------------------------------------
 
-    call shr_nuopc_methods_State_reset(is_local%wrap%NState_RofExp, value=spval, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_RofExp, trim(subname)//' RofExp_99 ', rc=rc)
-    endif
+    do n1 = 1,ncomps
+      n2 = comprof
+      if (is_local%wrap%med_coupling_active(n1,n2)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), is_local%wrap%FBImp(n1,n1), is_local%wrap%FBImp(n1,n2), &
+           consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+           consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
+           bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
+           patchmap=is_local%wrap%RH(n1,n2,mappatch), &
+           string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (dbug_flag > 1) then
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        endif
+      endif
+    enddo
 
     !---------------------------------------
-    !--- copy into export state
+    !--- auto merges 
     !---------------------------------------
 
-    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_RofExp, is_local%wrap%FBforRof, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_reset(is_local%wrap%FBExp(comprof), value=czero, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
+    call med_merge_auto(is_local%wrap%FBExp(comprof), &
+                    is_local%wrap%FBImp(complnd,comprof), is_local%wrap%FBfrac(comprof), 'lfrac', &
+                    document=first_call, string=subname, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
 
-#if (1 == 0)
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_RofExp, trim(subname)//' RofExp_final ', rc=rc)
-    endif
+    !---------------------------------------
+    !--- custom calculations 
+    !---------------------------------------
 
-    if (statewrite_flag) then
-      ! write the fields exported to rof to file
-      call NUOPC_Write(is_local%wrap%NState_RofExp, &
-        fldsToRof%shortname(1:fldsToRof%num), &
-        "field_med_to_rof_", timeslice=is_local%wrap%rofcntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-#endif
-    
+    !---------------------------------------
+    !--- update local scalar data
+    !---------------------------------------
+
+    !is_local%wrap%scalar_data(1) = 
+
     !---------------------------------------
     !--- clean up
     !---------------------------------------
@@ -829,7 +652,7 @@ module med_phases_mod
     type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    integer                     :: i,j,n
+    integer                     :: i,j,n,n1,n2
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_wav)'
     
@@ -848,12 +671,6 @@ module med_phases_mod
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    !---------------------------------------
-
-    is_local%wrap%wavcntr = is_local%wrap%wavcntr + 1
-
-    !---------------------------------------
-
     call ESMF_ClockGet(clock,currtime=time,rc=rc)
     call ESMF_TimeGet(time,timestring=timestr)
     if (dbug_flag > 1) then
@@ -865,38 +682,51 @@ module med_phases_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !---------------------------------------
-    !--- set export State to special value for testing
+    !--- mapping
     !---------------------------------------
 
-    call shr_nuopc_methods_State_reset(is_local%wrap%NState_WavExp, value=spval, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_WavExp, trim(subname)//' WavExp_99 ', rc=rc)
-    endif
+    do n1 = 1,ncomps
+      n2 = compwav
+      if (is_local%wrap%med_coupling_active(n1,n2)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), is_local%wrap%FBImp(n1,n1), is_local%wrap%FBImp(n1,n2), &
+           consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+           consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
+           bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
+           patchmap=is_local%wrap%RH(n1,n2,mappatch), &
+           string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (dbug_flag > 1) then
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        endif
+      endif
+    enddo
 
     !---------------------------------------
-    !--- copy into export state
+    !--- auto merges 
     !---------------------------------------
 
-    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_WavExp, is_local%wrap%FBforWav, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_reset(is_local%wrap%FBExp(compwav), value=czero, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
+    call med_merge_auto(is_local%wrap%FBExp(compwav), &
+                    FB1=is_local%wrap%FBImp(compocn,compwav), &
+                    FB2=is_local%wrap%FBImp(compice,compwav), &
+                    FB3=is_local%wrap%FBImp(compatm,compwav), &
+                    document=first_call, string=subname, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
 
-#if (1 == 0)
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_WavExp, trim(subname)//' WavExp_final ', rc=rc)
-    endif
+    !---------------------------------------
+    !--- custom calculations 
+    !---------------------------------------
 
-    if (statewrite_flag) then
-      ! write the fields exported to wav to file
-      call NUOPC_Write(is_local%wrap%NState_WavExp, &
-        fldsToWav%shortname(1:fldsToWav%num), &
-        "field_med_to_wav_", timeslice=is_local%wrap%wavcntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-#endif
-    
+    !---------------------------------------
+    !--- update local scalar data
+    !---------------------------------------
+
+    !is_local%wrap%scalar_data(1) = 
+
     !---------------------------------------
     !--- clean up
     !---------------------------------------
@@ -925,7 +755,7 @@ module med_phases_mod
     type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    integer                     :: i,j,n
+    integer                     :: i,j,n,n1,n2
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_glc)'
     
@@ -944,12 +774,6 @@ module med_phases_mod
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    !---------------------------------------
-
-    is_local%wrap%glccntr = is_local%wrap%glccntr + 1
-
-    !---------------------------------------
-
     call ESMF_ClockGet(clock,currtime=time,rc=rc)
     call ESMF_TimeGet(time,timestring=timestr)
     if (dbug_flag > 1) then
@@ -961,38 +785,49 @@ module med_phases_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !---------------------------------------
-    !--- set export State to special value for testing
+    !--- mapping
     !---------------------------------------
 
-    call shr_nuopc_methods_State_reset(is_local%wrap%NState_GlcExp, value=spval, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_GlcExp, trim(subname)//' GlcExp_99 ', rc=rc)
-    endif
+    do n1 = 1,ncomps
+      n2 = compglc
+      if (is_local%wrap%med_coupling_active(n1,n2)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), is_local%wrap%FBImp(n1,n1), is_local%wrap%FBImp(n1,n2), &
+           consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+           consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
+           bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
+           patchmap=is_local%wrap%RH(n1,n2,mappatch), &
+           string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (dbug_flag > 1) then
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        endif
+      endif
+    enddo
 
     !---------------------------------------
-    !--- copy into export state
+    !--- auto merges 
     !---------------------------------------
 
-    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_GlcExp, is_local%wrap%FBforGlc, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_reset(is_local%wrap%FBExp(compglc), value=czero, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
+    call med_merge_auto(is_local%wrap%FBExp(compglc), &
+                    is_local%wrap%FBImp(complnd,compglc), is_local%wrap%FBfrac(compglc), 'lfrac', &
+                    document=first_call, string=subname, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
 
-#if (1 == 0)
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_GlcExp, trim(subname)//' GlcExp_final ', rc=rc)
-    endif
+    !---------------------------------------
+    !--- custom calculations 
+    !---------------------------------------
 
-    if (statewrite_flag) then
-      ! write the fields exported to glc to file
-      call NUOPC_Write(is_local%wrap%NState_GlcExp, &
-        fldsToGlc%shortname(1:fldsToGlc%num), &
-        "field_med_to_glc_", timeslice=is_local%wrap%glccntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-#endif
-    
+    !---------------------------------------
+    !--- update local scalar data
+    !---------------------------------------
+
+    !is_local%wrap%scalar_data(1) = 
+
     !---------------------------------------
     !--- clean up
     !---------------------------------------
@@ -1018,7 +853,7 @@ module med_phases_mod
     type(ESMF_State)            :: importState, exportState
     type(ESMF_StateItem_Flag)   :: itemType
     type(InternalState)         :: is_local
-    integer                     :: i,j,n
+    integer                     :: i,j,n,n1,n2
     character(ESMF_MAXSTR)      :: fieldname1(10),fieldname2(10),fieldname3(10)
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:)
     real(ESMF_KIND_R8), pointer :: atmwgt(:),icewgt(:),customwgt(:)
@@ -1041,12 +876,6 @@ module med_phases_mod
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    !---------------------------------------
-
-    is_local%wrap%ocncntr = is_local%wrap%ocncntr + 1
-
-    !---------------------------------------
-
     call ESMF_ClockGet(clock,currtime=time,rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_TimeGet(time,timestring=timestr)
@@ -1059,299 +888,48 @@ module med_phases_mod
       preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-#if (1 == 0)
-    if (statewrite_flag) then
-      ! write the fields imported from ocn to file
-      call NUOPC_Write(is_local%wrap%NState_OcnImp, &
-        fldsFrOcn%shortname(1:fldsFrOcn%num), &
-        "field_med_from_ocn_", timeslice=is_local%wrap%ocncntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-#endif
-
     !---------------------------------------
-    !--- average atm, ice, lnd accumulators
+    !--- average ocn accumulator
     !---------------------------------------
 
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumAtm, trim(subname)//' FBaccA_B4avg ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumIce, trim(subname)//' FBaccI_B4avg ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumLnd, trim(subname)//' FBaccL_B4avg ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumRof, trim(subname)//' FBaccH_B4avg ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumAtmOcn, trim(subname)//' FBaccAO_B4avg ', rc=rc)
-    endif
-
-    call shr_nuopc_methods_FB_average(is_local%wrap%FBaccumAtm, is_local%wrap%accumcntAtm, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_average(is_local%wrap%FBaccumIce, is_local%wrap%accumcntIce, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_average(is_local%wrap%FBaccumLnd, is_local%wrap%accumcntLnd, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_average(is_local%wrap%FBaccumRof, is_local%wrap%accumcntRof, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    
-    call shr_nuopc_methods_FB_average(is_local%wrap%FBaccumAtmOcn, is_local%wrap%accumcntAtmOcn, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumAtm, trim(subname)//' FBaccA_avg ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumIce, trim(subname)//' FBaccI_avg ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumLnd, trim(subname)//' FBaccL_avg ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumRof, trim(subname)//' FBaccH_avg ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumAtmOcn, trim(subname)//' FBaccAO_avg ', rc=rc)
-    endif
-
-    !---------------------------------------
-    !--- regrid average atm+ice+lnd+rof fields to ocean grid
-    !---------------------------------------
-
-    if (is_local%wrap%a2o_active) then
-      call ESMF_LogWrite(trim(subname)//' calling FBRegrid FBaccumAtm to FBAtm_o', ESMF_LOGMSG_INFO, rc=rc)
-      call shr_nuopc_methods_FB_Regrid(fldsFrAtm, is_local%wrap%FBaccumAtm, is_local%wrap%FBAtm_o, &
-        consfmap=is_local%wrap%RH_a2o_consf, &
-        consdmap=is_local%wrap%RH_a2o_consd, &
-        bilnrmap=is_local%wrap%RH_a2o_bilnr, &
-        patchmap=is_local%wrap%RH_a2o_patch, &
-        string='a2o', rc=rc)
+    if (dbug_flag > 7) then
+      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExpAccum(compocn), trim(subname)//' FBaccO_B4avg ', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
-    if (is_local%wrap%i2o_active) then
-      call ESMF_LogWrite(trim(subname)//' calling FBRegrid FBaccumIce to FBIce_o', ESMF_LOGMSG_INFO, rc=rc)
-      call shr_nuopc_methods_FB_Regrid(fldsFrIce, is_local%wrap%FBaccumIce, is_local%wrap%FBIce_o, &
-        consfmap=is_local%wrap%RH_i2o_consf, &
-        consdmap=is_local%wrap%RH_i2o_consd, &
-        bilnrmap=is_local%wrap%RH_i2o_bilnr, &
-        patchmap=is_local%wrap%RH_i2o_patch, &
-        fcopymap=is_local%wrap%RH_i2o_fcopy, &
-        string='i2o', rc=rc)
+    call shr_nuopc_methods_FB_average(is_local%wrap%FBExpAccum(compocn), is_local%wrap%FBExpAccumCnt(compocn), rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (dbug_flag > 5) then
+      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExpAccum(compocn), trim(subname)//' FBaccO_avg ', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtm_o, trim(subname)//' FBAtm_o ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBIce_o, trim(subname)//' FBIce_o ', rc=rc)
-    endif
-
-! tcx Xgrid
-    ! XGrid intermediary required? instantiate FBXgrid FieldBundle?
-    ! call ESMF_FieldBundleRegrid(is_local%wrap%FBaccumAtm, FBXgrid, is_local%wrap%RHa2x, &
-    !    termorderflag=(/ESMF_TERMORDER_SRCSEQ/), rc=rc)
-    ! call ESMF_FieldBundleRegrid(FBXgrid, is_local%wrap%FBforOcn  , is_local%wrap%RHx2o, &
-    !    termorderflag=(/ESMF_TERMORDER_SRCSEQ/), rc=rc)
-    ! tcraig temporarily copy
-    
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBforOcn, is_local%wrap%FBAtm_o, rc=rc)
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBforOcn, is_local%wrap%FBIce_o, rc=rc)
-    call shr_nuopc_methods_FB_copy(is_local%wrap%FBforOcn, is_local%wrap%FBAccumAtmOcn, rc=rc)
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBforOcn, trim(subname)//' FB4ocn_AFregrid ', rc=rc)
-    endif
-
     !---------------------------------------
-    !--- custom calculations to ocn
+    !--- copy to FBExp(compocn)
     !---------------------------------------
 
-!    if (dbug_flag > 1) then
-!      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBforOcn, trim(subname)//' FB4ocn_AFcc ', rc=rc)
-!    endif
-
-    !---------------------------------------
-    !--- merges to ocn
-    !---------------------------------------
-
-#if (1 == 0)
-
-    ! atm and ice fraction
-    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBIce_o, 'ice_fraction', icewgt, rc=rc)
+    call shr_nuopc_methods_FB_copy(is_local%wrap%FBExp(compocn), is_local%wrap%FBExpAccum(compocn), rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    allocate(atmwgt(lbound(icewgt,1):ubound(icewgt,1),lbound(icewgt,2):ubound(icewgt,2)))
-    allocate(customwgt(lbound(icewgt,1):ubound(icewgt,1),lbound(icewgt,2):ubound(icewgt,2)))
-    do j=lbound(icewgt,2),ubound(icewgt,2)
-    do i=lbound(icewgt,1),ubound(icewgt,1)
-      atmwgt = 1.0_ESMF_KIND_R8 - icewgt
-    enddo
-    enddo
-
-    !-------------
-    ! mean_evap_rate = mean_laten_heat_flux * (1-ice_fraction)/const_lhvap
-    !-------------
-
-!    customwgt = atmwgt / const_lhvap
-!    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn,'mean_evap_rate' , & 
-!                                  is_local%wrap%FBAtm_o, 'mean_laten_heat_flux' ,customwgt, rc=rc)
-!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !-------------
-    ! field_for_ocn = field_from_atm * (1-ice_fraction)
-    !-------------
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn,'mean_fprec_rate' , & 
-                                  is_local%wrap%FBAtm_o, 'mean_fprec_rate' ,atmwgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn,'mean_down_lw_flx' , & 
-                                  is_local%wrap%FBAtm_o, 'mean_down_lw_flx' ,atmwgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn     ,'mean_evap_rate' , & 
-                                  is_local%wrap%FBAccumAtmOcn,'mean_evap_rate_atm_into_ocn' ,atmwgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn     ,'mean_laten_heat_flx' , & 
-                                  is_local%wrap%FBAccumAtmOcn,'mean_laten_heat_flx_atm_into_ocn' ,atmwgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn     ,'mean_net_lw_flx' , & 
-                                  is_local%wrap%FBAtm_o      ,'mean_down_lw_flx  ' ,atmwgt, &
-                                  is_local%wrap%FBAccumAtmOcn,'mean_up_lw_flx_ocn' ,atmwgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn     ,'mean_up_lw_flx' , & 
-                                  is_local%wrap%FBAccumAtmOcn,'mean_up_lw_flx_ocn' ,atmwgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !-------------
-    ! field_for_ocn = field_from_atm * (1-ice_fraction) + field_from_ice * (ice_fraction)
-    !-------------
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn,'mean_prec_rate' , & 
-                                  is_local%wrap%FBAtm_o, 'mean_prec_rate' ,atmwgt, &
-                                  is_local%wrap%FBIce_o, 'mean_fresh_water_to_ocean_rate', icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn     ,'mean_sensi_heat_flx' , & 
-                                  is_local%wrap%FBAccumAtmOcn,'mean_sensi_heat_flx_atm_into_ocn' ,atmwgt, &
-                                  is_local%wrap%FBIce_o      ,'net_heat_flx_to_ocn', icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn  ,'mean_zonal_moment_flx' , & 
-                                  is_local%wrap%FBAccumAtmOcn,'stress_on_air_ocn_zonal',atmwgt, &
-                                  is_local%wrap%FBIce_o   ,'stress_on_ocn_ice_zonal',icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn  ,'mean_merid_moment_flx' , & 
-                                  is_local%wrap%FBAccumAtmOcn,'stress_on_air_ocn_merid',atmwgt, &
-                                  is_local%wrap%FBIce_o   ,'stress_on_ocn_ice_merid',icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !-------------
-    ! netsw_for_ocn = downsw_from_atm * (1-ocn_albedo) * (1-ice_fraction) + pensw_from_ice * (ice_fraction)
-    !-------------
-
-    customwgt = atmwgt * (1.0 - 0.06)
-!    customwgt = (1.0 - 0.06)
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn,'mean_net_sw_vis_dir_flx' , & 
-                                  is_local%wrap%FBAtm_o ,'mean_down_sw_vis_dir_flx',customwgt, &
-                                  is_local%wrap%FBIce_o ,'mean_net_sw_vis_dir_flx' ,icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn,'mean_net_sw_vis_dif_flx' , & 
-                                  is_local%wrap%FBAtm_o ,'mean_down_sw_vis_dif_flx',customwgt, &
-                                  is_local%wrap%FBIce_o ,'mean_net_sw_vis_dif_flx',icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn,'mean_net_sw_ir_dir_flx' , & 
-                                  is_local%wrap%FBAtm_o ,'mean_down_sw_ir_dir_flx',customwgt, &
-                                  is_local%wrap%FBIce_o ,'mean_net_sw_ir_dir_flx',icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBforOcn,'mean_net_sw_ir_dif_flx' , & 
-                                  is_local%wrap%FBAtm_o ,'mean_down_sw_ir_dif_flx',customwgt, &
-                                  is_local%wrap%FBIce_o ,'mean_net_sw_ir_dif_flx',icewgt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !-------------
-    ! End merges
-    !-------------
-
-    deallocate(atmwgt,customwgt)
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBforOcn, trim(subname)//' FB4ocn_AFmrg ', rc=rc)
-    endif
-    
-#endif
 
     !---------------------------------------
     !--- zero accumulator
     !---------------------------------------
 
-    is_local%wrap%accumcntAtm = 0
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumAtm, value=czero, rc=rc)
+    is_local%wrap%FBExpAccumCnt(compocn) = 0
+    call shr_nuopc_methods_FB_reset(is_local%wrap%FBExpAccum(compocn), value=czero, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    is_local%wrap%accumcntIce = 0
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumIce, value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    is_local%wrap%accumcntLnd = 0
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumLnd, value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    is_local%wrap%accumcntRof = 0
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumRof, value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    is_local%wrap%accumcntAtmOcn = 0
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBaccumAtmOcn, value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (dbug_flag > 1) then
-!tcx      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumAtm, trim(subname)//' FBacc_AFzero ', rc=rc)
-!tcx      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumIce, trim(subname)//' FBacc_AFzero ', rc=rc)
-!dcr      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumLnd, trim(subname)//' FBacc_AFzero ', rc=rc)
-!dcr      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumRof, trim(subname)//' FBacc_AFzero ', rc=rc)
-!tcx      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumAtmOcn, trim(subname)//' FBacc_AFzero ', rc=rc)
+    if (dbug_flag > 5) then
+      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExpAccum(compocn), trim(subname)//' FBaccO_AFzero ', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     !---------------------------------------
     !--- update local scalar data
     !---------------------------------------
 
-#if (1 == 0)
-! tcraig test data
-    is_local%wrap%scalar_data(1) = 200._r8 + is_local%wrap%ocncntr
-    is_local%wrap%scalar_data(2) = 210._r8 + is_local%wrap%ocncntr
-#endif
-
-    !---------------------------------------
-    !--- set export State to special value for testing
-    !---------------------------------------
-
-    call shr_nuopc_methods_State_reset(is_local%wrap%NState_OcnExp, value=spval, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_OcnExp, trim(subname)//' es_AF99 ', rc=rc)
-    endif
-
-    !---------------------------------------
-    !--- copy into export state
-    !---------------------------------------
-
-    call shr_nuopc_methods_FB_copy(is_local%wrap%NState_OcnExp, is_local%wrap%FBforOcn, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_OcnExp, trim(subname)//' es_AFcp ', rc=rc)
-    endif
-
-#if (1 == 0)
-    if (statewrite_flag) then
-      ! write the fields exported to ocn to file
-      call NUOPC_Write(is_local%wrap%NState_OcnExp, &
-        fldsToOcn%shortname(1:fldsToOcn%num), &
-        "field_med_to_ocn_", timeslice=is_local%wrap%ocncntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-#endif
+    !is_local%wrap%scalar_data(1) = 
 
     !---------------------------------------
     !--- clean up
@@ -1378,7 +956,7 @@ module med_phases_mod
     character(len=64)           :: timestr
     type(ESMF_State)            :: importState, exportState
     type(InternalState)         :: is_local
-    integer                     :: i,j,n
+    integer                     :: i,j,n,n1,n2
     logical,save                :: first_call = .true.
     character(len=*),parameter :: subname='(med_phases_accum_fast)'
     
@@ -1409,80 +987,108 @@ module med_phases_mod
       preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+    !---------------------------------------
+    !--- mapping
+    !---------------------------------------
+
+    do n1 = 1,ncomps
+      n2 = compocn
+      if (is_local%wrap%med_coupling_active(n1,n2)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), is_local%wrap%FBImp(n1,n1), is_local%wrap%FBImp(n1,n2), &
+           consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+           consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
+           bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
+           patchmap=is_local%wrap%RH(n1,n2,mappatch), &
+           string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (dbug_flag > 1) then
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        endif
+      endif
+    enddo
+
+    !---------------------------------------
+    !--- flux calculation (tcx maybe should be separate phase?)
+    !---------------------------------------
+
+    !call flux_calc(is_local%wrap%FBAtmOcn_o, rc=rc)
+
+    !---------------------------------------
+    !--- auto merges to ocn
+    !---------------------------------------
+
+    call shr_nuopc_methods_FB_reset(is_local%wrap%FBExp(compocn), value=czero, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
+    call med_merge_auto(is_local%wrap%FBExp(compocn), &
+                    FB1=is_local%wrap%FBImp(compatm,compocn)   , FB1w=is_local%wrap%FBfrac(compocn), fldw1='afrac', &
+                    FB2=is_local%wrap%FBAtmOcn_o               , FB2w=is_local%wrap%FBfrac(compocn), fldw2='afrac', &
+                    FB3=is_local%wrap%FBImp(compice,compocn)   , FB3w=is_local%wrap%FBfrac(compocn), fldw3='ifrac', &
+                    FB4=is_local%wrap%FBImp(comprof,compocn)   , &
+                    FB5=is_local%wrap%FBImp(compglc,compocn)   , &
+                    document=first_call, string=subname, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return                                            
+
+    !---------------------------------------
+    !--- custom calculations to ocn
+    !---------------------------------------
+
 #if (1 == 0)
-    if (statewrite_flag) then
-      ! write the fields imported from atm to file
-      call NUOPC_Write(is_local%wrap%NState_AtmImp, &
-        fldsFrAtm%shortname(1:fldsFrAtm%num), &
-        "field_med_from_atm_", timeslice=is_local%wrap%atmcntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      ! write the fields imported from ice to file
-      call NUOPC_Write(is_local%wrap%NState_IceImp, &
-        fldsFrIce%shortname(1:fldsFrIce%num), &
-        "field_med_from_ice_", timeslice=is_local%wrap%atmcntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    ! atm and ice fraction
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compocn), trim(ice_fraction_name), icewgt, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    allocate(atmwgt(lbound(icewgt,1):ubound(icewgt,1),lbound(icewgt,2):ubound(icewgt,2)))
+    allocate(customwgt(lbound(icewgt,1):ubound(icewgt,1),lbound(icewgt,2):ubound(icewgt,2)))
+    do j=lbound(icewgt,2),ubound(icewgt,2)
+    do i=lbound(icewgt,1),ubound(icewgt,1)
+      atmwgt = 1.0_ESMF_KIND_R8 - icewgt
+    enddo
+    enddo
 
-      ! write the fields imported from lnd to file
-      call NUOPC_Write(is_local%wrap%NState_LndImp, &
-        fieldNameList=fldsFrLnd%shortname(1:fldsFrLnd%num), &
-        fileNamePrefix="field_med_from_lnd_", timeslice=is_local%wrap%atmcntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    !-------------
+    ! mean_evap_rate = mean_laten_heat_flux * (1-ice_fraction)/const_lhvap
+    !-------------
 
-      ! write the fields imported from rof to file
-      call NUOPC_Write(is_local%wrap%NState_RofImp, &
-        fieldNameList=fldsFrRof%shortname(1:fldsFrRof%num), &
-        fileNamePrefix="field_med_from_rof_", timeslice=is_local%wrap%atmcntr, &
-        overwrite=.true., relaxedFlag=.true., rc=rc)
+!    customwgt = atmwgt / const_lhvap
+!    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBExp(compocn),'mean_evap_rate' , & 
+!                                  is_local%wrap%FBImp(compatm,compocn), 'mean_laten_heat_flux' ,customwgt, rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !-------------
+    ! field_for_ocn = field_from_atm * (1-ice_fraction)
+    !-------------
+
+    call shr_nuopc_methods_FB_FieldMerge(is_local%wrap%FBExp(compocn),'mean_fprec_rate' , & 
+                                  is_local%wrap%FBImp(compatm,compocn), 'mean_fprec_rate' ,atmwgt, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !-------------
+    ! End merges
+    !-------------
+
+    deallocate(atmwgt,customwgt)
+
+    if (dbug_flag > 1) then
+      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExp(compocn), trim(subname)//' FB4ocn_AFmrg ', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
+    
 #endif
 
     !---------------------------------------
-    !--- atm, ice, lnd, rof accumulator for ocean
+    !--- ocean accumulator
     !---------------------------------------
 
-    if (dbug_flag > 1) then
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_AtmImp, trim(subname)//' AtmImp ', rc=rc)
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_IceImp, trim(subname)//' IceImp ', rc=rc)
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_LndImp, trim(subname)//' LndImp ', rc=rc)
-      call shr_nuopc_methods_State_diagnose(is_local%wrap%NState_RofImp, trim(subname)//' RofImp ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumAtm, trim(subname)//' FBaccAtm_B4accum ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumIce, trim(subname)//' FBaccIce_B4accum ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumLnd, trim(subname)//' FBaccLnd_B4accum ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumRof, trim(subname)//' FBaccRof_B4accum ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumAtmOcn, trim(subname)//' FBaccAtmOcn_B4accum ', rc=rc)
-    endif
-
-    call shr_nuopc_methods_FB_accum(is_local%wrap%FBaccumAtm, is_local%wrap%NState_AtmImp, rc=rc)
+    call shr_nuopc_methods_FB_accum(is_local%wrap%FBExpAccum(compocn), is_local%wrap%FBExp(compocn), rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    is_local%wrap%accumcntAtm = is_local%wrap%accumcntAtm + 1
-
-    call shr_nuopc_methods_FB_accum(is_local%wrap%FBaccumIce, is_local%wrap%NState_IceImp, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    is_local%wrap%accumcntIce = is_local%wrap%accumcntIce + 1
-
-    call shr_nuopc_methods_FB_accum(is_local%wrap%FBaccumLnd, is_local%wrap%NState_LndImp, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    is_local%wrap%accumcntLnd = is_local%wrap%accumcntLnd + 1
-
-    call shr_nuopc_methods_FB_accum(is_local%wrap%FBaccumRof, is_local%wrap%NState_RofImp, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    is_local%wrap%accumcntRof = is_local%wrap%accumcntRof + 1
-
-    call shr_nuopc_methods_FB_accum(is_local%wrap%FBaccumAtmOcn, is_local%wrap%FBAtmOcn_o, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    is_local%wrap%accumcntAtmOcn = is_local%wrap%accumcntAtmOcn + 1
+    is_local%wrap%FBExpAccumCnt(compocn) = is_local%wrap%FBExpAccumCnt(compocn) + 1
 
     if (dbug_flag > 1) then
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumAtm, trim(subname)//' FBaccAtm_AFaccum ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumIce, trim(subname)//' FBaccIce_AFaccum ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumLnd, trim(subname)//' FBaccLnd_AFaccum ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumRof, trim(subname)//' FBaccRof_AFaccum ', rc=rc)
-      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBaccumAtmOcn, trim(subname)//' FBaccAtmOcn_AFaccum ', rc=rc)
+      call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExpAccum(compocn), trim(subname)//' FBaccOcn_AFaccum ', rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     !---------------------------------------
@@ -1498,6 +1104,56 @@ module med_phases_mod
   end subroutine med_phases_accum_fast
 
   !-----------------------------------------------------------------------------
+
+  subroutine med_phases_map_frac(FBin, fldin, FBout, fldout, RH, iarr, iarr_r, rc)
+
+    type(ESMF_FieldBundle) :: FBin            ! input FB
+    character(len=*)       :: fldin           ! input fieldname
+    type(ESMF_FieldBundle) :: FBout           ! output FB
+    character(len=*)       :: fldout          ! output fieldname
+    type(ESMF_RouteHandle) :: RH              ! RH
+    real(ESMF_KIND_R8), pointer :: iarr(:)    ! mapped field
+    real(ESMF_KIND_R8), pointer :: iarr_r(:)  ! reciprical of mapped field
+    integer :: rc                             ! return code
+
+    ! local
+    integer :: i
+    real(ESMF_KIND_R8), pointer :: dataPtr2(:)
+    character(len=*),parameter :: subname='(med_phases_map_frac)'
+    
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    if (ESMF_RouteHandleIsCreated(RH, rc=rc)) then
+      call shr_nuopc_methods_FB_FieldRegrid(FBin, fldin, FBout, fldout, RH, rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !--- copy out the ifrac on ice grid and ifrac on atm grid
+      call shr_nuopc_methods_FB_GetFldPtr(FBout, fldout, fldptr1=dataPtr2, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      allocate(iarr(lbound(dataptr2,1):ubound(dataptr2,1)))
+      allocate(iarr_r(lbound(dataptr2,1):ubound(dataptr2,1)))
+      do i=lbound(dataptr2,1),ubound(dataptr2,1)
+        !--- compute ice fraction on atm grid and reciprocal
+        if (dataPtr2(i) == 0.0_ESMF_KIND_R8) then
+          iarr(i)   = 0.0_ESMF_KIND_R8
+          iarr_r(i) = 0.0_ESMF_KIND_R8
+        else
+          iarr(i)   = dataPtr2(i)
+          iarr_r(i) = 1.0_ESMF_KIND_R8/dataPtr2(i)
+        endif
+      enddo
+    endif
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine med_phases_map_frac
+
   !-----------------------------------------------------------------------------
   !-----------------------------------------------------------------------------
 
