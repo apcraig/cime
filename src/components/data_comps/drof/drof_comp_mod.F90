@@ -8,16 +8,16 @@ module drof_comp_mod
   use esmf
   use mct_mod
   use perf_mod
-  use shr_sys_mod     , only: shr_sys_flush, shr_sys_abort
-  use shr_kind_mod    , only: IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
-  use shr_file_mod    , only: shr_file_getunit, shr_file_freeunit
-  use shr_mpi_mod     , only: shr_mpi_bcast
-  use shr_strdata_mod , only: shr_strdata_type, shr_strdata_pioinit, shr_strdata_init
-  use shr_strdata_mod , only: shr_strdata_print, shr_strdata_restRead
-  use shr_strdata_mod , only: shr_strdata_advance, shr_strdata_restWrite
-  use shr_dmodel_mod  , only: shr_dmodel_gsmapcreate, shr_dmodel_rearrGGrid
-  use shr_dmodel_mod  , only: shr_dmodel_translate_list, shr_dmodel_translateAV_list, shr_dmodel_translateAV
-  use seq_timemgr_mod , only: seq_timemgr_EClockGetData, seq_timemgr_RestartAlarmIsOn
+  use shr_sys_mod        , only: shr_sys_flush, shr_sys_abort
+  use shr_kind_mod       , only: IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
+  use shr_file_mod       , only: shr_file_getunit, shr_file_freeunit
+  use shr_mpi_mod        , only: shr_mpi_bcast
+  use shr_strdata_mod    , only: shr_strdata_type, shr_strdata_pioinit, shr_strdata_init
+  use shr_strdata_mod    , only: shr_strdata_print, shr_strdata_restRead
+  use shr_strdata_mod    , only: shr_strdata_advance, shr_strdata_restWrite
+  use shr_dmodel_mod     , only: shr_dmodel_gsmapcreate, shr_dmodel_rearrGGrid
+  use shr_dmodel_mod     , only: shr_dmodel_translate_list, shr_dmodel_translateAV_list, shr_dmodel_translateAV
+  use seq_timemgr_mod    , only: seq_timemgr_EClockGetData, seq_timemgr_RestartAlarmIsOn
 
   use drof_shr_mod   , only: rof_mode       ! namelist input
   use drof_shr_mod   , only: decomp         ! namelist input
