@@ -14,6 +14,7 @@ module docn_comp_nuopc
   use shr_nuopc_fldList_mod
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
   use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
   use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
   use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
@@ -35,7 +36,6 @@ module docn_comp_nuopc
   use docn_comp_mod, only: docn_comp_init, docn_comp_run, docn_comp_final
   use perf_mod
   use mct_mod
-  use shr_nuopc_methods_mod, only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
 
   implicit none
 
@@ -205,7 +205,6 @@ module docn_comp_nuopc
     type(ESMF_VM) :: vm
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
-    integer(IN)   :: MCTID
     logical       :: exists
     integer(IN)   :: ierr       ! error code
     integer(IN)   :: shrlogunit ! original log unit
@@ -244,13 +243,12 @@ module docn_comp_nuopc
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    read(cvalue,*) MCTID  ! convert from string to integer
+    read(cvalue,*) compid  ! convert from string to integer
 
     !----------------------------------------------------------------------------
     ! determine instance information
     !----------------------------------------------------------------------------
 
-    compid = MCTID
     inst_name   = seq_comm_name(compid)
     inst_index  = seq_comm_inst(compid)
     inst_suffix = seq_comm_suffix(compid)

@@ -47,7 +47,7 @@ module datm_shr_mod
   ! variables obtained from namelist read
   character(CL) , public :: rest_file             ! restart filename
   character(CL) , public :: rest_file_strm        ! restart filename for streams
-  character(CL) , public :: atm_mode              ! mode
+  character(CL) , public :: datamode              ! mode
   character(len=*), public, parameter :: nullstr = 'undefined'
 
   !--------------------------------------------------------------------------
@@ -152,22 +152,22 @@ CONTAINS
     !----------------------------------------------------------------------------
 
     call shr_strdata_readnml(SDATM, trim(filename), mpicom=mpicom)
+    call shr_sys_flush(shrlogunit)
 
     ! Validate mode
 
-    atm_mode = trim(SDATM%dataMode)
-    if (trim(atm_mode) == 'NULL'      .or. &
-         trim(atm_mode) == 'CORE2_NYF' .or. &
-         trim(atm_mode) == 'CORE2_IAF' .or. &
-         trim(atm_mode) == 'CLMNCEP'   .or. &
-         trim(atm_mode) == 'CPLHIST'   .or. &
-         trim(atm_mode) == 'COPYALL'   ) then
+    datamode = trim(SDATM%dataMode)
+    if (trim(datamode) == 'NULL'      .or. &
+        trim(datamode) == 'CORE2_NYF' .or. &
+        trim(datamode) == 'CORE2_IAF' .or. &
+        trim(datamode) == 'CLMNCEP'   .or. &
+        trim(datamode) == 'COPYALL'   ) then
        if (my_task == master_task) then
-          write(logunit,F00) ' atm mode = ',trim(atm_mode)
+          write(logunit,F00) ' datm datamode = ',trim(datamode)
           call shr_sys_flush(logunit)
        end if
     else
-       write(logunit,F00) ' ERROR illegal atm mode = ',trim(atm_mode)
+       write(logunit,F00) ' ERROR illegal datm datamode = ',trim(datamode)
        call shr_sys_abort()
     endif
 
@@ -181,7 +181,7 @@ CONTAINS
        atm_present    = .true.
        atm_prognostic = .true.
     endif
-    if (trim(atm_mode) /= 'NULL') then
+    if (trim(datamode) /= 'NULL') then
        atm_present = .true.
     end if
 

@@ -22,7 +22,7 @@ module dlnd_comp_mod
   use seq_timemgr_mod   , only: seq_timemgr_EClockGetData, seq_timemgr_RestartAlarmIsOn
   use glc_elevclass_mod , only: glc_get_num_elevation_classes, glc_elevclass_as_string
 
-  use dlnd_shr_mod   , only: lnd_mode       ! namelist input
+  use dlnd_shr_mod   , only: datamode       ! namelist input
   use dlnd_shr_mod   , only: decomp         ! namelist input
   use dlnd_shr_mod   , only: rest_file      ! namelist input
   use dlnd_shr_mod   , only: rest_file_strm ! namelist input
@@ -48,8 +48,6 @@ module dlnd_comp_mod
   character(CS) :: myModelName = 'lnd'   ! user defined model name
   character(len=*),parameter :: rpfile = 'rpointer.lnd'
   type(mct_rearr) :: rearr
-  integer       :: kf                    ! index for frac in AV
-  real(R8),pointer :: lfrac(:)           ! land frac
 
   !--------------------------------------------------------------------------
   !--- names of fields ---
@@ -223,7 +221,7 @@ CONTAINS
     call shr_dmodel_gsmapcreate(gsmap,SDLND%nxg*SDLND%nyg,compid,mpicom,decomp)
     lsize = mct_gsmap_lsize(gsmap,mpicom)
 
-    ! create a rearranger from the data model SDLND%gsmap to gsmap
+    ! create a rearranger from the data model DLND%gsmap to gsmap
     call mct_rearr_init(SDLND%gsmap, gsmap, mpicom, rearr)
 
     call t_stopf('dlnd_initgsmaps')
@@ -237,9 +235,6 @@ CONTAINS
     call shr_sys_flush(logunit)
 
     call shr_dmodel_rearrGGrid(SDLND%grid, ggrid, gsmap, rearr, mpicom)
-    kfrac = mct_aVect_indexRA(ggrid%data,'frac')
-    allocate(lfrac(lsize))
-    lfrac(:) = ggrid%data%rAttr(kfrac,:))
 
     call t_stopf('dlnd_initmctdom')
 
@@ -256,8 +251,6 @@ CONTAINS
 
     call mct_aVect_init(x2l, rList=seq_flds_x2l_fields, lsize=lsize)
     call mct_aVect_zero(x2l)
-
-    kf = mct_aVect_indexRA(l2x,'Sl_lfrin')
 
     call t_stopf('dlnd_initmctavs')
 
@@ -385,10 +378,6 @@ CONTAINS
     call t_startf('dlnd')
 
     call t_startf('dlnd_strdata_advance')
-    lsize = mct_avect_lsize(l2x)
-    do n = 1,lsize
-       l2x%rAttr(kf,n) = lfrac(n)
-    enddo
     call shr_strdata_advance(SDLND,currentYMD,currentTOD,mpicom,'dlnd')
     call t_stopf('dlnd_strdata_advance')
 
@@ -400,6 +389,19 @@ CONTAINS
     call t_stopf('dlnd_scatter')
 
     call t_stopf('dlnd')
+
+    !-------------------------------------------------
+    ! Determine data model behavior based on the mode
+    !-------------------------------------------------
+
+    call t_startf('dlnd_datamode')
+    select case (trim(datamode))
+
+    case('COPYALL')
+       ! do nothing extra
+
+    end select
+    call t_stopf('dlnd_datamode')
 
     !--------------------
     ! Write restart

@@ -19,7 +19,7 @@ module drof_comp_mod
   use shr_dmodel_mod     , only: shr_dmodel_translate_list, shr_dmodel_translateAV_list, shr_dmodel_translateAV
   use seq_timemgr_mod    , only: seq_timemgr_EClockGetData, seq_timemgr_RestartAlarmIsOn
 
-  use drof_shr_mod   , only: rof_mode       ! namelist input
+  use drof_shr_mod   , only: datamode       ! namelist input
   use drof_shr_mod   , only: decomp         ! namelist input
   use drof_shr_mod   , only: rest_file      ! namelist input
   use drof_shr_mod   , only: rest_file_strm ! namelist input
@@ -332,6 +332,19 @@ CONTAINS
     enddo
 
     call t_stopf('drof_r')
+
+    !-------------------------------------------------
+    ! Determine data model behavior based on the mode
+    !-------------------------------------------------
+
+    call t_startf('drof_datamode')
+    select case (trim(datamode))
+
+    case('COPYALL')
+       ! do nothing extra
+
+    end select
+    call t_stopf('drof_datamode')
 
     !--------------------
     ! Write restart

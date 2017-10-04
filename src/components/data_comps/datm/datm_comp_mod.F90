@@ -8,7 +8,6 @@ module datm_comp_mod
   use mct_mod
   use esmf
   use perf_mod
-
   use shr_const_mod
   use shr_sys_mod
   use shr_kind_mod   , only: IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
@@ -24,7 +23,7 @@ module datm_comp_mod
   use seq_timemgr_mod, only: seq_timemgr_EClockGetData, seq_timemgr_RestartAlarmIsOn
 
   use datm_shr_mod   , only: datm_shr_getNextRadCDay, datm_shr_esat, datm_shr_CORE2getFactors
-  use datm_shr_mod   , only: atm_mode       ! namelist input
+  use datm_shr_mod   , only: datamode       ! namelist input
   use datm_shr_mod   , only: decomp         ! namelist input
   use datm_shr_mod   , only: wiso_datm      ! namelist input
   use datm_shr_mod   , only: rest_file      ! namelist input
@@ -33,7 +32,6 @@ module datm_comp_mod
   use datm_shr_mod   , only: iradsw         ! namelist input
   use datm_shr_mod   , only: nullstr
 
-  !
   ! !PUBLIC TYPES:
   implicit none
   private ! except
@@ -673,7 +671,7 @@ CONTAINS
     call t_stopf('datm_strdata_advance')
     call t_barrierf('datm_scatter_BARRIER',mpicom)
     call t_startf('datm_scatter')
-    if (trim(atm_mode) /= 'COPYALL') then
+    if (trim(datamode) /= 'COPYALL') then
        lsize = mct_avect_lsize(a2x)
        do n = 1,lsize
           a2x%rAttr(kbid,n) = aerodep_spval
@@ -722,13 +720,14 @@ CONTAINS
     enddo
     call t_stopf('datm_scatter')
 
-    call t_startf('datm_mode')
-    select case (trim(atm_mode))
+    !-------------------------------------------------
+    ! Determine data model behavior based on the mode
+    !-------------------------------------------------
+
+    call t_startf('datm_datamode')
+    select case (trim(datamode))
 
     case('COPYALL')
-       ! do nothing extra
-
-    case('CPLHIST')
        ! do nothing extra
 
     case('CORE2_NYF','CORE2_IAF')
@@ -737,7 +736,7 @@ CONTAINS
              write(logunit,F00) 'ERROR: prec and swdn must be in streams for CORE2'
              call shr_sys_abort(trim(subname)//'ERROR: prec and swdn must be in streams for CORE2')
           endif
-          if (trim(atm_mode) == 'CORE2_IAF' ) then
+          if (trim(datamode) == 'CORE2_IAF' ) then
              if (starcf < 1 ) then
                 write(logunit,F00) 'ERROR: tarcf must be in an input stream for CORE2_IAF'
                 call shr_sys_abort(trim(subname)//'tarcf must be in an input stream for CORE2_IAF')
@@ -781,7 +780,7 @@ CONTAINS
           !--- Dupont correction to NCEP Arctic air T  ---
           !--- don't correct during summer months (July-September)
           !--- ONLY correct when forcing year is 1997->2004
-          if (trim(atm_mode) == 'CORE2_IAF' ) then
+          if (trim(datamode) == 'CORE2_IAF' ) then
              a2x%rAttr(ktbot,n) = a2x%rAttr(ktbot,n) +  avstrm%rAttr(starcf,n)
              a2x%rAttr(kptem,n) = a2x%rAttr(ktbot,n)
           end if
@@ -984,7 +983,7 @@ CONTAINS
 
     end select
 
-    call t_stopf('datm_mode')
+    call t_stopf('datm_datamode')
 
     !----------------------------------------------------------
     ! bias correction / anomaly forcing ( start block )
