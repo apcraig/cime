@@ -202,7 +202,6 @@ module dice_comp_nuopc
     type(ESMF_VM) :: vm
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
-    integer(IN)   :: MCTID
     logical       :: exists
     integer(IN)   :: ierr       ! error code
     integer(IN)   :: shrlogunit ! original log unit
@@ -233,7 +232,7 @@ module dice_comp_nuopc
     call mpi_comm_rank(mpicom, my_task, ierr)
 
     !----------------------------------------------------------------------------
-    ! get MCT compid
+    ! get compid
     !----------------------------------------------------------------------------
 
     call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
@@ -364,7 +363,6 @@ module dice_comp_nuopc
     real(R8)               :: scmLat  = shr_const_SPVAL ! single column lat
     real(R8)               :: scmLon  = shr_const_SPVAL ! single column lon
     logical                :: connected                 ! is field connected?
-    real(R8)               :: scalar                    ! temporary if if-logic
     integer                :: klon, klat
     integer                :: lsize
     integer                :: iam
