@@ -216,7 +216,7 @@
 	<arg name="anum_tasks"> -np $TOTALPES</arg>
 	<arg name="labelstdout">-p "%g:"</arg>
 	<!-- the omplace argument needs to be last -->
-	<arg name="zthreadplacement"> omplace </arg>
+	<arg name="zthreadplacement"> omplace -tm open64 </arg>
       </arguments>
     </mpirun>
     <mpirun mpilib="default" unit_testing="true">
@@ -241,8 +241,11 @@
       <modules compiler="intel">
 	<command name="load">intel/17.0.1</command>
 	<command name="load">mkl</command>
+<!--
 	<command name="load">esmf_libs</command>
+-->
       </modules>
+<!--
       <modules compiler="intel" mpilib="!mpi-serial" debug="true">
 	<command name="load">esmf-7.0.0-defio-mpi-g</command>
       </modules>
@@ -255,11 +258,12 @@
       <modules compiler="intel" mpilib="mpi-serial" debug="false">
 	<command name="load">esmf-7.0.0-ncdfio-uni-O</command>
       </modules>
+-->
       <modules compiler="gnu">
 	<command name="load">gnu/6.3.0</command>
       </modules>
       <modules>
-	<command name="load">mpt/2.15</command>
+	<command name="load">mpt/2.15f</command>
 	<command name="load">ncarcompilers/0.3.5</command>
       </modules>
       <modules mpilib="mpi-serial">
@@ -273,6 +277,7 @@
     <environment_variables>
       <env name="OMP_STACKSIZE">256M</env>
       <env name="MPI_TYPE_DEPTH">16</env>
+      <env name="ESMFMKFILE">/glade/u/home/tcraig/ESMF-INSTALLS/ESMF_7_1_0_bsxx_trunk170328-Intel17.0.1-NetCDF4.4.1.1-g/lib/esmf.mk</env>
     </environment_variables>
     <environment_variables unit_testing="true">
       <!-- It's possible that we also need to set:
@@ -878,7 +883,7 @@
 	<command name="load">  tool/parallel-netcdf/1.7.0/intel/mvapich2  </command>
       </modules>
       <modules compiler="pgi">
-	<command name="load">compiler/pgi/15.1</command>
+	<command name="load">compiler/pgi/17.04</command>
       </modules>
       <modules  compiler="pgi" mpilib="mvapich2">
 	  <command name="load">  tool/parallel-netcdf/1.6.1/pgi/mvapich2  </command>
@@ -892,6 +897,7 @@
     </module_system>
     <environment_variables>
       <env name="OMP_STACKSIZE">64M</env>
+      <env name="ESMFMKFILE">/home/fischer/ESMF_code/ESMF_7_1_0_beta/lib/libg/Linux.intel.64.mvapich2.default/esmf.mk</env>
     </environment_variables>
   </machine>
 
@@ -1641,8 +1647,8 @@
 	<command name="load">intel/15.0.3</command>
 	<command name="load">mkl/11.1.2</command>
 	<command name="load">trilinos/11.10.2</command>
-	<command name="load">esmf</command>
       </modules>
+<!--
       <modules compiler="intel" mpilib="!mpi-serial" debug="true">
 	<command name="load">esmf-7.0.0-ncdfio-mpi-g</command>
       </modules>
@@ -1655,6 +1661,7 @@
       <modules compiler="intel" mpilib="mpi-serial" debug="false">
 	<command name="load">esmf-7.0.0-ncdfio-uni-O</command>
       </modules>
+-->
       <modules compiler="pgi">
 	<command name="load">pgi/15.10</command>
       </modules>
@@ -1682,6 +1689,7 @@
       <env name="MP_EUILIB">us</env>
       <env name="MP_STDOUTMODE">unordered</env>
       <env name="MP_RC_USE_LMC">yes</env>
+      <env name="ESMFMKFILE">/glade/u/home/tcraig/ESMF-INSTALLS/ESMF_7_1_0_bsxx_trunk170328-Intel15.0.3-NetCDF4.3.3.1-g/lib/esmf.mk</env>
     </environment_variables>
     <environment_variables debug="true">
       <env name="MP_EAGER_LIMIT">0</env>

@@ -114,7 +114,7 @@ logger = logging.getLogger(__name__)
 # Fortran syntax regular expressions.
 # Variable names.
 #FORTRAN_NAME_REGEX = re.compile(r"(^[a-z][a-z0-9_]{0,62})(\([+-]?\d*:?[+-]?\d*:?[+-]?\d*\))?$", re.IGNORECASE)
-FORTRAN_NAME_REGEX = re.compile(r"""(^[a-z][a-z0-9_]{0,62})                             #  The variable name
+FORTRAN_NAME_REGEX = re.compile(r"""(^[a-z][a-z0-9_@]{0,62})                             #  The variable name
                                   (\(                                                   # begin optional index expression
                                   (([+-]?\d+)                                           # Single valued index
                                   |                                                     # or
@@ -128,8 +128,7 @@ _int_re_string = r"(\+|-)?[0-9]+"
 FORTRAN_LITERAL_REGEXES['integer'] = re.compile("^" + _int_re_string + "$")
 # Real/complex literals.
 _ieee_exceptional_re_string = r"inf(inity)?|nan(\([^)]+\))?"
-_float_re_string = r"((\+|-)?([0-9]+(\.[0-9]*)?|\.[0-9]+)([ed]?%s)?|%s)" % \
-                   (_int_re_string, _ieee_exceptional_re_string)
+_float_re_string = r"((\+|-)?([0-9]+(\.[0-9]*)?|\.[0-9]+)([ed]?{})?|{})".format(_int_re_string, _ieee_exceptional_re_string)
 FORTRAN_LITERAL_REGEXES['real'] = re.compile("^" + _float_re_string + "$",
                                              re.IGNORECASE)
 FORTRAN_LITERAL_REGEXES['complex'] = re.compile(r"^\([ \n]*" +
@@ -574,7 +573,7 @@ def is_valid_fortran_namelist_literal(type_, string):
     True
     """
     expect(type_ in FORTRAN_LITERAL_REGEXES,
-           "Invalid Fortran type for a namelist: %r" % str(type_))
+           "Invalid Fortran type for a namelist: {!r}".format(str(type_)))
     # Strip off whitespace and repetition.
     string = fortran_namelist_base_value(string)
     # Null values are always allowed.
@@ -658,12 +657,11 @@ def literal_to_python_value(literal, type_=None):
                 type_ = test_type
                 break
         expect(type_ is not None,
-               "%r is not a valid literal for any Fortran type." % str(literal))
+               "{!r} is not a valid literal for any Fortran type.".format(str(literal)))
     else:
         # Check that type is valid.
         expect(is_valid_fortran_namelist_literal(type_, literal),
-               "%r is not a valid literal of type %r." %
-               (str(literal), str(type_)))
+               "{!r} is not a valid literal of type {!r}.".format(str(literal), str(type_)))
     # Conversion for each type.
     if type_ == 'character':
         return character_literal_to_string(literal)
@@ -836,7 +834,7 @@ def parse(in_file=None, text=None, groupless=False, convert_tab_to_space=True):
     expect(in_file is None or text is None,
            "Cannot specify both input file and text to the namelist parser.")
     if isinstance(in_file, str) or isinstance(in_file, unicode):
-        logger.debug("Reading namelist at: %s", in_file)
+        logger.debug("Reading namelist at: {}".format(in_file))
         with open(in_file) as in_file_obj:
             text = in_file_obj.read()
     elif in_file is not None:
@@ -884,8 +882,9 @@ class Namelist(object):
         self._groups = {}
         if groups is not None:
             for group_name in groups:
-                expect(group_name is not None, " Got None in groups %s"%groups)
-                group_lc = group_name.lower()
+                expect(group_name is not None, " Got None in groups {}".format(groups))
+                #group_lc = group_name.lower()
+                group_lc = group_name
                 self._groups[group_lc] = collections.OrderedDict()
                 for variable_name in groups[group_name]:
                     variable_lc = variable_name.lower()
@@ -922,7 +921,7 @@ class Namelist(object):
         >>> sorted(x.get_variable_names('fOo'))
         [u'bar(::)', u'bazz', u'bazz(2)', u'bazz(:2:)']
         """
-        group_name = group_name.lower()
+        #group_name = group_name.lower()
         if group_name not in self._groups:
             return []
         return self._groups[group_name].keys()
@@ -941,8 +940,8 @@ class Namelist(object):
         >>> parse(text='&foo bar=1,2 /').get_variable_value('foO', 'Bar')
         [u'1', u'2']
         """
-        group_name = group_name.lower()
-        variable_name = variable_name.lower()
+        #group_name = group_name.lower()
+        #variable_name = variable_name.lower()
         if group_name not in self._groups or \
            variable_name not in self._groups[group_name]:
             return [u'']
@@ -959,7 +958,7 @@ class Namelist(object):
         >>> parse(text='&foo bar=1 / &bazz bar=1 /').get_value('bar')
         Traceback (most recent call last):
         ...
-        SystemExit: ERROR: Namelist.get_value: Variable %s is present in multiple groups: [u'bazz', u'foo']
+        SystemExit: ERROR: Namelist.get_value: Variable {} is present in multiple groups: [u'bazz', u'foo']
         >>> parse(text='&foo bar=1 / &bazz /').get_value('Bar')
         [u'1']
         >>> parse(text='&foo bar(2)=1 / &bazz /').get_value('Bar(2)')
@@ -967,11 +966,11 @@ class Namelist(object):
         >>> parse(text='&foo / &bazz /').get_value('bar')
         [u'']
         """
-        variable_name = variable_name.lower()
+        #variable_name = variable_name.lower()
         possible_groups = [group_name for group_name in self._groups
                            if variable_name in self._groups[group_name]]
         expect(len(possible_groups) <= 1,
-               "Namelist.get_value: Variable %s is present in multiple groups: "
+               "Namelist.get_value: Variable {} is present in multiple groups: "
                + str(possible_groups))
         if possible_groups:
             return self._groups[possible_groups[0]][variable_name]
@@ -1003,12 +1002,13 @@ class Namelist(object):
         >>> x.get_variable_value('foo', 'red')
         ['', u'2', '', u'4', '', u'6']
         """
-        group_name = group_name.lower()
+        #group_name = group_name.lower()
 
         minindex, maxindex, step = get_fortran_variable_indices(variable_name, var_size)
-        variable_name = get_fortran_name_only(variable_name.lower())
+        #variable_name = get_fortran_name_only(variable_name.lower())
+        variable_name = get_fortran_name_only(variable_name)
 
-        expect(minindex > 0, "Indices < 1 not supported in CIME interface to fortran namelists... lower bound=%s"%minindex)
+        expect(minindex > 0, "Indices < 1 not supported in CIME interface to fortran namelists... lower bound={}".format(minindex))
 
         if group_name not in self._groups:
             self._groups[group_name] = {}
@@ -1044,8 +1044,8 @@ class Namelist(object):
         >>> x.get_variable_names('brack')
         []
         """
-        group_name = group_name.lower()
-        variable_name = variable_name.lower()
+        #group_name = group_name.lower()
+        #variable_name = variable_name.lower()
         if group_name in self._groups and \
            variable_name in self._groups[group_name]:
             del self._groups[group_name][variable_name]
@@ -1111,7 +1111,9 @@ class Namelist(object):
                 self.set_variable_value(group_name, variable_name, merged_val,
                                         var_size=len(merged_val))
 
-    def write(self, out_file, groups=None, append=False, format_='nml', sorted_groups=True):
+    def write(self, out_file, groups=None, append=False, format_='nml', sorted_groups=True,
+              skip_comps=None, prognostic_comps=None, atm_cpl_dt=None, ocn_cpl_dt=None):
+
         """Write a Fortran namelist to a file.
 
         As with `parse`, the `out_file` argument can be either a file name, or a
@@ -1126,32 +1128,133 @@ class Namelist(object):
         specifies the file format. Formats other than 'nml' may not support all
         possible output values.
         """
-        expect(format_ in ('nml', 'rc', 'nmlcontents'),
-               "Namelist.write: unexpected output format %r" % str(format_))
+        expect(format_ in ('nml', 'rc', 'nmlcontents', 'nuopc'),
+               "Namelist.write: unexpected output format {!r}".format(str(format_)))
         if isinstance(out_file, str) or isinstance(out_file, unicode):
-            logger.debug("Writing namelist to: %s", out_file)
+            logger.debug("Writing namelist to: {}".format(out_file))
             flag = 'a' if append else 'w'
             with open(out_file, flag) as file_obj:
-                self._write(file_obj, groups, format_, sorted_groups=sorted_groups)
+                if format_ == 'nuopc':
+                    self._write_nuopc(file_obj, groups, sorted_groups=sorted_groups,
+                                      skip_comps=skip_comps, atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
+                else:
+                    self._write(file_obj, groups, format_, sorted_groups=sorted_groups)
         else:
             logger.debug("Writing namelist to file object")
-            self._write(out_file, groups, format_, sorted_groups=sorted_groups)
+            if format_ == 'nuopc':
+                self._write_noupc(out_file, groups, sorted_groups=sorted_groups,
+                                  skip_comps=skip_comps, atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
+            else:
+                self._write(out_file, groups, format_, sorted_groups=sorted_groups)
+
+    def _write_nuopc(self, out_file, groups, sorted_groups, skip_comps, atm_cpl_dt, ocn_cpl_dt):
+        """Unwrapped version of `write` assuming that a file object is input."""
+
+        if groups is None:
+            groups = self._groups.keys()
+
+        if (sorted_groups):
+            #group_names = sorted(group.lower() for group in groups)
+            group_names = sorted(group for group in groups)
+        else:
+            group_names = groups
+
+        for group_name in group_names:
+            if "_attributes" not in group_name and "nuopc_" not in group_name:
+                continue
+
+            if "_attributes" in group_name:
+                out_file.write("{}::\n".format(group_name))
+
+            group = self._groups[group_name]
+            for name in sorted(group.keys()):
+                values = group[name]
+                if "component_list" in name:
+                    for skip_comp in skip_comps:
+                        if skip_comp in values[0]:
+                            values[0] = values[0].replace(skip_comp,"")
+                components = values[0]
+
+                # @ is used in a namelist to put the same namelist variable in multiple groups
+                # in the write phase, all characters in the namelist variable name after
+                # the @ and including the @ should be removed
+                if "@" in name:
+                    name = re.sub('@.+$', "", name)
+
+                equals = " ="
+                if group_name == 'nuopc_runseq':
+                    equals = '::\n       '
+                elif "_var" in group_name:
+                    equals = ':'
+
+                # To prettify things for long lists of values, build strings
+                # line-by-line.
+                if values[0] == "True" or values[0] == "False":
+                    values[0] = values[0].replace("True",".true.").replace("False",".false.")
+
+                if "_attribute" in group_name:
+                    lines = ["     {}{} {}".format(name, equals, values[0])]
+                else:
+                    lines = ["{}{} {}".format(name, equals, values[0])]
+
+                for value in values[1:]:
+                    if value == "True" or value == "False":
+                        value = value.replace("True",".true.").replace("False",".false.")
+                    if len(lines[-1]) + len(value) <= 77:
+                        lines[-1] += ", " + value
+                    else:
+                        lines[-1] += ",\n"
+                        lines.append("      " + value)
+                lines[-1] += "\n"
+                for line in lines:
+                    line = line.replace('"','')
+                    # remove un-needed entries from the nuopc_runseq based
+                    # on the prognostic_comps and skip_comps lists
+                    if group_name == 'nuopc_runseq':
+                        run_entries = line.splitlines()
+                        newline = ""
+                        for run_entry in run_entries:
+                            print_entry = True
+                            for skip_comp in skip_comps:
+                                if "@" not in run_entry:
+                                    if skip_comp in run_entry:
+                                        print_entry = False
+                                        logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
+                                    if skip_comp.lower().strip() in run_entry:
+                                        print_entry = False
+                                        logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
+                            if print_entry:
+                                if "@atm_cpl_dt" in run_entry:
+                                    run_entry = run_entry.replace("atm_cpl_dt",atm_cpl_dt)
+                                if "@ocn_cpl_dt" in run_entry:
+                                    run_entry = run_entry.replace("ocn_cpl_dt",ocn_cpl_dt)
+                                newline += run_entry + "\n"
+                        out_file.write(newline)
+                    else:
+                        out_file.write(line)
+
+            if "_attribute" in group_name or "runseq" in group_name:
+                out_file.write("::\n\n")
 
     def _write(self, out_file, groups, format_, sorted_groups):
         """Unwrapped version of `write` assuming that a file object is input."""
         if groups is None:
             groups = self._groups.keys()
+
         if format_ == 'nml' or format_ == 'nmlcontents':
             equals = ' ='
         elif format_ == 'rc':
             equals = ':'
+
         if (sorted_groups):
             group_names = sorted(group.lower() for group in groups)
         else:
             group_names = groups
+
         for group_name in group_names:
             if format_ == 'nml':
-                out_file.write("&%s\n" % group_name)
+                out_file.write("&{}\n".format(group_name))
+
             group = self._groups[group_name]
             for name in sorted(group.keys()):
                 values = group[name]
@@ -1166,7 +1269,8 @@ class Namelist(object):
                 # line-by-line.
                 if values[0] == "True" or values[0] == "False":
                     values[0] = values[0].replace("True",".true.").replace("False",".false.")
-                lines = ["  %s%s %s" % (name, equals, values[0])]
+
+                lines = ["  {}{} {}".format(name, equals, values[0])]
                 for value in values[1:]:
                     if value == "True" or value == "False":
                         value = value.replace("True",".true.").replace("False",".false.")
@@ -1182,7 +1286,6 @@ class Namelist(object):
                 out_file.write("/\n")
             if format_ == 'nmlcontents':
                 out_file.write("\n")
-
 
 class _NamelistEOF(Exception):
 
@@ -1202,7 +1305,7 @@ class _NamelistEOF(Exception):
         """Get an error message suitable for display."""
         string = "Unexpected end of file encountered in namelist."
         if self._message is not None:
-            string += " (%s)" % self._message
+            string += " ({})".format(self._message)
         return string
 
 
@@ -1224,7 +1327,7 @@ class _NamelistParseError(Exception):
         """Get an error message suitable for display."""
         string = "Error in parsing namelist"
         if self._message is not None:
-            string += ": %s" % self._message
+            string += ": {}".format(self._message)
         return string
 
 
@@ -1262,7 +1365,7 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
         >>> x._line_col_string()
         'line 2, column 1'
         """
-        return "line %s, column %s" % (self._line, self._col)
+        return "line {}, column {}".format(self._line, self._col)
 
     def _curr(self):
         """Return the character at the current position."""
@@ -1462,9 +1565,8 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
             if len(chars) == 1:
                 char_description = repr(str(chars))
             else:
-                char_description = "one of the characters in %r" % str(chars)
-            raise _NamelistParseError("expected %s but found %r" %
-                                      (char_description, str(self._curr())))
+                char_description = "one of the characters in {!r}".format(str(chars))
+            raise _NamelistParseError("expected {} but found {!r}".format(char_description, str(self._curr())))
 
     def _parse_namelist_group_name(self):
         r"""Parses and returns a namelist group name at the current position.
@@ -1562,9 +1664,9 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
 
         if not is_valid_fortran_name(text_check):
             if re.search(r".*\(.*\,.*\)", text_check):
-                err_str = "Multiple dimensions not supported in CIME namelist variables %r" % str(text)
+                err_str = "Multiple dimensions not supported in CIME namelist variables {!r}".format(str(text))
             else:
-                err_str = "%r is not a valid variable name" % str(text)
+                err_str = "{!r} is not a valid variable name".format(str(text))
             raise _NamelistParseError(err_str)
         name = text.lower()
 
@@ -1611,8 +1713,7 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
                 break
         text = self._text[old_pos:self._pos+1]
         if not is_valid_fortran_namelist_literal("character", text):
-            raise _NamelistParseError("%s is not a valid character literal" %
-                                      (text))
+            raise _NamelistParseError("{} is not a valid character literal".format(text))
         return text
 
     def _parse_complex_literal(self):
@@ -1637,8 +1738,7 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
             self._advance()
         text = self._text[old_pos:self._pos+1]
         if not is_valid_fortran_namelist_literal("complex", text):
-            raise _NamelistParseError("%r is not a valid complex literal"
-                                      % (str(text)))
+            raise _NamelistParseError("{!r} is not a valid complex literal".format(str(text)))
         return text
 
     def _look_ahead_for_equals(self, pos):
@@ -1845,8 +1945,7 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
         text = self._text[old_pos:self._pos]
         if not any(is_valid_fortran_namelist_literal(type_, text)
                    for type_ in ("integer", "logical", "real")):
-            raise _NamelistParseError("expected literal value, but got %r"
-                                      % (str(text)))
+            raise _NamelistParseError("expected literal value, but got {!r}".format(str(text)))
         return text
 
     def _expect_separator(self, allow_eof=False):
@@ -2044,7 +2143,7 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
         (minindex, maxindex, step) = get_fortran_variable_indices(name,allow_any_len=True)
         if (minindex > 1 or maxindex > minindex or step > 1) and maxindex > 0:
             arraylen =max(0,1 + ((maxindex - minindex)/step))
-            expect(len(values) <= arraylen, "Too many values for array %s"%(name))
+            expect(len(values) <= arraylen, "Too many values for array {}".format(name))
 
         return name, values, addto
 
@@ -2110,8 +2209,7 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
         if not self._groupless:
             # Make sure that this is the first time we've seen this group.
             if group_name in self._settings:
-                raise _NamelistParseError("Namelist group %r encountered twice."
-                                          % str(group_name))
+                raise _NamelistParseError("Namelist group {!r} encountered twice.".format(str(group_name)))
             self._settings[group_name] = {}
         self._eat_whitespace()
         while self._curr() != '/':

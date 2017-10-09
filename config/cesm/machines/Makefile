@@ -78,6 +78,16 @@ endif
 
 CPPDEFS := $(USER_CPPDEFS)
 
+CPPDEFS += -DESMFUSE_$(COMP_CPL)
+CPPDEFS += -DESMFUSE_$(COMP_ATM)
+CPPDEFS += -DESMFUSE_$(COMP_LND)
+CPPDEFS += -DESMFUSE_$(COMP_OCN)
+CPPDEFS += -DESMFUSE_$(COMP_ICE)
+CPPDEFS += -DESMFUSE_$(COMP_ROF)
+CPPDEFS += -DESMFUSE_$(COMP_WAV)
+CPPDEFS += -DESMFUSE_$(COMP_GLC)
+CPPDEFS += -DESMFUSE_$(COMP_ESP)
+
 # Unless DEBUG mode is enabled, use NDEBUG to turn off assert statements.
 ifneq ($(strip $(DEBUG)),TRUE)
    CPPDEFS += -DNDEBUG
@@ -91,6 +101,8 @@ endif
 # ESMF_INTERFACE is currently only defined in env_build.xml
 ifeq ($(COMP_INTERFACE), ESMF)
    CPPDEFS += -DESMF_INTERFACE
+else ifeq ($(COMP_INTERFACE), NUOPC)
+   CPPDEFS += -DNUOPC_INTERFACE
 else
    CPPDEFS += -DMCT_INTERFACE
 endif
@@ -225,7 +237,9 @@ endif
 
 
 ifeq ($(MPILIB),mpi-serial)
-  undefine PNETCDF_PATH
+  ifdef PNETCDF_PATH
+    undefine PNETCDF_PATH
+  endif
 else
   ifdef PNETCDF_PATH
     ifndef $(INC_PNETCDF)
