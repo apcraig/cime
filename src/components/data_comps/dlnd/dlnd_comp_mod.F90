@@ -45,9 +45,11 @@ module dlnd_comp_mod
   !--------------------------------------------------------------------------
 
   !--- other ---
-  character(CS) :: myModelName = 'lnd'   ! user defined model name
+  character(CS)              :: myModelName = 'lnd' ! user defined model name
+  type(mct_rearr)            :: rearr
+  integer                    :: kf                  ! index for frac in AV
+  real(R8),pointer           :: lfrac(:)            ! land frac
   character(len=*),parameter :: rpfile = 'rpointer.lnd'
-  type(mct_rearr) :: rearr
 
   !--------------------------------------------------------------------------
   !--- names of fields ---
@@ -231,10 +233,14 @@ CONTAINS
     !----------------------------------------------------------------------------
 
     call t_startf('dlnd_initmctdom')
+
     if (my_task == master_task) write(logunit,F00) 'copy domains'
     call shr_sys_flush(logunit)
 
     call shr_dmodel_rearrGGrid(SDLND%grid, ggrid, gsmap, rearr, mpicom)
+    kfrac = mct_aVect_indexRA(ggrid%data, 'frac')
+    allocate(lfrac(lsize))
+    lfrac(:) = ggrid%data%rAttr(kfrac,:)
 
     call t_stopf('dlnd_initmctdom')
 
@@ -252,6 +258,7 @@ CONTAINS
     call mct_aVect_init(x2l, rList=seq_flds_x2l_fields, lsize=lsize)
     call mct_aVect_zero(x2l)
 
+    kf = mct_aVect_indexRA(l2x, 'Sl_lfrin', perrwith='quiet')
     call t_stopf('dlnd_initmctavs')
 
     !----------------------------------------------------------------------------
@@ -378,6 +385,12 @@ CONTAINS
     call t_startf('dlnd')
 
     call t_startf('dlnd_strdata_advance')
+    if (kf /= 0) then
+       do n = 1,lsize
+          l2x%rAttr(kf,n) = lfrac(n)
+       enddo
+    end if
+
     call shr_strdata_advance(SDLND,currentYMD,currentTOD,mpicom,'dlnd')
     call t_stopf('dlnd_strdata_advance')
 

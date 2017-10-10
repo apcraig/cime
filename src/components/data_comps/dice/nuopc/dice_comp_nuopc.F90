@@ -240,13 +240,12 @@ module dice_comp_nuopc
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    read(cvalue,*) MCTID  ! convert from string to integer
+    read(cvalue,*) compid  ! convert from string to integer
 
     !----------------------------------------------------------------------------
     ! determine instance information
     !----------------------------------------------------------------------------
 
-    compid = MCTID
     inst_name   = seq_comm_name(compid)
     inst_index  = seq_comm_inst(compid)
     inst_suffix = seq_comm_suffix(compid)
@@ -363,6 +362,7 @@ module dice_comp_nuopc
     real(R8)               :: scmLat  = shr_const_SPVAL ! single column lat
     real(R8)               :: scmLon  = shr_const_SPVAL ! single column lon
     logical                :: connected                 ! is field connected?
+    real(R8)               :: scalar
     integer                :: klon, klat
     integer                :: lsize
     integer                :: iam

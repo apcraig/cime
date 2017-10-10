@@ -57,7 +57,7 @@ module docn_comp_mod
   real(R8),parameter :: latice  = shr_const_latice      ! latent heat of fusion
   real(R8),parameter :: ocnsalt = shr_const_ocn_ref_sal ! ocean reference salinity
 
-  integer(IN)   :: kt,ks,ku,kv,kdhdx,kdhdy,kq,kswp  ! field indices
+  integer(IN)   :: km,kt,ks,ku,kv,kdhdx,kdhdy,kq,kswp  ! field indices
   integer(IN)   :: kswnet,klwup,klwdn,ksen,klat,kmelth,ksnow,krofi
   integer(IN)   :: kh,kqbot
   integer(IN)   :: index_lat, index_lon
@@ -241,6 +241,7 @@ CONTAINS
     call mct_aVect_init(o2x, rList=seq_flds_o2x_fields, lsize=lsize)
     call mct_aVect_zero(o2x)
 
+    km    = mct_aVect_indexRA(o2x,'So_omask', perrwith='quiet')
     kt    = mct_aVect_indexRA(o2x,'So_t')
     ks    = mct_aVect_indexRA(o2x,'So_s')
     ku    = mct_aVect_indexRA(o2x,'So_u')
@@ -416,6 +417,9 @@ CONTAINS
 
     lsize = mct_avect_lsize(o2x)
     do n = 1,lsize
+       if (km /= 0) then
+          o2x%rAttr(km,n) = imask(n)
+       end if
        o2x%rAttr(kt   ,n) = TkFrz
        o2x%rAttr(ks   ,n) = ocnsalt
        o2x%rAttr(ku   ,n) = 0.0_R8
