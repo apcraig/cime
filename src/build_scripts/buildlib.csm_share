@@ -54,6 +54,7 @@ if($comp eq "nuopc") {
 }
 
 my @filepath_add = ("$CIMEROOT/src/components/xcpl_models/xshare",
+		    "$CIMEROOT/src/components/data_comps/dshare",
 		    "$CIMEROOT/src/share/util",
 		    "$CIMEROOT/src/share/RandNum/src",
 		    "$CIMEROOT/src/share/RandNum/src/dsfmt_f03",

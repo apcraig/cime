@@ -22,8 +22,8 @@ module docn_comp_mod
   use shr_dmodel_mod  , only: shr_dmodel_translate_list, shr_dmodel_translateAV_list, shr_dmodel_translateAV
   use seq_timemgr_mod , only: seq_timemgr_EClockGetData, seq_timemgr_RestartAlarmIsOn
 
-  use docn_shr_mod   , only: ocn_mode       ! namelist input
-  use docn_shr_mod   , only: aquap_option   ! derived from ocn_mode namelist input
+  use docn_shr_mod   , only: datamode       ! namelist input
+  use docn_shr_mod   , only: aquap_option   ! derived from datamode namelist input
   use docn_shr_mod   , only: decomp         ! namelist input
   use docn_shr_mod   , only: rest_file      ! namelist input
   use docn_shr_mod   , only: rest_file_strm ! namelist input
@@ -66,7 +66,7 @@ module docn_comp_mod
   type(mct_avect)        :: avstrm       ! av of data from stream
   real(R8), pointer      :: somtp(:)
   real(R8), pointer      :: tfreeze(:)
-  integer(IN), pointer   :: imask(:)
+  integer , pointer      :: imask(:)
   real(R8), pointer      :: xc(:), yc(:) ! arryas of model latitudes and longitudes
 
   !--------------------------------------------------------------------------
@@ -218,7 +218,7 @@ CONTAINS
 
     ! Special logic for either prescribed or som aquaplanet - overwrite and
     ! set mask/frac to 1
-    if (ocn_mode == 'SST_AQUAPANAL' .or. ocn_mode == 'SST_AQUAPFILE' .or. ocn_mode == 'SOM_AQUAP') then
+    if (datamode == 'SST_AQUAPANAL' .or. datamode == 'SST_AQUAPFILE' .or. datamode == 'SOM_AQUAP') then
        kmask = mct_aVect_indexRA(ggrid%data,'mask')
        ggrid%data%rattr(kmask,:) = 1
 
@@ -241,7 +241,7 @@ CONTAINS
     call mct_aVect_init(o2x, rList=seq_flds_o2x_fields, lsize=lsize)
     call mct_aVect_zero(o2x)
 
-    km    = mct_aVect_indexRA(o2x,'So_omask')
+    km    = mct_aVect_indexRA(o2x,'So_omask', perrwith='quiet')
     kt    = mct_aVect_indexRA(o2x,'So_t')
     ks    = mct_aVect_indexRA(o2x,'So_s')
     ku    = mct_aVect_indexRA(o2x,'So_u')
@@ -319,7 +319,7 @@ CONTAINS
           endif
        endif
        call shr_mpi_bcast(exists,mpicom,'exists')
-       if (trim(ocn_mode) == 'SOM' .or. trim(ocn_mode) == 'SOM_AQUAP') then
+       if (trim(datamode) == 'SOM' .or. trim(datamode) == 'SOM_AQUAP') then
           if (my_task == master_task) write(logunit,F00) ' reading ',trim(rest_file)
           call shr_pcdf_readwrite('read',SDOCN%pio_subsystem, SDOCN%io_type, &
                trim(rest_file), mpicom, gsmap, rf1=somtp, rf1n='somtp')
@@ -417,7 +417,9 @@ CONTAINS
 
     lsize = mct_avect_lsize(o2x)
     do n = 1,lsize
-       o2x%rAttr(km   ,n) = imask(n)
+       if (km /= 0) then
+          o2x%rAttr(km,n) = imask(n)
+       end if
        o2x%rAttr(kt   ,n) = TkFrz
        o2x%rAttr(ks   ,n) = ocnsalt
        o2x%rAttr(ku   ,n) = 0.0_R8
@@ -443,10 +445,12 @@ CONTAINS
     enddo
     call t_stopf('docn_scatter')
 
-    ! --- handle the docn modes
+    !-------------------------------------------------
+    ! Determine data model behavior based on the mode
+    !-------------------------------------------------
 
-    call t_startf('docn_mode')
-    select case (trim(ocn_mode))
+    call t_startf('docn_datamode')
+    select case (trim(datamode))
 
     case('COPYALL')
        ! do nothing extra
@@ -575,7 +579,7 @@ CONTAINS
 
     end select
 
-    call t_stopf('docn_mode')
+    call t_stopf('docn_datamode')
 
     !--------------------
     ! Write restart
@@ -597,7 +601,7 @@ CONTAINS
           close(nu)
           call shr_file_freeUnit(nu)
        endif
-       if (trim(ocn_mode) == 'SOM' .or. trim(ocn_mode) == 'SOM_AQUAP') then
+       if (trim(datamode) == 'SOM' .or. trim(datamode) == 'SOM_AQUAP') then
           if (my_task == master_task) write(logunit,F04) ' writing ',trim(rest_file),currentYMD,currentTOD
           call shr_pcdf_readwrite('write', SDOCN%pio_subsystem, SDOCN%io_type,&
                trim(rest_file), mpicom, gsmap, clobber=.true., rf1=somtp,rf1n='somtp')

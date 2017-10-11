@@ -26,7 +26,7 @@ module dice_comp_mod
   use shr_dmodel_mod  , only: shr_dmodel_translate_list, shr_dmodel_translateAV_list, shr_dmodel_translateAV
   use seq_timemgr_mod , only: seq_timemgr_EClockGetData, seq_timemgr_RestartAlarmIsOn
 
-  use dice_shr_mod   , only: ice_mode       ! namelist input
+  use dice_shr_mod   , only: datamode       ! namelist input
   use dice_shr_mod   , only: decomp         ! namelist input
   use dice_shr_mod   , only: rest_file      ! namelist input
   use dice_shr_mod   , only: rest_file_strm ! namelist input
@@ -79,7 +79,7 @@ module dice_comp_mod
   real(R8),parameter  :: ax_vsdr = ai_vsdr*(1.0_R8-snwfrac) + as_vsdr*snwfrac
 
   integer(IN) :: kswvdr,kswndr,kswvdf,kswndf,kq,kz,kua,kva,kptem,kshum,kdens,ktbot
-  integer(IN) :: km,kiFrac,kt,kavsdr,kanidr,kavsdf,kanidf,kswnet,kmelth,kmeltw
+  integer(IN) :: kiFrac,kt,kavsdr,kanidr,kavsdf,kanidf,kswnet,kmelth,kmeltw
   integer(IN) :: ksen,klat,klwup,kevap,ktauxa,ktauya,ktref,kqref,kswpen,ktauxo,ktauyo,ksalt
   integer(IN) :: ksalinity
 
@@ -188,10 +188,6 @@ CONTAINS
 
     call t_startf('DICE_INIT')
 
-    !----------------------------------------------------------------------------
-    ! Initialize pio
-    !----------------------------------------------------------------------------
-
     ice_pio_subsystem => shr_pio_getiosys(trim(inst_name))
     call shr_strdata_pioinit(SDICE, ice_pio_subsystem, shr_pio_getiotype(trim(inst_name)))
 
@@ -265,7 +261,6 @@ CONTAINS
     call mct_aVect_init(i2x, rList=seq_flds_i2x_fields, lsize=lsize)
     call mct_aVect_zero(i2x)
 
-    km     = mct_aVect_indexRA(i2x,'Si_imask')
     kiFrac = mct_aVect_indexRA(i2x,'Si_ifrac')
     kt     = mct_aVect_indexRA(i2x,'Si_t')
     ktref  = mct_aVect_indexRA(i2x,'Si_tref')
@@ -468,7 +463,7 @@ CONTAINS
 
     !--- copy all fields from streams to i2x as default ---
 
-    if (trim(ice_mode) /= 'NULL') then
+    if (trim(datamode) /= 'NULL') then
        call t_startf('dice_strdata_advance')
        call shr_strdata_advance(SDICE,currentYMD,currentTOD,mpicom,'dice')
        call t_stopf('dice_strdata_advance')
@@ -482,9 +477,13 @@ CONTAINS
        call mct_aVect_zero(i2x)
     endif
 
-    call t_startf('dice_mode')
+    !-------------------------------------------------
+    ! Determine data model behavior based on the mode
+    !-------------------------------------------------
 
-    select case (trim(ice_mode))
+    call t_startf('dice_datamode')
+
+    select case (trim(datamode))
 
     case('COPYALL')
        ! do nothing extra
@@ -596,20 +595,15 @@ CONTAINS
 
        end do
 
-       !----------------------------------------------------------------------------
        ! compute atm/ice surface fluxes
-       !----------------------------------------------------------------------------
        call shr_flux_atmIce(iMask  ,x2i%rAttr(kz,:)     ,x2i%rAttr(kua,:)    ,x2i%rAttr(kva,:), &
             x2i%rAttr(kptem,:) ,x2i%rAttr(kshum,:)  ,x2i%rAttr(kdens,:)  ,x2i%rAttr(ktbot,:),  &
             i2x%rAttr(kt,:)    ,i2x%rAttr(ksen,:)   ,i2x%rAttr(klat,:)   ,i2x%rAttr(klwup,:), &
             i2x%rAttr(kevap,:) ,i2x%rAttr(ktauxa,:) ,i2x%rAttr(ktauya,:) ,i2x%rAttr(ktref,:), &
             i2x%rAttr(kqref,:) )
 
-       !----------------------------------------------------------------------------
        ! compute ice/oce surface fluxes (except melth & meltw, see above)
-       !----------------------------------------------------------------------------
        do n=1,lsize
-          i2x%rAttr(km,n) = imask(n)
           if (iMask(n) == 0) then
              i2x%rAttr(kswpen,n) = spval
              i2x%rAttr(kmelth,n) = spval
@@ -637,7 +631,9 @@ CONTAINS
 
     end select
 
+    !-------------------------------------------------
     ! optional per thickness category fields
+    !-------------------------------------------------
 
     if (seq_flds_i2o_per_cat) then
        do n=1,lsize
@@ -646,7 +642,11 @@ CONTAINS
        end do
     end if
 
-    call t_stopf('dice_mode')
+    call t_stopf('dice_datamode')
+
+    !--------------------
+    ! Write restart
+    !--------------------
 
     if (write_restart) then
        call t_startf('dice_restart')

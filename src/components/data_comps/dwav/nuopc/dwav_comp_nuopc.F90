@@ -2,9 +2,6 @@ module dwav_comp_nuopc
 
 !----------------------------------------------------------------------------
 ! This is the NUOPC cap
-! It follows the conventions of NUOPC and couples into the data
-! model using the old mct interfaces.  Tranlation between NUOPC/ESMF
-! datatypes and mct datatypes is implemented via share code.
 !----------------------------------------------------------------------------
 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
@@ -17,11 +14,10 @@ module dwav_comp_nuopc
   use shr_nuopc_fldList_mod
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_Diagnose
-  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_gridinit
-  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_AvectToState
-  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_StateToAvect
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
   use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
   use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
   use shr_file_mod          , only: shr_file_setIO, shr_file_getUnit
@@ -38,7 +34,6 @@ module dwav_comp_nuopc
 
   use dwav_shr_mod , only: dwav_shr_read_namelists
   use dwav_comp_mod, only: dwav_comp_init, dwav_comp_run, dwav_comp_final
-  use perf_mod
   use mct_mod
 
   implicit none
@@ -206,7 +201,6 @@ module dwav_comp_nuopc
     type(ESMF_VM) :: vm
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
-    integer(IN)   :: MCTID
     logical       :: exists
     integer(IN)   :: ierr       ! error code
     integer(IN)   :: shrlogunit ! original log unit
@@ -237,7 +231,7 @@ module dwav_comp_nuopc
     call mpi_comm_rank(mpicom, my_task, ierr)
 
     !----------------------------------------------------------------------------
-    ! get MCT compid
+    ! get compid
     !----------------------------------------------------------------------------
 
     call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
@@ -245,13 +239,12 @@ module dwav_comp_nuopc
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    read(cvalue,*) MCTID  ! convert from string to integer
+    read(cvalue,*) compid  ! convert from string to integer
 
     !----------------------------------------------------------------------------
     ! determine instance information
     !----------------------------------------------------------------------------
 
-    compid = MCTID
     inst_name   = seq_comm_name(compid)
     inst_index  = seq_comm_inst(compid)
     inst_suffix = seq_comm_suffix(compid)
@@ -292,10 +285,10 @@ module dwav_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (wav_prognostic) then
-       call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2w_states, "will provide", subname//":seq_flds_x2l_states", rc=rc)
+       call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2w_states, "will provide", subname//":seq_flds_x2w_states", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-       call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2w_fluxes, "will provide", subname//":seq_flds_x2l_fluxes", rc=rc)
+       call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2w_fluxes, "will provide", subname//":seq_flds_x2w_fluxes", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -309,10 +302,10 @@ module dwav_comp_nuopc
     call shr_nuopc_fldList_Zero(fldsFrWav, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_l2x_states, "will provide", subname//":seq_flds_w2x_states", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_w2x_states, "will provide", subname//":seq_flds_w2x_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_l2x_fluxes, "will provide", subname//":seq_flds_w2x_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_w2x_fluxes, "will provide", subname//":seq_flds_w2x_fluxes", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call shr_nuopc_fldList_Add(fldsFrWav, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
@@ -358,6 +351,11 @@ module dwav_comp_nuopc
     real(R8)                 :: scmLat  = shr_const_SPVAL ! single column lat
     real(R8)                 :: scmLon  = shr_const_SPVAL ! single column lon
     logical                  :: connected                 ! is field connected?
+    integer                  :: klon, klat
+    integer                  :: lsize
+    integer                  :: iam
+    real(r8), pointer        :: lon(:),lat(:)
+    integer , pointer        :: gindex(:)
     character(len=*),parameter :: subname=trim(modName)//':(InitializeRealize) '
     !-------------------------------------------------------------------------------
 
@@ -373,7 +371,7 @@ module dwav_comp_nuopc
     call shr_file_setLogUnit (logunit)
 
     !----------------------------------------------------------------------------
-    ! If component is prognostic, map ESMF state to attribute vector
+    ! Read input namelists and set present and prognostic flags
     !----------------------------------------------------------------------------
 
     phase = 1  !TODO - this is hard-wired for now and needs to be generalized
@@ -387,7 +385,7 @@ module dwav_comp_nuopc
                 call shr_sys_abort("Wav prognostic .true. requires connection for " // trim(fldsToWav%shortname(n)))
              end if
           end do
-          call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
+          call shr_nuopc_grid_StateToArray(importState, x2d%rattr, seq_flds_x2w_fields, grid_option, rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
        end if
     endif
@@ -418,8 +416,23 @@ module dwav_comp_nuopc
 
     nx_global = SDWAV%nxg
     ny_global = SDWAV%nyg
-    call shr_nuopc_dmodel_gridinit(nx_global, ny_global, mpicom, gsMap, ggrid, grid_option, EGrid, Emesh, rc)
+    lsize = mct_gsMap_lsize(gsMap, mpicom)
+    allocate(lon(lsize))
+    allocate(lat(lsize))
+    allocate(gindex(lsize))
+    klat = mct_aVect_indexRA(ggrid%data, 'lat')
+    klon = mct_aVect_indexRA(ggrid%data, 'lon')
+    call mpi_comm_rank(mpicom, iam, ierr)
+    call mct_gGrid_exportRattr(ggrid,'lon',lon,lsize)
+    call mct_gGrid_exportRattr(ggrid,'lat',lat,lsize)
+    call mct_gsMap_OrderedPoints(gsMap_target, iam, gindex)
+
+    call shr_nuopc_grid_MeshInit(gcomp, nx_global, ny_global, mpicom, compid, gindex, lon, lat, Emesh, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
+    deallocate(lon)
+    deallocate(lat)
+    deallocate(gindex)
 
     !--------------------------------
     ! realize the actively coupled fields, now that a grid or mesh is established
@@ -459,7 +472,7 @@ module dwav_comp_nuopc
     ! Set the coupling scalars
     !--------------------------------
 
-    call shr_nuopc_dmodel_AvectToState(d2x, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_w2x_fields, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     call shr_nuopc_methods_State_SetScalar(dble(ny_global),seq_flds_scalar_index_nx, exportState, mpicom, rc)
@@ -495,7 +508,7 @@ module dwav_comp_nuopc
     call ESMF_AttributeSet(comp, "ShortName", "DWAV", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "LongName", &
-         "Data Land Model", &
+         "Data Wave Model", &
          convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "Description", &
          "The CIME data models perform the basic function of " // &
@@ -624,7 +637,7 @@ module dwav_comp_nuopc
     !--------------------------------
 
     if (unpack_import) then
-       call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
+       call shr_nuopc_grid_StateToArray(importState, x2d%rattr, seq_flds_x2w_fields, grid_option, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     end if
 
@@ -640,7 +653,7 @@ module dwav_comp_nuopc
     ! Pack export state
     !--------------------------------
 
-    call shr_nuopc_dmodel_AvectToState(d2x, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_w2x_fields, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------

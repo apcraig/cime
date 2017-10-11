@@ -216,16 +216,6 @@ contains
        ki = mct_aVect_indexRA(d2x,"Si_imask",perrWith=subname)
        d2x%rAttr(ki,:) = float(nint(min(1.0_R8,max(0.0_R8,d2x%rAttr(ki,:)))))
 
-    case('ocn')
-
-       ki = mct_aVect_indexRA(d2x,"So_omask",perrWith=subname)
-       d2x%rAttr(ki,:) = float(nint(min(1.0_R8,max(0.0_R8,d2x%rAttr(ki,:)))))
-
-    case('lnd')
-
-       ki = mct_aVect_indexRA(d2x,"Sl_lfrin",perrWith=subname)
-       d2x%rAttr(ki,:) = 1.0_R8
-
     case('glc')
 
        ki = mct_aVect_indexRA(d2x,"Sg_icemask",perrWith=subname)

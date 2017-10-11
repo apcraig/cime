@@ -2,9 +2,6 @@ module datm_comp_nuopc
 
 !----------------------------------------------------------------------------
 ! This is the NUOPC cap
-! It follows the conventions of NUOPC and couples into the data
-! model using the old mct interfaces.  Tranlation between NUOPC/ESMF
-! datatypes and mct datatypes is implemented via share code.
 !----------------------------------------------------------------------------
 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
@@ -19,9 +16,9 @@ module datm_comp_nuopc
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_Diagnose
-  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_gridinit
-  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_AvectToState
-  use shr_nuopc_dmodel_mod  , only: shr_nuopc_dmodel_StateToAvect
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
   use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
   use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
   use shr_file_mod          , only: shr_file_setIO, shr_file_getUnit
@@ -212,7 +209,6 @@ module datm_comp_nuopc
     type(ESMF_VM) :: vm
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
-    integer(IN)   :: MCTID
     logical       :: exists
     integer(IN)   :: ierr       ! error code
     integer(IN)   :: shrlogunit ! original log unit
@@ -243,7 +239,7 @@ module datm_comp_nuopc
     call mpi_comm_rank(mpicom, my_task, ierr)
 
     !----------------------------------------------------------------------------
-    ! get MCT compid
+    ! get compid
     !----------------------------------------------------------------------------
 
     call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
@@ -251,13 +247,12 @@ module datm_comp_nuopc
       line=__LINE__, &
       file=__FILE__)) &
       return  ! bail out
-    read(cvalue,*) MCTID  ! convert from string to integer
+    read(cvalue,*) compid  ! convert from string to integer
 
     !----------------------------------------------------------------------------
     ! determine instance information
     !----------------------------------------------------------------------------
 
-    compid = MCTID
     inst_name   = seq_comm_name(compid)
     inst_index  = seq_comm_inst(compid)
     inst_suffix = seq_comm_suffix(compid)
@@ -365,27 +360,32 @@ module datm_comp_nuopc
     integer, intent(out) :: rc
 
     ! local variables
-    integer(IN)              :: phase
-    character(ESMF_MAXSTR)   :: convCIM, purpComp
-    type(ESMF_Grid)          :: Egrid
-    type(ESMF_Mesh)          :: Emesh
-    integer                  :: nx_global, ny_global
-    type(ESMF_VM)            :: vm
-    integer                  :: n
-    character(CL)            :: cvalue
-    integer(IN)              :: shrlogunit                ! original log unit
-    integer(IN)              :: shrloglev                 ! original log level
-    logical                  :: read_restart              ! start from restart
-    integer(IN)              :: ierr                      ! error code
-    logical                  :: scmMode = .false.         ! single column mode
-    real(R8)                 :: scmLat  = shr_const_SPVAL ! single column lat
-    real(R8)                 :: scmLon  = shr_const_SPVAL ! single column lon
-    real(R8)                 :: orbEccen                  ! orb eccentricity (unit-less)
-    real(R8)                 :: orbMvelpp                 ! orb moving vernal eq (radians)
-    real(R8)                 :: orbLambm0                 ! orb mean long of perhelion (radians)
-    real(R8)                 :: orbObliqr                 ! orb obliquity (radians)
-    real(R8)                 :: nextsw_cday               ! calendar of next atm sw
-    logical                  :: connected                 ! is field connected?
+    integer(IN)            :: phase
+    character(ESMF_MAXSTR) :: convCIM, purpComp
+    type(ESMF_Grid)        :: Egrid
+    type(ESMF_Mesh)        :: Emesh
+    integer                :: nx_global, ny_global
+    type(ESMF_VM)          :: vm
+    integer                :: n
+    character(CL)          :: cvalue
+    integer(IN)            :: shrlogunit                ! original log unit
+    integer(IN)            :: shrloglev                 ! original log level
+    logical                :: read_restart              ! start from restart
+    integer(IN)            :: ierr                      ! error code
+    logical                :: scmMode = .false.         ! single column mode
+    real(R8)               :: scmLat  = shr_const_SPVAL ! single column lat
+    real(R8)               :: scmLon  = shr_const_SPVAL ! single column lon
+    real(R8)               :: orbEccen                  ! orb eccentricity (unit-less)
+    real(R8)               :: orbMvelpp                 ! orb moving vernal eq (radians)
+    real(R8)               :: orbLambm0                 ! orb mean long of perhelion (radians)
+    real(R8)               :: orbObliqr                 ! orb obliquity (radians)
+    real(R8)               :: nextsw_cday               ! calendar of next atm sw
+    logical                :: connected                 ! is field connected?
+    integer                :: klon, klat
+    integer                :: lsize
+    integer                :: iam
+    real(r8), pointer      :: lon(:),lat(:)
+    integer , pointer      :: gindex(:)
     character(len=*),parameter :: subname=trim(modName)//':(InitializeRealize) '
     !-------------------------------------------------------------------------------
 
@@ -418,7 +418,7 @@ module datm_comp_nuopc
                 call shr_sys_abort("Atm prognostic .true. requires connection for " // trim(fldsToAtm%shortname(n)))
              end if
           end do
-          call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
+          call shr_nuopc_grid_StateToArray(importState, x2d%rattr, seq_flds_x2a_fields, grid_option, rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
        end if
     endif
@@ -487,14 +487,29 @@ module datm_comp_nuopc
          orbEccen, orbMvelpp, orbLambm0, orbObliqr, phase, nextsw_cday)
 
     !--------------------------------
-    ! generate the grid or mesh from the gsmap and ggrid
+    ! generate the mesh
     ! grid_option specifies grid or mesh
     !--------------------------------
 
     nx_global = SDATM%nxg
     ny_global = SDATM%nyg
-    call shr_nuopc_dmodel_gridinit(nx_global, ny_global, mpicom, gsMap, ggrid, grid_option, EGrid, Emesh,rc)
+    lsize = mct_gsMap_lsize(gsMap, mpicom)
+    allocate(lon(lsize))
+    allocate(lat(lsize))
+    allocate(gindex(lsize))
+    klat = mct_aVect_indexRA(ggrid%data, 'lat')
+    klon = mct_aVect_indexRA(ggrid%data, 'lon')
+    call mpi_comm_rank(mpicom, iam, ierr)
+    call mct_gGrid_exportRattr(ggrid,'lon',lon,lsize)
+    call mct_gGrid_exportRattr(ggrid,'lat',lat,lsize)
+    call mct_gsMap_OrderedPoints(gsMap_target, iam, gindex)
+
+    call shr_nuopc_grid_MeshInit(gcomp, nx_global, ny_global, mpicom, compid, gindex, lon, lat, Emesh, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
+    deallocate(lon)
+    deallocate(lat)
+    deallocate(gindex)
 
     !--------------------------------
     ! realize the actively coupled fields, now that a grid or mesh is established
@@ -534,7 +549,7 @@ module datm_comp_nuopc
     ! Set the coupling scalars
     !--------------------------------
 
-    call shr_nuopc_dmodel_AvectToState(d2x, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_a2x_fields, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     call shr_nuopc_methods_State_SetScalar(dble(ny_global),seq_flds_scalar_index_nx, exportState, mpicom, rc)
@@ -721,7 +736,7 @@ module datm_comp_nuopc
     !--------------------------------
 
     if (unpack_import) then
-       call shr_nuopc_dmodel_StateToAvect(importState, x2d, grid_option, rc=rc)
+       call shr_nuopc_grid_StateToArray(importState, x2d%rattr, seq_flds_x2a_fields, grid_option, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     end if
 
@@ -737,7 +752,7 @@ module datm_comp_nuopc
     ! Pack export state
     !--------------------------------
 
-    call shr_nuopc_dmodel_AvectToState(d2x, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_a2x_fields, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     call shr_nuopc_methods_State_SetScalar(nextsw_cday, seq_flds_scalar_index_nextsw_cday, exportState, mpicom, rc)
