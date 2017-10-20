@@ -8,13 +8,13 @@ Two concepts to understand before working with CIME are component sets and model
 
 - *Component sets*, which are usually referred to as "compsets," define both individual model components and any component-specific namelist or configuration settings that are used in a case.
 
-- *Model grids* specify the grid or resolution for each component making up the model.
+- *Model grids* specify the grid or resolution for each component of the model.
 
 Creating a CIME experiment or *case* requires, at a minimum, specifying a compset and a model grid.
 
-Out-of-the-box compsets and models grids are associated with two names: a longname and an alias name. Examples of both follow.
+Out-of-the-box compsets and model grids each have two names: a *longname* and an *alias* name. Examples of both follow.
 
-The CIME regression test system requires aliases, but aliases can also be used for convenience. Compset aliases are unique; each compset alias is associated with one and only one compset. Grid aliases, on the other hand, are overloaded; the same grid alias may result in a different grid depending on the associated compset. Always confirm that the *compset longname* and the *grid longname* are correct when using aliases to create a case.
+Aliases are used for convenience. *Compset aliases* are unique; each is associated with one and only one compset. *Grid aliases*, on the other hand, are overloaded; the same grid alias may result in a different grid depending on the associated compset. Always confirm that the *compset longname* and the *grid longname* are correct when using aliases to create a case.
 
 ================
  Component sets
@@ -23,6 +23,8 @@ The CIME regression test system requires aliases, but aliases can also be used f
 A compset longname has this form::
 
   TIME_ATM[%phys]_LND[%phys]_ICE[%phys]_OCN[%phys]_ROF[%phys]_GLC[%phys]_WAV[%phys]_ESP[_BGC%phys]
+
+Supported values for each element of the longname::
 
   TIME = model time period (e.g. 1850, 2000, 20TR, RCP8...)
 
@@ -36,38 +38,21 @@ A compset longname has this form::
   WAV  = [SWAV, XWAV]
   ESP  = [SESP]
 
-  If CIME is run with CESM active components, the following additional values are permitted:
-  ATM  = [CAM40, CAM50, CAM55, CAM60]
-  LND  = [CLM45, CLM50]
-  ICE  = [CICE]
-  OCN  = [POP2, AQUAP]
-  ROF  = [RTM, MOSART]
-  GLC  = [CISM1, CISM2]
-  WAV  = [WW]
-  BGC  = optional BGC scenario
+A CIME-driven model may have other options available.  Use **query_config** to determine the available options.
 
-  If CIME is run with ACME active components, the following additional values are permitted:
-  ATM  = []
-  LND  = []
-  ICE  = []
-  OCN  = []
-  ROF  = []
-  GLC  = []
-  WAV  = []
-  BGC  = optional BGC scenario
+The OPTIONAL %phys attributes specify sub-modes of the given system.
+For example, DOCN%DOM is the DOCN data ocean (rather than slab-ocean) mode.
+ALL the possible %phys choices for each component are listed by
+calling **query_case** with the --compsets all argument.  ALL data models have
+a %phys option that corresponds to the data model mode.
 
-  The OPTIONAL %phys attributes specify sub-modes of the given system.
-  For example, DOCN%DOM is the DOCN data ocean (rather than slab-ocean) mode.
-  ALL the possible %phys choices for each component are listed by
-  calling **manage_case** with the **-list** compsets argument.
-  ALL data models have a %phys option that corresponds to the data model mode.
-
-As an example, the CESM compset longname (below) refers to running a pre-industrial control with active CESM components CAM, CLM, CICE, POP2, MOSART, CISM2 and WW3 in a BDRD BGC coupling scenario.::
+As an example, this actual CESM compset longname refers to running a pre-industrial control with active CESM components CAM, CLM, CICE, POP2, MOSART, CISM2 and WW3 in a BDRD BGC coupling scenario::
 
    1850_CAM60_CLM50%BGC_CICE_POP2%ECO_MOSART_CISM2%NOEVOLVE_WW3_BGC%BDRD
 
-The alias for this compset is B1850. Input to **create_newcase** can be either a compset longname or a compset alias.
-It is also possible to create your own custom compset. See *How do I create my own compset?* in the FAQ.
+The alias for this compset is B1850.
+
+Either a compset longname or a compset alias can be input to **create_newcase**. You can also create your own custom compset. See *How do I create my own compset?* in the FAQ.
 
 ===============================
  Model Grids
@@ -77,35 +62,37 @@ A model grid longname has the form::
 
   a%name_l%name_oi%name_r%name_m%mask_g%name_w%name
 
+For reference::
+
   a%  = atmosphere grid
   l%  = land grid
   oi% = ocean/sea-ice grid (must be the same)
   r%  = river grid
   m%  = ocean mask grid
-  g%  = internal land-ice (CISM) grid
+  g%  = internal land-ice grid
   w%  = wave component grid
 
-  The ocean mask grid determines land/ocean boundaries in the model.
-  On the ocean grid, a grid cell is assumed to be either all ocean or all land.
-  The land mask on the land grid is obtained by mapping the ocean mask
-  (using first-order conservative mapping) from the ocean grid to the land grid.
+The ocean mask grid determines land/ocean boundaries in the model.
+On the ocean grid, a grid cell is assumed to be either all ocean or all land.
+The land mask on the land grid is obtained by mapping the ocean mask
+(using first-order conservative mapping) from the ocean grid to the land grid.
 
-  From the point of view of model coupling, the glc (CISM) grid is assumed to
-  be identical to the land grid. The internal CISM grid can be different,
-  however, and is specified by the g% value.
+From the point of view of model coupling, the glc grid is assumed to
+be identical to the land grid. The internal land-ice grid can be different,
+however, and is specified by the g% value.
 
-As an example, examine this longname::
+As an example, examine this actual grid longname::
 
    a%ne30np4_l%ne30np4_oi%gx1v7_r%r05_m%gx1v7_g%null_w%null
 
-It refers to a model grid with a ne30np4 spectral element 1-degree atmosphere and land grids, gx1v7 Greenland pole 1-degree ocean and sea-ice grids, a 1/2 degree river routing grid, null wave and internal cism grids, and an gx1v7 ocean mask.
+It refers to a model grid with a ne30np4 spectral element (approximately 1-degree) atmosphere and land grids, gx1v7 Greenland pole, 1-degree ocean and sea-ice grids, a 1/2 degree river routing grid, null wave and internal cism grids, and an gx1v7 ocean mask.
 The alias for this grid is ne30_g16.
 
 CIME also permits users to introduce their own :ref:`user-defined grids <adding-a-grid>`.
 
 Component grids are denoted by the following naming convention:
 
-- "[dlat]x[dlon]" are regular lon/lat finite volume grids where dlat and dlon are the approximate grid spacing. The shorthand convention is "fnn" where nn generally is a pair of numbers indicating the resolution. An example is 1.9x2.5 or f19 for the approximately "2-degree" finite volume grid. Note that CAM uses an [nlat]x[nlon] naming convention internally for this grid.
+- "[dlat]x[dlon]" are regular lon/lat finite volume grids where dlat and dlon are the approximate grid spacing. The shorthand convention is "fnn" where nn generally is a pair of numbers indicating the resolution. An example is 1.9x2.5 or f19 for the approximately "2-degree" finite-volume grid. Note that CAM uses an [nlat]x[nlon] naming convention internally for this grid.
 
 - "Tnn" are spectral lon/lat grids where nn is the spectral truncation value for the resolution. The shorthand name is identical. Example: T85.
 
@@ -113,36 +100,41 @@ Component grids are denoted by the following naming convention:
 
 - "pt1" is a single grid point.
 
-- "gx[D]v[n]" is a displaced pole grid where D is the approximate resolution in degrees and n is the grid version. The short name generally is g[D][n]. An example is gx1v7 or g17 for a grid of approximately 1-degree resolution.
+- "gx[D]v[n]" is a POP displaced pole grid where D is the approximate resolution in degrees and n is the grid version. The short name generally is g[D][n]. An example is gx1v7 or g17 for a grid of approximately 1-degree resolution.
 
-- "tx[D]v[n]" is a tripole grid where D is the approximate resolution in degrees and n is the grid version.
+- "tx[D]v[n]" is a POP tripole grid where D is the approximate resolution in degrees and n is the grid version.
+
+- "oRSS[x]to[y]" is an MPAS grid with grid spacing from x to y kilometers.
+
+- "oEC[x]to[y]" is an MPAS grid with grid spacing from x to y kilometers.
+
 
 ==============================================
 Querying CIME - calling **query_config**
 ==============================================
 
-The utility **$CIMEROOT/scripts/query_config** permits you to query the out-of-the-box compsets, components, grids and machines that are available for a model.
+Use the utility **$CIMEROOT/scripts/query_config** to see which out-of-the-box compsets, components, grids and machines are available for a model.
 
-Optional arguments include the following:
-  ::
+Optional arguments include the following::
 
-     --compsets
-     --components
-     --grids
-     --machines
+  --compsets
+  --components
+  --grids
+  --machines
 
-If CIME is downloaded in standalone mode, only standalone CIME compsets can be queried. If CIME is part of a larger checkout that includes the prognostic components of a model, **query_config** will allow you to query all prognostic component compsets, as well.
+If CIME is downloaded in standalone mode, only standalone CIME compsets can be queried. If CIME is part of CIME-driven model, **query_config** will allow you to query all prognostic component compsets.
 
-Run **query_config -- --help** to see lists of available compsets, components, grids and machines.
+To see lists of available compsets, components, grids and machines, look at the **help** text::
+
+  > query_config --help
 
 **Usage examples**
-  To run **query_config** for compset information, use the **---compsets** option and the component name, which is **drv** in this example:
-  ::
 
-     query_config --compsets drv
+To run **query_config** for compset information, follow this example, where **drv** is the component name::
 
-  The output will be similar to this:
-  ::
+  > query_config --compsets drv
+
+The output will be similar to this::
 
      --------------------------------------
      Compset Short Name: Compset Long Name
@@ -158,13 +150,11 @@ Run **query_config -- --help** to see lists of available compsets, components, g
 
 Each model component specifies its own definitions of what can appear after the ``%`` modifier in the compset longname (for example, ``DOM`` in ``DOCN%DOM``).
 
-  To see what supported modifiers are for ``DOCN``, run **query_config** as in this example:
-  ::
+To see what supported modifiers are for ``DOCN``, run **query_config** as in this example::
 
-     query_config --component docn
+  > query_config --component docn
 
-  The output will be similar to this:
-  ::
+The output will be similar to this::
 
      =========================================
      DOCN naming conventions

@@ -8,16 +8,16 @@ module drof_comp_mod
   use esmf
   use mct_mod
   use perf_mod
-  use shr_sys_mod        , only: shr_sys_flush, shr_sys_abort
-  use shr_kind_mod       , only: IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
-  use shr_file_mod       , only: shr_file_getunit, shr_file_freeunit
-  use shr_mpi_mod        , only: shr_mpi_bcast
-  use shr_strdata_mod    , only: shr_strdata_type, shr_strdata_pioinit, shr_strdata_init
-  use shr_strdata_mod    , only: shr_strdata_print, shr_strdata_restRead
-  use shr_strdata_mod    , only: shr_strdata_advance, shr_strdata_restWrite
-  use shr_dmodel_mod     , only: shr_dmodel_gsmapcreate, shr_dmodel_rearrGGrid
-  use shr_dmodel_mod     , only: shr_dmodel_translate_list, shr_dmodel_translateAV_list, shr_dmodel_translateAV
-  use seq_timemgr_mod    , only: seq_timemgr_EClockGetData, seq_timemgr_RestartAlarmIsOn
+  use shr_sys_mod     , only: shr_sys_flush, shr_sys_abort
+  use shr_kind_mod    , only: IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
+  use shr_file_mod    , only: shr_file_getunit, shr_file_freeunit
+  use shr_mpi_mod     , only: shr_mpi_bcast
+  use shr_strdata_mod , only: shr_strdata_type, shr_strdata_pioinit, shr_strdata_init
+  use shr_strdata_mod , only: shr_strdata_print, shr_strdata_restRead
+  use shr_strdata_mod , only: shr_strdata_advance, shr_strdata_restWrite
+  use shr_dmodel_mod  , only: shr_dmodel_gsmapcreate, shr_dmodel_rearrGGrid
+  use shr_dmodel_mod  , only: shr_dmodel_translate_list, shr_dmodel_translateAV_list, shr_dmodel_translateAV
+  use seq_timemgr_mod , only: seq_timemgr_EClockGetData, seq_timemgr_RestartAlarmIsOn
 
   use drof_shr_mod   , only: datamode       ! namelist input
   use drof_shr_mod   , only: decomp         ! namelist input
@@ -67,8 +67,6 @@ CONTAINS
        inst_suffix, inst_name, logunit, read_restart)
 
     ! !DESCRIPTION: initialize drof model
-    use pio        , only : iosystem_desc_t
-    use shr_pio_mod, only : shr_pio_getiosys, shr_pio_getiotype
     implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
@@ -95,7 +93,6 @@ CONTAINS
     logical       :: exists      ! file existance logical
     integer(IN)   :: nu          ! unit number
     character(CL) :: calendar ! model calendar
-    type(iosystem_desc_t), pointer :: rof_pio_subsystem
 
     !--- formats ---
     character(*), parameter :: F00   = "('(drof_comp_init) ',8a)"
@@ -115,8 +112,7 @@ CONTAINS
     ! Initialize pio
     !----------------------------------------------------------------------------
 
-    rof_pio_subsystem => shr_pio_getiosys(trim(inst_name))
-    call shr_strdata_pioinit(SDROF, rof_pio_subsystem, shr_pio_getiotype(trim(inst_name)))
+    call shr_strdata_pioinit(SDROF, COMPID)
 
     !----------------------------------------------------------------------------
     ! Initialize SDROF
@@ -183,6 +179,19 @@ CONTAINS
     call mct_aVect_init(r2x, rList=seq_flds_r2x_fields, lsize=lsize)
     call mct_aVect_zero(r2x)
     call t_stopf('drof_initmctavs')
+
+    !-------------------------------------------------
+    ! Determine data model behavior based on the mode
+    !-------------------------------------------------
+
+    call t_startf('drof_datamode')
+    select case (trim(datamode))
+
+    case('COPYALL')
+       ! do nothing extra
+
+    end select
+    call t_stopf('dlnd_datamode')
 
     !----------------------------------------------------------------------------
     ! Read restart
@@ -308,6 +317,7 @@ CONTAINS
     call t_startf('drof_r')
 
     call t_startf('drof_r_strdata_advance')
+
     call shr_strdata_advance(SDROF, currentYMD, currentTOD, mpicom, 'drof_r')
     call t_stopf('drof_r_strdata_advance')
 

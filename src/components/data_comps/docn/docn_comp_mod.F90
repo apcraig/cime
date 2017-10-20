@@ -66,7 +66,7 @@ module docn_comp_mod
   type(mct_avect)        :: avstrm       ! av of data from stream
   real(R8), pointer      :: somtp(:)
   real(R8), pointer      :: tfreeze(:)
-  integer , pointer      :: imask(:)
+  integer(IN), pointer   :: imask(:)
   real(R8), pointer      :: xc(:), yc(:) ! arryas of model latitudes and longitudes
 
   !--------------------------------------------------------------------------
@@ -83,9 +83,9 @@ module docn_comp_mod
 
   character(12),parameter  :: avofld(1:ktrans) = &
        (/ "Si_ifrac    ","Sa_pslv     ","So_duu10n   ","Foxx_taux   ","Foxx_tauy   ", &
-       "Foxx_swnet  ","Foxx_lat    ","Foxx_sen    ","Foxx_lwup   ","Foxx_lwdn   ", &
-       "Foxx_melth  ","Foxx_salt   ","Foxx_prec   ","Foxx_snow   ","Foxx_rain   ", &
-       "Foxx_evap   ","Foxx_meltw  ","Foxx_rofl   ","Foxx_rofi   ",                &
+       "Foxx_swnet  ","Foxx_lat    ","Foxx_sen    ","Foxx_lwup   ","Faxa_lwdn   ", &
+       "Fioi_melth  ","Fioi_salt   ","Faxa_prec   ","Faxa_snow   ","Faxa_rain   ", &
+       "Foxx_evap   ","Fioi_meltw  ","Foxx_rofl   ","Foxx_rofi   ",                &
        "So_t        ","So_u        ","So_v        ","So_dhdx     ","So_dhdy     ", &
        "So_s        ","Fioo_q      ","strm_h      ","strm_qbot   ","So_fswpen   "  /)
   !--------------------------------------------------------------------------
@@ -158,8 +158,7 @@ CONTAINS
     ! Initialize pio
     !----------------------------------------------------------------------------
 
-    ocn_pio_subsystem => shr_pio_getiosys(trim(inst_name))
-    call shr_strdata_pioinit(SDOCN, ocn_pio_subsystem, shr_pio_getiotype(trim(inst_name)))
+    call shr_strdata_pioinit(SDOCN, COMPID)
 
     !----------------------------------------------------------------------------
     ! Initialize SDOCN
@@ -322,7 +321,7 @@ CONTAINS
        if (trim(datamode) == 'SOM' .or. trim(datamode) == 'SOM_AQUAP') then
           if (my_task == master_task) write(logunit,F00) ' reading ',trim(rest_file)
           call shr_pcdf_readwrite('read',SDOCN%pio_subsystem, SDOCN%io_type, &
-               trim(rest_file), mpicom, gsmap, rf1=somtp, rf1n='somtp')
+               trim(rest_file), mpicom, gsmap=gsmap, rf1=somtp, rf1n='somtp', io_format=SDOCN%io_format)
        endif
        if (exists) then
           if (my_task == master_task) write(logunit,F00) ' reading ',trim(rest_file_strm)
@@ -418,7 +417,7 @@ CONTAINS
     lsize = mct_avect_lsize(o2x)
     do n = 1,lsize
        if (km /= 0) then
-          o2x%rAttr(km,n) = imask(n)
+          o2x%rAttr(km   ,n) = imask(n)
        end if
        o2x%rAttr(kt   ,n) = TkFrz
        o2x%rAttr(ks   ,n) = ocnsalt

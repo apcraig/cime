@@ -3,85 +3,108 @@
 Multi-instance component functionality
 ======================================
 
-The CIME coupling infrastructure has the capability to run multiple component instances under one model executable. 
-The only caveat to this usage is that if N multiple instances of any one active component is used, then N multiple instances of ALL active components are required. 
-More details are discussed below. 
-The primary motivation for this development was to be able to run an ensemble Kalman-Filter for data assimilation and parameter estimation (e.g. UQ). 
-However, it also provides you with the ability to run a set of experiments within a single model executable where each instance can have a different namelist, and have all the output go to one directory. 
+The CIME coupling infrastructure is capable of running multiple
+component instances (ensembles) under one model executable.  There are
+two modes of ensemble capability, single driver in which all component
+instances are handled by a single driver/coupler component or
+multi-driver in which each instance includes a separate driver/coupler
+component.  In the multi-driver mode the entire model is duplicated
+for each instance while in the single driver mode only active
+components need be duplicated.  In most cases the multi-driver mode
+will give better performance and should be used.
 
-In the following an F compset will be used as an illustration. Utilizing the multiple instance code involves the following steps:
+The primary motivation for this development was to be able to run an
+ensemble Kalman-Filter for data assimilation and parameter estimation
+(UQ, for example).  However, it also provides the ability to run a set
+of experiments within a single model executable where each instance
+can have a different namelist, and to have all the output go to one
+directory.
 
-1. create the case
+An F compset is used in the following example. Using the
+multiple-instance code involves the following steps:
+
+1. Create the case.
 ::
 
-   > create_newcase -case Fmulti -compset F -res ne30_g16 
+   > create_newcase --case Fmulti --compset F2000_DEV --res f19_f19_mg17
    > cd Fmulti
 
-2. Lets assume the following out of the box pe-layout 
+2. Assume this is the out-of-the-box pe-layout:
 ::
 
-   NTASKS(ATM)=128, NTHRDS(ATM)=1, ROOTPE(ATM)=0, NINST(ATM)=1
-   NTASKS(LND)=128, NTHRDS(LND)=1, ROOTPE(LND)=0, NINST(LND)=1
-   NTASKS(ICE)=128, NTHRDS(ICE)=1, ROOTPE(ICE)=0, NINST(ICE)=1
-   NTASKS(OCN)=128, NTHRDS(OCN)=1, ROOTPE(OCN)=0, NINST(OCN)=1
-   NTASKS(GLC)=128, NTHRDS(GLC)=1, ROOTPE(GLC)=0, NINST(GLC)=1
-   NTASKS(WAV)=128, NTHRDS(WAV)=1, ROOTPE(WAV)=0, NINST(WAV)=1
-   NTASKS(CPL)=128, NTHRDS(CPL)=1, ROOTPE(CPL)=0
+   Comp  NTASKS  NTHRDS  ROOTPE
+   CPL :    144/     1;      0
+   ATM :    144/     1;      0
+   LND :    144/     1;      0
+   ICE :    144/     1;      0
+   OCN :    144/     1;      0
+   ROF :    144/     1;      0
+   GLC :    144/     1;      0
+   WAV :    144/     1;      0
+   ESP :      1/     1;      0
 
-In this F compset, the atm, lnd, rof are active components, the ocn is a prescribed data component, cice is a mixed prescribed/active component (ice-coverage is prescribed) and glc and wav are stub components. 
-Lets say we want to run 2 instances of CAM in this experiment. 
-The current implementation of multi-instances will also require you to run 2 instances of CLM, CICE and RTM. 
-However, you have the flexibility to run either 1 or 2 instances of DOCN (we can ignore glc and wav since they do not do anything in this compset). 
-To run 2 instances of CAM, CLM, CICE, RTM and DOCN, all you need to do is to invoke the following command in your ``$CASEROOT``:
+The atm, lnd, rof and glc are active components in this compset. The ocn is
+a prescribed data component, cice is a mixed prescribed/active
+component (ice-coverage is prescribed), and wav and esp are stub
+components.
+
+Let's say we want to run two instances of CAM in this experiment.  We
+will also have to run two instances of CLM, CICE, RTM and GLC.  However, we
+can run either one or two instances of DOCN, and we can ignore the
+stub components since they do not do anything in this compset.
+
+To run two instances of CAM, CLM, CICE, RTM, GLC and DOCN, invoke the following :ref: `xmlchange<modifying-an-xml-file>` commands in your **$CASEROOT** directory:
 ::
 
-   ./xmlchange NINST_ATM=2
-   ./xmlchange NINST_LND=2
-   ./xmlchange NINST_ICE=2
-   ./xmlchange NINST_ROF=2
-   ./xmlchange NINST_OCN=2
+   > ./xmlchange NINST_ATM=2
+   > ./xmlchange NINST_LND=2
+   > ./xmlchange NINST_ICE=2
+   > ./xmlchange NINST_ROF=2
+   > ./xmlchange NINST_GLC=2
+   > ./xmlchange NINST_OCN=2
 
-As a result of this, you will have 2 instances of CAM, CLM and CICE (prescribed), RTM, and DOCN,  each running concurrently on 64 MPI tasks  **TODO: put in reference to xmlchange".**
+As a result, you will have two instances of CAM, CLM and CICE (prescribed), RTM, GLC, and DOCN, each running concurrently on 72 MPI tasks and all using the same driver/coupler component.   In this single driver/coupler mode the number of tasks for each component instance is NTASKS_COMPONENT/NINST_COMPONENT and the total number of tasks is the same as for the single instance case.
 
-3. Setup the case
+Now consider the multi driver model.
+To use this mode change
+::
+
+   > ./xmlchange MULTI_DRIVER=TRUE
+
+This configuration will run each component instance on the original 144 tasks but will generate two copies of the model (in the same executable) for a total of 288 tasks.
+
+3. Set up the case
 ::
 
    > ./case.setup
 
-New user_nl_xxx_NNNN file (where NNNN is the number of the component instances) will be generated when **case.setup** is called. 
-In particular, calling **case.setup** with the above ``env_mach_pes.xml`` file will result in the following ``user_nl_*`` files in ``$CASEROOT``
+A new **user_nl_xxx_NNNN** file is generated for each component instance when case.setup is called (where xxx is the component type and NNNN is the number of the component instance).
+When calling **case.setup** with the **env_mach_pes.xml** file specifically, these files are created in **$CASEROOT**:
 ::
 
-   user_nl_cam_0001,  user_nl_cam_0002
-   user_nl_cice_0001, user_nl_cice_0002
-   user_nl_clm_0001,  user_nl_clm_0002
-   user_nl_rtm_0001,  user_nl_rtm_0002
-   user_nl_docn_0001, user_nl_docn_0002
+   user_nl_cam_0001 user_nl_clm_0001 user_nl_docn_0001 user_nl_cice_0001
+   user_nl_cism_0001 user_nl_mosart_0001
+   user_nl_cam_0002 user_nl_clm_0002 user_nl_docn_0002 user_nl_cice_0002
+   user_nl_cism_0002 user_nl_mosart_0002
    user_nl_cpl
 
-and the following ``*_in_*`` files and ``*txt*`` files in $CASEROOT/CaseDocs:
-::
+The namelist for each component instance can be modified by changing the corresponding **user_nl_xxx_NNNN** file.
+Modifying **user_nl_cam_0002** will result in your namelist changes being active ONLY for the second instance of CAM.
+To change the DOCN stream txt file instance 0002, copy **docn.streams.txt.prescribed_0002** to your **$CASEROOT** directory with the name **user_docn.streams.txt.prescribed_0002** and modify it accordlingly.
 
-   atm_in_0001, atm_in_0002
-   docn.streams.txt.prescribed_0001, docn.streams.txt.prescribed_0002
-   docn_in_0001, docn_in_0002
-   docn_ocn_in_0001, docn_ocn_in_0002
-   drv_flds_in, drv_in
-   ice_in_0001, ice_in_0002
-   lnd_in_0001, lnd_in_0002
-   rof_in_0001, rof_in_0002
+Also keep these important points in mind:
 
-The namelist for each component instance can be modified by changing the corresponding user_nl_xxx_NNNN file for that component instance. 
-Modifying the user_nl_cam_0002 will result in the namelist changes you put in to be active ONLY for instance 2 of CAM. 
-To change the DOCN stream txt file instance 0002, you should place a copy of ``docn.streams.txt.prescribed_0002`` in ``$CASEROOT`` with the name ``user_docn.streams.txt.prescribed_0002`` and modify it accordlingly.
+#. Note that these changes can be made at create_newcase time with option --ninst # where # is a positive integer, use the additional logical option --multi-driver to invoke the multi-driver mode.
 
-It is also important to stress the following points:
+#. **Multiple component instances can differ ONLY in namelist settings; they ALL use the same model executable.**
 
-1. **Different component instances can ONLY differ by differences in namelist settings - they are ALL using the same model executable.**
+#. Calling **case.setup** with ``--clean`` *DOES NOT* remove the **user_nl_xxx_NN** (where xxx is the component name) files created by **case.setup**.
 
-2. Only 1 coupler component is supported currently in multiple instance implementation.
+#. A special variable NINST_LAYOUT is provided for some experimental compsets, its value should be
+   'concurrent' for all but a few special cases and it cannot be used if MULTI_DRIVER=TRUE.
 
-3. ``user_nl_xxx_NN`` files once they are created by **case.setup** *ARE NOT* removed by calling **case.setup -clean**. 
+#. In **create_test** these options can be invoked with testname modifiers _N# for the single driver mode and _C# for the multi-driver mode.  These are mutually exclusive options, they cannot be combined.
 
-4. In general, you should run multiple instances concurrently (the default setting in ``env_mach_pes.xml``). 
-   The serial setting is only for EXPERT USERS in upcoming development code implementations.
+#. In create_newcase you may use --ninst # to set the number of instances and --multi-driver for multi-driver mode.
+
+#. In multi-driver mode you will always get 1 instance of each component for each driver/coupler, if you change a case using xmlchange MULTI_COUPLER=TRUE you will get a number of driver/couplers equal to the maximum NINST value over all components.

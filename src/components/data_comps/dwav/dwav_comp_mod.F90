@@ -4,7 +4,6 @@
 module dwav_comp_mod
 
   ! !USES:
-
   use esmf
   use mct_mod
   use perf_mod
@@ -146,12 +145,12 @@ CONTAINS
     call shr_sys_flush(logunit)
 
     ! create a data model global seqmap (gsmap) given the data model global grid sizes
-    ! NOTE: gsmap is initialized using the decomp read in from the docn_in namelist
+    ! NOTE: gsmap is initialized using the decomp read in from the dwav_in namelist
     ! (which by default is "1d")
     call shr_dmodel_gsmapcreate(gsmap,SDWAV%nxg*SDWAV%nyg,compid,mpicom,decomp)
     lsize = mct_gsmap_lsize(gsmap,mpicom)
 
-    ! create a rearranger from the data model SDOCN%gsmap to gsmap
+    ! create a rearranger from the data model SDWAV%gsmap to gsmap
     call mct_rearr_init(SDWAV%gsmap,gsmap,mpicom,rearr)
 
     write(logunit,*)'lsize= ',lsize
@@ -325,9 +324,6 @@ CONTAINS
        call shr_dmodel_translateAV(SDWAV%avs(n),w2x,avifld,avofld,rearr)
     enddo
     call t_stopf('dwav_scatter')
-
-    call t_startf('dwav_mode')
-    call t_stopf('dwav_mode')
 
     !-------------------------------------------------
     ! Determine data model behavior based on the mode

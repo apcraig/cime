@@ -54,13 +54,13 @@ class DAE(SystemTestsCompareTwo):
         self._case.set_value("DATA_ASSIMILATION_CYCLES", 2)
         stopn = self._case.get_value("STOP_N")
         expect((stopn % 2) == 0, "ERROR: DAE test requires that STOP_N be even")
-        stopn = stopn / 2
+        stopn = int(stopn / 2)
         self._case.set_value("STOP_N", stopn)
 
         self._case.flush()
 
     ###########################################################################
-    def run_phase(self):
+    def run_phase(self): # pylint: disable=arguments-differ
     ###########################################################################
         # Clean up any da.log files in case this is a re-run.
         self._activate_case2()

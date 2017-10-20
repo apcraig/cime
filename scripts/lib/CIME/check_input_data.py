@@ -34,6 +34,15 @@ def download_if_in_repo(svn_loc, input_data_root, rel_path):
     rel_path = rel_path.strip('/')
     full_url = os.path.join(svn_loc, rel_path)
 
+    err = run_cmd("svn --non-interactive --trust-server-cert ls {}".format(svn_loc))[0]
+    if err != 0:
+        logging.warning(
+"""
+Could not connect to svn repo '{0}'
+This is most likely either a credential, proxy, or network issue .
+To check connection and store your credential run 'svn ls {0}' and permanently store your password""".format(svn_loc))
+        return False
+
     full_path = os.path.join(input_data_root, rel_path)
     logging.info("Trying to download file: '{}' to path '{}'".format(full_url, full_path))
     # Make sure local path exists, create if it does not
@@ -64,6 +73,9 @@ def check_all_input_data(case):
     success = check_input_data(case=case, download=True)
     expect(success, "Failed to download input data")
 
+    stage_refcase(case)
+
+def stage_refcase(case):
     get_refcase  = case.get_value("GET_REFCASE")
     run_type     = case.get_value("RUN_TYPE")
     continue_run = case.get_value("CONTINUE_RUN")
@@ -104,17 +116,18 @@ and prestage the restart data to $RUNDIR manually
             logger.debug("Creating run directory: {}".format(rundir))
             os.makedirs(rundir)
 
-        for rcfile in glob.iglob(os.path.join(refdir,"*{}*".format(run_refcase))):
-            logger.debug("Staging file {}".format(rcfile))
-            rcbaseline = os.path.basename(rcfile)
-            if not os.path.exists("{}/{}".format(rundir, rcbaseline)):
-                os.symlink(rcfile, "{}/{}".format(rundir, rcbaseline))
-
         # copy the refcases' rpointer files to the run directory
-        for rpointerfile in  glob.iglob(os.path.join("{}","*rpointer*").format(refdir)):
-            logger.debug("Copy rpointer {}".format(rpointerfile))
+        for rpointerfile in glob.iglob(os.path.join("{}","*rpointer*").format(refdir)):
+            logger.info("Copy rpointer {}".format(rpointerfile))
             shutil.copy(rpointerfile, rundir)
 
+        # link everything else
+
+        for rcfile in glob.iglob(os.path.join(refdir,"*")):
+            rcbaseline = os.path.basename(rcfile)
+            if not os.path.exists("{}/{}".format(rundir, rcbaseline)):
+                logger.info("Staging file {}".format(rcfile))
+                os.symlink(rcfile, "{}/{}".format(rundir, rcbaseline))
 
         for cam2file in  glob.iglob(os.path.join("{}","*.cam2.*").format(rundir)):
             camfile = cam2file.replace("cam2", "cam")
@@ -126,6 +139,7 @@ def check_input_data(case, svn_loc=None, input_data_root=None, data_list_dir="Bu
     """
     # Fill in defaults as needed
     svn_loc = SVN_LOCS[get_model()] if svn_loc is None else svn_loc
+
     input_data_root = case.get_value("DIN_LOC_ROOT") if input_data_root is None else input_data_root
 
     expect(os.path.isdir(input_data_root), "Invalid input_data_root directory: '{}'".format(input_data_root))
