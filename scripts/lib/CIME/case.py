@@ -130,7 +130,6 @@ class Case(object):
         env_mach_spec = self.get_env('mach_specific')
         comp_classes  = self.get_values("COMP_CLASSES")
         MAX_MPITASKS_PER_NODE  = self.get_value("MAX_MPITASKS_PER_NODE")
-        print "DEBUG: MAX_MPITASKS_PER_NODE = ",MAX_MPITASKS_PER_NODE
         self.total_tasks = env_mach_pes.get_total_tasks(comp_classes)
         self.thread_count = env_mach_pes.get_max_thread_count(comp_classes)
         self.tasks_per_node = env_mach_pes.get_tasks_per_node(self.total_tasks, self.thread_count)
@@ -156,7 +155,6 @@ class Case(object):
             self.num_nodes += self.spare_nodes
         else:
             self.num_nodes, self.spare_nodes = env_mach_pes.get_total_nodes(self.total_tasks, self.thread_count)
-            print "DEBUG: spare_nodes is ",self.spare_nodes
             self.num_nodes += self.spare_nodes
 
     # Define __enter__ and __exit__ so that we can use this as a context manager
@@ -439,11 +437,7 @@ class Case(object):
 
         # Determine the compsets file for this component
         comp_root_dir_cpl = files.get_value( "COMP_ROOT_DIR_CPL",{"component":driver}, resolved=False)
-        self.set_lookup_value("COMP_ROOT_DIR_CPL", comp_root_dir_cpl)
-
-        print "DEBUG: driver is ",driver
-        print "DEBUG: comp_root_dir_cpl is ",comp_root_dir_cpl
-        print "DEBUG: components are ",components
+        files.set_value("COMP_ROOT_DIR_CPL", comp_root_dir_cpl)
 
         # Loop through all of the files listed in COMPSETS_SPEC_FILE and find the file
         # that has a match for either the alias or the longname in that order
@@ -455,8 +449,9 @@ class Case(object):
             if driver == 'drv-nuopc' and component == 'drv':
                 continue
 
+            # Note that the get_value call below will use the resolved value of $COMP_ROOT_DIR_CPL
+            # to resolve the value of COMPSETS_SPEC_FILE
             compsets_filename = files.get_value("COMPSETS_SPEC_FILE", {"component":component})
-            print "DEBUG: component %s compsets_filename %s " %(component, compsets_filename)
 
             # If the file exists, read it and see if there is a match for the compset alias or longname
             if (os.path.isfile(compsets_filename)):
@@ -612,7 +607,6 @@ class Case(object):
             env_file.add_elements_by_group(files, attlist)
 
         drv_config_file = files.get_value("CONFIG_CPL_FILE",  {"component":self._driver})
-        print "DEBUG: drv_config is ",drv_config_file
         self.set_value("CONFIG_CPL_FILE", drv_config_file)
         drv_comp = Component(drv_config_file, "CPL")
         for env_file in self._env_entryid_files:
