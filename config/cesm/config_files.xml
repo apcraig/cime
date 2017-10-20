@@ -363,8 +363,8 @@
     <values>
       <value component="modelio"       >$COMP_ROOT_DIR_CPL/cime_config/namelist_definition_modelio.xml</value>
       <value component="drv_flds"      >$COMP_ROOT_DIR_CPL/cime_config/namelist_definition_drv_flds.xml</value>
-      <value component="drv"           >$COMP_ROOT_DIR_CPL/cime_config/namelist_definition_drv.xml</value>
       <value component="drv_flds-nuopc">$COMP_ROOT_DIR_CPL/cime_config/namelist_definition_drv_flds.xml</value>
+      <value component="drv"           >$COMP_ROOT_DIR_CPL/cime_config/namelist_definition_drv.xml</value>
       <value component="drv-nuopc"     >$COMP_ROOT_DIR_CPL/cime_config/namelist_definition_drv.xml</value>
       <!-- data model components -->
       <value component="drof">$CIMEROOT/src/components/data_comps/drof/cime_config/namelist_definition_drof.xml</value>

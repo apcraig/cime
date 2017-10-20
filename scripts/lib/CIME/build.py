@@ -112,7 +112,9 @@ def _build_checks(case, build_threaded, comp_interface, use_esmf_lib,
     ninst_value  = case.get_value("NINST_VALUE")
     smp_build    = case.get_value("SMP_BUILD")
     build_status = case.get_value("BUILD_STATUS")
-    expect(comp_interface == "mct", "Only supporting mct comp_interface at this time")
+    expect(comp_interface == "nuopc" or comp_interface =="mct",
+           "COMP_INTERFACE is {}, Only supporting mct or nuopc comp_interface settings at this time".\
+           format(case.get_value("COMP_INTERFACE")))
 
     smpstr = ""
     inststr = ""
@@ -220,6 +222,8 @@ def _build_libraries(case, exeroot, sharedpath, caseroot, cimeroot, libroot, lid
         libs.insert(0, mpilib)
     logs = []
     sharedlibroot = os.path.abspath(case.get_value("SHAREDLIBROOT"))
+    print "DEBUG: sharedlibroot ",sharedlibroot
+
     for lib in libs:
         if buildlist is not None and lib not in buildlist:
             continue
@@ -231,6 +235,7 @@ def _build_libraries(case, exeroot, sharedpath, caseroot, cimeroot, libroot, lid
             full_lib_path = os.path.join(sharedlibroot, sharedpath, "mct", lib)
         else:
             full_lib_path = os.path.join(sharedlibroot, sharedpath, lib)
+
         # pio build creates its own directory
         if (lib != "pio" and not os.path.exists(full_lib_path)):
             os.makedirs(full_lib_path)

@@ -359,7 +359,7 @@ class Case(object):
             if ("$" not in item):
                 return item
             else:
-                Item = self.get_resolved_value(item, recurse=recurse+1)
+                item = self.get_resolved_value(item, recurse=recurse+1)
 
         return item
 
@@ -606,14 +606,14 @@ class Case(object):
         for env_file in self._env_entryid_files:
             env_file.add_elements_by_group(files, attlist)
 
-        drv_config_file = files.get_value("CONFIG_CPL_FILE",  {"component":self._driver})
+        drv_config_file = files.get_value("CONFIG_CPL_FILE",  {"component":self._driver}, resolved=False)
         self.set_value("CONFIG_CPL_FILE", drv_config_file)
+        drv_config_file = self.get_resolved_value(drv_config_file)
         drv_comp = Component(drv_config_file, "CPL")
         for env_file in self._env_entryid_files:
             env_file.add_elements_by_group(drv_comp, attributes=attlist)
 
         drv_config_file_model_specific = files.get_value("CONFIG_CPL_FILE_MODEL_SPECIFIC", {"component":self._driver})
-        self.set_value("CONFIG_CPL_FILE_MODEL_SPECIFIC", drv_config_file_model_specific)
         drv_comp_model_specific = Component(drv_config_file_model_specific, "CPL")
 
         self._component_description["forcing"] = drv_comp_model_specific.get_forcing_description(self._compsetname)
