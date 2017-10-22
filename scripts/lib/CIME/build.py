@@ -222,7 +222,6 @@ def _build_libraries(case, exeroot, sharedpath, caseroot, cimeroot, libroot, lid
         libs.insert(0, mpilib)
     logs = []
     sharedlibroot = os.path.abspath(case.get_value("SHAREDLIBROOT"))
-    print "DEBUG: sharedlibroot ",sharedlibroot
 
     for lib in libs:
         if buildlist is not None and lib not in buildlist:

@@ -128,10 +128,6 @@ OR
                         "The default is the first listing in MPILIBS in config_machines.xml")
 
     if model == "cesm":
-        parser.add_argument("--driver", "-driver", default="mct", choices=('mct','nuopc'),
-                            help="Specify the cime driver "
-                            "Allowed values are ('mct','nuopc') ")
-
         parser.add_argument("-c", "--compare",
                             help="While testing, compare baselines"
                             "  against the given compare directory ")
@@ -306,6 +302,7 @@ OR
         if machine_name is None:
             for test in args.testargs:
                 testsplit = CIME.utils.parse_test_name(test)
+                print "DEBUG: testsplit is ",testsplit
                 if testsplit[4] is not None:
                     if machine_name is None:
                         machine_name = testsplit[4]
@@ -366,11 +363,6 @@ OR
     if args.input_dir is not None:
         args.input_dir = os.path.abspath(args.input_dir)
 
-    if args.driver == 'mct':
-        args.driver = 'drv'
-    if args.driver == 'nuopc':
-        args.driver = 'drv-nuopc'
-
     # sanity check
     for name in test_names:
         dot_count = name.count('.')
@@ -387,8 +379,7 @@ OR
         args.test_root, args.baseline_root, args.clean, baseline_cmp_name, baseline_gen_name, \
         args.namelists_only, args.project, args.test_id, args.parallel_jobs, args.walltime, \
         args.single_submit, args.proc_pool, args.use_existing, args.save_timing, args.queue, \
-        args.allow_baseline_overwrite, args.output_root, args.wait, args.force_procs, args.force_threads, args.mpilib, args.input_dir, args.pesfile, \
-        args.driver
+        args.allow_baseline_overwrite, args.output_root, args.wait, args.force_procs, args.force_threads, args.mpilib, args.input_dir, args.pesfile \
 
 ###############################################################################
 def single_submit_impl(machine_name, test_id, proc_pool, project, args, job_cost_map, wall_time, test_root):
@@ -489,7 +480,7 @@ def single_submit_impl(machine_name, test_id, proc_pool, project, args, job_cost
 def create_test(test_names, test_data, compiler, machine_name, no_run, no_build, no_setup, no_batch, test_root,
                 baseline_root, clean, baseline_cmp_name, baseline_gen_name, namelists_only, project, test_id, parallel_jobs,
                 walltime, single_submit, proc_pool, use_existing, save_timing, queue, allow_baseline_overwrite, output_root, wait,
-                force_procs, force_threads, mpilib, input_dir, pesfile, driver):
+                force_procs, force_threads, mpilib, input_dir, pesfile):
 ###############################################################################
     impl = TestScheduler(test_names, test_data=test_data,
                          no_run=no_run, no_build=no_build, no_setup=no_setup, no_batch=no_batch,
@@ -502,7 +493,7 @@ def create_test(test_names, test_data, compiler, machine_name, no_run, no_build,
                          proc_pool=proc_pool, use_existing=use_existing, save_timing=save_timing,
                          queue=queue, allow_baseline_overwrite=allow_baseline_overwrite,
                          output_root=output_root, force_procs=force_procs, force_threads=force_threads,
-                         mpilib=mpilib, input_dir=input_dir, pesfile=pesfile, driver=driver)
+                         mpilib=mpilib, input_dir=input_dir, pesfile=pesfile)
 
     success = impl.run_tests(wait=wait)
 
@@ -543,14 +534,13 @@ def _main_func(description):
     test_names, test_data, compiler, machine_name, no_run, no_build, no_setup, no_batch, \
     test_root, baseline_root, clean, baseline_cmp_name, baseline_gen_name, namelists_only, \
     project, test_id, parallel_jobs, walltime, single_submit, proc_pool, use_existing, \
-    save_timing, queue, allow_baseline_overwrite, output_root, wait, force_procs, force_threads, mpilib, input_dir, pesfile, driver \
+    save_timing, queue, allow_baseline_overwrite, output_root, wait, force_procs, force_threads, mpilib, input_dir, pesfile \
     = parse_command_line(sys.argv, description)
 
     sys.exit(create_test(test_names, test_data, compiler, machine_name, no_run, no_build, no_setup, no_batch, test_root,
                          baseline_root, clean, baseline_cmp_name, baseline_gen_name, namelists_only,
                          project, test_id, parallel_jobs, walltime, single_submit, proc_pool, use_existing, save_timing,
-                         queue, allow_baseline_overwrite, output_root, wait, force_procs, force_threads, mpilib, input_dir, pesfile,
-                         driver))
+                         queue, allow_baseline_overwrite, output_root, wait, force_procs, force_threads, mpilib, input_dir, pesfile))
 
 ###############################################################################
 

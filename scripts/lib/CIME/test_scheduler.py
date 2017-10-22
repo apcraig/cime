@@ -88,7 +88,7 @@ class TestScheduler(object):
                  use_existing=False, save_timing=False, queue=None,
                  allow_baseline_overwrite=False, output_root=None,
                  force_procs=None, force_threads=None, mpilib=None,
-                 input_dir=None, pesfile=None, driver=None):
+                 input_dir=None, pesfile=None):
     ###########################################################################
         self._cime_root       = CIME.utils.get_cime_root()
         self._cime_model      = get_model()
@@ -98,7 +98,6 @@ class TestScheduler(object):
         self._mpilib          = mpilib  # allow override of default mpilib
         self._completed_tests = 0
         self._input_dir       = input_dir
-        self._driver          = driver
         self._pesfile         = pesfile
         self._allow_baseline_overwrite = allow_baseline_overwrite
 
@@ -382,7 +381,7 @@ class TestScheduler(object):
             create_newcase_cmd += " --output-root {} ".format(self._output_root)
         if self._input_dir is not None:
             create_newcase_cmd += " --input-dir {} ".format(self._input_dir)
-        if self._driver == 'drv-nuopc':
+        if "Vnuopc" in case_opts:
             create_newcase_cmd += " --driver nuopc "
 
         if self._pesfile is not None:
@@ -396,8 +395,11 @@ class TestScheduler(object):
             else:
                 (component, modspath) = test_mods.split('/',1)
 
-            if component == "drv" and self._driver == 'drv-nuopc':
-                component = "drv-nuopc"
+            # TODO: to get the right attributes of COMP_ROOT_DIR_CPL in evaluating definition_file - need
+            # to do the following first - this needs to be changed so that the following two lines are not needed!
+            comp_root_dir_cpl = files.get_value( "COMP_ROOT_DIR_CPL",{"component":"drv-nuopc"}, resolved=False)
+            files.set_value("COMP_ROOT_DIR_CPL", comp_root_dir_cpl)
+
             testmods_dir = files.get_value("TESTS_MODS_DIR", {"component": component})
             test_mod_file = os.path.join(testmods_dir, component, modspath)
             if not os.path.exists(test_mod_file):
@@ -543,6 +545,10 @@ class TestScheduler(object):
 
                 elif opt.startswith('P'):
                     # P option handled by create newcase
+                    continue
+
+                elif opt.startswith('V'):
+                    # V option is driver type and is handled by create_newcase
                     continue
 
                 elif opt.startswith('N'):
