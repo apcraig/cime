@@ -50,7 +50,7 @@ $ENV{PIO_VERSION}  	= `./xmlquery PIO_VERSION	--value`;
 #--------------------------------------------------------------------
 
 my $comp="mct";
-$comp = "nuopc" if ($COMP_INTERFACE eq "NUOPC");
+$comp = "nuopc" if ($COMP_INTERFACE eq "nuopc");
 
 my $useesmf = "noesmf";
 $useesmf = "esmf" if ($USE_ESMF_LIB eq "TRUE");

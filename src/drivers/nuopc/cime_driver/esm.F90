@@ -20,7 +20,7 @@ module ESM
 #ifdef ESMFUSE_NOTYET_cice
   use cice_comp_nuopc, only:   cice_SS => SetServices
 #endif
-#ifdef ESMFUSE_NOTYET_clm
+#ifdef ESMFUSE_clm
   use  clm_comp_nuopc, only:   clm_SS => SetServices
 #endif
 #ifdef ESMFUSE_NOTYET_rtm
@@ -34,6 +34,9 @@ module ESM
 #endif
 #ifdef ESMFUSE_NOTYET_ww3
   use  ww3_comp_nuopc, only:   ww3_SS => SetServices
+#endif
+#ifdef ESMFUSE_NOTYET_cism
+  use cism_comp_nuopc, only:   cism_SS => SetServices
 #endif
 
 
@@ -305,7 +308,7 @@ module ESM
           file=__FILE__, rcToReturn=rc)
         return  ! bail out
       endif
- 
+
       if (trim(prefix) == "MED") then
         med_present = "true"
       elseif (trim(prefix) == "ATM") then
@@ -337,7 +340,7 @@ module ESM
 
     call NUOPC_CompAttributeAdd(driver, attrList=(/'atm_present','lnd_present','ocn_present', &
       'ice_present','rof_present','wav_present','glc_present','med_present'/), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call NUOPC_CompAttributeSet(driver, name="atm_present", value=atm_present, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -622,7 +625,7 @@ module ESM
           return  ! bail out
 #endif
         elseif (trim(model) == "clm") then
-#ifdef ESMFUSE_NOTYET_clm
+#ifdef ESMFUSE_clm
           call NUOPC_DriverAddComp(driver, "LND", clm_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 #else
@@ -679,8 +682,8 @@ module ESM
           return  ! bail out
 #endif
         elseif (trim(model) == "ww") then
-#ifdef ESMFUSE_NOTYET_clm
-          call NUOPC_DriverAddComp(driver, "WAV", clm_SS, petList=petList, comp=child, rc=rc)
+#ifdef ESMFUSE_NOTYET_ww3
+          call NUOPC_DriverAddComp(driver, "WAV", ww3_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 #else
           call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
@@ -726,8 +729,8 @@ module ESM
 
         call seq_comm_petlist(GLCID(1),petList)
         if (trim(model) == "cism") then
-#ifdef ESMFUSE_NOTYET_clm
-          call NUOPC_DriverAddComp(driver, "GLC", clm_SS, petList=petList, comp=child, rc=rc)
+#ifdef ESMFUSE_NOTYET_cism
+          call NUOPC_DriverAddComp(driver, "GLC", cism_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 #else
           call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
