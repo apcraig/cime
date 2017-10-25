@@ -1,6 +1,7 @@
 import CIME.utils
 from CIME.utils import expect, convert_to_seconds, parse_test_name
 from CIME.XML.machines import Machines
+import six
 
 # Here are the tests belonging to acme suites. Format is
 # <test>.<grid>.<compset>.
@@ -37,20 +38,22 @@ _TEST_SUITES = {
                     "TESTMEMLEAKPASS_P1.f09_g16.X")
                    ),
 
-    "cime_developer" : (None, "0:10:00",
+    "cime_developer" : (None, "0:15:00",
                             ("NCK_Ld3.f45_g37_rx1.A",
                              "ERI.f09_g16.X",
                              "ERIO.f09_g16.X",
                              "SEQ_Ln9.f19_g16_rx1.A",
                              "ERS.ne30_g16_rx1.A",
-                             "ERS_N2.f19_g16_rx1.A",
+                             "IRT_N2.f19_g16_rx1.A",
                              "ERR.f45_g37_rx1.A",
                              "ERP.f45_g37_rx1.A",
                              "SMS_D_Ln9.f19_g16_rx1.A",
                              "DAE.f19_f19.A",
-                             "PET_P32.f19_f19.A",
+                             "PET_P4.f19_f19.A",
                              "SMS.T42_T42.S",
-                             "PRE.f45_g37_rx1.ADESP")
+                             "PRE.f19_f19.ADESP",
+                             "PRE.f19_f19.ADESP_TEST",
+                             "MCC_P1.f19_g16_rx1.A")
                             ),
 
     #
@@ -66,7 +69,11 @@ _TEST_SUITES = {
                              ("ERS.f19_f19.I1850CLM45CN",
                               "ERS.f09_g16.I1850CLM45CN",
                               "SMS.hcru_hcru.I1850CRUCLM45CN",
-                             ("SMS_Ly3_P1x1.1x1_smallvilleIA.ICLM45CNCROP", "force_netcdf_pio"),
+                             ("ERS.f19_g16.I1850CNECACNTBC" ,"clm-eca"),
+                             ("ERS.f19_g16.I1850CNECACTCBC" ,"clm-eca"),
+                             ("SMS_Ly2_P1x1.1x1_smallvilleIA.ICLM45CNCROP", "force_netcdf_pio"),
+                             ("SMS_Ld4.f45_f45.ICLM45ED","clm-fates"),
+                             ("ERS.f19_g16.I1850CLM45","clm-betr"),
                               "ERS.ne11_oQU240.I20TRCLM45",
                               "ERS.f09_g16.IMCLM45BC")
                              ),
@@ -107,6 +114,7 @@ _TEST_SUITES = {
                          "ERS.f09_g16_g.MPASLISIA",
                          "SMS.T62_oQU120_ais20.MPAS_LISIO_TEST",
                          "SMS.f09_g16_a.IGCLM45_MLI",
+                        ("SMS_Ln5.ne4_ne4.FC5AV1C-L", "cam-cosplite_nhtfrq5"),
                          "SMS_D_Ln5.ne16_ne16.FC5AV1F",
                          "SMS_D_Ln5.ne16_ne16.FC5AV1C",
                          "SMS_D_Ln5.ne16_ne16.FC5AV1C-01",
@@ -118,6 +126,7 @@ _TEST_SUITES = {
                          "SMS_D_Ln5.ne16_ne16.F1850C5AV1C-04",
                          "SMS_D_Ln5.ne16_ne16.F20TRC5AV1C-03",
                          "SMS_D_Ln5.ne16_ne16.FC5AV1C-04P",
+                         "SMS_D_Ln5.ne4_ne4.FC5AV1C-04P2",
                          "SMS_D_Ld1.ne16_ne16.FC5ATMMOD")
                         ),
 
@@ -134,10 +143,10 @@ _TEST_SUITES = {
                            ("PET_Ln9.ne30_ne30.FC5", "cam-outfrq9s"),
                            "PET.f19_g16.X",
                            "PET.f45_g37_rx1.A",
-                           "PET_Ln9.ne30_oEC.A_WCYCL2000",
-                           "ERP_Ld3.ne30_oEC.A_WCYCL2000",
+                           "PET_Ln9.ne30_oECv3_ICG.A_WCYCL1850S",
+                           "ERP_Ld3.ne30_oECv3_ICG.A_WCYCL1850S",
                            "SEQ_IOP.f19_g16.X",
-                           "SMS.ne30_oEC.A_WCYCL2000",
+                           "SMS.ne30_oECv3_ICG.A_WCYCL1850S",
                            "SMS.ne16_ne16.FC5AQUAP",
                            "SMS_D_Ld3.ne16_ne16.FC5",
                            "SMS.f09_g16_a.MPASLIALB",
@@ -152,6 +161,7 @@ _TEST_SUITES = {
                            "ERS_Ld5.ne30_oEC.F1850C5AV1C-02",
                            "ERS_Ld5.ne16_ne16.F1850C5AV1C-04",
                            "ERS_Ld5.ne16_ne16.F20TRC5AV1C-03",
+                           "ERP_Ld5_P8x4.ne4_ne4.FC5AV1C-04P2",
                            "SMS_D_Ld1.ne16_ne16.FC5ATMMODCOSP")
                           ),
 }
@@ -174,27 +184,27 @@ def get_test_suite(suite, machine=None, compiler=None):
     tests = []
     for item in tests_raw:
         test_mod = None
-        if (isinstance(item, str)):
+        if (isinstance(item, six.string_types)):
             test_name = item
         else:
             expect(isinstance(item, tuple), "Bad item type for item '{}'".format(str(item)))
             expect(len(item) in [2, 3], "Expected two or three items in item '{}'".format(str(item)))
-            expect(isinstance(item[0], str), "Expected string in first field of item '{}'".format(str(item)))
-            expect(isinstance(item[1], str), "Expected string in second field of item '{}'".format(str(item)))
+            expect(isinstance(item[0], six.string_types), "Expected string in first field of item '{}'".format(str(item)))
+            expect(isinstance(item[1], six.string_types), "Expected string in second field of item '{}'".format(str(item)))
 
             test_name = item[0]
             if (len(item) == 2):
                 test_mod = item[1]
             else:
-                expect(type(item[2]) in [str, tuple], "Expected string or tuple for third field of item '{}'".format(str(item)))
-                test_mod_machines = [item[2]] if isinstance(item[2], str) else item[2]
+                expect(type(item[2]) in [six.string_types, tuple], "Expected string or tuple for third field of item '{}'".format(str(item)))
+                test_mod_machines = [item[2]] if isinstance(item[2], six.string_types) else item[2]
                 if (machine in test_mod_machines):
                     test_mod = item[1]
 
         tests.append(CIME.utils.get_full_test_name(test_name, machine=machine, compiler=compiler, testmod=test_mod))
 
     if (inherits_from is not None):
-        inherits_from = [inherits_from] if isinstance(inherits_from, str) else inherits_from
+        inherits_from = [inherits_from] if isinstance(inherits_from, six.string_types) else inherits_from
         for inherits in inherits_from:
             inherited_tests = get_test_suite(inherits, machine, compiler)
 
@@ -207,7 +217,7 @@ def get_test_suite(suite, machine=None, compiler=None):
 ###############################################################################
 def get_test_suites():
 ###############################################################################
-    return _TEST_SUITES.keys()
+    return list(_TEST_SUITES.keys())
 
 ###############################################################################
 def infer_machine_name_from_tests(testargs):
@@ -313,14 +323,14 @@ def get_recommended_test_time(test_full_name):
         _, rec_time, tests_raw = _TEST_SUITES[suite]
         for item in tests_raw:
             test_mod = None
-            if (isinstance(item, str)):
+            if (isinstance(item, six.string_types)):
                 test_name = item
             else:
                 test_name = item[0]
                 if (len(item) == 2):
                     test_mod = item[1]
                 else:
-                    test_mod_machines = [item[2]] if isinstance(item[2], str) else item[2]
+                    test_mod_machines = [item[2]] if isinstance(item[2], six.string_types) else item[2]
                     if (machine in test_mod_machines):
                         test_mod = item[1]
 
@@ -332,3 +342,27 @@ def get_recommended_test_time(test_full_name):
                     best_time = rec_time
 
     return best_time
+
+###############################################################################
+def sort_by_time(test_one, test_two):
+###############################################################################
+    """
+    >>> tests = get_full_test_names(["cime_tiny"], "melvin", "gnu")
+    >>> tests.extend(get_full_test_names(["cime_developer"], "melvin", "gnu"))
+    >>> tests.append("A.f19_f19.A.melvin_gnu")
+    >>> tests.sort(cmp=sort_by_time)
+    >>> tests
+    ['DAE.f19_f19.A.melvin_gnu', 'ERI.f09_g16.X.melvin_gnu', 'ERIO.f09_g16.X.melvin_gnu', 'ERP.f45_g37_rx1.A.melvin_gnu', 'ERR.f45_g37_rx1.A.melvin_gnu', 'ERS.ne30_g16_rx1.A.melvin_gnu', 'IRT_N2.f19_g16_rx1.A.melvin_gnu', 'NCK_Ld3.f45_g37_rx1.A.melvin_gnu', 'PET_P32.f19_f19.A.melvin_gnu', 'PRE.f19_f19.ADESP.melvin_gnu', 'PRE.f19_f19.ADESP_TEST.melvin_gnu', 'SEQ_Ln9.f19_g16_rx1.A.melvin_gnu', 'SMS.T42_T42.S.melvin_gnu', 'SMS_D_Ln9.f19_g16_rx1.A.melvin_gnu', 'ERS.f19_g16_rx1.A.melvin_gnu', 'NCK.f19_g16_rx1.A.melvin_gnu', 'A.f19_f19.A.melvin_gnu']
+    """
+    rec1, rec2 = get_recommended_test_time(test_one), get_recommended_test_time(test_two)
+    if rec1 == rec2:
+        return (test_one > test_two) - (test_two < test_one)
+    else:
+        if rec2 is None:
+            return -1
+        elif rec1 is None:
+            return 1
+        else:
+            a = convert_to_seconds(rec2)
+            b = convert_to_seconds(rec1)
+            return (a < b) - (b < a)

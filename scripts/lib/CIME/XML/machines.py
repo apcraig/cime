@@ -38,7 +38,7 @@ class Machines(GenericXML):
         # Append the contents of $HOME/.cime/config_machines.xml if it exists
         # This could cause problems if node matchs are repeated when only one is expected
         local_infile = os.path.join(os.environ.get("HOME"),".cime","config_machines.xml")
-        logger.debug("Infile: {}" , local_infile)
+        logger.debug("Infile: {}".format(local_infile))
         if os.path.exists(local_infile):
             GenericXML.read(self, local_infile, schema)
 
@@ -163,7 +163,7 @@ class Machines(GenericXML):
             self.machine = machine
 
         return machine
-
+    #pylint: disable=arguments-differ
     def get_value(self, name, attributes=None, resolved=True, subgroup=None):
         """
         Get Value of fields in the config_machines.xml file
@@ -211,7 +211,7 @@ class Machines(GenericXML):
 
         expect(supported_values is not None,
                "No list found for " + listname + " on machine " + self.machine)
-        supported_values = supported_values.split(",")
+        supported_values = supported_values.split(",") #pylint: disable=no-member
 
         if reqval is None or reqval == "UNSET":
             return supported_values[0]
@@ -240,7 +240,7 @@ class Machines(GenericXML):
         >>> machobj = Machines(machine="edison")
         >>> machobj.get_default_compiler()
         'intel'
-        >>> machobj.is_valid_compiler("cray")
+        >>> machobj.is_valid_compiler("gnu")
         True
         >>> machobj.is_valid_compiler("nag")
         False
@@ -298,12 +298,39 @@ class Machines(GenericXML):
             os_  = machine.find("OS")
             compilers = machine.find("COMPILERS")
             max_tasks_per_node = machine.find("MAX_TASKS_PER_NODE")
-            pes_per_node = machine.find("PES_PER_NODE")
+            MAX_MPITASKS_PER_NODE = machine.find("MAX_MPITASKS_PER_NODE")
 
             print( "  {} : {} ".format(name , desc.text))
             print( "      os             ", os_.text)
             print( "      compilers      ",compilers.text)
-            if pes_per_node is not None:
-                print( "      pes/node       ",pes_per_node.text)
+            if MAX_MPITASKS_PER_NODE is not None:
+                print("      pes/node       ",MAX_MPITASKS_PER_NODE.text)
             if max_tasks_per_node is not None:
-                print( "      max_tasks/node ",max_tasks_per_node.text)
+                print("      max_tasks/node ",max_tasks_per_node.text)
+
+    def return_all_values(self):
+        # return a dictionary of machines
+        mach_dict = dict()
+        machines = self.get_nodes(nodename="machine")
+        for machine in machines:
+            name = machine.get("MACH")
+            desc = machine.find("DESC")
+            os_  = machine.find("OS")
+            compilers = machine.find("COMPILERS")
+            max_tasks_per_node = machine.find("MAX_TASKS_PER_NODE")
+            MAX_MPITASKS_PER_NODE = machine.find("MAX_MPITASKS_PER_NODE")
+            ppn = ''
+            if MAX_MPITASKS_PER_NODE is not None:
+                ppn = MAX_MPITASKS_PER_NODE.text
+
+            max_tasks_pn = ''
+            if max_tasks_per_node is not None:
+                max_tasks_pn = max_tasks_per_node.text
+
+            mach_dict[name] = { 'description'    : desc.text,
+                                'os'             : os_.text,
+                                'compilers'      : compilers.text,
+                                'pes/node'       : ppn,
+                                'max_tasks/node' : max_tasks_pn }
+
+        return mach_dict

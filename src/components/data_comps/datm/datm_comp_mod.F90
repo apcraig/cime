@@ -33,6 +33,7 @@ module datm_comp_mod
   use datm_shr_mod   , only: nullstr
 
   ! !PUBLIC TYPES:
+
   implicit none
   private ! except
 
@@ -219,8 +220,6 @@ CONTAINS
        orbEccen, orbMvelpp, orbLambm0, orbObliqr, phase, nextsw_cday)
 
     ! !DESCRIPTION: initialize data atm model
-    use pio        , only : iosystem_desc_t
-    use shr_pio_mod, only : shr_pio_getiosys, shr_pio_getiotype
     implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
@@ -264,7 +263,6 @@ CONTAINS
     integer(IN)   :: stepno      ! step number
     character(CL) :: calendar    ! calendar type
     character(CL) :: flds_strm
-    type(iosystem_desc_t)  , pointer :: iosystem
 
     !--- formats ---
     character(*), parameter :: F00   = "('(datm_comp_init) ',8a)"
@@ -288,8 +286,7 @@ CONTAINS
        ! Initialize PIO
        !----------------------------------------------------------------------------
 
-       iosystem => shr_pio_getiosys(trim(inst_name))
-       call shr_strdata_pioinit(SDATM, iosystem, shr_pio_getiotype(trim(inst_name)))
+       call shr_strdata_pioinit(SDATM, COMPID)
 
        !----------------------------------------------------------------------------
        ! Initialize SDATM
@@ -341,7 +338,6 @@ CONTAINS
        ! create a data model global seqmap (gsmap) given the data model global grid sizes
        ! NOTE: gsmap is initialized using the decomp read in from the datm_in namelist
        ! (which by default is "1d")
-
        call shr_dmodel_gsmapcreate(gsmap, SDATM%nxg*SDATM%nyg, compid, mpicom, decomp)
        lsize = mct_gsmap_lsize(gsmap,mpicom)
 
@@ -669,7 +665,9 @@ CONTAINS
     call t_startf('datm_strdata_advance')
     call shr_strdata_advance(SDATM,currentYMD,currentTOD,mpicom,'datm')
     call t_stopf('datm_strdata_advance')
+
     call t_barrierf('datm_scatter_BARRIER',mpicom)
+
     call t_startf('datm_scatter')
     if (trim(datamode) /= 'COPYALL') then
        lsize = mct_avect_lsize(a2x)

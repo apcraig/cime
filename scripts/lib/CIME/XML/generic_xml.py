@@ -5,8 +5,8 @@ be used by other XML interface modules and not directly.
 from CIME.XML.standard_module_setup import *
 from distutils.spawn import find_executable
 from xml.dom import minidom
-
 import getpass
+import six
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +124,9 @@ class GenericXML(object):
             # one attribute in an xpath query so we query seperately for each attribute
             # and create a result with the intersection of those lists
 
-            for key, value in attributes.iteritems():
+            for key, value in attributes.items():
                 if value is not None:
-                    expect(isinstance(value, basestring),
+                    expect(isinstance(value, six.string_types),
                            " Bad value passed for key {}".format(key))
                     xpath = ".//{}[@{}=\'{}\']".format(nodename, key, value)
                     logger.debug("xpath is {}".format(xpath))
@@ -197,8 +197,8 @@ class GenericXML(object):
         '4'
         >>> obj.get_resolved_value("0001-01-01")
         '0001-01-01'
-        >>> obj.get_resolved_value("$SHELL{echo hi}")
-        'hi'
+        >>> obj.get_resolved_value("$SHELL{echo hi}") == 'hi'
+        True
         """
         logger.debug("raw_value {}".format(raw_value))
         reference_re = re.compile(r'\${?(\w+)}?')
@@ -216,7 +216,8 @@ class GenericXML(object):
         for m in env_ref_re.finditer(item_data):
             logger.debug("look for {} in env".format(item_data))
             env_var = m.groups()[0]
-            expect(env_var in os.environ, "Undefined env var '{}'".format(env_var))
+            env_var_exists = env_var in os.environ
+            expect(env_var_exists, "Undefined env var '{}'".format(env_var))
             item_data = item_data.replace(m.group(), os.environ[env_var])
 
         for s in shell_ref_re.finditer(item_data):
@@ -267,7 +268,7 @@ class GenericXML(object):
             logger.debug("Checking file {} against schema {}".format(filename, schema))
             run_cmd_no_fail("{} --noout --schema {} {}".format(xmllint, schema, filename))
         else:
-            logger.warn("xmllint not found, could not validate file {}".format(filename))
+            logger.warning("xmllint not found, could not validate file {}".format(filename))
 
     def get_element_text(self, element_name, attributes=None, root=None, xpath=None):
         element_node = self.get_optional_node(element_name, attributes, root, xpath)
@@ -283,6 +284,7 @@ class GenericXML(object):
         return None
 
     def get_raw_record(self, root=None):
+        logger.debug("writing file {}".format(self.filename))
         if root is None:
             root = self.root
         try:

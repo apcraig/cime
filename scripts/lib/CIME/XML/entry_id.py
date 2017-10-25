@@ -39,7 +39,7 @@ class EntryID(GenericXML):
         if node is not None:
             val = self.set_element_text("default_value", val, root=node)
             if val is None:
-                logger.warn("Called set_default_value on a node without default_value field")
+                logger.warning("Called set_default_value on a node without default_value field")
 
         return val
 
@@ -67,6 +67,15 @@ class EntryID(GenericXML):
         '''
         Note that the component class has a specific version of this function
         '''
+        # if there is a <values> element - check to see if there is a match attribute
+        # if there is NOT a match attribute, then set the default to "first"
+        # this is different than the component class _get_value_match where the default is "last"
+        values_node = self.get_optional_node("values", root=node)
+        if values_node is not None:
+            match_type = values_node.get("match", default="first")
+        else:
+            match_type = "first"
+
         # Store nodes that match the attributes and their scores.
         matches = []
         nodes = self.get_nodes("value", root=node)
@@ -97,8 +106,23 @@ class EntryID(GenericXML):
         if not matches:
             return None
 
-        # Get maximum score using custom `key` function, extract the node.
-        _, mnode = max(matches, key=lambda x: x[0])
+        # Get maximum score using either a "last" or "first" match in case of a tie
+        max_score = -1
+        mnode = None
+        for score,node in matches:
+            if match_type == "last":
+                # take the *last* best match
+                if score >= max_score:
+                    max_score = score
+                    mnode = node
+            elif match_type == "first":
+                # take the *first* best match
+                if score > max_score:
+                    max_score = score
+                    mnode = node
+            else:
+                expect(False,
+                       "match attribute can only have a value of 'last' or 'first', value is %s" %match_type)
 
         return mnode.text
 
@@ -187,7 +211,7 @@ class EntryID(GenericXML):
         current_value = node.get("value")
         valid_values_list = self._get_valid_values(node)
         if current_value is not None and current_value not in valid_values_list:
-            logger.warn("WARNING: Current setting for {} not in new valid values. Updating setting to \"{}\"".format(node.get("id"), valid_values_list[0]))
+            logger.warning("WARNING: Current setting for {} not in new valid values. Updating setting to \"{}\"".format(node.get("id"), valid_values_list[0]))
             self._set_value(node, valid_values_list[0])
         return new_valid_values
 
@@ -378,18 +402,24 @@ class EntryID(GenericXML):
                     if f1val != f2val:
                         xmldiffs[vid] = [f1val, f2val]
                 else:
-                    f1val = ET.tostring(node, method="text")
-                    f2val = ET.tostring(f2match, method="text")
-                    if f2val != f1val:
-                        f1value_nodes = self.get_nodes("value", root=node)
-                        for valnode in f1value_nodes:
-                            f2valnodes = other.get_nodes("value", root=f2match, attributes=valnode.attrib)
-                            for f2valnode in f2valnodes:
-                                if valnode.attrib is None and f2valnode.attrib is None or \
-                                   f2valnode.attrib == valnode.attrib:
-                                    if other.get_resolved_value(f2valnode.text) != self.get_resolved_value(valnode.text):
-                                        xmldiffs["{}:{}".format(vid, valnode.attrib)] = [valnode.text, f2valnode.text]
-
+                    for comp in self.get_values("COMP_CLASSES"):
+                        f1val = self.get_value("{}_{}".format(vid,comp), resolved=False)
+                        if f1val is not None:
+                            f2val = other.get_value("{}_{}".format(vid,comp), resolved=False)
+                            if f1val != f2val:
+                                xmldiffs[vid] = [f1val, f2val]
+                        else:
+                            f1val = ET.tostring(node, method="text")
+                            f2val = ET.tostring(f2match, method="text")
+                            if f2val != f1val:
+                                f1value_nodes = self.get_nodes("value", root=node)
+                                for valnode in f1value_nodes:
+                                    f2valnodes = other.get_nodes("value", root=f2match, attributes=valnode.attrib)
+                                    for f2valnode in f2valnodes:
+                                        if valnode.attrib is None and f2valnode.attrib is None or \
+                                           f2valnode.attrib == valnode.attrib:
+                                            if other.get_resolved_value(f2valnode.text) != self.get_resolved_value(valnode.text):
+                                                xmldiffs["{}:{}".format(vid, valnode.attrib)] = [valnode.text, f2valnode.text]
         return xmldiffs
 
     def __iter__(self):

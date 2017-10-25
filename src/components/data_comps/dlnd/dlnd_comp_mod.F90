@@ -45,12 +45,11 @@ module dlnd_comp_mod
   !--------------------------------------------------------------------------
 
   !--- other ---
-  character(CS)              :: myModelName = 'lnd' ! user defined model name
-  type(mct_rearr)            :: rearr
-  integer                    :: kf                  ! index for frac in AV
-  real(R8),pointer           :: lfrac(:)            ! land frac
+  character(CS) :: myModelName = 'lnd'   ! user defined model name
   character(len=*),parameter :: rpfile = 'rpointer.lnd'
-
+  type(mct_rearr)  :: rearr
+  integer          :: kf                 ! index for frac in AV
+  real(R8),pointer :: lfrac(:)           ! land frac
   !--------------------------------------------------------------------------
   !--- names of fields ---
   integer(IN),parameter :: fld_len = 12       ! max character length of fields in avofld & avifld
@@ -99,8 +98,6 @@ CONTAINS
        scmMode, scmlat, scmlon)
 
     ! !DESCRIPTION: initialize dlnd model
-    use pio        , only : iosystem_desc_t
-    use shr_pio_mod, only : shr_pio_getiosys, shr_pio_getiotype
     implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
@@ -134,7 +131,6 @@ CONTAINS
     integer(IN)        :: field_num ! field number
     character(nec_len) :: nec_str   ! elevation class, as character string
     integer(IN)        :: kfrac     ! AV index
-    type(iosystem_desc_t), pointer :: lnd_pio_subsystem
 
     !--- formats ---
     character(*), parameter :: F00   = "('(dlnd_comp_init) ',8a)"
@@ -154,8 +150,7 @@ CONTAINS
     ! Initialize pio
     !----------------------------------------------------------------------------
 
-    lnd_pio_subsystem => shr_pio_getiosys(trim(inst_name))
-    call shr_strdata_pioinit(SDLND, lnd_pio_subsystem, shr_pio_getiotype(trim(inst_name)))
+    call shr_strdata_pioinit(SDLND, COMPID)
 
     !----------------------------------------------------------------------------
     ! Initialize SDLND
@@ -223,7 +218,7 @@ CONTAINS
     call shr_dmodel_gsmapcreate(gsmap,SDLND%nxg*SDLND%nyg,compid,mpicom,decomp)
     lsize = mct_gsmap_lsize(gsmap,mpicom)
 
-    ! create a rearranger from the data model DLND%gsmap to gsmap
+    ! create a rearranger from the data model SDLND%gsmap to gsmap
     call mct_rearr_init(SDLND%gsmap, gsmap, mpicom, rearr)
 
     call t_stopf('dlnd_initgsmaps')
@@ -233,12 +228,11 @@ CONTAINS
     !----------------------------------------------------------------------------
 
     call t_startf('dlnd_initmctdom')
-
     if (my_task == master_task) write(logunit,F00) 'copy domains'
     call shr_sys_flush(logunit)
 
     call shr_dmodel_rearrGGrid(SDLND%grid, ggrid, gsmap, rearr, mpicom)
-    kfrac = mct_aVect_indexRA(ggrid%data, 'frac')
+    kfrac = mct_aVect_indexRA(ggrid%data,'frac')
     allocate(lfrac(lsize))
     lfrac(:) = ggrid%data%rAttr(kfrac,:)
 
@@ -355,6 +349,7 @@ CONTAINS
     real(R8)      :: dt                    ! timestep
     integer(IN)   :: nu                    ! unit number
     logical       :: write_restart         ! restart now
+    integer(IN)   :: lsize                 ! local size
 
     character(*), parameter :: F00   = "('(dlnd_comp_run) ',8a)"
     character(*), parameter :: F04   = "('(dlnd_comp_run) ',2a,2i8,'s')"
@@ -386,11 +381,11 @@ CONTAINS
 
     call t_startf('dlnd_strdata_advance')
     if (kf /= 0) then
+       lsize = mct_avect_lsize(l2x)
        do n = 1,lsize
           l2x%rAttr(kf,n) = lfrac(n)
        enddo
     end if
-
     call shr_strdata_advance(SDLND,currentYMD,currentTOD,mpicom,'dlnd')
     call t_stopf('dlnd_strdata_advance')
 

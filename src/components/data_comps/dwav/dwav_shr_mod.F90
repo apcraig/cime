@@ -126,8 +126,8 @@ CONTAINS
 
     datamode = trim(SDWAV%dataMode)
 
-    if (trim(datamode) == 'null' .or. &
-        trim(datamode) == 'copyall') then
+    if (trim(datamode) == 'NULL' .or. &
+        trim(datamode) == 'COPYALL') then
         if (my_task == master_task) then
            write(logunit,F00) 'dwav datamode = ',trim(datamode)
         end if

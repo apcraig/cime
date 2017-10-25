@@ -5,7 +5,6 @@
 module dice_comp_mod
 
   ! !USES:
-
   use esmf
   use mct_mod
   use perf_mod
@@ -79,7 +78,7 @@ module dice_comp_mod
   real(R8),parameter  :: ax_vsdr = ai_vsdr*(1.0_R8-snwfrac) + as_vsdr*snwfrac
 
   integer(IN) :: kswvdr,kswndr,kswvdf,kswndf,kq,kz,kua,kva,kptem,kshum,kdens,ktbot
-  integer(IN) :: kiFrac,kt,kavsdr,kanidr,kavsdf,kanidf,kswnet,kmelth,kmeltw
+  integer(IN) :: km,kiFrac,kt,kavsdr,kanidr,kavsdf,kanidf,kswnet,kmelth,kmeltw
   integer(IN) :: ksen,klat,klwup,kevap,ktauxa,ktauya,ktref,kqref,kswpen,ktauxo,ktauyo,ksalt
   integer(IN) :: ksalinity
 
@@ -137,8 +136,6 @@ CONTAINS
        scmMode, scmlat, scmlon)
 
     ! !DESCRIPTION: initialize dice model
-    use pio        , only : iosystem_desc_t
-    use shr_pio_mod, only : shr_pio_getiosys, shr_pio_getiotype
     implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
@@ -170,7 +167,6 @@ CONTAINS
     logical       :: exists      ! file existance logical
     integer(IN)   :: nu          ! unit number
     character(CL) :: calendar    ! calendar type
-    type(iosystem_desc_t), pointer :: ice_pio_subsystem
 
     !--- formats ---
     character(*), parameter :: F00   = "('(dice_comp_init) ',8a)"
@@ -188,8 +184,7 @@ CONTAINS
 
     call t_startf('DICE_INIT')
 
-    ice_pio_subsystem => shr_pio_getiosys(trim(inst_name))
-    call shr_strdata_pioinit(SDICE, ice_pio_subsystem, shr_pio_getiotype(trim(inst_name)))
+    call shr_strdata_pioinit(SDICE, COMPID)
 
     !----------------------------------------------------------------------------
     ! Initialize SDICE
@@ -261,6 +256,7 @@ CONTAINS
     call mct_aVect_init(i2x, rList=seq_flds_i2x_fields, lsize=lsize)
     call mct_aVect_zero(i2x)
 
+    km     = mct_aVect_indexRA(i2x,'Si_imask')
     kiFrac = mct_aVect_indexRA(i2x,'Si_ifrac')
     kt     = mct_aVect_indexRA(i2x,'Si_t')
     ktref  = mct_aVect_indexRA(i2x,'Si_tref')
@@ -359,7 +355,7 @@ CONTAINS
        call shr_mpi_bcast(exists,mpicom,'exists')
        if (my_task == master_task) write(logunit,F00) ' reading ',trim(rest_file)
        call shr_pcdf_readwrite('read',SDICE%pio_subsystem, SDICE%io_type, &
-            trim(rest_file),mpicom,gsmap,rf1=water,rf1n='water')
+            trim(rest_file),mpicom,gsmap=gsmap,rf1=water,rf1n='water',io_format=SDICE%io_format)
        if (exists) then
           if (my_task == master_task) write(logunit,F00) ' reading ',trim(rest_file_strm)
           call shr_strdata_restRead(trim(rest_file_strm),SDICE,mpicom)
@@ -482,7 +478,6 @@ CONTAINS
     !-------------------------------------------------
 
     call t_startf('dice_datamode')
-
     select case (trim(datamode))
 
     case('COPYALL')
@@ -628,7 +623,6 @@ CONTAINS
           !         iFrac0(n) = i2x%rAttr(kiFrac,n)
        end do
 
-
     end select
 
     !-------------------------------------------------
@@ -723,5 +717,4 @@ CONTAINS
 
   end subroutine dice_comp_final
   !===============================================================================
-
 end module dice_comp_mod

@@ -175,6 +175,7 @@ class NamelistGenerator(object):
                 value[i] = self.quote_string(scalar)
         return compress_literal_list(value)
 
+
     def get_value(self, name):
         """Get the current value of a given namelist variable.
 
@@ -328,7 +329,7 @@ class NamelistGenerator(object):
                 if self._case.get_value('GLC_NEC') == 0:
                     glc_nec_indices = [0]
                 else:
-                    glc_nec_indices = range(self._case.get_value('GLC_NEC'))
+                    glc_nec_indices = list(range(self._case.get_value('GLC_NEC')))
                 glc_nec_indices.append(glc_nec_indices[-1] + 1)
                 glc_nec_indices.pop(0)
                 for i in glc_nec_indices:
@@ -569,7 +570,7 @@ class NamelistGenerator(object):
                         continue
                     file_path = self.set_abs_file_path(file_path)
                     if not os.path.exists(file_path):
-                        logger.warn("File not found: {} = {}, will attempt to download in check_input_data phase".format(name, literal))
+                        logger.warning("File not found: {} = {}, will attempt to download in check_input_data phase".format(name, literal))
                     current_literals[i] = string_to_character_literal(file_path)
                 current_literals = compress_literal_list(current_literals)
 
@@ -585,6 +586,10 @@ class NamelistGenerator(object):
             for variable in self._streams_variables:
                 self.add_default(variable,
                                  value=self._streams_namelists[variable])
+
+    def get_group_variables(self, group_name):
+        return self._namelist.get_group_variables(group_name)
+
 
     def _write_input_files(self, input_data_list):
         """Write input data files to list."""
@@ -657,11 +662,11 @@ class NamelistGenerator(object):
         """ Write  component modelio files"""
         self._namelist.write(filename, groups=["modelio", "pio_inparm"], format_="nml")
 
-    def write_nuopc_config_file(self, filename, data_list_path=None, 
+    def write_nuopc_config_file(self, filename, data_list_path=None,
                                 skip_comps=None, atm_cpl_dt=None, ocn_cpl_dt=None):
         self._definition.validate(self._namelist)
         groups = self._namelist.get_group_names()
-        self._namelist.write(filename, groups=groups, format_='nuopc', sorted_groups=False, 
+        self._namelist.write(filename, groups=groups, format_='nuopc', sorted_groups=False,
                              skip_comps=skip_comps, atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
         if data_list_path is not None:
             # append to input_data_list file

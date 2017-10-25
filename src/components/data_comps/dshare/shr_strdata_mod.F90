@@ -66,6 +66,17 @@ module shr_strdata_mod
    public shr_strdata_setlogunit
    public shr_strdata_pioinit
 
+!! Interface
+
+   interface shr_strdata_pioinit
+      module procedure shr_strdata_pioinit_oldway
+      module procedure shr_strdata_pioinit_newway
+   end interface shr_strdata_pioinit
+
+   interface shr_strdata_create
+      module procedure shr_strdata_create_oldway
+      module procedure shr_strdata_create_newway
+   end interface shr_strdata_create
 ! !PUBLIC DATA MEMBERS:
 
 
@@ -95,7 +106,9 @@ module shr_strdata_mod
     character(CL)                  :: mapread (nStrMax) ! regrid mapping file to read
     character(CL)                  :: mapwrit (nStrMax) ! regrid mapping file to write
     character(CL)                  :: tintalgo(nStrMax) ! time interpolation algorithm
-    integer(IN)                    :: io_type
+    character(CL)                  :: readmode(nStrMax) ! file read mode
+    integer(IN)                      :: io_type
+    integer(IN)                      :: io_format
 
     !--- data required by cosz t-interp method, set by user ---
     real(R8)                       :: eccen
@@ -127,6 +140,7 @@ module shr_strdata_mod
     type(mct_gsmap)                :: gsmapR(nStrMax)
     type(mct_rearr)                :: rearrR(nStrMax)
     type(mct_ggrid)                :: gridR(nStrMax)
+    type(mct_avect)                :: avRFile(nStrMax)  ! Read attrvect for multiple time slices
     type(mct_avect)                :: avRLB(nStrMax)    ! Read attrvect
     type(mct_avect)                :: avRUB(nStrMax)    ! Read attrvect
     type(mct_avect)                :: avFUB(nStrMax)    ! Final attrvect
@@ -333,7 +347,7 @@ module shr_strdata_mod
 
   else
 
-     ! NOTE: if the stream model domainfile is 'null' (or shr_strdata_nullstr), 
+     ! NOTE: if the stream model domainfile is 'null' (or shr_strdata_nullstr),
      ! then set the model domain to the domain of the first stream
 
      if (trim(SDAT%domainfile) == trim(shr_strdata_nullstr)) then
@@ -413,7 +427,8 @@ module shr_strdata_mod
                write(logunit,F00) ' writing ',trim(SDAT%fillwrit(n))
                call shr_sys_flush(logunit)
              endif
-             call shr_mct_sMatWritednc(SDAT%sMatPf(n)%Matrix,SDAT%pio_subsystem,sdat%io_type,  SDAT%fillwrit(n),compid,mpicom)
+             call shr_mct_sMatWritednc(SDAT%sMatPf(n)%Matrix,SDAT%pio_subsystem,&
+                  sdat%io_type,  SDAT%io_format, SDAT%fillwrit(n),compid,mpicom)
            endif
         else
            if (my_task == master_task) then
@@ -422,7 +437,8 @@ module shr_strdata_mod
            endif
            call shr_mct_sMatReaddnc(sMati,SDAT%gsmapR(n),SDAT%gsmapR(n),'src', &
              filename=trim(SDAT%fillread(n)),mytask=my_task,mpicom=mpicom)
-           call mct_sMatP_Init(SDAT%sMatPf(n),sMati,SDAT%gsMapR(n),SDAT%gsmapR(n),0, mpicom, compid)
+           call mct_sMatP_Init(SDAT%sMatPf(n),sMati,SDAT%gsMapR(n),&
+                SDAT%gsmapR(n),0, mpicom, compid)
            call mct_sMat_Clean(sMati)
         endif
      endif
@@ -448,7 +464,8 @@ module shr_strdata_mod
                write(logunit,F00) ' writing ',trim(SDAT%mapwrit(n))
                call shr_sys_flush(logunit)
              endif
-             call shr_mct_sMatWritednc(SDAT%sMatPs(n)%Matrix,sdat%pio_subsystem,sdat%io_type,SDAT%mapwrit(n),compid,mpicom)
+             call shr_mct_sMatWritednc(SDAT%sMatPs(n)%Matrix,sdat%pio_subsystem,&
+                  sdat%io_type,SDAT%io_format,SDAT%mapwrit(n),compid,mpicom)
            endif
         else
            if (my_task == master_task) then
@@ -689,7 +706,8 @@ module shr_strdata_mod
      call shr_dmodel_readLBUB(SDAT%stream(n),SDAT%pio_subsystem,SDAT%io_type,SDAT%pio_iodesc(n), &
           ymdmod(n),todmod,mpicom,SDAT%gsmapR(n),&
           SDAT%avRLB(n),SDAT%ymdLB(n),SDAT%todLB(n), &
-          SDAT%avRUB(n),SDAT%ymdUB(n),SDAT%todUB(n),newData(n), &
+          SDAT%avRUB(n),SDAT%ymdUB(n),SDAT%todUB(n), &
+          SDAT%avRFile(n), trim(SDAT%readmode(n)), newData(n), &
           istr=trim(lstr)//'_readLBUB')
 
      if (debug > 0) then
@@ -1114,6 +1132,7 @@ subroutine shr_strdata_readnml(SDAT,file,rc,mpicom)
    character(CL) :: mapread(nStrMax)  ! regrid mapping file to read
    character(CL) :: mapwrite(nStrMax) ! regrid mapping file to write
    character(CL) :: tintalgo(nStrMax) ! time interpolation algorithm
+   character(CL) :: readmode(nStrMax) ! file read mode
    character(CL) :: io_type
    integer(IN)   :: num_iotasks
    integer(IN)   :: io_root
@@ -1140,7 +1159,8 @@ subroutine shr_strdata_readnml(SDAT,file,rc,mpicom)
       , mapmask         &
       , mapread         &
       , mapwrite        &
-      , tintalgo
+      , tintalgo        &
+      , readmode
    !----- formats -----
    character(*),parameter :: subName = "(shr_strdata_readnml) "
    character(*),parameter ::   F00 = "('(shr_strdata_readnml) ',8a)"
@@ -1186,6 +1206,7 @@ subroutine shr_strdata_readnml(SDAT,file,rc,mpicom)
    mapread(:)  = trim(shr_strdata_unset)
    mapwrite(:) = trim(shr_strdata_unset)
    tintalgo(:) = 'linear'
+   readmode(:) = 'single'
 
 
    !----------------------------------------------------------------------------
@@ -1231,6 +1252,7 @@ subroutine shr_strdata_readnml(SDAT,file,rc,mpicom)
    SDAT%mapread(:)  = mapread(:)
    SDAT%mapwrit(:)  = mapwrite(:)
    SDAT%tintalgo(:) = tintalgo(:)
+   SDAT%readmode(:) = readmode(:)
    do n=1,nStrMax
       if (trim(streams(n)) /= trim(shr_strdata_nullstr)) SDAT%nstreams = max(SDAT%nstreams,n)
       if (trim(SDAT%taxMode(n)) == trim(shr_stream_taxis_extend)) SDAT%dtlimit(n) = 1.0e30
@@ -1291,15 +1313,30 @@ end subroutine shr_strdata_readnml
 !     2010-10-26    Jim Edwards
 !
 ! !INTERFACE: ------------------------------------------------------------------
-subroutine shr_strdata_pioinit(SDAT,io_subsystem, io_type )
+subroutine shr_strdata_pioinit_newway(SDAT, compid )
+  use shr_pio_mod, only: shr_pio_getiosys, shr_pio_getiotype, shr_pio_getioformat
+  type(shr_strdata_type),intent(inout):: SDAT  ! strdata data data-type
+  type(iosystem_desc_t), pointer :: io_subsystem
+  integer, intent(in) :: compid
+
+  SDAT%pio_subsystem => shr_pio_getiosys(compid)
+  SDAT%io_type=shr_pio_getiotype(compid)
+  SDAT%io_format = shr_pio_getioformat(compid)
+
+end subroutine shr_strdata_pioinit_newway
+
+subroutine shr_strdata_pioinit_oldway(SDAT,io_subsystem, io_type )
   type(shr_strdata_type),intent(inout):: SDAT  ! strdata data data-type
   type(iosystem_desc_t), pointer :: io_subsystem
   integer, intent(in) :: io_type
 
   SDAT%pio_subsystem => io_subsystem
   SDAT%io_type=io_type
+  SDAT%io_format = PIO_64BIT_OFFSET  ! hardcoded
 
-end subroutine shr_strdata_pioinit
+end subroutine shr_strdata_pioinit_oldway
+
+
 
 !===============================================================================
 !BOP ===========================================================================
@@ -1316,7 +1353,151 @@ end subroutine shr_strdata_pioinit
 !     2009-Apr-16 - T. Craig - add minimal parallel support
 !
 ! !INTERFACE: ------------------------------------------------------------------
-subroutine shr_strdata_create(SDAT, name, mpicom, compid, gsmap, ggrid, nxg, nyg, &
+subroutine shr_strdata_create_newway(SDAT, name, mpicom, compid, gsmap, ggrid, nxg, nyg, &
+!--- streams stuff required ---
+           yearFirst, yearLast, yearAlign, offset,          &
+           domFilePath, domFileName,                        &
+           domTvarName, domXvarName, domYvarName, domAreaName, domMaskName, &
+           filePath, filename, fldListFile, fldListModel,   &
+!--- strdata optional ---
+           nzg, domZvarName,                                &
+           taxMode, dtlimit, tintalgo, readmode,            &
+           fillalgo, fillmask, fillread, fillwrite,         &
+           mapalgo, mapmask, mapread, mapwrite,             &
+           calendar)
+
+   implicit none
+
+! !INPUT/OUTPUT PARAMETERS:
+
+   type(shr_strdata_type),intent(inout):: SDAT  ! strdata data data-type
+   character(*)          ,intent(in)   :: name  ! name of strdata
+   integer(IN)           ,intent(in)   :: mpicom ! mpi comm
+   integer(IN)           ,intent(in)   :: compid
+   type(mct_gsmap)       ,intent(in)   :: gsmap
+   type(mct_ggrid)       ,intent(in)   :: ggrid
+   integer(IN)           ,intent(in)   :: nxg
+   integer(IN)           ,intent(in)   :: nyg
+
+   integer(IN)           ,intent(in)   :: yearFirst ! first year to use
+   integer(IN)           ,intent(in)   :: yearLast  ! last  year to use
+   integer(IN)           ,intent(in)   :: yearAlign ! align yearFirst with this model year
+   integer(IN)           ,intent(in)   :: offset    ! offset in seconds of stream data
+   character(*)          ,intent(in)   :: domFilePath  ! domain file path
+   character(*)          ,intent(in)   :: domFileName  ! domain file name
+   character(*)          ,intent(in)   :: domTvarName  ! domain time dim name
+   character(*)          ,intent(in)   :: domXvarName  ! domain x dim name
+   character(*)          ,intent(in)   :: domYvarName  ! domain y dim name
+   character(*)          ,intent(in)   :: domAreaName  ! domain area name
+   character(*)          ,intent(in)   :: domMaskName  ! domain mask name
+   character(*)          ,intent(in)   :: filePath     ! path to filenames
+   character(*)          ,intent(in)   :: filename(:)  ! filename for index filenumber
+   character(*)          ,intent(in)   :: fldListFile  ! file field names, colon delim list
+   character(*)          ,intent(in)   :: fldListModel ! model field names, colon delim list
+   integer(IN) ,optional ,intent(in)   :: nzg
+   character(*),optional ,intent(in)   :: domZvarName  ! domain z dim name
+   character(*),optional ,intent(in)   :: taxMode
+   real(R8)    ,optional ,intent(in)   :: dtlimit
+   character(*),optional ,intent(in)   :: fillalgo  ! fill algorithm
+   character(*),optional ,intent(in)   :: fillmask  ! fill mask
+   character(*),optional ,intent(in)   :: fillread  ! fill mapping file to read
+   character(*),optional ,intent(in)   :: fillwrite ! fill mapping file to write
+   character(*),optional ,intent(in)   :: mapalgo   ! scalar map algorithm
+   character(*),optional ,intent(in)   :: mapmask   ! scalar map mask
+   character(*),optional ,intent(in)   :: mapread   ! regrid mapping file to read
+   character(*),optional ,intent(in)   :: mapwrite  ! regrid mapping file to write
+   character(*),optional ,intent(in)   :: tintalgo  ! time interpolation algorithm
+   character(*),optional ,intent(in)   :: readmode  ! file read mode
+   character(*),optional, intent(in)   :: calendar
+
+!EOP
+
+!  --- local ---
+!  --- formats ---
+   character(*),parameter :: subName = "(shr_strdata_create) "
+   character(*),parameter ::   F00 = "('(shr_strdata_create) ',8a)"
+
+!-------------------------------------------------------------------------------
+!
+!-------------------------------------------------------------------------------
+
+   call shr_strdata_readnml(SDAT,mpicom=mpicom)
+
+   SDAT%nstreams = 1
+
+   call shr_strdata_pioinit(sdat, compid)
+
+   if (present(taxMode)) then
+      SDAT%taxMode(1) = taxMode
+      if (trim(SDAT%taxMode(1)) == trim(shr_stream_taxis_extend)) SDAT%dtlimit(1) = 1.0e30
+   endif
+   if (present(dtlimit)) then
+      SDAT%dtlimit(1) = dtlimit
+   endif
+   if (present(fillalgo)) then
+      SDAT%fillalgo(1) = fillalgo
+   endif
+   if (present(fillmask)) then
+      SDAT%fillmask(1) = fillmask
+   endif
+   if (present(fillread)) then
+      SDAT%fillread(1) = fillread
+   endif
+   if (present(fillwrite)) then
+      SDAT%fillwrit(1) = fillwrite
+   endif
+   if (present(mapalgo)) then
+      SDAT%mapalgo(1) = mapalgo
+   endif
+   if (present(mapmask)) then
+      SDAT%mapmask(1) = mapmask
+   endif
+   if (present(mapread)) then
+      SDAT%mapread(1) = mapread
+   endif
+   if (present(mapwrite)) then
+      SDAT%mapwrit(1) = mapwrite
+   endif
+   if (present(tintalgo)) then
+      SDAT%tintalgo(1) = tintalgo
+   endif
+   if (present(readmode)) then
+      SDAT%readmode(1) = readmode
+   endif
+   if (present(mapmask)) then
+      SDAT%mapmask(1) = mapmask
+   endif
+   if (present(calendar)) then
+     SDAT%calendar = trim(shr_cal_calendarName(trim(calendar)))
+   endif
+
+   !---- Backwards compatibility requires Z be optional
+
+   if (present(domZvarName)) then
+      call shr_stream_set(SDAT%stream(1),yearFirst,yearLast,yearAlign,offset,taxMode, &
+                          fldListFile,fldListModel,domFilePath,domFileName, &
+                          domTvarName,domXvarName,domYvarName,domZvarName, &
+                          domAreaName,domMaskName, &
+                          filePath,filename,trim(name))
+   else
+      call shr_stream_set(SDAT%stream(1),yearFirst,yearLast,yearAlign,offset,taxMode, &
+                          fldListFile,fldListModel,domFilePath,domFileName, &
+                          domTvarName,domXvarName,domYvarName,'undefined', &
+                          domAreaName,domMaskName, &
+                          filePath,filename,trim(name))
+   endif
+
+   if (present(nzg)) then
+      call shr_strdata_init(SDAT, mpicom, compid, &
+           gsmap=gsmap, ggrid=ggrid, nxg=nxg, nyg=nyg, nzg=nzg)
+   else
+      call shr_strdata_init(SDAT, mpicom, compid, &
+           gsmap=gsmap, ggrid=ggrid, nxg=nxg, nyg=nyg, nzg=1)
+   endif
+
+end subroutine shr_strdata_create_newway
+
+subroutine shr_strdata_create_oldway(SDAT, name, mpicom, compid, gsmap, ggrid, nxg, nyg, &
 !--- streams stuff required ---
            yearFirst, yearLast, yearAlign, offset,          &
            domFilePath, domFileName,                        &
@@ -1325,7 +1506,7 @@ subroutine shr_strdata_create(SDAT, name, mpicom, compid, gsmap, ggrid, nxg, nyg
            pio_subsystem, pio_iotype,                       &
 !--- strdata optional ---
            nzg, domZvarName,                                &
-           taxMode, dtlimit, tintalgo,                      &
+           taxMode, dtlimit, tintalgo, readmode,            &
            fillalgo, fillmask, fillread, fillwrite,         &
            mapalgo, mapmask, mapread, mapwrite,             &
            calendar)
@@ -1374,92 +1555,21 @@ subroutine shr_strdata_create(SDAT, name, mpicom, compid, gsmap, ggrid, nxg, nyg
    character(*),optional ,intent(in)   :: mapread   ! regrid mapping file to read
    character(*),optional ,intent(in)   :: mapwrite  ! regrid mapping file to write
    character(*),optional ,intent(in)   :: tintalgo  ! time interpolation algorithm
+   character(*),optional ,intent(in)   :: readmode  ! file read mode
    character(*),optional, intent(in)   :: calendar
 
 !EOP
+   ! pio variables are already in SDAT no need to copy them
+   call shr_strdata_create_newway(SDAT, name, mpicom, compid, gsmap, ggrid, nxg, nyg,&
+        yearFirst, yearLast, yearAlign, offset, domFilePath, domFilename, domTvarName, &
+        domXvarName, domYvarName, domAreaName, domMaskName, &
+        filePath, filename, fldListFile, fldListModel, nzg=nzg, domZvarName=domZvarName,&
+        taxMode=taxMode,dtlimit=dtlimit,tintalgo=tintalgo,readmode=readmode,&
+        fillalgo=fillalgo,fillmask=fillmask,fillread=fillread,fillwrite=fillwrite,mapalgo=mapalgo,&
+        mapmask=mapmask,mapread=mapread,mapwrite=mapwrite,calendar=calendar)
 
-!  --- local ---
-!  --- formats ---
-   character(*),parameter :: subName = "(shr_strdata_create) "
-   character(*),parameter ::   F00 = "('(shr_strdata_create) ',8a)"
 
-!-------------------------------------------------------------------------------
-!
-!-------------------------------------------------------------------------------
-
-   call shr_strdata_readnml(SDAT,mpicom=mpicom)
-
-   SDAT%nstreams = 1
-
-   call shr_strdata_pioinit(sdat, pio_subsystem, pio_iotype)
-
-   if (present(taxMode)) then
-      SDAT%taxMode(1) = taxMode
-      if (trim(SDAT%taxMode(1)) == trim(shr_stream_taxis_extend)) SDAT%dtlimit(1) = 1.0e30
-   endif
-   if (present(dtlimit)) then
-      SDAT%dtlimit(1) = dtlimit
-   endif
-   if (present(fillalgo)) then
-      SDAT%fillalgo(1) = fillalgo
-   endif
-   if (present(fillmask)) then
-      SDAT%fillmask(1) = fillmask
-   endif
-   if (present(fillread)) then
-      SDAT%fillread(1) = fillread
-   endif
-   if (present(fillwrite)) then
-      SDAT%fillwrit(1) = fillwrite
-   endif
-   if (present(mapalgo)) then
-      SDAT%mapalgo(1) = mapalgo
-   endif
-   if (present(mapmask)) then
-      SDAT%mapmask(1) = mapmask
-   endif
-   if (present(mapread)) then
-      SDAT%mapread(1) = mapread
-   endif
-   if (present(mapwrite)) then
-      SDAT%mapwrit(1) = mapwrite
-   endif
-   if (present(tintalgo)) then
-      SDAT%tintalgo(1) = tintalgo
-   endif
-   if (present(mapmask)) then
-      SDAT%mapmask(1) = mapmask
-   endif
-   if (present(calendar)) then
-     SDAT%calendar = trim(shr_cal_calendarName(trim(calendar)))
-   endif
-
-   !---- Backwards compatibility requires Z be optional
-
-   if (present(domZvarName)) then
-      call shr_stream_set(SDAT%stream(1),yearFirst,yearLast,yearAlign,offset,taxMode, &
-                          fldListFile,fldListModel,domFilePath,domFileName, &
-                          domTvarName,domXvarName,domYvarName,domZvarName, &
-                          domAreaName,domMaskName, &
-                          filePath,filename,trim(name))
-   else
-      call shr_stream_set(SDAT%stream(1),yearFirst,yearLast,yearAlign,offset,taxMode, &
-                          fldListFile,fldListModel,domFilePath,domFileName, &
-                          domTvarName,domXvarName,domYvarName,'undefined', &
-                          domAreaName,domMaskName, &
-                          filePath,filename,trim(name))
-   endif
-
-   if (present(nzg)) then
-      call shr_strdata_init(SDAT, mpicom, compid, &
-           gsmap=gsmap, ggrid=ggrid, nxg=nxg, nyg=nyg, nzg=nzg)
-   else
-      call shr_strdata_init(SDAT, mpicom, compid, &
-           gsmap=gsmap, ggrid=ggrid, nxg=nxg, nyg=nyg, nzg=1)
-   endif
-
-end subroutine shr_strdata_create
-
+ end subroutine shr_strdata_create_oldway
 !===============================================================================
 !BOP ===========================================================================
 !
@@ -1546,6 +1656,7 @@ subroutine shr_strdata_print(SDAT,name)
      write(logunit,F04) "  mapread (",n,") = ",trim(SDAT%mapread(n))
      write(logunit,F04) "  mapwrit (",n,") = ",trim(SDAT%mapwrit(n))
      write(logunit,F04) "  tintalgo(",n,") = ",trim(SDAT%tintalgo(n))
+     write(logunit,F04) "  readmode(",n,") = ",trim(SDAT%readmode(n))
      write(logunit,F01) " "
    end do
    write(logunit,F01) "nvectors    = ",SDAT%nvectors
@@ -1614,6 +1725,7 @@ subroutine shr_strdata_bcastnml(SDAT,mpicom,rc)
    call shr_mpi_bcast(SDAT%mapread   ,mpicom,'mapread')
    call shr_mpi_bcast(SDAT%mapwrit   ,mpicom,'mapwrit')
    call shr_mpi_bcast(SDAT%tintalgo  ,mpicom,'tintalgo')
+   call shr_mpi_bcast(SDAT%readmode  ,mpicom,'readmode')
 
    if (present(rc)) then
       rc = lrc
@@ -1636,4 +1748,3 @@ end subroutine shr_strdata_setlogunit
 !===============================================================================
 
 end module shr_strdata_mod
-

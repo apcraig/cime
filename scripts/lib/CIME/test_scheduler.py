@@ -9,6 +9,7 @@ they can be run outside the context of TestScheduler.
 """
 
 import traceback, stat, threading, time, glob
+from collections import OrderedDict
 from CIME.XML.standard_module_setup import *
 import CIME.compare_namelists
 import CIME.utils
@@ -86,7 +87,8 @@ class TestScheduler(object):
                  walltime=None, proc_pool=None,
                  use_existing=False, save_timing=False, queue=None,
                  allow_baseline_overwrite=False, output_root=None,
-                 force_procs=None, force_threads=None, mpilib=None, input_dir=None, driver=None):
+                 force_procs=None, force_threads=None, mpilib=None,
+                 input_dir=None, pesfile=None):
     ###########################################################################
         self._cime_root       = CIME.utils.get_cime_root()
         self._cime_model      = get_model()
@@ -96,8 +98,7 @@ class TestScheduler(object):
         self._mpilib          = mpilib  # allow override of default mpilib
         self._completed_tests = 0
         self._input_dir       = input_dir
-        self._driver          = driver
-
+        self._pesfile         = pesfile
         self._allow_baseline_overwrite = allow_baseline_overwrite
 
         self._machobj = Machines(machine=machine_name)
@@ -192,13 +193,13 @@ class TestScheduler(object):
         # Each test has it's own value and setting/retrieving items from a dict
         # is atomic, so this should be fine to use without mutex.
         # name -> (phase, status)
-        self._tests = {}
+        self._tests = OrderedDict()
         for test_name in test_names:
             self._tests[test_name] = (TEST_START, TEST_PASS_STATUS)
 
         # Oversubscribe by 1/4
         if proc_pool is None:
-            pes = int(self._machobj.get_value("PES_PER_NODE"))
+            pes = int(self._machobj.get_value("MAX_MPITASKS_PER_NODE"))
             self._proc_pool = int(pes * 1.25)
         else:
             self._proc_pool = int(proc_pool)
@@ -224,8 +225,15 @@ class TestScheduler(object):
                             # We need to pick up here
                             break
                         else:
-                            self._update_test_status(test, phase, TEST_PEND_STATUS)
-                            self._update_test_status(test, phase, status)
+                            if phase != SUBMIT_PHASE:
+                                # Somewhat subtle. Create_test considers submit/run to be the run phase,
+                                # so don't try to update test status for a passed submit phase
+                                self._update_test_status(test, phase, TEST_PEND_STATUS)
+                                self._update_test_status(test, phase, status)
+
+                                if phase == RUN_PHASE:
+                                    logger.info("Test {} passed and will not be re-run".format(test))
+
                 logger.info("Using existing test directory {}".format(self._get_test_dir(test)))
         else:
             # None of the test directories should already exist.
@@ -238,6 +246,10 @@ class TestScheduler(object):
         # By the end of this constructor, this program should never hard abort,
         # instead, errors will be placed in the TestStatus files for the various
         # tests cases
+
+    ###########################################################################
+    def get_testnames(self):
+        return list(self._tests.keys())
 
     ###########################################################################
     def _log_output(self, test, output):
@@ -356,17 +368,24 @@ class TestScheduler(object):
         _, case_opts, grid, compset,\
             machine, compiler, test_mods = CIME.utils.parse_test_name(test)
 
-        create_newcase_cmd = "{} --case {} --res {} --mach {} --compiler {} --compset {}"\
-                               " --test".format(os.path.join(self._cime_root, "scripts", "create_newcase"),
-                                                test_dir, grid, machine, compiler, compset)
+        create_newcase_cmd = "{} --case {} --res {} --compset {}"\
+                             " --test".format(os.path.join(self._cime_root, "scripts", "create_newcase"),
+                                              test_dir, grid, compset)
+        if machine is not None:
+            create_newcase_cmd += " --machine {}".format(machine)
+        if compiler is not None:
+            create_newcase_cmd += " --compiler {}".format(compiler)
         if self._project is not None:
             create_newcase_cmd += " --project {} ".format(self._project)
         if self._output_root is not None:
             create_newcase_cmd += " --output-root {} ".format(self._output_root)
         if self._input_dir is not None:
             create_newcase_cmd += " --input-dir {} ".format(self._input_dir)
-        if self._driver == 'drv-nuopc':
+        if "Vnuopc" in case_opts:
             create_newcase_cmd += " --driver nuopc "
+
+        if self._pesfile is not None:
+            create_newcase_cmd += " --pesfile {} ".format(self._pesfile)
 
         if test_mods is not None:
             files = Files()
@@ -376,8 +395,11 @@ class TestScheduler(object):
             else:
                 (component, modspath) = test_mods.split('/',1)
 
-            if component == "drv" and self._driver == 'drv-nuopc':
-                component = "drv-nuopc"
+            # TODO: to get the right attributes of COMP_ROOT_DIR_CPL in evaluating definition_file - need
+            # to do the following first - this needs to be changed so that the following two lines are not needed!
+            comp_root_dir_cpl = files.get_value( "COMP_ROOT_DIR_CPL",{"component":"drv-nuopc"}, resolved=False)
+            files.set_value("COMP_ROOT_DIR_CPL", comp_root_dir_cpl)
+
             testmods_dir = files.get_value("TESTS_MODS_DIR", {"component": component})
             test_mod_file = os.path.join(testmods_dir, component, modspath)
             if not os.path.exists(test_mod_file):
@@ -388,6 +410,8 @@ class TestScheduler(object):
             create_newcase_cmd += " --user-mods-dir {}".format(test_mod_file)
 
         mpilib = None
+        ninst = 1
+        ncpl = 1
         if case_opts is not None:
             for case_opt in case_opts: # pylint: disable=not-an-iterable
                 if case_opt.startswith('M'):
@@ -395,9 +419,15 @@ class TestScheduler(object):
                     create_newcase_cmd += " --mpilib {}".format(mpilib)
                     logger.debug (" MPILIB set to {}".format(mpilib))
                 if case_opt.startswith('N'):
+                    expect(ncpl == 1,"Cannot combine _C and _N options")
                     ninst = case_opt[1:]
                     create_newcase_cmd += " --ninst {}".format(ninst)
                     logger.debug (" NINST set to {}".format(ninst))
+                if case_opt.startswith('C'):
+                    expect(ninst == 1,"Cannot combine _C and _N options")
+                    ncpl = case_opt[1:]
+                    create_newcase_cmd += " --ninst {} --multi-driver" .format(ncpl)
+                    logger.debug (" NCPL set to {}" .format(ncpl))
                 if case_opt.startswith('P'):
                     pesize = case_opt[1:]
                     create_newcase_cmd += " --pecount {}".format(pesize)
@@ -439,7 +469,7 @@ class TestScheduler(object):
         # to deal with. This list follows the same order as compset longnames follow.
         files = Files()
         drv_config_file = files.get_value("CONFIG_CPL_FILE")
-        drv_comp = Component(drv_config_file)
+        drv_comp = Component(drv_config_file, "CPL")
         envtest.add_elements_by_group(files, {}, "env_test.xml")
         envtest.add_elements_by_group(drv_comp, {}, "env_test.xml")
         envtest.set_value("TESTCASE", test_case)
@@ -505,6 +535,9 @@ class TestScheduler(object):
                     envtest.set_test_parameter("STOP_N", opti)
                     logger.debug (" STOP_OPTION set to {}".format(stop_option[opt]))
                     logger.debug (" STOP_N      set to {}".format(opti))
+                elif opt.startswith('I'):
+                    # Marker to distinguish tests with same name - ignored
+                    continue
 
                 elif opt.startswith('M'):
                     # M option handled by create newcase
@@ -514,11 +547,18 @@ class TestScheduler(object):
                     # P option handled by create newcase
                     continue
 
+                elif opt.startswith('V'):
+                    # V option is driver type and is handled by create_newcase
+                    continue
+
                 elif opt.startswith('N'):
                     # handled in create_newcase
                     continue
+                elif opt.startswith('C'):
+                    # handled in create_newcase
+                    continue
                 elif opt.startswith('IOP'):
-                    logger.warn("IOP test option not yet implemented")
+                    logger.warning("IOP test option not yet implemented")
                 else:
                     expect(False, "Could not parse option '{}' ".format(opt))
 
@@ -631,7 +671,7 @@ class TestScheduler(object):
         expect(len(threads_in_flight) <= self._parallel_jobs, "Oversubscribed?")
         finished_tests = []
         while not finished_tests:
-            for test, thread_info in threads_in_flight.iteritems():
+            for test, thread_info in threads_in_flight.items():
                 if not thread_info[0].is_alive():
                     finished_tests.append((test, thread_info[1]))
 
@@ -702,12 +742,14 @@ class TestScheduler(object):
             num_threads_launched_this_iteration = 0
             for test in self._tests:
                 logger.debug("test_name: " + test)
-                # If we have no workers available, immediately wait
-                if len(threads_in_flight) == self._parallel_jobs:
-                    self._wait_for_something_to_finish(threads_in_flight)
 
                 if self._work_remains(test):
                     work_to_do = True
+
+                    # If we have no workers available, immediately break out of loop so we can wait
+                    if len(threads_in_flight) == self._parallel_jobs:
+                        break
+
                     if test not in threads_in_flight:
                         test_phase, test_status = self._get_test_data(test)
                         expect(test_status != TEST_PEND_STATUS, test)
