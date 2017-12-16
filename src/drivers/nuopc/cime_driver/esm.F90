@@ -59,7 +59,7 @@ module ESM
 #ifdef ESMFUSE_NOTYET_pop2
   use pop2_comp_nuopc, only:   pop2_SS => SetServices
 #endif
-#ifdef ESMFUSE_NOTYET_cice
+#ifdef ESMFUSE_cice
   use cice_comp_nuopc, only:   cice_SS => SetServices
 #endif
 #ifdef ESMFUSE_clm
@@ -626,7 +626,7 @@ module ESM
           return  ! bail out
 #endif
         elseif (trim(model) == "cice") then
-#ifdef ESMFUSE_NOTYET_cice
+#ifdef ESMFUSE_cice
           call NUOPC_DriverAddComp(driver, "ICE", cice_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 #else
@@ -1295,7 +1295,6 @@ module ESM
     integer                         :: mpicom_CPLID          ! MPI cpl communicator
     integer                         :: mpicom_OCNID          ! MPI ocn communicator for ensemble member 1
     integer                         :: iam_GLOID             ! pe number in global id
-    logical                         :: iamin_CPLID           ! pe associated with CPLID
     logical                         :: iamroot_GLOID         ! GLOID masterproc
     logical                         :: iamroot_CPLID         ! CPLID masterproc
     integer                         :: nthreads_GLOID        ! OMP global number of threads
@@ -1333,7 +1332,6 @@ module ESM
     real(SHR_KIND_R8)               :: orb_lambm0            ! Mean long of perihelion at vernal equinox (radians)
     real(SHR_KIND_R8)               :: orb_mvelpp            ! moving vernal equinox long
     real(SHR_KIND_R8)               :: wall_time_limit       ! wall time limit in hours
-    character(SHR_KIND_CS)          :: force_stop_at         ! force stop at next (month, day, etc)
     character(SHR_KIND_CS)          :: cime_model            ! currently acme or cesm
     character(SHR_KIND_CL)          :: atm_gnam              ! atm grid
     character(SHR_KIND_CL)          :: lnd_gnam              ! lnd grid
@@ -1411,43 +1409,50 @@ module ESM
     character(len=*) , parameter    :: subname = '(esm_SetAttributes_and_InitClocks)'
 
     !----------------------------------------------------------
-    !| Initialize MCT and MPI communicators and IO
+    ! Initialize MPI communicators and IO
     !----------------------------------------------------------
 
     call mpi_initialized(flag,ierr)
     call shr_mpi_chkerr(ierr,subname//' mpi_initialized')
-    if (.not. flag) then
-       call mpi_init(ierr)
-       call shr_mpi_chkerr(ierr,subname//' mpi_init')
-    endif
+    ! if (.not. flag) then
+    !    call mpi_init(ierr)
+    !    call shr_mpi_chkerr(ierr,subname//' mpi_init')
+    ! endif
 
-    Global_Comm=MPI_COMM_WORLD
-    comp_comm = MPI_COMM_NULL
+    Global_Comm = MPI_COMM_WORLD
 
     call shr_pio_init1(num_inst_total,NLFileName, Global_Comm)
     !
     ! If pio_async_interface is true Global_Comm is MPI_COMM_NULL on the servernodes
     ! and server nodes do not return from shr_pio_init2
     !   if (Global_Comm /= MPI_COMM_NULL) then
+    ! The following call also initializes MCT which is still needed for some models
 
     call seq_comm_init(Global_Comm, NLFileName)
 
-    !--- set task based threading counts ---
+    ! set task based threading counts
+
     call seq_comm_getinfo(GLOID,pethreads=pethreads_GLOID,iam=iam_GLOID)
     call seq_comm_setnthreads(pethreads_GLOID)
 
-    !--- get some general data ---
-    it=1
+    ! get data for GLOID
+
     call seq_comm_getinfo(GLOID,mpicom=mpicom_GLOID,&
          iamroot=iamroot_GLOID,nthreads=nthreads_GLOID)
 
-    call seq_comm_getinfo(CPLID,mpicom=mpicom_CPLID,&
-         iamroot=iamroot_CPLID,nthreads=nthreads_CPLID,&
-         iam=comp_comm_iam(it))
+    ! get data for CPLID
 
+    call seq_comm_getinfo(CPLID,mpicom=mpicom_CPLID,&
+         iamroot=iamroot_CPLID,nthreads=nthreads_CPLID, iam=comp_comm_iam(it))
+
+    ! determine arrays comp_id, comp_comm, comp_iam and comp_name - these are needed for call
+    ! to shr_pio_init2
+
+    comp_comm(:) = MPI_COMM_NULL
+
+    it=1
     comp_id(it)    = CPLID
     comp_comm(it)  = mpicom_CPLID
-    iamin_CPLID    = seq_comm_iamin(CPLID)
     comp_iamin(it) = seq_comm_iamin(comp_id(it))
     comp_name(it)  = seq_comm_name(comp_id(it))
     do n = 1,num_inst_atm
@@ -1535,7 +1540,7 @@ module ESM
     call shr_pio_init2(comp_id,comp_name,comp_iamin,comp_comm,comp_comm_iam)
 
     !----------------------------------------------------------
-    !| Timer initialization (has to be after mpi init)
+    ! Timer initialization (has to be after mpi init)
     !----------------------------------------------------------
 
     maxthreads = max(nthreads_GLOID,nthreads_CPLID,nthreads_ATMID, &
@@ -1544,11 +1549,6 @@ module ESM
 
     call t_initf(NLFileName, LogPrint=.true., mpicom=mpicom_GLOID, &
          MasterTask=iamroot_GLOID,MaxThreads=maxthreads)
-
-    if (iamin_CPLID) then
-       ! TODO: where should this be called
-       ! MV: call seq_io_cpl_init()
-    endif
 
     call t_startf('CPL:INIT')
     call t_adj_detailf(+1)
@@ -1565,7 +1565,7 @@ module ESM
     ! Initialize infodata
     !----------------------------------------------------------
 
-    call med_infodata_init1(med_infodata, GLOID)
+    call med_infodata_init1(med_infodata)
 
     !----------------------------------------------------------
     ! Add atm_aero to driver attributes

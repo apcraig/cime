@@ -91,14 +91,13 @@ module med_infodata_mod
 CONTAINS
 
   !===============================================================================
-  subroutine med_infodata_init1(infodata, ID)
+  subroutine med_infodata_init1(infodata)
 
     ! !DESCRIPTION:
     ! Initialize pause_resume
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(med_infodata_type), intent(INOUT) :: infodata  ! infodata object
-    integer(SHR_KIND_IN),    intent(IN)    :: ID        ! seq_comm ID
 
     !----- local -----
     character(len=*),    parameter :: subname = '(med_infodata_Init1) '
