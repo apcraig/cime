@@ -44,6 +44,7 @@ module atm_comp_mct
   integer(IN)            :: logunit             ! logging unit number
   integer(IN)            :: compid              ! mct comp id
   integer(IN),parameter  :: master_task=0       ! task number of master task
+  integer    ,parameter  :: dbug = 10
 
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 CONTAINS
@@ -189,6 +190,14 @@ CONTAINS
     end if
 
     !----------------------------------------------------------------------------
+    ! diagnostics
+    !----------------------------------------------------------------------------
+
+    if (dbug > 1) then
+      call mct_aVect_info(2, a2x, istr="initial diag"//':AV')
+    endif
+
+    !----------------------------------------------------------------------------
     ! Reset shr logging to original values
     !----------------------------------------------------------------------------
 
@@ -243,6 +252,10 @@ CONTAINS
     call datm_comp_run(EClock, x2a, a2x, &
        SDATM, gsmap, ggrid, mpicom, compid, my_task, master_task, &
        inst_suffix, logunit, nextsw_cday, write_restart, case_name=case_name)
+
+    if (dbug > 1) then
+       call mct_aVect_info(2, a2x, istr='run diag'//':AV')
+    end if
 
     call seq_infodata_PutData(infodata, nextsw_cday=nextsw_cday )
 

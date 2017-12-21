@@ -653,6 +653,7 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
         call esm_AddAttributes(child, driver, ICEID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -717,6 +718,7 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
         call esm_AddAttributes(child, driver, LNDID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -774,6 +776,7 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
         call esm_AddAttributes(child, driver, WAVID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -821,6 +824,7 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
         call esm_AddAttributes(child, driver, GLCID(1), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -1060,8 +1064,6 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call esm_AddAttributes(child, driver, CPLID, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! read MED attributes from config file into FreeFormat
         attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", relaxedflag=.true., rc=rc)
@@ -1101,6 +1103,9 @@ module ESM
         call NUOPC_CompAttributeIngest(child, attrFF, addFlag=.true., rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+        call esm_AddAttributes(child, driver, CPLID, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       else
@@ -1292,7 +1297,6 @@ module ESM
     ! threading control
     integer                         :: Global_Comm
     integer                         :: mpicom_GLOID          ! MPI global communicator
-    integer                         :: mpicom_CPLID          ! MPI cpl communicator
     integer                         :: mpicom_OCNID          ! MPI ocn communicator for ensemble member 1
     integer                         :: iam_GLOID             ! pe number in global id
     logical                         :: iamroot_GLOID         ! GLOID masterproc
@@ -1437,13 +1441,7 @@ module ESM
 
     ! get data for GLOID
 
-    call seq_comm_getinfo(GLOID,mpicom=mpicom_GLOID,&
-         iamroot=iamroot_GLOID,nthreads=nthreads_GLOID)
-
-    ! get data for CPLID
-
-    call seq_comm_getinfo(CPLID,mpicom=mpicom_CPLID,&
-         iamroot=iamroot_CPLID,nthreads=nthreads_CPLID, iam=comp_comm_iam(it))
+    call seq_comm_getinfo(GLOID, mpicom=mpicom_GLOID, iamroot=iamroot_GLOID, nthreads=nthreads_GLOID)
 
     ! determine arrays comp_id, comp_comm, comp_iam and comp_name - these are needed for call
     ! to shr_pio_init2
@@ -1452,9 +1450,10 @@ module ESM
 
     it=1
     comp_id(it)    = CPLID
-    comp_comm(it)  = mpicom_CPLID
     comp_iamin(it) = seq_comm_iamin(comp_id(it))
     comp_name(it)  = seq_comm_name(comp_id(it))
+    call seq_comm_getinfo(CPLID, mpicom=comp_comm(it), nthreads=nthreads_CPLID, iam=comp_comm_iam(it))
+
     do n = 1,num_inst_atm
        it=it+1
        comp_id(it)    = ATMID(n)
@@ -1517,6 +1516,7 @@ module ESM
     !| Set logging parameters both for shr code and locally
     !----------------------------------------------------------
 
+    call seq_comm_getinfo(CPLID, iamroot=iamroot_CPLID)
     if (iamroot_CPLID) then
        inquire(file='cpl_modelio.nml',exist=exists)
        if (exists) then

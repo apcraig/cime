@@ -7,10 +7,11 @@ module med_constants_mod
   use ESMF
 
   implicit none
-  
+
   public
-  
+
   integer           , parameter :: med_constants_dbug_flag = 6
+ !logical           , parameter :: med_constants_statewrite_flag = .true.
   logical           , parameter :: med_constants_statewrite_flag = .false.
   real(ESMF_KIND_R8), parameter :: med_constants_spval_init = 0.0_ESMF_KIND_R8  ! spval for initialization
   real(ESMF_KIND_R8), parameter :: med_constants_spval = 0.0_ESMF_KIND_R8  ! spval
@@ -21,4 +22,3 @@ module med_constants_mod
   !-----------------------------------------------------------------------------
 
 end module med_constants_mod
-

@@ -420,30 +420,23 @@ contains
     allocate(mask(lsize))
     mask(:) = 1
 
-    ! TODO: the following must be uncommented - simply works for aquaplanet
     ! use domain mask first
-    ! allocate(rmask(lsize))
     ! if (trim(aoflux_grid) == 'ocn') then
     !    ! In this case, FBFrac is the FBFrac_o
-    !    call shr_nuopc_methods_FB_getFldPtr(FBFrac , 'ofrac' , rmask, rc=rc)
+    !    call shr_nuopc_methods_FB_getFldPtr(FBFrac, 'ofrac' , rmask, rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    !    write(6,*)'DEBUG: ofrac is ',rmask(:)
     ! else
     !    rmask(:) = 1._r8
     ! end if
     ! where (rmask(:) < 0.5_r8) mask(:) = 0   ! like nint
-    ! deallocate(rmask)
 
-    ! ! then check ofrac + ifrac
-    ! allocate(ifrac(lsize))
-    ! allocate(ofrac(lsize))
+    ! then check ofrac + ifrac
     ! call shr_nuopc_methods_FB_getFldPtr(FBFrac , fldname='ofrac' , fldptr1=ofrac, rc=rc)
     ! if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     ! call shr_nuopc_methods_FB_getFldPtr(FBFrac , fldname='ifrac' , fldptr1=ifrac, rc=rc)
     ! if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     ! where (ofrac(:) + ifrac(:) <= 0.0_r8) mask(:) = 0
-
-    ! deallocate(ifrac)
-    ! deallocate(ofrac)
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -498,14 +491,17 @@ contains
     call NUOPC_CompAttributeGet(gcomp, name='orb_eccen', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) eccen
+    write(6,*)'DEBUG: med_atmocn orb_eccen = ',eccen
 
     call NUOPC_CompAttributeGet(gcomp, name='orb_obliqr', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) obliqr
+    write(6,*)'DEBUG: med_atmocn obliqr = ',obliqr
 
     call NUOPC_CompAttributeGet(gcomp, name='orb_lambm0', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) lambm0
+    write(6,*)'DEBUG: med_atmocn lambm0 = ',lambm0
 
     call NUOPC_CompAttributeGet(gcomp, name='orb_mvelpp', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -558,13 +554,23 @@ contains
        ! Solar declination
        ! Will only do albedo calculation if nextsw_cday is not -1.
        if (nextsw_cday >= -0.5_r8) then
+
+          write(6,*)'DEBUG: eccen = ',eccen
           call shr_orb_decl(nextsw_cday, eccen, mvelpp,lambm0, obliqr, delta, eccf)
+
+          write(6,*)'DEBUG: nextsw_cday = ',nextsw_cday
+          write(6,*)'DEBUG: delta = ',delta
+          write(6,*)'DEBUG: lambm0 = ',lambm0
+          write(6,*)'DEBUG: obliqr = ',obliqr
 
           ! Compute albedos
           do n = 1,lsize
              rlat = const_deg2rad * lats(n)
+             write(6,*)'DEBUG_OCNALB: n,lats= ',n,lats(n)
              rlon = const_deg2rad * lons(n)
+             write(6,*)'DEBUG_OCNALB: n,lons= ',n,lons(n)
              cosz = shr_orb_cosz( nextsw_cday, rlat, rlon, delta )
+             write(6,*)'DEBUG_OCNALB: n,cosz= ',n,cosz
              if (cosz  >  0.0_r8) then !--- sun hit --
                 anidr(n) = (.026_r8/(cosz**1.7_r8 + 0.065_r8)) +   &
                            (.150_r8*(cosz         - 0.100_r8 ) *   &

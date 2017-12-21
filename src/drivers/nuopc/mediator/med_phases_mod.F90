@@ -244,7 +244,8 @@ module med_phases_mod
         call shr_nuopc_methods_FB_reset(FBtmp1, value=czero, rc=rc)
         if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
 
-        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), fldptr1=dataPtr1, rc=rc)
+        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), &
+             fldptr1=dataPtr1, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         do n = 1,fldsFr(compice)%num
@@ -252,9 +253,11 @@ module med_phases_mod
               shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compice), fldsFr(compice)%shortname(n), rc=rc) .and. &
               shr_nuopc_methods_FB_FldChk(FBtmp1                              , fldsFr(compice)%shortname(n), rc=rc)) then
 
-            call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compice) , fldsFr(compice)%shortname(n), dataPtr3, rc=rc)
+             call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compice) , &
+                  fldsFr(compice)%shortname(n), dataPtr3, rc=rc)
 
-            call shr_nuopc_methods_FB_GetFldPtr(FBtmp1                               , fldsFr(compice)%shortname(n), dataPtr4, rc=rc)
+             call shr_nuopc_methods_FB_GetFldPtr(FBtmp1, &
+                  fldsFr(compice)%shortname(n), dataPtr4, rc=rc)
 
             ! avoid non array fields like the scalars
             if (lbound(dataptr1,1) == lbound(dataptr3,1) .and. &

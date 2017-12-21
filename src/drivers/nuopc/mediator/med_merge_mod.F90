@@ -265,10 +265,9 @@ module med_merge_mod
     !  FBout = Foxx_salt, FB=Faii_salt, skipped ("o" in Foxx is not present in Faii)
 
     ! local variables
-    real(ESMF_KIND_R8), pointer :: dp1 (:), dp2 (:,:)
-    real(ESMF_KIND_R8), pointer :: dpf1(:), dpf2 (:,:)
+    real(ESMF_KIND_R8), pointer :: dp1 (:), dp2(:,:)
+    real(ESMF_KIND_R8), pointer :: dpf1(:), dpf2(:,:)
     real(ESMF_KIND_R8), pointer :: dpw1(:), dpw2(:,:)
-
     integer                     :: nf, n1, n2
     integer                     :: cnt, cntf
     character(ESMF_MAXSTR)      :: FBoutfld, FBoutpre, FBoutname, FBfld, FBname, FBpre
@@ -277,9 +276,9 @@ module med_merge_mod
     character(len=128)          :: lstring
     character(len=*),parameter  :: subname='(med_merge_fbx)'
 
-!    if (dbug_flag > 5) then
-!      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
-!    endif
+    !    if (dbug_flag > 5) then
+    !      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    !    endif
     rc = ESMF_SUCCESS
 
     ldocument = .false.
@@ -293,21 +292,22 @@ module med_merge_mod
     n2 = scan(FBoutfld,'_')-1
     FBoutpre  = trim(FBoutfld(1:n2))
     FBoutname = trim(FBoutfld(scan(FBoutfld,'_'):))
-    call shr_nuopc_methods_FB_GetFldPtr(FBout, trim(FBoutfld), dp1, dp2, lrank, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBout, trim(FBoutfld), fldptr1=dp1, fldptr2=dp2, rank=lrank, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-!    write(tmpstr,*) subname,'tcx FBoutfld=',n,trim(FBoutfld)
-!    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+    !    write(tmpstr,*) subname,'tcx FBoutfld=',n,trim(FBoutfld)
+    !    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     if (present(FBw) .and. present(fldw)) then
-      call shr_nuopc_methods_FB_GetFldPtr(FBw, trim(fldw), dpw1, dpw2, rc=rc)
+      call shr_nuopc_methods_FB_GetFldPtr(FBw, trim(fldw), fldptr1=dpw1, fldptr2=dpw2, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     call ESMF_FieldBundleGet(FB, fieldCount=cntf, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-!    write(tmpstr,*) subname,'tcx cntf=',cntf
-!    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+    !    write(tmpstr,*) subname,'tcx cntf=',cntf
+    !    call ESMF_LogWrite(trim(tmpstr), ESMF_LOGMSG_INFO, rc=dbrc)
+
     do nf = 1,cntf
       call shr_nuopc_methods_FB_getNameN(FB, nf, FBfld, rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -322,9 +322,9 @@ module med_merge_mod
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (document) call ESMF_LogWrite(trim(subname)//":"//trim(lstring)//":"//trim(FBoutfld)//" ="//trim(FBfld), ESMF_LOGMSG_INFO, rc=dbrc)
         if (lrank == 1) then
-          dp1 = dpf1
+          dp1(:) = dpf1(:)
         else
-          dp2 = dpf2
+          dp2(:,:) = dpf2(:,:)
         endif
 
       elseif (index(FBoutpre,'x') > 0 .and. trim(FBname) == trim(FBoutname)) then
@@ -350,7 +350,7 @@ module med_merge_mod
           if (present(FBw) .and. present(fldw)) then
             if (document) call ESMF_LogWrite(trim(subname)//":"//trim(lstring)//":"//trim(FBoutfld)//"+="//trim(FBfld)//"*"//trim(fldw), ESMF_LOGMSG_INFO, rc=dbrc)
             if (lrank == 1) then
-              dp1 = dp1 + dpf1*dpw1
+              dp1(:) = dp1(:) + dpf1(:)*dpw1(:)
             else
               dp2 = dp2 + dpf2*dpw2
             endif
@@ -370,9 +370,9 @@ module med_merge_mod
     !--- clean up
     !---------------------------------------
 
-!    if (dbug_flag > 5) then
-!      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
-!    endif
+    ! if (dbug_flag > 5) then
+    !    call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    ! endif
 
   end subroutine med_merge_fbx
 

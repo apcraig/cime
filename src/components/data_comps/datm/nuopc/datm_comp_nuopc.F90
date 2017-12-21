@@ -570,7 +570,7 @@ module datm_comp_nuopc
     !--------------------------------
 
     if (dbug > 1) then
-      call mct_aVect_info(2, d2x, istr=subname//':AV')
+      call mct_aVect_info(2, d2x, istr='initial diag'//':AV')
       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     endif
@@ -770,7 +770,7 @@ module datm_comp_nuopc
     !--------------------------------
 
     if (dbug > 1) then
-      call mct_aVect_info(2, d2x, istr=subname//':AV')
+      call mct_aVect_info(2, d2x, istr='run diag'//':AV')
       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     endif

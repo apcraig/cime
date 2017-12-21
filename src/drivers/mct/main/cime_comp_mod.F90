@@ -1462,6 +1462,10 @@ subroutine cime_init()
    ocnrun_count = 0
    cpl2ocn_first = .true.
 
+   !DEBUG: TODO - need to removoe this
+   skip_ocean_run = .false.
+   !DEBUG
+
    do_histavg = .true.
    if (seq_timemgr_histavg_type == seq_timemgr_type_never) then
       do_histavg = .false.
@@ -2225,6 +2229,11 @@ end subroutine cime_init
          endif
       endif
 
+      write(6,*)'DEBUG: curr_tod= ',tod
+      write(6,*)'DEBUG: ocnrun_alarm  = ',ocnrun_alarm
+      write(6,*)'DEBUG: ocnnext_alarm = ',ocnnext_alarm
+      write(6,*)'DEBUG: skip_ocean_run= ',skip_ocean_run
+
       ! override ocnrun_alarm and ocnnext_alarm for first ocn run
       ! skip_ocean_run is initialized above to true if it's a startup
       ! if it's not a startup, ignore all of this
@@ -2236,6 +2245,9 @@ end subroutine cime_init
          ocnrun_alarm = .false.
          ocnnext_alarm = .false.
       endif
+
+      write(6,*)'DEBUG: ocnrun_alarm  = ',ocnrun_alarm
+      write(6,*)'DEBUG: ocnnext_alarm = ',ocnnext_alarm
 
       if (iamroot_CPLID) then
          if (loglevel > 1) then

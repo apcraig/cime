@@ -57,10 +57,12 @@ module docn_comp_mod
   real(R8),parameter :: latice  = shr_const_latice      ! latent heat of fusion
   real(R8),parameter :: ocnsalt = shr_const_ocn_ref_sal ! ocean reference salinity
 
-  integer(IN)   :: km,kt,ks,ku,kv,kdhdx,kdhdy,kq,kswp  ! field indices
+  integer(IN)   :: kt,ks,ku,kv,kdhdx,kdhdy,kq,kswp  ! field indices
   integer(IN)   :: kswnet,klwup,klwdn,ksen,klat,kmelth,ksnow,krofi
   integer(IN)   :: kh,kqbot
   integer(IN)   :: index_lat, index_lon
+  integer(IN)   :: kmask, kfrac ! frac and mask field indices of docn domain
+  integer(IN)   :: ksomask      ! So_omask field index
 
   type(mct_rearr)        :: rearr
   type(mct_avect)        :: avstrm       ! av of data from stream
@@ -124,8 +126,6 @@ CONTAINS
     integer(IN)   :: lsize    ! local size
     logical       :: exists   ! file existance
     integer(IN)   :: nu       ! unit number
-    integer(IN)   :: kmask    ! field reference
-    integer(IN)   :: kfrac    ! field reference
     character(CL) :: calendar ! model calendar
     type(iosystem_desc_t), pointer :: ocn_pio_subsystem
 
@@ -222,7 +222,6 @@ CONTAINS
     call mct_aVect_init(o2x, rList=seq_flds_o2x_fields, lsize=lsize)
     call mct_aVect_zero(o2x)
 
-    km    = mct_aVect_indexRA(o2x,'So_omask', perrwith='quiet')
     kt    = mct_aVect_indexRA(o2x,'So_t')
     ks    = mct_aVect_indexRA(o2x,'So_s')
     ku    = mct_aVect_indexRA(o2x,'So_u')
@@ -279,14 +278,14 @@ CONTAINS
     allocate(xc(lsize))
     allocate(yc(lsize))
 
-    ! Note that the module array, imask, does not change after initialization
     kmask = mct_aVect_indexRA(ggrid%data,'mask')
     imask(:) = nint(ggrid%data%rAttr(kmask,:))
 
-    if (km /= 0) then
-       do n = 1,lsize
-          o2x%rAttr(km, n) = imask(n)
-       end do
+    kfrac = mct_aVect_indexRA(ggrid%data,'frac')
+
+    ksomask = mct_aVect_indexRA(o2x,'So_omask', perrwith='quiet')
+    if (ksomask /= 0) then
+       o2x%rAttr(ksomask, :) = ggrid%data%rAttr(kfrac,:)
     end if
 
     index_lon = mct_aVect_indexRA(ggrid%data,'lon')
@@ -384,7 +383,7 @@ CONTAINS
     integer(IN)            , intent(in)    :: logunit          ! logging unit number
     logical                , intent(in)    :: read_restart     ! start from restart
     logical                , intent(in)    :: write_restart    ! restart alarm is on
-    character(CL)          , intent(in), optional :: case_name ! case name
+    character(len=*)       , intent(in), optional :: case_name ! case name
 
     !--- local ---
     integer(IN)   :: CurrentYMD            ! model date
@@ -426,8 +425,8 @@ CONTAINS
 
     lsize = mct_avect_lsize(o2x)
     do n = 1,lsize
-       if (km /= 0) then
-          o2x%rAttr(km, n) = imask(n)
+       if (ksomask /= 0) then
+          o2x%rAttr(ksomask, n) = ggrid%data%rAttr(kfrac,n)
        end if
        o2x%rAttr(kt   ,n) = TkFrz
        o2x%rAttr(ks   ,n) = ocnsalt
@@ -488,8 +487,8 @@ CONTAINS
        call prescribed_sst(xc, yc, lsize, aquap_option, o2x%rAttr(kt,:))
        do n = 1,lsize
           o2x%rAttr(kt,n) = o2x%rAttr(kt,n) + TkFrz
-          if (km /= 0) then
-             o2x%rAttr(km, n) = imask(n)
+          if (ksomask /= 0) then
+             o2x%rAttr(ksomask, n) = ggrid%data%rAttr(kfrac,n)
           end if
        enddo
 
