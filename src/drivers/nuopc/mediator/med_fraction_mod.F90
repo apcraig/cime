@@ -2,12 +2,15 @@ module med_fraction_mod
 
   !-----------------------------------------------------------------------------
   ! Mediator Component.
-  ! This mediator operates on two timescales and keeps two internal Clocks to
-  ! do so.
+  ! Sets fracations on all component grids
   !-----------------------------------------------------------------------------
 
   use ESMF
-  use shr_nuopc_methods_mod
+  use shr_nuopc_methods_mod, only : shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod, only : shr_nuopc_methods_FB_reset
+  use shr_nuopc_methods_mod, only : shr_nuopc_methods_FB_getFldPtr
+  use shr_nuopc_methods_mod, only : shr_nuopc_methods_FB_FieldRegrid
+  use shr_nuopc_methods_mod, only : shr_nuopc_methods_FB_diagnose
   use med_internalstate_mod
   use med_constants_mod
 
@@ -15,7 +18,7 @@ module med_fraction_mod
 
   private
 
-  integer            :: dbrc
+  integer                       :: dbrc
   integer           , parameter :: dbug_flag   = med_constants_dbug_flag
   logical           , parameter :: statewrite_flag = med_constants_statewrite_flag
   real(ESMF_KIND_R8), parameter :: spval_init  = med_constants_spval_init
@@ -27,6 +30,8 @@ module med_fraction_mod
   public med_fraction_setupflds
   public med_fraction_init
   public med_fraction_set
+
+  private med_fraction_check
 
   integer, parameter, public :: nfracs = 5
   character(len=5),public :: fraclist(nfracs,ncomps)
@@ -44,11 +49,13 @@ module med_fraction_mod
   real(ESMF_KIND_R8),parameter :: eps_fracval = 1.0e-02   ! allowed error in any frac +- 0,1
   real(ESMF_KIND_R8),parameter :: eps_fraclim = 1.0e-03   ! truncation limit in fractions_a(lfrac)
   logical ,parameter :: atm_frac_correct = .false. ! turn on frac correction on atm grid
+
   !--- standard plus atm fraction consistency ---
   !  real(ESMF_KIND_R8),parameter :: eps_fracsum = 1.0e-12   ! allowed error in sum of fracs
   !  real(ESMF_KIND_R8),parameter :: eps_fracval = 1.0e-02   ! allowed error in any frac +- 0,1
   !  real(ESMF_KIND_R8),parameter :: eps_fraclim = 1.0e-03   ! truncation limit in fractions_a(lfrac)
   !  logical ,parameter :: atm_frac_correct = .true. ! turn on frac correction on atm grid
+
   !--- unconstrained and area conserving? ---
   !  real(ESMF_KIND_R8),parameter :: eps_fracsum = 1.0e-12   ! allowed error in sum of fracs
   !  real(ESMF_KIND_R8),parameter :: eps_fracval = 1.0e-02   ! allowed error in any frac +- 0,1

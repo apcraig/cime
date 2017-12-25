@@ -127,6 +127,9 @@ CONTAINS
     logical       :: exists   ! file existance
     integer(IN)   :: nu       ! unit number
     character(CL) :: calendar ! model calendar
+    integer(IN)   :: currentYMD    ! model date
+    integer(IN)   :: currentTOD    ! model sec into model date
+    logical       :: write_restart
     type(iosystem_desc_t), pointer :: ocn_pio_subsystem
 
     !--- formats ---
@@ -348,9 +351,15 @@ CONTAINS
     !----------------------------------------------------------------------------
 
     call t_adj_detailf(+2)
+
+    call seq_timemgr_EClockGetData( EClock, curr_ymd=CurrentYMD, curr_tod=CurrentTOD)
+
+    write_restart = .false.
     call docn_comp_run(EClock, x2o, o2x, &
          SDOCN, gsmap, ggrid, mpicom, compid, my_task, master_task, &
-         inst_suffix, logunit, read_restart, write_restart=.false.)
+         inst_suffix, logunit, read_restart, write_restart, &
+         currentYMD, currentTOD)
+
     call t_adj_detailf(-2)
 
     if (my_task == master_task) write(logunit,F00) 'docn_comp_init done'
@@ -361,9 +370,11 @@ CONTAINS
   end subroutine docn_comp_init
 
   !===============================================================================
+
   subroutine docn_comp_run(EClock, x2o, o2x, &
        SDOCN, gsmap, ggrid, mpicom, compid, my_task, master_task, &
-       inst_suffix, logunit, read_restart, write_restart, case_name)
+       inst_suffix, logunit, read_restart, write_restart, &
+       currentYMD, currentTOD, case_name)
 
     ! !DESCRIPTION:  run method for docn model
     implicit none
@@ -375,19 +386,19 @@ CONTAINS
     type(shr_strdata_type) , intent(inout) :: SDOCN
     type(mct_gsMap)        , pointer       :: gsMap
     type(mct_gGrid)        , pointer       :: ggrid
-    integer(IN)            , intent(in)    :: mpicom           ! mpi communicator
-    integer(IN)            , intent(in)    :: compid           ! mct comp id
-    integer(IN)            , intent(in)    :: my_task          ! my task in mpi communicator mpicom
-    integer(IN)            , intent(in)    :: master_task      ! task number of master task
-    character(len=*)       , intent(in)    :: inst_suffix      ! char string associated with instance
-    integer(IN)            , intent(in)    :: logunit          ! logging unit number
-    logical                , intent(in)    :: read_restart     ! start from restart
-    logical                , intent(in)    :: write_restart    ! restart alarm is on
+    integer(IN)            , intent(in)    :: mpicom        ! mpi communicator
+    integer(IN)            , intent(in)    :: compid        ! mct comp id
+    integer(IN)            , intent(in)    :: my_task       ! my task in mpi communicator mpicom
+    integer(IN)            , intent(in)    :: master_task   ! task number of master task
+    character(len=*)       , intent(in)    :: inst_suffix   ! char string associated with instance
+    integer(IN)            , intent(in)    :: logunit       ! logging unit number
+    logical                , intent(in)    :: read_restart  ! start from restart
+    logical                , intent(in)    :: write_restart ! restart alarm is on
+    integer(IN)            , intent(in)    :: currentYMD    ! model date
+    integer(IN)            , intent(in)    :: currentTOD    ! model sec into model date
     character(len=*)       , intent(in), optional :: case_name ! case name
 
     !--- local ---
-    integer(IN)   :: CurrentYMD            ! model date
-    integer(IN)   :: CurrentTOD            ! model sec into model date
     integer(IN)   :: yy,mm,dd              ! year month day
     integer(IN)   :: n                     ! indices
     integer(IN)   :: nf                    ! fields loop index
@@ -409,8 +420,9 @@ CONTAINS
     call t_startf('DOCN_RUN')
 
     call t_startf('docn_run1')
-    call seq_timemgr_EClockGetData( EClock, &
-         curr_ymd=CurrentYMD, curr_tod=CurrentTOD, curr_yr=yy, curr_mon=mm, curr_day=dd, dtime=idt)
+
+    call seq_timemgr_EClockGetData( EClock, curr_yr=yy, curr_mon=mm, curr_day=dd, dtime=idt)
+
     dt = idt * 1.0_R8
     call t_stopf('docn_run1')
 

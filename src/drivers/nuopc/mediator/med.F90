@@ -1684,6 +1684,7 @@ module MED
             if (n1 == compatm .and. n2 == compwav) fmapfile=smapfile
             if (n1 == compocn .and. n2 == compwav) fmapfile=smapfile
             if (n1 == compice .and. n2 == compwav) fmapfile=smapfile
+
             ! tcraig, skip this for now, file too big and slow to read
             ! if (rhname_file == 'glc2ocn') then
             !   call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_rmapname", value=smapfile, rc=rc)
@@ -1696,34 +1697,45 @@ module MED
             ! endif
 
             if (mastertask) write(llogunit,*) subname,' calling RH_init for '//trim(rhname)
-            call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBImp(n1,n1), FBdst=is_local%wrap%FBImp(n1,n2), &
-              bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-              consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-              consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-              patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-              fcopymap=is_local%wrap%RH(n1,n2,mapfcopy), &
-              srcMaskValue=srcMaskValue, dstMaskValue=dstMaskValue, &
-              fldlist1=FldsFr(n1), string=trim(rhname)//'_weights', &
-              bilnrfn=trim(smapfile), &
-              consffn=trim(fmapfile), &
-              consdfn=trim(dmapfile), &
-              patchfn=trim(pmapfile), &
-              spvalfn=med_constants_spval_rhfile, mastertask=mastertask, &
-              rc=rc)
+
+            call shr_nuopc_methods_RH_Init( &
+                 FBsrc=is_local%wrap%FBImp(n1,n1), &
+                 FBdst=is_local%wrap%FBImp(n1,n2), &
+                 bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
+                 consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+                 consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
+                 patchmap=is_local%wrap%RH(n1,n2,mappatch), &
+                 fcopymap=is_local%wrap%RH(n1,n2,mapfcopy), &
+                 srcMaskValue=srcMaskValue, &
+                 dstMaskValue=dstMaskValue, &
+                 fldlist1=FldsFr(n1), &
+                 string=trim(rhname)//'_weights', &
+                 bilnrfn=trim(smapfile), &
+                 consffn=trim(fmapfile), &
+                 consdfn=trim(dmapfile), &
+                 patchfn=trim(pmapfile), &
+                 spvalfn=med_constants_spval_rhfile, &
+                 mastertask=mastertask, &
+                 rc=rc)
             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
           elseif (is_local%wrap%comp_present(n1) .and. is_local%wrap%comp_present(n2)) then
 
             call NUOPC_CompAttributeGet(gcomp, name=trim(rhname)//"_fmapname", value=fmapfile, rc=rc)
             if (.not. shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) then
-              call ESMF_LogWrite(trim(rhname)//"_fmapname = "//trim(fmapfile), ESMF_LOGMSG_INFO)
-              call shr_nuopc_methods_RH_Init(FBsrc=is_local%wrap%FBfrac(n1), FBdst=is_local%wrap%FBfrac(n2), &
-                consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-                srcMaskValue=srcMaskValue, dstMaskValue=dstMaskValue, &
-                string=trim(rhname)//'_weights_for_fraction', &
-                consffn=trim(fmapfile), &
-                spvalfn=med_constants_spval_rhfile, mastertask=mastertask, &
-                rc=rc)
+               call ESMF_LogWrite(trim(rhname)//"_fmapname = "//trim(fmapfile), ESMF_LOGMSG_INFO)
+
+               call shr_nuopc_methods_RH_Init(&
+                    FBsrc=is_local%wrap%FBfrac(n1), &
+                    FBdst=is_local%wrap%FBfrac(n2), &
+                    consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+                    srcMaskValue=srcMaskValue, &
+                    dstMaskValue=dstMaskValue, &
+                    string=trim(rhname)//'_weights_for_fraction', &
+                    consffn=trim(fmapfile), &
+                    spvalfn=med_constants_spval_rhfile, &
+                    mastertask=mastertask, &
+                    rc=rc)
               if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
             endif
           endif
@@ -1855,7 +1867,7 @@ module MED
 
           RETURN ! IMPORTANT - return if cpl_scalars have not been set
 
-       else ! cpl_scalars form atm are set
+       else ! cpl_scalars from atm are set
 
           ! (2) check if the atm/ocn init should be done.
 

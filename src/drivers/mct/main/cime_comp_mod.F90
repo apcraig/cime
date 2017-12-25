@@ -1462,9 +1462,9 @@ subroutine cime_init()
    ocnrun_count = 0
    cpl2ocn_first = .true.
 
-   !DEBUG: TODO - need to removoe this
+   ! TODO NUOPC - This is not the case for nuopc - hard-coding it to false here -
+   ! not sure how to handle this in the nuopc case
    skip_ocean_run = .false.
-   !DEBUG
 
    do_histavg = .true.
    if (seq_timemgr_histavg_type == seq_timemgr_type_never) then
@@ -1716,6 +1716,9 @@ subroutine cime_init()
    endif
 #endif
    if (single_column) areafact_samegrid = .true.
+
+   !TODO NUOPC: setting areafract_samegrid to samegrid_alo - not sure why it is not set this way by default
+   areafact_samegrid = samegrid_alo
 
    call t_startf ('CPL:init_areacor')
    call t_adj_detailf(+2)
@@ -2229,10 +2232,7 @@ end subroutine cime_init
          endif
       endif
 
-      write(6,*)'DEBUG: curr_tod= ',tod
-      write(6,*)'DEBUG: ocnrun_alarm  = ',ocnrun_alarm
-      write(6,*)'DEBUG: ocnnext_alarm = ',ocnnext_alarm
-      write(6,*)'DEBUG: skip_ocean_run= ',skip_ocean_run
+      ! TODO NUOPC: how is the following handled in NUOPC?
 
       ! override ocnrun_alarm and ocnnext_alarm for first ocn run
       ! skip_ocean_run is initialized above to true if it's a startup

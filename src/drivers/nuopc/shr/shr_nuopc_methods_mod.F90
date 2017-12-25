@@ -1344,10 +1344,14 @@ module shr_nuopc_methods_mod
       if (ESMF_RouteHandleIsCreated(fcopymap, rc=rc)) okfcopy = .true.
     endif
 
+    ! Loop over all fields in the field bundle - determine the mapping for the target field from
+    ! the fldlist%mapping setting and apply it
     do n = 1,fldlist%num
+
       if (fldlist%shortname(n) == trim(seq_flds_scalar_name)) then
         if (dbug_flag > 1) then
-          call ESMF_LogWrite(trim(subname)//trim(lstring)//": skip : fld="//trim(fldlist%shortname(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+           call ESMF_LogWrite(trim(subname)//trim(lstring)//": skip : fld="//trim(fldlist%shortname(n)), &
+                ESMF_LOGMSG_INFO, rc=dbrc)
         endif
 
       elseif (shr_nuopc_methods_FB_FldChk(FBin , fldlist%shortname(n), rc=rc) .and. &

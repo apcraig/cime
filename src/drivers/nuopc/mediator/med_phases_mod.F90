@@ -94,6 +94,10 @@ module med_phases_mod
     integer                     :: i, j, n, n1, n2, ncnt, lsize
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_atm)'
+
+    !DEBUG
+    real(ESMF_KIND_R8), pointer :: debug1(:), debug2(:)
+    !DEBUG
     !---------------------------------------
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -147,14 +151,18 @@ module med_phases_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !---------------------------------------
-    !--- map to create FBimp(:,compatm)
+    !--- Map to create import field bundle on atm grid - FBimp(:,compatm)
     !---------------------------------------
 
     !tcraig, turn this off for ice2atm, use ice frac weighted mapping below
 
     n2 = compatm
     do n1 = 1,ncomps
-       if (n1/=compice .and. is_local%wrap%med_coupling_active(n1,n2)) then
+       !TODO: this is a hack
+       !if (n1/=compice .and. is_local%wrap%med_coupling_active(n1,n2)) then
+       !  compice should be included in the map if the atm and ice grid are identical -
+       !  it should behave just like the land mapping - since all you are doing is redistributing
+       if (is_local%wrap%med_coupling_active(n1,n2)) then
           call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -204,6 +212,9 @@ module med_phases_mod
     !---------------------------------------
     !--- map ice to atm with frac weighting
     !---------------------------------------
+
+#if (1==0)
+    !TODO: temporarily are not using this to verify bfb with F compset and everyone on the same grid
 
     if (is_local%wrap%med_coupling_active(compice,compatm)) then
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
@@ -295,7 +306,9 @@ module med_phases_mod
           if (fldsFr(compice)%shortname(n) /= trim(ice_fraction_name) .and. &
               shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compatm), fldsFr(compice)%shortname(n), rc=rc)) then
 
-            call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compatm), fldsFr(compice)%shortname(n), dataPtr3, rc=rc)
+             call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compatm), fldsFr(compice)%shortname(n), &
+                  dataPtr3, rc=rc)
+
             ! avoid non array fields like the scalars
 
             if (lbound(dataptr1,1) == lbound(dataptr3,1) .and. ubound(dataptr1,1) == ubound(dataptr3,1)) then
@@ -316,7 +329,8 @@ module med_phases_mod
                   dataPtr3(i) = dataPtr3(i) * ifrac_apr(i)
                 enddo
               else
-                call ESMF_LogWrite(trim(subname)//": mapping name error "//trim(fldsFr(compice)%mapping(n)), ESMF_LOGMSG_INFO, rc=rc)
+                 call ESMF_LogWrite(trim(subname)//": mapping name error "//trim(fldsFr(compice)%mapping(n)), &
+                      ESMF_LOGMSG_INFO, rc=rc)
                 rc=ESMF_FAILURE
                 if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
               endif
@@ -367,6 +381,7 @@ module med_phases_mod
       endif
 
     endif !end of if coupling is active between ice => atm
+#endif
 
     !---------------------------------------
     !--- auto merges

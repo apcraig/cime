@@ -813,21 +813,12 @@ contains
           calday = nextsw_cday
           call shr_orb_decl(calday, eccen, mvelpp,lambm0, obliqr, delta, eccf)
 
-          write(6,*)'DEBUG: nextsw_cday = ',nextsw_cday
-          write(6,*)'DEBUG: delta = ',delta
-          write(6,*)'DEBUG: eccen = ',eccen
-          write(6,*)'DEBUG: lambm0 = ',lambm0
-          write(6,*)'DEBUG: obliqr = ',obliqr
-
-
           ! Compute albedos
           do n=1,nloc_o
              rlat = const_deg2rad * lats(n)
-             write(6,*)'DEBUG_OCNALB: n,lats= ',n,lats(n)
              rlon = const_deg2rad * lons(n)
-             write(6,*)'DEBUG_OCNALB: n,lons= ',n,lons(n)
              cosz = shr_orb_cosz( calday, rlat, rlon, delta )
-             write(6,*)'DEBUG_OCNALB: n,cosz= ',n,cosz
+             write(6,*)'DEBUG: atmocn_alb n,cosz= ',n,cosz
              if (cosz  >  0.0_r8) then !--- sun hit --
                 anidr = (.026_r8/(cosz**1.7_r8 + 0.065_r8)) +   &
                         (.150_r8*(cosz         - 0.100_r8 ) *   &
@@ -1456,11 +1447,6 @@ contains
                           !duu10n,ustar, re  , ssq, missval = 0.0_r8 )
                           cold_start=cold_start)
     else
-       do n = 1,nloc
-          write(6,*)'DEBUG: n,zbot= ',n,zbot(n)
-          write(6,*)'DEBUG: n,ubot= ',n,ubot(n)
-          write(6,*)'DEBUG: n,thbot= ',n,thbot(n)
-       end do
        call shr_flux_atmocn (nloc , zbot , ubot, vbot, thbot, prec_gust, gust_fac, &
                           shum , shum_16O , shum_HDO, shum_18O, dens , tbot, uocn, vocn , &
                           tocn , emask, sen , lat , lwup , &
@@ -1470,12 +1456,6 @@ contains
                           !missval should not be needed if flux calc
                           !consistent with mrgx2a fraction
                           !duu10n,ustar, re  , ssq, missval = 0.0_r8 )
-       do n = 1,nloc
-          write(6,*)'DEBUG: n,taux= ',n,taux(n)
-          write(6,*)'DEBUG: n,tauy= ',n,tauy(n)
-          write(6,*)'DEBUG: n,sen= ',n,sen(n)
-          write(6,*)'DEBUG: n,lat= ',n,lat(n)
-       end do
     endif
 
     do n = 1,nloc

@@ -5,7 +5,7 @@ module med_atmocn_mod
   use shr_sys_mod           , only: shr_sys_abort
   use shr_flux_mod          , only: shr_flux_atmocn, shr_flux_atmocn_diurnal
   use shr_orb_mod           , only: shr_orb_params, shr_orb_cosz, shr_orb_decl
-  use shr_const_mod         , only: SHR_CONST_PI
+  use shr_const_mod         , only: SHR_CONST_PI, shr_const_spval
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_getFieldN
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_GetFldPtr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
@@ -115,8 +115,8 @@ module med_atmocn_mod
   character(len=1024)    :: tmpstr
   real(r8)    ,parameter :: const_pi      = SHR_CONST_PI       ! pi
   real(r8)    ,parameter :: const_deg2rad = const_pi/180.0_r8  ! deg to rads
-  character(*),parameter :: u_FILE_u = &
-    __FILE__
+  character(*),parameter :: u_FILE_u = __FILE__
+
 !===============================================================================
 contains
 !===============================================================================
@@ -421,16 +421,15 @@ contains
     mask(:) = 1
 
     ! use domain mask first
-    ! if (trim(aoflux_grid) == 'ocn') then
-    !    ! In this case, FBFrac is the FBFrac_o
-    !    call shr_nuopc_methods_FB_getFldPtr(FBFrac, 'ofrac' , rmask, rc=rc)
-    !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    !    write(6,*)'DEBUG: ofrac is ',rmask(:)
-    ! else
-    !    rmask(:) = 1._r8
-    ! end if
-    ! where (rmask(:) < 0.5_r8) mask(:) = 0   ! like nint
+    if (trim(aoflux_grid) == 'ocn') then
+       call shr_nuopc_methods_FB_getFldPtr(FBOcn, 'So_omask' , rmask, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    else
+       rmask(:) = 1._r8
+    end if
+    where (rmask(:) == 0._r8) mask(:) = 0   ! like nint
 
+    ! TODO: need to check if this logic is correct
     ! then check ofrac + ifrac
     ! call shr_nuopc_methods_FB_getFldPtr(FBFrac , fldname='ofrac' , fldptr1=ofrac, rc=rc)
     ! if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -491,17 +490,14 @@ contains
     call NUOPC_CompAttributeGet(gcomp, name='orb_eccen', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) eccen
-    write(6,*)'DEBUG: med_atmocn orb_eccen = ',eccen
 
     call NUOPC_CompAttributeGet(gcomp, name='orb_obliqr', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) obliqr
-    write(6,*)'DEBUG: med_atmocn obliqr = ',obliqr
 
     call NUOPC_CompAttributeGet(gcomp, name='orb_lambm0', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) lambm0
-    write(6,*)'DEBUG: med_atmocn lambm0 = ',lambm0
 
     call NUOPC_CompAttributeGet(gcomp, name='orb_mvelpp', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -510,6 +506,7 @@ contains
     ! The following is for debugging
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call ESMF_VMGet(vm, localPet=iam, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -555,22 +552,15 @@ contains
        ! Will only do albedo calculation if nextsw_cday is not -1.
        if (nextsw_cday >= -0.5_r8) then
 
-          write(6,*)'DEBUG: eccen = ',eccen
           call shr_orb_decl(nextsw_cday, eccen, mvelpp,lambm0, obliqr, delta, eccf)
 
-          write(6,*)'DEBUG: nextsw_cday = ',nextsw_cday
-          write(6,*)'DEBUG: delta = ',delta
-          write(6,*)'DEBUG: lambm0 = ',lambm0
-          write(6,*)'DEBUG: obliqr = ',obliqr
-
+          write(6,*)'DEBUG: atmocn nextsw_cday = ',nextsw_cday
           ! Compute albedos
           do n = 1,lsize
              rlat = const_deg2rad * lats(n)
-             write(6,*)'DEBUG_OCNALB: n,lats= ',n,lats(n)
              rlon = const_deg2rad * lons(n)
-             write(6,*)'DEBUG_OCNALB: n,lons= ',n,lons(n)
              cosz = shr_orb_cosz( nextsw_cday, rlat, rlon, delta )
-             write(6,*)'DEBUG_OCNALB: n,cosz= ',n,cosz
+             write(6,*)'DEBUG: atmocn_alb n,cosz= ',n,cosz
              if (cosz  >  0.0_r8) then !--- sun hit --
                 anidr(n) = (.026_r8/(cosz**1.7_r8 + 0.065_r8)) +   &
                            (.150_r8*(cosz         - 0.100_r8 ) *   &
@@ -596,13 +586,12 @@ contains
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call shr_nuopc_methods_FB_getFldPtr(FBFrac_o, 'ifrad', fldptr1=ifrad_o, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       ifrad_o(:) = ifrac_o(:)
 
        call shr_nuopc_methods_FB_getFldPtr(FBFrac_o, fldname='ofrac', fldptr1=ofrac_o, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call shr_nuopc_methods_FB_getFldPtr(FBFrac_o, fldname='ofrad', fldptr1=ofrad_o, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       ifrad_o(:) = ifrac_o(:)
        ofrad_o(:) = ofrac_o(:)
     endif
 
@@ -736,6 +725,17 @@ contains
           end if
        enddo
     end if
+
+    do n = 1,lsize
+       sen(n)  = shr_const_spval
+       lat(n)  = shr_const_spval
+       lwup(n) = shr_const_spval
+       evap(n) = shr_const_spval
+       taux(n) = shr_const_spval
+       tauy(n) = shr_const_spval
+       tref(n) = shr_const_spval
+       qref(n) = shr_const_spval
+    end do
 
     if (flux_diurnal) then
        call shr_flux_atmocn_diurnal (lsize , zbot , ubot, vbot, thbot, &

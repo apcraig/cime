@@ -700,6 +700,7 @@ contains
             fldlist=seq_flds_i2x_fluxes, &
             avwts_s=fractions_ix(eii), avwtsfld_s='ifrac')
     enddo
+
     call t_drvstopf  (trim(timer))
 
   end subroutine prep_atm_calc_i2x_ax
