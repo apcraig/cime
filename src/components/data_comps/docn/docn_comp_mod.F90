@@ -399,7 +399,7 @@ CONTAINS
     character(len=*)       , intent(in), optional :: case_name ! case name
 
     !--- local ---
-    integer(IN)   :: yy,mm,dd              ! year month day
+    integer(IN)   :: yy,mm,dd,tod          ! year month day time-of-day
     integer(IN)   :: n                     ! indices
     integer(IN)   :: nf                    ! fields loop index
     integer(IN)   :: nl                    ! ocn frac index
@@ -420,9 +420,7 @@ CONTAINS
     call t_startf('DOCN_RUN')
 
     call t_startf('docn_run1')
-
-    call seq_timemgr_EClockGetData( EClock, curr_yr=yy, curr_mon=mm, curr_day=dd, dtime=idt)
-
+    call seq_timemgr_EClockGetData( EClock, dtime=idt)
     dt = idt * 1.0_R8
     call t_stopf('docn_run1')
 
@@ -614,13 +612,15 @@ CONTAINS
     if (write_restart) then
        call t_startf('docn_restart')
 
+       call seq_timemgr_EClockGetData( EClock, curr_yr=yy, curr_mon=mm, curr_day=dd, curr_tod=tod)
+
        write(rest_file,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
             trim(case_name), '.docn'//trim(inst_suffix)//'.r.', &
-            yy,'-',mm,'-',dd,'-',currentTOD,'.nc'
+            yy,'-',mm,'-',dd,'-',tod,'.nc'
 
        write(rest_file_strm,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
             trim(case_name), '.docn'//trim(inst_suffix)//'.rs1.', &
-            yy,'-',mm,'-',dd,'-',currentTOD,'.bin'
+            yy,'-',mm,'-',dd,'-',tod,'.bin'
 
        if (my_task == master_task) then
           nu = shr_file_getUnit()
