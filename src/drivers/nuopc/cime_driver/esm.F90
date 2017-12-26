@@ -193,8 +193,10 @@ module ESM
     ! Create, open and set the config
     config = ESMF_ConfigCreate(rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call ESMF_ConfigLoadFile(config, runseq_filename, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call ESMF_GridCompSet(driver, config=config, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -1235,32 +1237,35 @@ module ESM
     call NUOPC_DriverGetComp(driver, compList=connectorList, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    write (msgstr,*) "Found ", size(connectorList), " Connectors."// &
-      " Modifying CplList Attribute...."
+    write (msgstr,*) "Found ", size(connectorList), " Connectors."// " Modifying CplList Attribute...."
     call ESMF_LogWrite(trim(msgstr), ESMF_LOGMSG_INFO, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     do i=1, size(connectorList)
+
       ! query the cplList for connector i
-      call NUOPC_CompAttributeGet(connectorList(i), name="CplList", &
-        itemCount=cplListSize, rc=rc)
+      call NUOPC_CompAttributeGet(connectorList(i), name="CplList", itemCount=cplListSize, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
       if (cplListSize>0) then
         allocate(cplList(cplListSize))
-        call NUOPC_CompAttributeGet(connectorList(i), name="CplList", &
-          valueList=cplList, rc=rc)
+
+        call NUOPC_CompAttributeGet(connectorList(i), name="CplList", valueList=cplList, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        ! go through all of the entries in the cplList and add options
+
+        ! go through all of the entries in the cplList and set the mapping method to "redist"
         do j=1, cplListSize
            !tempString = trim(cplList(j))//":REMAPMETHOD=bilinear"//&
            !":SrcTermProcessing=1:DUMPWEIGHTS=true:TermOrder=SrcSeq"
-          tempString = trim(cplList(j))//":remapmethod=redist"
-          cplList(j) = trim(tempString)
+
+           tempString = trim(cplList(j))//":remapmethod=redist"
+           cplList(j) = trim(tempString)
         enddo
+
         ! store the modified cplList in CplList attribute of connector i
-        call NUOPC_CompAttributeSet(connectorList(i), &
-          name="CplList", valueList=cplList, rc=rc)
+        call NUOPC_CompAttributeSet(connectorList(i), name="CplList", valueList=cplList, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
         deallocate(cplList)
       endif
     enddo

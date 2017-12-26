@@ -81,8 +81,6 @@ module med_phases_mod
     type(ESMF_Clock)            :: clock
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
-    type(ESMF_State)            :: importState, exportState
-    type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
     real(ESMF_KIND_R8), pointer :: ifrac_i(:)                 ! ice fraction on ice grid
@@ -94,11 +92,8 @@ module med_phases_mod
     integer                     :: i, j, n, n1, n2, ncnt, lsize
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_atm)'
-
-    !DEBUG
-    real(ESMF_KIND_R8), pointer :: debug1(:), debug2(:)
-    !DEBUG
     !---------------------------------------
+
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
@@ -158,10 +153,12 @@ module med_phases_mod
 
     n2 = compatm
     do n1 = 1,ncomps
+!#if (1 == 0)
        !TODO: this is a hack
        !if (n1/=compice .and. is_local%wrap%med_coupling_active(n1,n2)) then
        !  compice should be included in the map if the atm and ice grid are identical -
        !  it should behave just like the land mapping - since all you are doing is redistributing
+!#endif
        if (is_local%wrap%med_coupling_active(n1,n2)) then
           call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -492,11 +489,9 @@ module med_phases_mod
     type(ESMF_Clock)            :: clock
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
-    type(ESMF_State)            :: importState, exportState
-    type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
-    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    integer                     :: i,j,n,n1,n2,ncnt
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:), dataPtr2(:), dataPtr3(:), dataPtr4(:)
+    integer                     :: i,n,n1,n2,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_ice)'
     !---------------------------------------
@@ -598,6 +593,42 @@ module med_phases_mod
     !--- custom calculations
     !---------------------------------------
 
+    ! TODO: document custom merges below
+    ! TODO: need to obtain flux_epbalfact
+
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compatm,compice), 'Faxa_rainc', dataPtr1, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compatm,compice), 'Faxa_rainl', dataPtr2, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(compice), 'Faxa_rain' , dataPtr3, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    dataPtr3(:) = dataPtr1(:) + dataPtr2(:)
+#if (1 == 0)
+    dataPtr3(:) = dataPtr3(:) * flux_epbalfact
+#endif
+
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compatm,compice), 'Faxa_snowc', dataPtr1, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compatm,compice), 'Faxa_snowl', dataPtr2, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(compice), 'Faxa_snow' , dataPtr3, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    dataPtr3(:) = dataPtr1(:) + dataPtr2(:)
+#if (1 == 0)
+    dataPtr3(:) = dataPtr3(:) * flux_epbalfact
+#endif
+
+#if (1 == 0)
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compglc,compice), 'Figg_rofi', dataPtr1, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(comprof,compice), 'Firr_rofi', dataPtr2, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(compice), 'Fixx_rofi', dataPtr3, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    dataPtr3(:) = dataPtr1(:) + dataPtr2(:)
+    dataPtr3(:) = dataPtr3(:) * flux_epbalfact
+#endif
+
     !---------------------------------------
     !--- update local scalar data
     !---------------------------------------
@@ -628,8 +659,6 @@ module med_phases_mod
     type(ESMF_Clock)            :: clock
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
-    type(ESMF_State)            :: importState, exportState
-    type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
     integer                     :: i,j,n,n1,n2,ncnt
@@ -764,8 +793,6 @@ module med_phases_mod
     type(ESMF_Clock)            :: clock
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
-    type(ESMF_State)            :: importState, exportState
-    type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
     integer                     :: i,j,n,n1,n2,ncnt
@@ -898,8 +925,6 @@ module med_phases_mod
     type(ESMF_Clock)            :: clock
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
-    type(ESMF_State)            :: importState, exportState
-    type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
     integer                     :: i,j,n,n1,n2,ncnt
@@ -1031,8 +1056,6 @@ module med_phases_mod
     type(ESMF_Clock)            :: clock
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
-    type(ESMF_State)            :: importState, exportState
-    type(ESMF_Field)            :: field
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
     integer                     :: i,j,n,n1,n2,ncnt
@@ -1163,7 +1186,6 @@ module med_phases_mod
     type(ESMF_Clock)            :: clock
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
-    type(ESMF_State)            :: importState, exportState
     type(ESMF_StateItem_Flag)   :: itemType
     type(InternalState)         :: is_local
     integer                     :: i,j,n,n1,n2,ncnt
@@ -1298,7 +1320,6 @@ module med_phases_mod
     type(ESMF_Clock)            :: clock
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
-    type(ESMF_State)            :: importState, exportState
     type(InternalState)         :: is_local
     integer                     :: i,j,n,n1,n2,ncnt
     logical,save                :: first_call = .true.
