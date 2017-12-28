@@ -10,6 +10,7 @@ module drof_comp_nuopc
 
   use seq_flds_mod
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
+  use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
 
   use shr_nuopc_fldList_mod
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
@@ -92,85 +93,56 @@ module drof_comp_nuopc
   !===============================================================================
 
   subroutine SetServices(gcomp, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
+
+    ! Local varaibles
     character(len=*),parameter  :: subname=trim(modName)//':(SetServices) '
-    !-------------------------------------------------------------------------------
+    !--------------------------------
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! the NUOPC gcomp component will register the generic methods
     call NUOPC_CompDerive(gcomp, model_routine_SS, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     ! switching to IPD versions
-    call ESMF_GridCompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
-      userRoutine=InitializeP0, phase=0, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    call ESMF_GridCompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, userRoutine=InitializeP0, phase=0, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     ! set entry point for methods that require specific implementation
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
-      phaseLabelList=(/"IPDv01p1"/), userRoutine=InitializeAdvertise, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         phaseLabelList=(/"IPDv01p1"/), userRoutine=InitializeAdvertise, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
-      phaseLabelList=(/"IPDv01p3"/), userRoutine=InitializeRealize, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         phaseLabelList=(/"IPDv01p3"/), userRoutine=InitializeRealize, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     ! attach specializing method(s)
 #if (1 == 0)
-    call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetClock, &
-      specRoutine=SetClock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetClock, specRoutine=SetClock, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 #endif
 
-    call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Advance, &
-      specRoutine=ModelAdvance, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Advance, specRoutine=ModelAdvance, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call ESMF_MethodRemove(gcomp, label=model_label_SetRunClock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
-    call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetRunClock, &
-      specRoutine=ModelSetRunClock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Finalize, &
-      specRoutine=ModelFinalize, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetRunClock, specRoutine=ModelSetRunClock, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
+    call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Finalize, specRoutine=ModelFinalize, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine SetServices
 
-  !-----------------------------------------------------------------------------
+  !===============================================================================
 
   subroutine InitializeP0(gcomp, importState, exportState, clock, rc)
     type(ESMF_GridComp)   :: gcomp
@@ -182,19 +154,14 @@ module drof_comp_nuopc
     rc = ESMF_SUCCESS
 
     ! Switch to IPDv01 by filtering all other phaseMap entries
-    call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, &
-      acceptStringList=(/"IPDv01p"/), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, acceptStringList=(/"IPDv01p"/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
   end subroutine InitializeP0
 
   !===============================================================================
 
   subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
@@ -220,16 +187,10 @@ module drof_comp_nuopc
     !----------------------------------------------------------------------------
 
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call ESMF_VMGet(vm, mpiCommunicator=lmpicom, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call mpi_comm_dup(lmpicom, mpicom, ierr)
     call mpi_comm_rank(mpicom, my_task, ierr)
@@ -239,10 +200,7 @@ module drof_comp_nuopc
     !----------------------------------------------------------------------------
 
     call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=__FILE__)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     read(cvalue,*) compid  ! convert from string to integer
 
     !----------------------------------------------------------------------------
@@ -332,7 +290,6 @@ module drof_comp_nuopc
   !===============================================================================
 
   subroutine InitializeRealize(gcomp, importState, exportState, clock, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
@@ -380,16 +337,10 @@ module drof_comp_nuopc
     ggrid => ggrid_target
 
     call NUOPC_CompAttributeGet(gcomp, name='case_name', value=case_name, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, &
-         file=u_FILE_u)) &
-         return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(gcomp, name='read_restart', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, &
-         file=u_FILE_u)) &
-         return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     read(cvalue,*) read_restart
 
     call drof_comp_init(clock, x2d, d2x, &
@@ -436,23 +387,11 @@ module drof_comp_nuopc
     !  by replacing the advertised fields with the fields in fldsToRof of the same name.
     !--------------------------------
 
-    if (grid_option == 'mesh') then
+    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToRof, tag=subname//':drofImport', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToRof, tag=subname//':drofImport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrRof, tag=subname//':drofExport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    else
-
-      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToRof, tag=subname//':drofImport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrRof, tag=subname//':drofExport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    endif
+    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrRof, tag=subname//':drofExport', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! Pack export state
@@ -497,25 +436,15 @@ module drof_comp_nuopc
     endif
 
 #ifdef USE_ESMF_METADATA
-    !--------------------------------
-    ! CIM
-    !--------------------------------
-
     convCIM  = "CIM"
     purpComp = "Model Component Simulation Description"
-
-    call ESMF_AttributeAdd(comp,  &
-         convention=convCIM, purpose=purpComp, rc=rc)
-
-    call ESMF_AttributeSet(comp, "ShortName", "DROF", &
-         convention=convCIM, purpose=purpComp, rc=rc)
-    call ESMF_AttributeSet(comp, "LongName", &
-         "Data River Model", &
-         convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeAdd(comp, convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "ShortName", "DRIV", convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "LongName", "Climatological River Data Model", convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "Description", &
          "The CIME data models perform the basic function of " // &
          "reading external data, modifying that data, and then " // &
-         "sending it to the driver via standard CESM coupling " // &
+         "sending it to the driver via coupling " // &
          "interfaces. The driver and other models have no " // &
          "fundamental knowledge of whether another component " // &
          "is fully active or just a data model.  In some cases, " // &
@@ -525,18 +454,11 @@ module drof_comp_nuopc
          "prognostically and have no need to receive any data " // &
          "from the driver.", &
          convention=convCIM, purpose=purpComp, rc=rc)
-    call ESMF_AttributeSet(comp, "ReleaseDate", "2010", &
-         convention=convCIM, purpose=purpComp, rc=rc)
-    call ESMF_AttributeSet(comp, "ModelType", "Ocean", &
-         convention=convCIM, purpose=purpComp, rc=rc)
-
-    !   call ESMF_AttributeSet(comp, "Name", "Cecile Hannay", &
-    !                          convention=convCIM, purpose=purpComp, rc=rc)
-    !   call ESMF_AttributeSet(comp, "EmailAddress", &
-    !                          "hannay@ucar.edu", &
-    !                          convention=convCIM, purpose=purpComp, rc=rc)
-    !   call ESMF_AttributeSet(comp, "ResponsiblePartyRole", "contact", &
-    !                          convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "ReleaseDate", "2010", convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "ModelType", "River", convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "Name", "TBD", convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "EmailAddress", "TBD", convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "ResponsiblePartyRole", "contact", convention=convCIM, purpose=purpComp, rc=rc)
 #endif
 
     call shr_file_setLogLevel(shrloglev)
@@ -550,7 +472,6 @@ module drof_comp_nuopc
 
 #if (1 == 0)
   subroutine SetClock(gcomp, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
 
@@ -559,55 +480,48 @@ module drof_comp_nuopc
     type(ESMF_Time)             :: dcurrtime, dstarttime, dstoptime
     type(ESMF_TimeInterval)     :: dtimestep
     character(len=*),parameter  :: subname=trim(modName)//':(SetClock) '
+    !--------------------------------
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! query the Component for its clock, importState and exportState
     call NUOPC_ModelGet(gcomp, driverClock=dclock, modelClock=mclock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call ESMF_ClockGet(dclock, currtime=dcurrtime, starttime=dstarttime, &
-       stoptime=dstoptime, timestep=dtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         stoptime=dstoptime, timestep=dtimestep, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call ESMF_ClockSet(mclock, currtime=dcurrtime, starttime=dstarttime, &
-       stoptime=dstoptime, timestep=dtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         stoptime=dstoptime, timestep=dtimestep, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call NUOPC_CompSetClock(gcomp, mclock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine SetClock
 #endif
+
   !===============================================================================
 
   subroutine ModelAdvance(gcomp, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
 
     ! local variables
-    type(ESMF_Clock)         :: clock
-    type(ESMF_State)         :: importState, exportState
-    type(ESMF_Alarm)         :: alarm
-    integer(IN)              :: shrlogunit    ! original log unit
-    integer(IN)              :: shrloglev     ! original log level
-    logical                  :: write_restart ! write restart
+    type(ESMF_Clock)        :: clock
+    type(ESMF_State)        :: importState, exportState
+    type(ESMF_Alarm)        :: alarm
+    integer(IN)             :: shrlogunit    ! original log unit
+    integer(IN)             :: shrloglev     ! original log level
+    logical                 :: write_restart ! write restart
+    integer(IN)             :: currentYMD    ! model date
+    integer(IN)             :: currentTOD    ! model sec into model date
+    type(ESMF_Time)         :: currTime, nextTime
+    type(ESMF_TimeInterval) :: timeStep
     character(len=*),parameter :: subname=trim(modName)//':(ModelAdvance) '
     !-------------------------------------------------------------------------------
 
@@ -623,12 +537,8 @@ module drof_comp_nuopc
     ! query the Component for its clock, importState and exportState
     !--------------------------------
 
-    call NUOPC_ModelGet(gcomp, modelClock=clock, importState=importState, &
-      exportState=exportState, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    call NUOPC_ModelGet(gcomp, modelClock=clock, importState=importState, exportState=exportState, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (dbug > 1) then
       call shr_nuopc_methods_Clock_TimePrint(clock,subname//'clock',rc=rc)
@@ -651,24 +561,32 @@ module drof_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     if (ESMF_AlarmIsRinging(alarm, rc=rc)) then
-       write_restart = .true.
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+       write_restart = .true.
        call ESMF_AlarmRingerOff( alarm, rc=rc )
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     else
        write_restart = .false.
     endif
 
+    ! For nuopc - the component clock is advanced at the end of the time interval
+    ! For these to match for now - need to advance nuopc one timestep ahead for
+    ! shr_strdata time interpolation
+    call ESMF_ClockGet( clock, currTime=currTime, timeStep=timeStep)
+    nextTime = currTime + timeStep
+    call seq_timemgr_ETimeGet( nextTime, ymd=CurrentYMD, tod=CurrentTOD )
+
     call drof_comp_run(clock, x2d, d2x, &
        SDROF, gsmap, ggrid, mpicom, compid, my_task, master_task, &
-       inst_suffix, logunit, read_restart, write_restart, case_name=case_name)
+       inst_suffix, logunit, read_restart, write_restart, &
+         currentYMD, currentTOD, case_name=case_name)
 
     !--------------------------------
     ! Pack export state
     !--------------------------------
 
     call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_r2x_fields, exportState, grid_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! diagnostics
@@ -677,22 +595,14 @@ module drof_comp_nuopc
     if (dbug > 1) then
       call mct_aVect_info(2, d2x, istr=subname//':AV')
       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     endif
 
-    call ESMF_ClockPrint(clock, options="currTime", &
-      preString="------>Advancing ROF from: ", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    call ESMF_ClockPrint(clock, options="currTime", preString="------>Advancing ROF from: ", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call ESMF_ClockPrint(clock, options="stopTime", &
-      preString="--------------------------------> to: ", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    call ESMF_ClockPrint(clock, options="stopTime", preString="--------------------------------> to: ", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call shr_file_setLogLevel(shrloglev)
     call shr_file_setLogUnit (shrlogunit)
@@ -704,7 +614,6 @@ module drof_comp_nuopc
   !===============================================================================
 
   subroutine ModelSetRunClock(gcomp, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
 
@@ -790,7 +699,6 @@ module drof_comp_nuopc
   !===============================================================================
 
   subroutine ModelFinalize(gcomp, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
 

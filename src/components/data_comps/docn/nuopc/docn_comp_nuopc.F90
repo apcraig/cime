@@ -86,8 +86,7 @@ module docn_comp_nuopc
 
   !----- formats -----
   character(*),parameter :: modName =  "(docn_comp_nuopc)"
-  character(*),parameter :: u_FILE_u = &
-    __FILE__
+  character(*),parameter :: u_FILE_u = __FILE__
 
   !===============================================================================
   contains
@@ -105,74 +104,49 @@ module docn_comp_nuopc
 
     ! the NUOPC gcomp component will register the generic methods
     call NUOPC_CompDerive(gcomp, model_routine_SS, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     ! switching to IPD versions
     call ESMF_GridCompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
-      userRoutine=InitializeP0, phase=0, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         userRoutine=InitializeP0, phase=0, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     ! set entry point for methods that require specific implementation
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
-      phaseLabelList=(/"IPDv01p1"/), userRoutine=InitializeAdvertise, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         phaseLabelList=(/"IPDv01p1"/), userRoutine=InitializeAdvertise, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
-      phaseLabelList=(/"IPDv01p3"/), userRoutine=InitializeRealize, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         phaseLabelList=(/"IPDv01p3"/), userRoutine=InitializeRealize, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     ! attach specializing method(s)
 #if (1 == 0)
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetClock, &
       specRoutine=SetClock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 #endif
 
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Advance, &
-      specRoutine=ModelAdvance, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         specRoutine=ModelAdvance, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call ESMF_MethodRemove(gcomp, label=model_label_SetRunClock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetRunClock, &
-      specRoutine=ModelSetRunClock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         specRoutine=ModelSetRunClock, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Finalize, &
-      specRoutine=ModelFinalize, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         specRoutine=ModelFinalize, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine SetServices
 
-  !-----------------------------------------------------------------------------
+  !===============================================================================
 
   subroutine InitializeP0(gcomp, importState, exportState, clock, rc)
     type(ESMF_GridComp)   :: gcomp
@@ -185,11 +159,8 @@ module docn_comp_nuopc
 
     ! Switch to IPDv01 by filtering all other phaseMap entries
     call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, &
-      acceptStringList=(/"IPDv01p"/), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         acceptStringList=(/"IPDv01p"/), rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
   end subroutine InitializeP0
 
@@ -223,16 +194,10 @@ module docn_comp_nuopc
     !----------------------------------------------------------------------------
 
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call ESMF_VMGet(vm, mpiCommunicator=lmpicom, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call mpi_comm_dup(lmpicom, mpicom, ierr)
     call mpi_comm_rank(mpicom, my_task, ierr)
@@ -242,10 +207,7 @@ module docn_comp_nuopc
     !----------------------------------------------------------------------------
 
     call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=__FILE__)) &
-      return  ! bail out
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     read(cvalue,*) compid  ! convert from string to integer
 
     !----------------------------------------------------------------------------
@@ -421,8 +383,7 @@ module docn_comp_nuopc
          scmMode, scmlat, scmlon)
 
     !--------------------------------
-    ! generate the grid or mesh from the gsmap and ggrid
-    ! grid_option specifies grid or mesh
+    ! generate the mesh
     !--------------------------------
 
     nx_global = SDOCN%nxg
@@ -459,23 +420,11 @@ module docn_comp_nuopc
     !  by replacing the advertised fields with the fields in fldsToOcn of the same name.
     !--------------------------------
 
-    if (grid_option == 'mesh') then
+    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-       call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    else
-
-       call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    endif
+    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! Pack export state
@@ -509,23 +458,11 @@ module docn_comp_nuopc
     endif
 
 #ifdef USE_ESMF_METADATA
-    !--------------------------------
-    ! CIM
-    !--------------------------------
-
     convCIM  = "CIM"
     purpComp = "Model Component Simulation Description"
-
-    call ESMF_AttributeAdd(comp,  &
-         convention=convCIM, purpose=purpComp, rc=rc)
-
-    call ESMF_AttributeSet(comp, "ShortName", "DOCN", &
-         convention=convCIM, purpose=purpComp, rc=rc)
-
-    call ESMF_AttributeSet(comp, "LongName", &
-         "Climatological Ocean Data Model", &
-         convention=convCIM, purpose=purpComp, rc=rc)
-
+    call ESMF_AttributeAdd(comp, convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "ShortName", "DOCN", convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "LongName", "Climatological Ocean Data Model", convention=convCIM, purpose=purpComp, rc=rc)
     call ESMF_AttributeSet(comp, "Description", &
          "The CIME data models perform the basic function of " // &
          "reading external data, modifying that data, and then " // &
@@ -539,20 +476,11 @@ module docn_comp_nuopc
          "prognostically and have no need to receive any data " // &
          "from the driver.", &
          convention=convCIM, purpose=purpComp, rc=rc)
-
-    call ESMF_AttributeSet(comp, "ReleaseDate", "2010", &
-         convention=convCIM, purpose=purpComp, rc=rc)
-
-    call ESMF_AttributeSet(comp, "ModelType", "Ocean", &
-         convention=convCIM, purpose=purpComp, rc=rc)
-
-    !   call ESMF_AttributeSet(comp, "Name", "Cecile Hannay", &
-    !                          convention=convCIM, purpose=purpComp, rc=rc)
-    !   call ESMF_AttributeSet(comp, "EmailAddress", &
-    !                          "hannay@ucar.edu", &
-    !                          convention=convCIM, purpose=purpComp, rc=rc)
-    !   call ESMF_AttributeSet(comp, "ResponsiblePartyRole", "contact", &
-    !                          convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "ReleaseDate", "2010", convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "ModelType", "Ocean", convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "Name", "TBD", convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "EmailAddress", "TBD", convention=convCIM, purpose=purpComp, rc=rc)
+    call ESMF_AttributeSet(comp, "ResponsiblePartyRole", "contact", convention=convCIM, purpose=purpComp, rc=rc)
 #endif
 
     call shr_file_setLogLevel(shrloglev)
@@ -660,8 +588,8 @@ module docn_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (ESMF_AlarmIsRinging(alarm, rc=rc)) then
-       write_restart = .true.
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+       write_restart = .true.
        call ESMF_AlarmRingerOff( alarm, rc=rc )
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     else
@@ -676,9 +604,9 @@ module docn_comp_nuopc
     call seq_timemgr_ETimeGet( nextTime, ymd=CurrentYMD, tod=CurrentTOD )
 
     call docn_comp_run(clock, x2d, d2x, &
-       SDOCN, gsmap, ggrid, mpicom, compid, my_task, master_task, &
-       inst_suffix, logunit, read_restart, write_restart, &
-       currentYMD, currentTOD, case_name=case_name)
+         SDOCN, gsmap, ggrid, mpicom, compid, my_task, master_task, &
+         inst_suffix, logunit, read_restart, write_restart, &
+         currentYMD, currentTOD, case_name=case_name)
 
     !--------------------------------
     ! Pack export state

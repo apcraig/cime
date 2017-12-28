@@ -1954,7 +1954,10 @@ subroutine cime_init()
    !  Data or dead atmosphere may just return on this phase.
    !----------------------------------------------------------
 
-   if (atm_present) then
+   !TODO: should this not be an atm_prognostic flag - and have the datm have only 1 phase?
+   if (atm_prognostic) then
+      write(6,*)"DEBUG: should not be here if data atm"
+  !if (atm_present) then
       call t_startf('comp_init_cc_atm2')
       call t_adj_detailf(+2)
 
@@ -2246,8 +2249,8 @@ end subroutine cime_init
          ocnnext_alarm = .false.
       endif
 
-      write(6,*)'DEBUG: ocnrun_alarm  = ',ocnrun_alarm
-      write(6,*)'DEBUG: ocnnext_alarm = ',ocnnext_alarm
+      !write(6,*)'DEBUG: ocnrun_alarm  = ',ocnrun_alarm
+      !write(6,*)'DEBUG: ocnnext_alarm = ',ocnnext_alarm
 
       if (iamroot_CPLID) then
          if (loglevel > 1) then

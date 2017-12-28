@@ -360,10 +360,10 @@ CONTAINS
          inst_suffix, logunit, read_restart, write_restart, &
          currentYMD, currentTOD)
 
-    call t_adj_detailf(-2)
-
     if (my_task == master_task) write(logunit,F00) 'docn_comp_init done'
     call shr_sys_flush(logunit)
+
+    call t_adj_detailf(-2)
 
     call t_stopf('DOCN_INIT')
 
@@ -611,17 +611,13 @@ CONTAINS
 
     if (write_restart) then
        call t_startf('docn_restart')
-
        call seq_timemgr_EClockGetData( EClock, curr_yr=yy, curr_mon=mm, curr_day=dd, curr_tod=tod)
-
        write(rest_file,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
             trim(case_name), '.docn'//trim(inst_suffix)//'.r.', &
             yy,'-',mm,'-',dd,'-',tod,'.nc'
-
        write(rest_file_strm,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
             trim(case_name), '.docn'//trim(inst_suffix)//'.rs1.', &
             yy,'-',mm,'-',dd,'-',tod,'.bin'
-
        if (my_task == master_task) then
           nu = shr_file_getUnit()
           open(nu,file=trim(rpfile)//trim(inst_suffix),form='formatted')

@@ -818,7 +818,6 @@ contains
              rlat = const_deg2rad * lats(n)
              rlon = const_deg2rad * lons(n)
              cosz = shr_orb_cosz( calday, rlat, rlon, delta )
-             write(6,*)'DEBUG: atmocn_alb n,cosz= ',n,cosz
              if (cosz  >  0.0_r8) then !--- sun hit --
                 anidr = (.026_r8/(cosz**1.7_r8 + 0.065_r8)) +   &
                         (.150_r8*(cosz         - 0.100_r8 ) *   &

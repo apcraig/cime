@@ -92,7 +92,10 @@ CONTAINS
     integer(IN)   :: lsize       ! local size
     logical       :: exists      ! file existance logical
     integer(IN)   :: nu          ! unit number
-    character(CL) :: calendar ! model calendar
+    character(CL) :: calendar    ! model calendar
+    integer(IN)   :: currentYMD  ! model date
+    integer(IN)   :: currentTOD  ! model sec into model date
+    logical       :: write_restart
 
     !--- formats ---
     character(*), parameter :: F00   = "('(drof_comp_init) ',8a)"
@@ -191,7 +194,7 @@ CONTAINS
        ! do nothing extra
 
     end select
-    call t_stopf('dlnd_datamode')
+    call t_stopf('drof_datamode')
 
     !----------------------------------------------------------------------------
     ! Read restart
@@ -240,22 +243,30 @@ CONTAINS
     !----------------------------------------------------------------------------
 
     call t_adj_detailf(+2)
+
+    call seq_timemgr_EClockGetData( EClock, curr_ymd=CurrentYMD, curr_tod=CurrentTOD)
+
+    write_restart = .false.
     call drof_comp_run(EClock, x2r, r2x, &
          SDROF, gsmap, ggrid, mpicom, compid, my_task, master_task, &
-         inst_suffix, logunit, read_restart, write_restart=.false.)
-    call t_adj_detailf(-2)
+         inst_suffix, logunit, read_restart, write_restart, &
+         currentYMD, currentTOD)
 
     if (my_task == master_task) write(logunit,F00) 'drof_comp_init done'
     call shr_sys_flush(logunit)
+
+    call t_adj_detailf(-2)
 
     call t_stopf('DROF_INIT')
 
   end subroutine drof_comp_init
 
   !===============================================================================
+
   subroutine drof_comp_run(EClock, x2r, r2x, &
        SDROF, gsmap, ggrid, mpicom, compid, my_task, master_task, &
-       inst_suffix, logunit, read_restart, write_restart, case_name)
+       inst_suffix, logunit, read_restart, write_restart, &
+       currentYMD, currentTOD, case_name)
 
     ! !DESCRIPTION:  run method for drof model
     implicit none
@@ -275,12 +286,12 @@ CONTAINS
     integer(IN)            , intent(in)    :: logunit          ! logging unit number
     logical                , intent(in)    :: read_restart     ! start from restart
     logical                , intent(in)    :: write_restart    ! write restart
+    integer(IN)            , intent(in)    :: currentYMD       ! model date
+    integer(IN)            , intent(in)    :: currentTOD       ! model sec into model date
     character(CL)          , intent(in), optional :: case_name ! case name
 
     !--- local ---
-    integer(IN)   :: CurrentYMD        ! model date
-    integer(IN)   :: CurrentTOD        ! model sec into model date
-    integer(IN)   :: yy,mm,dd          ! year month day
+    integer(IN)   :: yy,mm,dd,tod      ! year month day time-of-day
     integer(IN)   :: n                 ! indices
     integer(IN)   :: nf                ! fields loop index
     integer(IN)   :: nl                ! land frac index
@@ -293,11 +304,6 @@ CONTAINS
     !-------------------------------------------------------------------------------
 
     call t_startf('DROF_RUN')
-
-    call t_startf('drof_run1')
-    call seq_timemgr_EClockGetData( EClock, curr_ymd=CurrentYMD, curr_tod=CurrentTOD)
-    call seq_timemgr_EClockGetData( EClock, curr_yr=yy, curr_mon=mm, curr_day=dd)
-    call t_stopf('drof_run1')
 
     !--------------------
     ! UNPACK
@@ -358,6 +364,7 @@ CONTAINS
 
     if (write_restart) then
        call t_startf('drof_restart')
+       call seq_timemgr_EClockGetData( EClock, curr_yr=yy, curr_mon=mm, curr_day=dd, curr_tod=tod)
        write(rest_file,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
             trim(case_name), '.drof'//trim(inst_suffix)//'.r.', &
             yy,'-',mm,'-',dd,'-',currentTOD,'.nc'

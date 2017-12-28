@@ -311,6 +311,7 @@ module shr_nuopc_methods_mod
 	if (fldlist1%mapping(n) == "conservedst" ) do_consd = .true.
         if (fldlist1%mapping(n) == 'patch'       ) do_patch = .true.
         if (fldlist1%mapping(n) == 'copy'        ) do_fcopy = .true.
+        write(6,*)'DEBUG: n,name,mapping = ',n,fldlist1%shortname(n),fldlist1%mapping(n)
       enddo
     endif
 
@@ -344,6 +345,12 @@ module shr_nuopc_methods_mod
       enddo
     endif
 
+    write(6,*)'DEBUG1: do_patch = ',do_patch
+    write(6,*)'DEBUG1: bilnrfn = ',trim(bilnrfn)
+    write(6,*)'DEBUG1: consffn = ',trim(consffn)
+    write(6,*)'DEBUG1: consdfn = ',trim(consdfn)
+    write(6,*)'DEBUG1: patchfn = ',trim(patchfn)
+
     if (present(spvalfn)) then
       if (present(bilnrfn)) then
         if (trim(bilnrfn) == trim(spvalfn)) do_bilnr = .false.
@@ -367,6 +374,8 @@ module shr_nuopc_methods_mod
     if (.not.present(consdmap)) do_consd = .false.
     if (.not.present(patchmap)) do_patch = .false.
     if (.not.present(fcopymap)) do_fcopy = .false.
+
+    write(6,*)'DEBUG2: do_patch = ',do_patch
 
     !---------------------------------------------------
     !--- get single fields from bundles

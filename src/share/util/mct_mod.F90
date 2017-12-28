@@ -259,6 +259,7 @@ subroutine mct_aVect_info(flag,aVect,comm,pe,fld,istr)
    character(*),parameter :: F01 = "('(mct_aVect_info) ',a,i9)"
    character(*),parameter :: F02 = "('(mct_aVect_info) ',240a)"
    character(*),parameter :: F03 = "('(mct_aVect_info) ',a,2es11.3,i4,2x,a)"
+   character(*),parameter :: F04 = "('(mct_aVect_info) ',a,2es11.3,2x,a)"
 
 !-------------------------------------------------------------------------------
 ! NOTE: has hard-coded knowledge/assumptions about mct aVect data type internals
@@ -328,7 +329,8 @@ subroutine mct_aVect_info(flag,aVect,comm,pe,fld,istr)
        call mct_aVect_getRList(item,k,aVect)
        itemc = mct_string_toChar(item)
        call mct_string_clean(item)
-       if (s_loglev > 0) write(s_logunit,F03) 'l min/max ',minl(k),maxl(k),k,trim(itemc)
+      !if (s_loglev > 0) write(s_logunit,F03) 'l min/max ',minl(k),maxl(k),k,trim(itemc)
+       if (s_loglev > 0) write(s_logunit,F04) 'l min/max ',minl(k),maxl(k),  trim(itemc)
        if (flag >= 3 .and. commOK) then
          if ((peOK .and. pe_loc == 0) .or. .not.peOK) then
            if (s_loglev > 0) write(s_logunit,F03) 'g min/max ',ming(k),maxg(k),k,trim(itemc)

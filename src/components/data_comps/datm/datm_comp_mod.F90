@@ -51,7 +51,7 @@ module datm_comp_mod
 
   character(CS) :: myModelName = 'atm'   ! user defined model name
   logical       :: firstcall = .true.    ! first call logical
-  integer(IN)   :: dbug = 0              ! debug level (higher is more)
+  integer(IN)   :: dbug = 1              ! debug level (higher is more)
   real(R8)      :: tbotmax               ! units detector
   real(R8)      :: tdewmax               ! units detector
   real(R8)      :: anidrmax              ! existance detector
@@ -217,7 +217,7 @@ CONTAINS
        SDATM, gsmap, ggrid, mpicom, compid, my_task, master_task, &
        inst_suffix, inst_name, logunit, read_restart, &
        scmMode, scmlat, scmlon, &
-       orbEccen, orbMvelpp, orbLambm0, orbObliqr, phase, nextsw_cday)
+       orbEccen, orbMvelpp, orbLambm0, orbObliqr, nextsw_cday)
 
     ! !DESCRIPTION: initialize data atm model
     implicit none
@@ -245,12 +245,11 @@ CONTAINS
     real(R8)               , intent(in)    :: orbMvelpp           ! orb moving vernal eq (radians)
     real(R8)               , intent(in)    :: orbLambm0           ! orb mean long of perhelion (radians)
     real(R8)               , intent(in)    :: orbObliqr           ! orb obliquity (radians)
-    integer                , intent(in)    :: phase               ! initialization phase index
     real(R8)               , intent(out)   :: nextsw_cday         ! calendar of next atm sw
 
     !--- local variables ---
     integer(IN)   :: n,k         ! generic counters
-    integer(IN)   :: lsize     ! local size
+    integer(IN)   :: lsize       ! local size
     integer(IN)   :: kmask       ! field reference
     integer(IN)   :: klat        ! field reference
     integer(IN)   :: kfld        ! fld index
@@ -263,6 +262,7 @@ CONTAINS
     integer(IN)   :: stepno      ! step number
     character(CL) :: calendar    ! calendar type
     character(CL) :: flds_strm
+    logical       :: write_restart
 
     !--- formats ---
     character(*), parameter :: F00   = "('(datm_comp_init) ',8a)"
@@ -279,294 +279,289 @@ CONTAINS
 
     call t_startf('DATM_INIT')
 
-    if (phase == 1) then
-       call t_startf('datm_strdata_init')
+    call t_startf('datm_strdata_init')
 
-       !----------------------------------------------------------------------------
-       ! Initialize PIO
-       !----------------------------------------------------------------------------
+    !----------------------------------------------------------------------------
+    ! Initialize PIO
+    !----------------------------------------------------------------------------
 
-       call shr_strdata_pioinit(SDATM, COMPID)
+    call shr_strdata_pioinit(SDATM, COMPID)
 
-       !----------------------------------------------------------------------------
-       ! Initialize SDATM
-       !----------------------------------------------------------------------------
+    !----------------------------------------------------------------------------
+    ! Initialize SDATM
+    !----------------------------------------------------------------------------
 
-       call seq_timemgr_EClockGetData( EClock, dtime=idt, calendar=calendar )
+    call seq_timemgr_EClockGetData( EClock, dtime=idt, calendar=calendar )
 
-       ! NOTE: shr_strdata_init calls shr_dmodel_readgrid which reads the data model
-       ! grid and from that computes SDATM%gsmap and SDATM%ggrid. DATM%gsmap is created
-       ! using the decomp '2d1d' (1d decomp of 2d grid)
-       if (scmmode) then
-          if (my_task == master_task) then
-             write(logunit,F05) ' scm lon lat = ',scmlon,scmlat
-          end if
-          call shr_strdata_init(SDATM,&
-               mpicom, compid, name='atm', &
-               scmmode=scmmode,scmlon=scmlon,scmlat=scmlat, &
-               calendar=calendar)
-       else
-          call shr_strdata_init(SDATM,&
-               mpicom, compid, name='atm', &
-               calendar=calendar)
-       endif
-
-       !--- overwrite mask and frac ---
-       k = mct_aVect_indexRA(SDATM%grid%data,'mask')
-       SDATM%grid%data%rAttr(k,:) = 1.0_R8
-
-       k = mct_aVect_indexRA(SDATM%grid%data,'frac')
-       SDATM%grid%data%rAttr(k,:) = 1.0_R8
-
-       !--- set data needed for cosz t-interp method ---
-       call shr_strdata_setOrbs(SDATM,orbEccen,orbMvelpp,orbLambm0,orbObliqr,idt)
-
+    ! NOTE: shr_strdata_init calls shr_dmodel_readgrid which reads the data model
+    ! grid and from that computes SDATM%gsmap and SDATM%ggrid. DATM%gsmap is created
+    ! using the decomp '2d1d' (1d decomp of 2d grid)
+    if (scmmode) then
        if (my_task == master_task) then
-          call shr_strdata_print(SDATM,'ATM data')
-       endif
-
-       call t_stopf('datm_strdata_init')
-
-       !----------------------------------------------------------------------------
-       ! Initialize MCT global seg map, 1d decomp, gsmap
-       !----------------------------------------------------------------------------
-
-       call t_startf('datm_initgsmaps')
-       if (my_task == master_task) write(logunit,F00) ' initialize gsmaps'
-       call shr_sys_flush(logunit)
-
-       ! create a data model global seqmap (gsmap) given the data model global grid sizes
-       ! NOTE: gsmap is initialized using the decomp read in from the datm_in namelist
-       ! (which by default is "1d")
-       call shr_dmodel_gsmapcreate(gsmap, SDATM%nxg*SDATM%nyg, compid, mpicom, decomp)
-       lsize = mct_gsmap_lsize(gsmap,mpicom)
-
-       ! create a rearranger from the data model SDATM%gsmap to gsmap
-       call mct_rearr_init(SDATM%gsmap, gsmap, mpicom, rearr)
-       call t_stopf('datm_initgsmaps')
-
-       !----------------------------------------------------------------------------
-       ! Initialize MCT domain
-       !----------------------------------------------------------------------------
-
-       call t_startf('datm_initmctdom')
-       if (my_task == master_task) write(logunit,F00) 'copy domains'
-       call shr_sys_flush(logunit)
-
-       call shr_dmodel_rearrGGrid(SDATM%grid, ggrid, gsmap, rearr, mpicom)
-       call t_stopf('datm_initmctdom')
-
-       !----------------------------------------------------------------------------
-       ! Initialize MCT attribute vectors
-       !----------------------------------------------------------------------------
-
-       call t_startf('datm_initmctavs')
-       if (my_task == master_task) write(logunit,F00) 'allocate AVs'
-       call shr_sys_flush(logunit)
-
-       call mct_aVect_init(a2x, rList=seq_flds_a2x_fields, lsize=lsize)
-       call mct_aVect_zero(a2x)
-
-       kz    = mct_aVect_indexRA(a2x,'Sa_z')
-       ktopo = mct_aVect_indexRA(a2x,'Sa_topo')
-       ku    = mct_aVect_indexRA(a2x,'Sa_u')
-       kv    = mct_aVect_indexRA(a2x,'Sa_v')
-       ktbot = mct_aVect_indexRA(a2x,'Sa_tbot')
-       kptem = mct_aVect_indexRA(a2x,'Sa_ptem')
-       kshum = mct_aVect_indexRA(a2x,'Sa_shum')
-       kdens = mct_aVect_indexRA(a2x,'Sa_dens')
-       kpbot = mct_aVect_indexRA(a2x,'Sa_pbot')
-       kpslv = mct_aVect_indexRA(a2x,'Sa_pslv')
-       klwdn = mct_aVect_indexRA(a2x,'Faxa_lwdn')
-       krc   = mct_aVect_indexRA(a2x,'Faxa_rainc')
-       krl   = mct_aVect_indexRA(a2x,'Faxa_rainl')
-       ksc   = mct_aVect_indexRA(a2x,'Faxa_snowc')
-       ksl   = mct_aVect_indexRA(a2x,'Faxa_snowl')
-       kswndr= mct_aVect_indexRA(a2x,'Faxa_swndr')
-       kswndf= mct_aVect_indexRA(a2x,'Faxa_swndf')
-       kswvdr= mct_aVect_indexRA(a2x,'Faxa_swvdr')
-       kswvdf= mct_aVect_indexRA(a2x,'Faxa_swvdf')
-       kswnet= mct_aVect_indexRA(a2x,'Faxa_swnet')
-       kco2p = mct_aVect_indexRA(a2x,'Sa_co2prog',perrWith='quiet')
-       kco2d = mct_aVect_indexRA(a2x,'Sa_co2diag',perrWith='quiet')
-
-       if (wiso_datm) then  ! water isotopic forcing
-          kshum_16O = mct_aVect_indexRA(a2x,'Sa_shum_16O')
-          kshum_18O = mct_aVect_indexRA(a2x,'Sa_shum_18O')
-          kshum_HDO = mct_aVect_indexRA(a2x,'Sa_shum_HDO')
-          krc_18O   = mct_aVect_indexRA(a2x,'Faxa_rainc_18O')
-          krc_HDO   = mct_aVect_indexRA(a2x,'Faxa_rainc_HDO')
-          krl_18O   = mct_aVect_indexRA(a2x,'Faxa_rainl_18O')
-          krl_HDO   = mct_aVect_indexRA(a2x,'Faxa_rainl_HDO')
-          ksc_18O   = mct_aVect_indexRA(a2x,'Faxa_snowc_18O')
-          ksc_HDO   = mct_aVect_indexRA(a2x,'Faxa_snowc_HDO')
-          ksl_18O   = mct_aVect_indexRA(a2x,'Faxa_snowl_18O')
-          ksl_HDO   = mct_aVect_indexRA(a2x,'Faxa_snowl_HDO')
+          write(logunit,F05) ' scm lon lat = ',scmlon,scmlat
        end if
+       call shr_strdata_init(SDATM,&
+            mpicom, compid, name='atm', &
+            scmmode=scmmode,scmlon=scmlon,scmlat=scmlat, &
+            calendar=calendar)
+    else
+       call shr_strdata_init(SDATM,&
+            mpicom, compid, name='atm', &
+            calendar=calendar)
+    endif
 
-       kbid  = mct_aVect_indexRA(a2x,'Faxa_bcphidry')
-       kbod  = mct_aVect_indexRA(a2x,'Faxa_bcphodry')
-       kbiw  = mct_aVect_indexRA(a2x,'Faxa_bcphiwet')
-       koid  = mct_aVect_indexRA(a2x,'Faxa_ocphidry')
-       kood  = mct_aVect_indexRA(a2x,'Faxa_ocphodry')
-       koiw  = mct_aVect_indexRA(a2x,'Faxa_ocphiwet')
-       kdd1  = mct_aVect_indexRA(a2x,'Faxa_dstdry1')
-       kdd2  = mct_aVect_indexRA(a2x,'Faxa_dstdry2')
-       kdd3  = mct_aVect_indexRA(a2x,'Faxa_dstdry3')
-       kdd4  = mct_aVect_indexRA(a2x,'Faxa_dstdry4')
-       kdw1  = mct_aVect_indexRA(a2x,'Faxa_dstwet1')
-       kdw2  = mct_aVect_indexRA(a2x,'Faxa_dstwet2')
-       kdw3  = mct_aVect_indexRA(a2x,'Faxa_dstwet3')
-       kdw4  = mct_aVect_indexRA(a2x,'Faxa_dstwet4')
+    !--- overwrite mask and frac ---
+    k = mct_aVect_indexRA(SDATM%grid%data,'mask')
+    SDATM%grid%data%rAttr(k,:) = 1.0_R8
 
-       call mct_aVect_init(x2a, rList=seq_flds_x2a_fields, lsize=lsize)
-       call mct_aVect_zero(x2a)
+    k = mct_aVect_indexRA(SDATM%grid%data,'frac')
+    SDATM%grid%data%rAttr(k,:) = 1.0_R8
 
-       kanidr = mct_aVect_indexRA(x2a,'Sx_anidr')
-       kanidf = mct_aVect_indexRA(x2a,'Sx_anidf')
-       kavsdr = mct_aVect_indexRA(x2a,'Sx_avsdr')
-       kavsdf = mct_aVect_indexRA(x2a,'Sx_avsdf')
+    !--- set data needed for cosz t-interp method ---
+    call shr_strdata_setOrbs(SDATM,orbEccen,orbMvelpp,orbLambm0,orbObliqr,idt)
 
-       !--- figure out what's on the standard streams ---
-       cnt = 0
-       flds_strm = ''
-       do n = 1,SDATM%nstreams
-          do k = 1,ktranss
-             kfld = mct_aVect_indexRA(SDATM%avs(n),trim(stifld(k)),perrWith='quiet')
-             if (kfld > 0) then
-                cnt = cnt + 1
-                if (cnt == 1) then
-                   flds_strm = trim(stofld(k))
-                else
-                   flds_strm = trim(flds_strm)//':'//trim(stofld(k))
-                endif
+    if (my_task == master_task) then
+       call shr_strdata_print(SDATM,'ATM data')
+    endif
+
+    call t_stopf('datm_strdata_init')
+
+    !----------------------------------------------------------------------------
+    ! Initialize MCT global seg map, 1d decomp, gsmap
+    !----------------------------------------------------------------------------
+
+    call t_startf('datm_initgsmaps')
+    if (my_task == master_task) write(logunit,F00) ' initialize gsmaps'
+    call shr_sys_flush(logunit)
+
+    ! create a data model global seqmap (gsmap) given the data model global grid sizes
+    ! NOTE: gsmap is initialized using the decomp read in from the datm_in namelist
+    ! (which by default is "1d")
+    call shr_dmodel_gsmapcreate(gsmap, SDATM%nxg*SDATM%nyg, compid, mpicom, decomp)
+    lsize = mct_gsmap_lsize(gsmap,mpicom)
+
+    ! create a rearranger from the data model SDATM%gsmap to gsmap
+    call mct_rearr_init(SDATM%gsmap, gsmap, mpicom, rearr)
+    call t_stopf('datm_initgsmaps')
+
+    !----------------------------------------------------------------------------
+    ! Initialize MCT domain
+    !----------------------------------------------------------------------------
+
+    call t_startf('datm_initmctdom')
+    if (my_task == master_task) write(logunit,F00) 'copy domains'
+    call shr_sys_flush(logunit)
+
+    call shr_dmodel_rearrGGrid(SDATM%grid, ggrid, gsmap, rearr, mpicom)
+    call t_stopf('datm_initmctdom')
+
+    !----------------------------------------------------------------------------
+    ! Initialize MCT attribute vectors
+    !----------------------------------------------------------------------------
+
+    call t_startf('datm_initmctavs')
+    if (my_task == master_task) write(logunit,F00) 'allocate AVs'
+    call shr_sys_flush(logunit)
+
+    call mct_aVect_init(a2x, rList=seq_flds_a2x_fields, lsize=lsize)
+    call mct_aVect_zero(a2x)
+
+    kz    = mct_aVect_indexRA(a2x,'Sa_z')
+    ktopo = mct_aVect_indexRA(a2x,'Sa_topo')
+    ku    = mct_aVect_indexRA(a2x,'Sa_u')
+    kv    = mct_aVect_indexRA(a2x,'Sa_v')
+    ktbot = mct_aVect_indexRA(a2x,'Sa_tbot')
+    kptem = mct_aVect_indexRA(a2x,'Sa_ptem')
+    kshum = mct_aVect_indexRA(a2x,'Sa_shum')
+    kdens = mct_aVect_indexRA(a2x,'Sa_dens')
+    kpbot = mct_aVect_indexRA(a2x,'Sa_pbot')
+    kpslv = mct_aVect_indexRA(a2x,'Sa_pslv')
+    klwdn = mct_aVect_indexRA(a2x,'Faxa_lwdn')
+    krc   = mct_aVect_indexRA(a2x,'Faxa_rainc')
+    krl   = mct_aVect_indexRA(a2x,'Faxa_rainl')
+    ksc   = mct_aVect_indexRA(a2x,'Faxa_snowc')
+    ksl   = mct_aVect_indexRA(a2x,'Faxa_snowl')
+    kswndr= mct_aVect_indexRA(a2x,'Faxa_swndr')
+    kswndf= mct_aVect_indexRA(a2x,'Faxa_swndf')
+    kswvdr= mct_aVect_indexRA(a2x,'Faxa_swvdr')
+    kswvdf= mct_aVect_indexRA(a2x,'Faxa_swvdf')
+    kswnet= mct_aVect_indexRA(a2x,'Faxa_swnet')
+    kco2p = mct_aVect_indexRA(a2x,'Sa_co2prog',perrWith='quiet')
+    kco2d = mct_aVect_indexRA(a2x,'Sa_co2diag',perrWith='quiet')
+
+    if (wiso_datm) then  ! water isotopic forcing
+       kshum_16O = mct_aVect_indexRA(a2x,'Sa_shum_16O')
+       kshum_18O = mct_aVect_indexRA(a2x,'Sa_shum_18O')
+       kshum_HDO = mct_aVect_indexRA(a2x,'Sa_shum_HDO')
+       krc_18O   = mct_aVect_indexRA(a2x,'Faxa_rainc_18O')
+       krc_HDO   = mct_aVect_indexRA(a2x,'Faxa_rainc_HDO')
+       krl_18O   = mct_aVect_indexRA(a2x,'Faxa_rainl_18O')
+       krl_HDO   = mct_aVect_indexRA(a2x,'Faxa_rainl_HDO')
+       ksc_18O   = mct_aVect_indexRA(a2x,'Faxa_snowc_18O')
+       ksc_HDO   = mct_aVect_indexRA(a2x,'Faxa_snowc_HDO')
+       ksl_18O   = mct_aVect_indexRA(a2x,'Faxa_snowl_18O')
+       ksl_HDO   = mct_aVect_indexRA(a2x,'Faxa_snowl_HDO')
+    end if
+
+    kbid  = mct_aVect_indexRA(a2x,'Faxa_bcphidry')
+    kbod  = mct_aVect_indexRA(a2x,'Faxa_bcphodry')
+    kbiw  = mct_aVect_indexRA(a2x,'Faxa_bcphiwet')
+    koid  = mct_aVect_indexRA(a2x,'Faxa_ocphidry')
+    kood  = mct_aVect_indexRA(a2x,'Faxa_ocphodry')
+    koiw  = mct_aVect_indexRA(a2x,'Faxa_ocphiwet')
+    kdd1  = mct_aVect_indexRA(a2x,'Faxa_dstdry1')
+    kdd2  = mct_aVect_indexRA(a2x,'Faxa_dstdry2')
+    kdd3  = mct_aVect_indexRA(a2x,'Faxa_dstdry3')
+    kdd4  = mct_aVect_indexRA(a2x,'Faxa_dstdry4')
+    kdw1  = mct_aVect_indexRA(a2x,'Faxa_dstwet1')
+    kdw2  = mct_aVect_indexRA(a2x,'Faxa_dstwet2')
+    kdw3  = mct_aVect_indexRA(a2x,'Faxa_dstwet3')
+    kdw4  = mct_aVect_indexRA(a2x,'Faxa_dstwet4')
+
+    call mct_aVect_init(x2a, rList=seq_flds_x2a_fields, lsize=lsize)
+    call mct_aVect_zero(x2a)
+
+    kanidr = mct_aVect_indexRA(x2a,'Sx_anidr')
+    kanidf = mct_aVect_indexRA(x2a,'Sx_anidf')
+    kavsdr = mct_aVect_indexRA(x2a,'Sx_avsdr')
+    kavsdf = mct_aVect_indexRA(x2a,'Sx_avsdf')
+
+    !--- figure out what's on the standard streams ---
+    cnt = 0
+    flds_strm = ''
+    do n = 1,SDATM%nstreams
+       do k = 1,ktranss
+          kfld = mct_aVect_indexRA(SDATM%avs(n),trim(stifld(k)),perrWith='quiet')
+          if (kfld > 0) then
+             cnt = cnt + 1
+             if (cnt == 1) then
+                flds_strm = trim(stofld(k))
+             else
+                flds_strm = trim(flds_strm)//':'//trim(stofld(k))
              endif
-          enddo
+          endif
        enddo
+    enddo
 
-       if (my_task == master_task) write(logunit,F00) ' flds_strm = ',trim(flds_strm)
-       call shr_sys_flush(logunit)
+    if (my_task == master_task) write(logunit,F00) ' flds_strm = ',trim(flds_strm)
+    call shr_sys_flush(logunit)
 
-       call mct_aVect_init(avstrm, rList=flds_strm, lsize=lsize)
-       call mct_aVect_zero(avstrm)
+    call mct_aVect_init(avstrm, rList=flds_strm, lsize=lsize)
+    call mct_aVect_zero(avstrm)
 
-       stbot  = mct_aVect_indexRA(avstrm,'strm_tbot'   ,perrWith='quiet')
-       swind  = mct_aVect_indexRA(avstrm,'strm_wind'   ,perrWith='quiet')
-       sz     = mct_aVect_indexRA(avstrm,'strm_z'      ,perrWith='quiet')
-       spbot  = mct_aVect_indexRA(avstrm,'strm_pbot'   ,perrWith='quiet')
-       sshum  = mct_aVect_indexRA(avstrm,'strm_shum'   ,perrWith='quiet')
-       stdew  = mct_aVect_indexRA(avstrm,'strm_tdew'   ,perrWith='quiet')
-       srh    = mct_aVect_indexRA(avstrm,'strm_rh'     ,perrWith='quiet')
-       slwdn  = mct_aVect_indexRA(avstrm,'strm_lwdn'   ,perrWith='quiet')
-       sswdn  = mct_aVect_indexRA(avstrm,'strm_swdn'   ,perrWith='quiet')
-       sswdndf= mct_aVect_indexRA(avstrm,'strm_swdndf' ,perrWith='quiet')
-       sswdndr= mct_aVect_indexRA(avstrm,'strm_swdndr' ,perrWith='quiet')
-       sprecc = mct_aVect_indexRA(avstrm,'strm_precc'  ,perrWith='quiet')
-       sprecl = mct_aVect_indexRA(avstrm,'strm_precl'  ,perrWith='quiet')
-       sprecn = mct_aVect_indexRA(avstrm,'strm_precn'  ,perrWith='quiet')
-       sco2p  = mct_aVect_indexRA(avstrm,'strm_co2p'   ,perrWith='quiet')
-       sco2d  = mct_aVect_indexRA(avstrm,'strm_co2d'   ,perrWith='quiet')
-       sswup  = mct_aVect_indexRA(avstrm,'strm_swup'   ,perrWith='quiet')
-       sprec  = mct_aVect_indexRA(avstrm,'strm_prec'   ,perrWith='quiet')
-       starcf = mct_aVect_indexRA(avstrm,'strm_tarcf'  ,perrWith='quiet')
+    stbot  = mct_aVect_indexRA(avstrm,'strm_tbot'   ,perrWith='quiet')
+    swind  = mct_aVect_indexRA(avstrm,'strm_wind'   ,perrWith='quiet')
+    sz     = mct_aVect_indexRA(avstrm,'strm_z'      ,perrWith='quiet')
+    spbot  = mct_aVect_indexRA(avstrm,'strm_pbot'   ,perrWith='quiet')
+    sshum  = mct_aVect_indexRA(avstrm,'strm_shum'   ,perrWith='quiet')
+    stdew  = mct_aVect_indexRA(avstrm,'strm_tdew'   ,perrWith='quiet')
+    srh    = mct_aVect_indexRA(avstrm,'strm_rh'     ,perrWith='quiet')
+    slwdn  = mct_aVect_indexRA(avstrm,'strm_lwdn'   ,perrWith='quiet')
+    sswdn  = mct_aVect_indexRA(avstrm,'strm_swdn'   ,perrWith='quiet')
+    sswdndf= mct_aVect_indexRA(avstrm,'strm_swdndf' ,perrWith='quiet')
+    sswdndr= mct_aVect_indexRA(avstrm,'strm_swdndr' ,perrWith='quiet')
+    sprecc = mct_aVect_indexRA(avstrm,'strm_precc'  ,perrWith='quiet')
+    sprecl = mct_aVect_indexRA(avstrm,'strm_precl'  ,perrWith='quiet')
+    sprecn = mct_aVect_indexRA(avstrm,'strm_precn'  ,perrWith='quiet')
+    sco2p  = mct_aVect_indexRA(avstrm,'strm_co2p'   ,perrWith='quiet')
+    sco2d  = mct_aVect_indexRA(avstrm,'strm_co2d'   ,perrWith='quiet')
+    sswup  = mct_aVect_indexRA(avstrm,'strm_swup'   ,perrWith='quiet')
+    sprec  = mct_aVect_indexRA(avstrm,'strm_prec'   ,perrWith='quiet')
+    starcf = mct_aVect_indexRA(avstrm,'strm_tarcf'  ,perrWith='quiet')
 
-       ! anomaly forcing
-       sprecsf  = mct_aVect_indexRA(avstrm,'strm_precsf'  ,perrWith='quiet')
-       sprec_af = mct_aVect_indexRA(avstrm,'strm_prec_af' ,perrWith='quiet')
-       su_af    = mct_aVect_indexRA(avstrm,'strm_u_af'    ,perrWith='quiet')
-       sv_af    = mct_aVect_indexRA(avstrm,'strm_v_af'    ,perrWith='quiet')
-       stbot_af = mct_aVect_indexRA(avstrm,'strm_tbot_af' ,perrWith='quiet')
-       spbot_af = mct_aVect_indexRA(avstrm,'strm_pbot_af' ,perrWith='quiet')
-       sshum_af = mct_aVect_indexRA(avstrm,'strm_shum_af' ,perrWith='quiet')
-       sswdn_af = mct_aVect_indexRA(avstrm,'strm_swdn_af' ,perrWith='quiet')
-       slwdn_af = mct_aVect_indexRA(avstrm,'strm_lwdn_af' ,perrWith='quiet')
+    ! anomaly forcing
+    sprecsf  = mct_aVect_indexRA(avstrm,'strm_precsf'  ,perrWith='quiet')
+    sprec_af = mct_aVect_indexRA(avstrm,'strm_prec_af' ,perrWith='quiet')
+    su_af    = mct_aVect_indexRA(avstrm,'strm_u_af'    ,perrWith='quiet')
+    sv_af    = mct_aVect_indexRA(avstrm,'strm_v_af'    ,perrWith='quiet')
+    stbot_af = mct_aVect_indexRA(avstrm,'strm_tbot_af' ,perrWith='quiet')
+    spbot_af = mct_aVect_indexRA(avstrm,'strm_pbot_af' ,perrWith='quiet')
+    sshum_af = mct_aVect_indexRA(avstrm,'strm_shum_af' ,perrWith='quiet')
+    sswdn_af = mct_aVect_indexRA(avstrm,'strm_swdn_af' ,perrWith='quiet')
+    slwdn_af = mct_aVect_indexRA(avstrm,'strm_lwdn_af' ,perrWith='quiet')
 
-       if(wiso_datm) then
-          ! isotopic forcing
-          sprecn_16O = mct_aVect_indexRA(avstrm,'strm_precn_16O',perrWith='quiet')
-          sprecn_18O = mct_aVect_indexRA(avstrm,'strm_precn_18O',perrWith='quiet')
-          sprecn_HDO = mct_aVect_indexRA(avstrm,'strm_precn_HDO',perrWith='quiet')
-          ! Okay here to just use srh_18O and srh_HDO, because the forcing is (should)
-          ! just be deltas, applied in lnd_comp_mct to the base tracer
-          srh_16O    = mct_aVect_indexRA(avstrm,'strm_rh_16O',perrWith='quiet')
-          srh_18O    = mct_aVect_indexRA(avstrm,'strm_rh_18O',perrWith='quiet')
-          srh_HDO    = mct_aVect_indexRA(avstrm,'strm_rh_HDO',perrWith='quiet')
-       end if
+    if(wiso_datm) then
+       ! isotopic forcing
+       sprecn_16O = mct_aVect_indexRA(avstrm,'strm_precn_16O',perrWith='quiet')
+       sprecn_18O = mct_aVect_indexRA(avstrm,'strm_precn_18O',perrWith='quiet')
+       sprecn_HDO = mct_aVect_indexRA(avstrm,'strm_precn_HDO',perrWith='quiet')
+       ! Okay here to just use srh_18O and srh_HDO, because the forcing is (should)
+       ! just be deltas, applied in lnd_comp_mct to the base tracer
+       srh_16O    = mct_aVect_indexRA(avstrm,'strm_rh_16O',perrWith='quiet')
+       srh_18O    = mct_aVect_indexRA(avstrm,'strm_rh_18O',perrWith='quiet')
+       srh_HDO    = mct_aVect_indexRA(avstrm,'strm_rh_HDO',perrWith='quiet')
+    end if
 
-       allocate(imask(lsize))
-       allocate(yc(lsize))
-       allocate(windFactor(lsize))
-       allocate(winddFactor(lsize))
-       allocate(qsatFactor(lsize))
+    allocate(imask(lsize))
+    allocate(yc(lsize))
+    allocate(windFactor(lsize))
+    allocate(winddFactor(lsize))
+    allocate(qsatFactor(lsize))
 
-       kmask = mct_aVect_indexRA(ggrid%data,'mask')
-       imask(:) = nint(ggrid%data%rAttr(kmask,:))
-       klat = mct_aVect_indexRA(ggrid%data,'lat')
-       yc(:) = ggrid%data%rAttr(klat,:)
+    kmask = mct_aVect_indexRA(ggrid%data,'mask')
+    imask(:) = nint(ggrid%data%rAttr(kmask,:))
+    klat = mct_aVect_indexRA(ggrid%data,'lat')
+    yc(:) = ggrid%data%rAttr(klat,:)
 
-       call t_stopf('datm_initmctavs')
+    call t_stopf('datm_initmctavs')
 
-       !----------------------------------------------------------------------------
-       ! Read restart
-       !----------------------------------------------------------------------------
+    !----------------------------------------------------------------------------
+    ! Read restart
+    !----------------------------------------------------------------------------
 
-       if (read_restart) then
-          if (trim(rest_file)      == trim(nullstr) .and. &
-               trim(rest_file_strm) == trim(nullstr)) then
-             if (my_task == master_task) then
-                write(logunit,F00) ' restart filenames from rpointer'
-                call shr_sys_flush(logunit)
-                inquire(file=trim(rpfile)//trim(inst_suffix),exist=exists)
-                if (.not.exists) then
-                   write(logunit,F00) ' ERROR: rpointer file does not exist'
-                   call shr_sys_abort(trim(subname)//' ERROR: rpointer file missing')
-                endif
-                nu = shr_file_getUnit()
-                open(nu,file=trim(rpfile)//trim(inst_suffix),form='formatted')
-                read(nu,'(a)') rest_file
-                read(nu,'(a)') rest_file_strm
-                close(nu)
-                call shr_file_freeUnit(nu)
-                inquire(file=trim(rest_file_strm),exist=exists)
+    if (read_restart) then
+       if (trim(rest_file)      == trim(nullstr) .and. &
+            trim(rest_file_strm) == trim(nullstr)) then
+          if (my_task == master_task) then
+             write(logunit,F00) ' restart filenames from rpointer'
+             call shr_sys_flush(logunit)
+             inquire(file=trim(rpfile)//trim(inst_suffix),exist=exists)
+             if (.not.exists) then
+                write(logunit,F00) ' ERROR: rpointer file does not exist'
+                call shr_sys_abort(trim(subname)//' ERROR: rpointer file missing')
              endif
-             call shr_mpi_bcast(rest_file,mpicom,'rest_file')
-             call shr_mpi_bcast(rest_file_strm,mpicom,'rest_file_strm')
-          else
-             ! use namelist already read
-             if (my_task == master_task) then
-                write(logunit,F00) ' restart filenames from namelist '
-                call shr_sys_flush(logunit)
-                inquire(file=trim(rest_file_strm),exist=exists)
-             endif
+             nu = shr_file_getUnit()
+             open(nu,file=trim(rpfile)//trim(inst_suffix),form='formatted')
+             read(nu,'(a)') rest_file
+             read(nu,'(a)') rest_file_strm
+             close(nu)
+             call shr_file_freeUnit(nu)
+             inquire(file=trim(rest_file_strm),exist=exists)
           endif
-
-          call shr_mpi_bcast(exists,mpicom,'exists')
-
-          if (exists) then
-             if (my_task == master_task) write(logunit,F00) ' reading ',trim(rest_file_strm)
-             call shr_strdata_restRead(trim(rest_file_strm),SDATM,mpicom)
-          else
-             if (my_task == master_task) write(logunit,F00) ' file not found, skipping ',trim(rest_file_strm)
-          endif
-          call shr_sys_flush(logunit)
-       endif
-
-       if (read_restart) then
-          call seq_timemgr_EClockGetData( EClock, curr_ymd=CurrentYMD, curr_tod=CurrentTOD)
-          call seq_timemgr_EClockGetData( EClock, stepno=stepno, dtime=idt )
-          call seq_timemgr_EClockGetData( EClock, calendar=calendar )
-          nextsw_cday = datm_shr_getNextRadCDay( CurrentYMD, CurrentTOD, stepno, idt, iradsw, calendar )
+          call shr_mpi_bcast(rest_file,mpicom,'rest_file')
+          call shr_mpi_bcast(rest_file_strm,mpicom,'rest_file_strm')
        else
-          call seq_timemgr_EClockGetData( EClock, curr_cday=nextsw_cday, stepno=stepno )
+          ! use namelist already read
+          if (my_task == master_task) then
+             write(logunit,F00) ' restart filenames from namelist '
+             call shr_sys_flush(logunit)
+             inquire(file=trim(rest_file_strm),exist=exists)
+          endif
        endif
 
-    else  ! phase = 2
+       call shr_mpi_bcast(exists,mpicom,'exists')
 
-       call seq_timemgr_EClockGetData( EClock, curr_ymd=CurrentYMD, curr_tod=CurrentTOD)
-       call seq_timemgr_EClockGetData( EClock, stepno=stepno, dtime=idt)
-       call seq_timemgr_EClockGetData( EClock, calendar=calendar )
+       if (exists) then
+          if (my_task == master_task) write(logunit,F00) ' reading ',trim(rest_file_strm)
+          call shr_strdata_restRead(trim(rest_file_strm),SDATM,mpicom)
+       else
+          if (my_task == master_task) write(logunit,F00) ' file not found, skipping ',trim(rest_file_strm)
+       endif
+       call shr_sys_flush(logunit)
+    endif
+
+    !----------------------------------------------------------------------------
+    ! Set nextsw_cday, CurrentYMD and CurrenntTOD
+    !----------------------------------------------------------------------------
+
+    if (read_restart) then
+       call seq_timemgr_EClockGetData( EClock, &
+            curr_ymd=CurrentYMD, curr_tod=CurrentTOD, stepno=stepno, dtime=idt, calendar=calendar)
        nextsw_cday = datm_shr_getNextRadCDay( CurrentYMD, CurrentTOD, stepno, idt, iradsw, calendar )
-
+    else
+       ! For a startup run the nextsw_cday is just the current calendar day
+       call seq_timemgr_EClockGetData( EClock, &
+            curr_cday=nextsw_cday, curr_ymd=CurrentYMD, curr_tod=CurrentTOD)
     endif
 
     !----------------------------------------------------------------------------
@@ -574,9 +569,13 @@ CONTAINS
     !----------------------------------------------------------------------------
 
     call t_adj_detailf(+2)
+
+    write_restart = .false.
     call datm_comp_run(EClock, x2a, a2x, &
          SDATM, gsmap, ggrid, mpicom, compid, my_task, master_task, &
-         inst_suffix, logunit, nextsw_cday, write_restart=.false.)
+         inst_suffix, logunit, nextsw_cday, write_restart, &
+         currentYMD, currentTOD)
+
     call t_adj_detailf(-2)
 
     call t_stopf('DATM_INIT')
@@ -584,9 +583,11 @@ CONTAINS
   end subroutine datm_comp_init
 
   !===============================================================================
+
   subroutine datm_comp_run(EClock, x2a, a2x, &
        SDATM, gsmap, ggrid, mpicom, compid, my_task, master_task, &
-       inst_suffix, logunit, nextsw_cday, write_restart, case_name)
+       inst_suffix, logunit, nextsw_cday, write_restart, &
+       currentYMD, currentTOD, case_name)
 
     ! !DESCRIPTION: run method for datm model
 
@@ -607,12 +608,12 @@ CONTAINS
     integer(IN)            , intent(in)    :: logunit          ! logging unit number
     real(R8)               , intent(out)   :: nextsw_cday      ! calendar of next atm sw
     logical                , intent(in)    :: write_restart    ! restart alarm is on
+    integer(IN)            , intent(in)    :: currentYMD       ! model date
+    integer(IN)            , intent(in)    :: currentTOD       ! model sec into model date
     character(CL)          , intent(in), optional :: case_name ! case name
 
     !--- local ---
-    integer(IN)   :: CurrentYMD        ! model date
-    integer(IN)   :: CurrentTOD        ! model sec into model date
-    integer(IN)   :: yy,mm,dd          ! year month day
+    integer(IN)   :: yy,mm,dd,tod          ! year month day time-of-day
     integer(IN)   :: n                 ! indices
     integer(IN)   :: lsize             ! size of attr vect
     integer(IN)   :: idt               ! integer timestep
@@ -634,6 +635,7 @@ CONTAINS
     real(R8)      :: tbot,pbot,rtmp,vp,ea,e,qsat,frac,qsatT
 
     character(*), parameter :: F00   = "('(datm_comp_run) ',8a)"
+    character(*), parameter :: F01   = "('(datm_comp_run) ',a, i7,2x,d21.14)"
     character(*), parameter :: F04   = "('(datm_comp_run) ',2a,2i8,'s')"
     character(*), parameter :: subName = "(datm_comp_run) "
     !-------------------------------------------------------------------------------
@@ -641,10 +643,8 @@ CONTAINS
     call t_startf('DATM_RUN')
 
     call t_startf('datm_run1')
-    call seq_timemgr_EClockGetData( EClock, curr_ymd=CurrentYMD, curr_tod=CurrentTOD)
+    call seq_timemgr_EClockGetData( EClock, dtime=idt)
     call seq_timemgr_EClockGetData( EClock, curr_yr=yy, curr_mon=mm, curr_day=dd)
-    call seq_timemgr_EClockGetData( EClock, stepno=stepno, dtime=idt)
-    call seq_timemgr_EClockGetData( EClock, calendar=calendar)
     dt = idt * 1.0_r8
     call t_stopf('datm_run1')
 
@@ -655,6 +655,7 @@ CONTAINS
     call t_barrierf('datm_BARRIER',mpicom)
     call t_startf('datm')
 
+    call seq_timemgr_EClockGetData( EClock, calendar=calendar, stepno=stepno)
     nextsw_cday = datm_shr_getNextRadCDay( CurrentYMD, CurrentTOD, stepno, idt, iradsw, calendar )
 
     !--- copy all fields from streams to a2x as default ---
@@ -1067,12 +1068,39 @@ CONTAINS
     ! bias correction / anomaly forcing ( end block )
     !----------------------------------------------------------
 
+    ! Debug output
+    if (dbug > 0) then
+       do n = 1,lsize
+          write(logunit,F01)'n,Sa_z       = ',n,a2x%rAttr(kz,n)
+          write(logunit,F01)'n,Sa_topo    = ',n,a2x%rAttr(ktopo,n)
+          write(logunit,F01)'n,Sa_u       = ',n,a2x%rAttr(ku,n)
+          write(logunit,F01)'n,Sa_v       = ',n,a2x%rAttr(kv,n)
+          write(logunit,F01)'n,Sa_tbot    = ',n,a2x%rAttr(ktbot,n)
+          write(logunit,F01)'n,Sa_ptem    = ',n,a2x%rAttr(kptem,n)
+          write(logunit,F01)'n,Sa_shum    = ',n,a2x%rAttr(kshum,n)
+          write(logunit,F01)'n,Sa_dens    = ',n,a2x%rAttr(kdens,n)
+          write(logunit,F01)'n,Sa_pbot    = ',n,a2x%rAttr(kpbot,n)
+          write(logunit,F01)'n,Sa_pslv    = ',n,a2x%rAttr(kpslv,n)
+          write(logunit,F01)'n,Sa_lwdn    = ',n,a2x%rAttr(klwdn,n)
+          write(logunit,F01)'n,Faxa_rainc = ',n,a2x%rAttr(krc,n)
+          write(logunit,F01)'n,Faxa_rainl = ',n,a2x%rAttr(krl,n)
+          write(logunit,F01)'n,Faxa_snowc = ',n,a2x%rAttr(ksc,n)
+          write(logunit,F01)'n,Faxa_snowl = ',n,a2x%rAttr(ksl,n)
+          write(logunit,F01)'n,Faxa_swndr = ',n,a2x%rAttr(kswndr,n)
+          write(logunit,F01)'n,Faxa_swndf = ',n,a2x%rAttr(kswndf,n)
+          write(logunit,F01)'n,Faxa_swvdr = ',n,a2x%rAttr(kswvdr,n)
+          write(logunit,F01)'n,Faxa_swvdf = ',n,a2x%rAttr(kswvdf,n)
+          write(logunit,F01)'n,Faxa_swnet = ',n,a2x%rAttr(kswnet,n)
+       end do
+    end if
+
     !--------------------
     ! Write restart
     !--------------------
 
     if (write_restart) then
        call t_startf('datm_restart')
+       call seq_timemgr_EClockGetData( EClock, curr_yr=yy, curr_mon=mm, curr_day=dd, curr_tod=tod)
        write(rest_file,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
             trim(case_name), '.datm'//trim(inst_suffix)//'.r.', &
             yy,'-',mm,'-',dd,'-',currentTOD,'.nc'
@@ -1087,7 +1115,6 @@ CONTAINS
           close(nu)
           call shr_file_freeUnit(nu)
        endif
-
        if (my_task == master_task) write(logunit,F04) ' writing ',trim(rest_file_strm),currentYMD,currentTOD
        call shr_strdata_restWrite(trim(rest_file_strm),SDATM,mpicom,trim(case_name),'SDATM strdata')
        call shr_sys_flush(logunit)

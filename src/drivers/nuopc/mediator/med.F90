@@ -564,18 +564,28 @@ module MED
     enddo
     call shr_nuopc_fldList_Zero(fldsAtmOcn,rc=rc)
 
+    ! TODO: The following sets all states to be mapped with bilinear and all fluxes to be mapped
+    ! with conservefrac - this needs to be generalized
+    ! TODO: also there is an inconsistency - what if the mapping file is a patch file - but the mapping
+    ! below specifies bilinear? - this is hard-wired in the code below - and it should be obtained
+    ! from generated input
+
     !------------------
     ! Create fldsTo(compatm)
     !------------------
+
     call shr_nuopc_fldList_fromseqflds(fldsTo(compatm), seq_flds_x2a_states, "cannot provide", &
          subname//":seq_flds_x2a_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsTo(compatm), seq_flds_x2a_fluxes, "cannot provide", &
          subname//":seq_flds_x2a_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsTo(compatm), seq_flds_x2a_fluxes, "cannot provide", &
     !       subname//":seq_flds_x2a_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsTo(compatm), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -587,12 +597,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsFr(compatm), seq_flds_a2x_states, "cannot provide", &
          subname//":seq_flds_a2x_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsFr(compatm), seq_flds_a2x_fluxes, "cannot provide", &
          subname//":seq_flds_a2x_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsFr(compatm), seq_flds_a2x_fluxes, "cannot provide", &
     !       subname//":seq_flds_a2x_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsFr(compatm), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -604,12 +617,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsTo(compocn), seq_flds_x2o_states, "cannot provide", &
          subname//":seq_flds_x2o_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsTo(compocn), seq_flds_x2o_fluxes, "cannot provide", &
          subname//":seq_flds_x2o_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsTo(compocn), seq_flds_x2o_fluxes, "cannot provide", &
     !       subname//":seq_flds_x2o_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsTo(compocn), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -621,12 +637,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsFr(compocn), seq_flds_o2x_states, "cannot provide", &
          subname//":seq_flds_o2x_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsFr(compocn), seq_flds_o2x_fluxes, "cannot provide", &
          subname//":seq_flds_o2x_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsFr(compocn), seq_flds_o2x_fluxes, "cannot provide", &
     !       subname//":seq_flds_o2x_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsFr(compocn), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -638,12 +657,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsTo(compice), seq_flds_x2i_states, "cannot provide", &
          subname//":seq_flds_x2i_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsTo(compice), seq_flds_x2i_fluxes, "cannot provide", &
          subname//":seq_flds_x2i_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsTo(compice), seq_flds_x2i_fluxes, "cannot provide", &
     !       subname//":seq_flds_x2i_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsTo(compice), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -655,12 +677,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsFr(compice), seq_flds_i2x_states, "cannot provide", &
          subname//":seq_flds_i2x_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsFr(compice), seq_flds_i2x_fluxes, "cannot provide", &
          subname//":seq_flds_i2x_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsFr(compice), seq_flds_i2x_fluxes, "cannot provide", &
     !       subname//":seq_flds_i2x_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsFr(compice), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -672,12 +697,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsTo(complnd), seq_flds_x2l_states, "cannot provide", &
          subname//":seq_flds_x2l_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsTo(complnd), seq_flds_x2l_fluxes, "cannot provide", &
          subname//":seq_flds_x2l_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsTo(complnd), seq_flds_x2l_fluxes, "cannot provide", &
     !       subname//":seq_flds_x2l_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsTo(complnd), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -689,12 +717,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsFr(complnd), seq_flds_l2x_states, "cannot provide", &
          subname//":seq_flds_l2x_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsFr(complnd), seq_flds_l2x_fluxes, "cannot provide", &
          subname//":seq_flds_l2x_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsFr(complnd), seq_flds_l2x_fluxes, "cannot provide", &
     !       subname//":seq_flds_l2x_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsFr(complnd), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -706,12 +737,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsTo(comprof), seq_flds_x2r_states, "cannot provide", &
          subname//":seq_flds_x2r_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsTo(comprof), seq_flds_x2r_fluxes, "cannot provide", &
          subname//":seq_flds_x2r_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsTo(comprof), seq_flds_x2r_fluxes, "cannot provide", &
     !       subname//":seq_flds_x2r_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsTo(comprof), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -723,12 +757,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsFr(comprof), seq_flds_r2x_states, "cannot provide", &
          subname//":seq_flds_r2x_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsFr(comprof), seq_flds_r2x_fluxes, "cannot provide", &
          subname//":seq_flds_r2x_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsFr(comprof), seq_flds_r2x_fluxes, "cannot provide", &
     !       subname//":seq_flds_r2x_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsFr(comprof), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -740,12 +777,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsTo(compwav), seq_flds_x2w_states, "cannot provide", &
          subname//":seq_flds_x2w_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsTo(compwav), seq_flds_x2w_fluxes, "cannot provide", &
          subname//":seq_flds_x2w_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsTo(compwav), seq_flds_x2w_fluxes, "cannot provide", &
     !       subname//":seq_flds_x2w_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsTo(compwav), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -757,12 +797,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsFr(compwav), seq_flds_w2x_states, "cannot provide", &
          subname//":seq_flds_w2x_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsFr(compwav), seq_flds_w2x_fluxes, "cannot provide", &
          subname//":seq_flds_w2x_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsFr(compwav), seq_flds_w2x_fluxes, "cannot provide", &
     !       subname//":seq_flds_rwx_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsFr(compwav), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -774,12 +817,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsTo(compglc), seq_flds_x2g_states, "cannot provide", &
          subname//":seq_flds_x2g_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsTo(compglc), seq_flds_x2g_fluxes, "cannot provide", &
          subname//":seq_flds_x2g_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsTo(compglc), seq_flds_x2g_fluxes, "cannot provide", &
     !       subname//":seq_flds_x2g_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsTo(compglc), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -791,12 +837,15 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsFr(compglc), seq_flds_g2x_states, "cannot provide", &
          subname//":seq_flds_g2x_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsFr(compglc), seq_flds_g2x_fluxes, "cannot provide", &
          subname//":seq_flds_g2x_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsFr(compglc), seq_flds_g2x_fluxes, "cannot provide", &
     !       subname//":seq_flds_g2x_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_Add(fldsFr(compglc), trim(seq_flds_scalar_name), "will provide", &
          subname//":seq_flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -808,15 +857,19 @@ module MED
     call shr_nuopc_fldList_fromseqflds(fldsAtmOcn, seq_flds_xao_states, "cannot provide", &
          subname//":seq_flds_xao_states", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsAtmOcn, seq_flds_xao_albedo, "cannot provide", &
          subname//":seq_flds_xao_albedo", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsAtmOcn, seq_flds_xao_diurnl, "cannot provide", &
          subname//":seq_flds_xao_diurnl", "bilinear", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call shr_nuopc_fldList_fromseqflds(fldsAtmOcn, seq_flds_xao_fluxes, "cannot provide", &
          subname//":seq_flds_xao_fluxes", "conservefrac", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !    call shr_nuopc_fldList_fromseqflds(fldsAtmOcn, seq_flds_xao_fluxes, "cannot provide", &
     !       subname//":seq_flds_xao_fluxes", "bilinear", rc=rc)
     !    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return

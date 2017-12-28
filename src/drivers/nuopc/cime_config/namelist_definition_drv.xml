@@ -1654,28 +1654,9 @@
     <category>mapping</category>
     <input_pathname>abs</input_pathname>
     <group>DRIVER_maps_attributes</group>
-    <desc>
-      atm to ocn flux mapping file for fluxes
-    </desc>
+    <desc>atm to ocn flux mapping file for fluxes</desc>
     <values>
       <value>$ATM2OCN_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="atm2ocn_fmaptype"    modify_via_xml="ATM2OCN_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1692,23 +1673,6 @@
     </values>
   </entry>
 
-  <entry id="atm2ocn_smaptype"    modify_via_xml="ATM2OCN_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="atm2ocn_vmapname"    modify_via_xml="ATM2OCN_VMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -1719,23 +1683,6 @@
     </desc>
     <values>
       <value>$ATM2OCN_VMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="atm2ocn_vmaptype"    modify_via_xml="ATM2OCN_VMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_VMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1752,23 +1699,6 @@
     </values>
   </entry>
 
-  <entry id="ocn2atm_fmaptype"    modify_via_xml="OCN2ATM_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$OCN2ATM_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="ocn2atm_smapname"    modify_via_xml="OCN2ATM_SMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -1779,23 +1709,6 @@
     </desc>
     <values>
       <value>$OCN2ATM_SMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="ocn2atm_smaptype"    modify_via_xml="OCN2ATM_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$OCN2ATM_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1812,23 +1725,6 @@
     </values>
   </entry>
 
-  <entry id="atm2ice_fmaptype"    modify_via_xml="ATM2ICE_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="atm2ice_smapname"    modify_via_xml="ATM2ICE_SMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -1839,23 +1735,6 @@
     </desc>
     <values>
       <value>$ATM2OCN_SMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="atm2ice_smaptype"    modify_via_xml="ATM2OCN_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1872,23 +1751,6 @@
     </values>
   </entry>
 
-  <entry id="atm2ice_vmaptype"    modify_via_xml="ATM2OCN_VMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_VMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="ice2atm_fmapname"    modify_via_xml="ICE2ATM_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -1899,23 +1761,6 @@
     </desc>
     <values>
       <value>$OCN2ATM_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="ice2atm_fmaptype"    modify_via_xml="OCN2ATM_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$OCN2ATM_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1932,23 +1777,6 @@
     </values>
   </entry>
 
-  <entry id="ice2atm_smaptype"    modify_via_xml="ICE2ATM_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$OCN2ATM_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="atm2lnd_fmapname"    modify_via_xml="ATM2LND_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -1959,23 +1787,6 @@
     </desc>
     <values>
       <value>$ATM2LND_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="atm2lnd_fmaptype"    modify_via_xml="ATM2LND_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2LND_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1992,23 +1803,6 @@
     </values>
   </entry>
 
-  <entry id="atm2lnd_smaptype"    modify_via_xml="ATM2LND_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2LND_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="lnd2atm_fmapname"    modify_via_xml="LND2ATM_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2019,23 +1813,6 @@
     </desc>
     <values>
       <value>$LND2ATM_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="lnd2atm_fmaptype"    modify_via_xml="LND2ATM_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$LND2ATM_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2052,23 +1829,6 @@
     </values>
   </entry>
 
-  <entry id="lnd2atm_smaptype"   modify_via_xml="LND2ATM_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$LND2ATM_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="lnd2rof_fmapname"    modify_via_xml="LND2ROF_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2079,23 +1839,6 @@
     </desc>
     <values>
       <value>$LND2ROF_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="lnd2rof_fmaptype"    modify_via_xml="LND2ROF_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$LND2ROF_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2112,23 +1855,6 @@
     </values>
   </entry>
 
-  <entry id="rof2lnd_fmaptype"    modify_via_xml="ROF2LND_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ROF2LND_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="rof2ocn_fmapname"    modify_via_xml="ROF2OCN_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2139,23 +1865,6 @@
     </desc>
     <values>
       <value>$ROF2OCN_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="rof2ocn_fmaptype"    modify_via_xml="ROF2OCN_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ROF2OCN_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2172,23 +1881,6 @@
     </values>
   </entry>
 
-  <entry id="glc2ocn_rmaptype"    modify_via_xml="GLC2OCN_RMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$GLC2OCN_RMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="glc2ice_rmapname"    modify_via_xml="GLC2ICE_RMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2199,23 +1891,6 @@
     </desc>
     <values>
       <value>$GLC2ICE_RMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="glc2ice_rmaptype"    modify_via_xml="GLC2ICE_RMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$GLC2ICE_RMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2232,23 +1907,6 @@
     </values>
   </entry>
 
-  <entry id="rof2ocn_liq_rmaptype"    modify_via_xml="ROF2OCN_LIQ_RMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ROF2OCN_LIQ_RMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="rof2ocn_ice_rmapname"    modify_via_xml="ROF2OCN_ICE_RMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2262,24 +1920,6 @@
     </values>
   </entry>
 
-  <entry id="rof2ocn_ice_rmaptype"    modify_via_xml="ROF2OCN_ICE_RMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ROF2OCN_ICE_RMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
-
   <entry id="lnd2glc_fmapname"    modify_via_xml="LND2GLC_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2290,23 +1930,6 @@
     </desc>
     <values>
       <value>$LND2GLC_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="lnd2glc_fmaptype"    modify_via_xml="LND2GLC_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$LND2GLC_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2323,23 +1946,6 @@
     </values>
   </entry>
 
-  <entry id="lnd2glc_smaptype"    modify_via_xml="LND2GLC_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$LND2GLC_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="glc2lnd_fmapname"    modify_via_xml="GLC2LND_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2350,23 +1956,6 @@
     </desc>
     <values>
       <value>$GLC2LND_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="glc2lnd_fmaptype"    modify_via_xml="GLC2LND_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$GLC2LND_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2383,23 +1972,6 @@
     </values>
   </entry>
 
-  <entry id="glc2lnd_smaptype"    modify_via_xml="GLC2LND_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$GLC2LND_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="atm2wav_smapname"    modify_via_xml="ATM2WAV_SMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2410,23 +1982,6 @@
     </desc>
     <values>
       <value>$ATM2WAV_SMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="atm2wav_smaptype"    modify_via_xml="ATM2WAV_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2WAV_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2443,23 +1998,6 @@
     </values>
   </entry>
 
-  <entry id="ocn2wav_smaptype"    modify_via_xml="OCN2WAV_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$OCN2WAV_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="ice2wav_smapname"    modify_via_xml="ICE2WAV_SMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2470,23 +2008,6 @@
     </desc>
     <values>
       <value>$ICE2WAV_SMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="ice2wav_smaptype"    modify_via_xml="ICE2WAV_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ICE2WAV_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2503,22 +2024,6 @@
     </values>
   </entry>
 
-  <entry id="wav2ocn_smaptype"    modify_via_xml="WAV2OCN_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$WAV2OCN_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
 
   <!-- ===========================     -->
   <!-- group DRIVER_auxhist_attributes -->

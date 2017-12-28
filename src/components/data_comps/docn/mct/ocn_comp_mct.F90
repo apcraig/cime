@@ -212,6 +212,7 @@ CONTAINS
     ! Reset shr logging to my log file
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
+    call shr_file_setLogLevel(max(shrloglev,1))
     call shr_file_setLogUnit (logUnit)
 
     call seq_cdata_setptrs(cdata, &
@@ -237,7 +238,6 @@ CONTAINS
 
     call shr_file_setLogUnit (shrlogunit)
     call shr_file_setLogLevel(shrloglev)
-    call shr_sys_flush(logunit)
 
   end subroutine ocn_run_mct
 

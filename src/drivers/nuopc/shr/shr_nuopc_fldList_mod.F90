@@ -154,8 +154,10 @@ contains
     rc = ESMF_SUCCESS
 
     ! make sure fldlist has been zero-ed out first
-    if (.not.associated(fldlist%stdname) .or. .not.associated(fldlist%shortname) .or. &
-        .not.associated(fldlist%transferOffer) .or. .not.associated(fldlist%mapping)) then
+    if ( .not.associated(fldlist%stdname) .or. &
+         .not.associated(fldlist%shortname) .or. &
+         .not.associated(fldlist%transferOffer) .or. &
+         .not.associated(fldlist%mapping)) then
       call ESMF_LogWrite(trim(subname)//":"//trim(tag)//" ERROR in fldlist, call shr_nuopc_fldList_Zero first "//trim(stdname), &
         ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
       rc = ESMF_FAILURE

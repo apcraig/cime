@@ -557,13 +557,14 @@ module med_phases_mod
         call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        call shr_nuopc_methods_FB_Regrid(&
-           fldsFr(n1), is_local%wrap%FBImp(n1,n1), is_local%wrap%FBImp(n1,n2), &
-           consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-           consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-           bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-           patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-           string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+        call shr_nuopc_methods_FB_Regrid( fldsFr(n1), &
+             is_local%wrap%FBImp(n1,n1), &
+             is_local%wrap%FBImp(n1,n2), &
+             consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+             consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
+             bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
+             patchmap=is_local%wrap%RH(n1,n2,mappatch), &
+             string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (dbug_flag > 1) then
