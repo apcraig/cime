@@ -15,7 +15,7 @@ module dice_flux_atmice_mod
   real(R8) :: loc_latice = shr_const_latice
   real(R8) :: loc_stebol = shr_const_stebol
 
-  integer,parameter :: debug = 0 ! internal debug level
+  integer,parameter :: dbug = 2 ! internal debug level
 
 !===============================================================================
 contains
@@ -249,7 +249,7 @@ contains
        endif
     enddo
 
-    if (debug > 0) then
+    if (dbug > 0) then
        do n = 1,lsize
           if (mask(n) /= 0) then
              write(logunit, F01)'n,mask  = ',n,mask(n)

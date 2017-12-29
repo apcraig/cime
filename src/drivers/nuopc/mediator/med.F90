@@ -507,10 +507,11 @@ module MED
 
     allocate(is_local%wrap, stat=stat)
     if (ESMF_LogFoundAllocError(statusToCheck=stat, &
-      msg="Allocation of the internal state memory failed.", &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+         msg="Allocation of the internal state memory failed.", &
+         line=__LINE__, &
+         file=u_FILE_u)) &
+         return  ! bail out
+
     call ESMF_GridCompSetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -883,10 +884,11 @@ module MED
     do n1 = 1,ncomps
        call shr_nuopc_fldList_Advertise(is_local%wrap%NStateImp(n1), fldsFr(n1), &
             subname//':Fr'//trim(compname(n1)), rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      call shr_nuopc_fldList_Advertise(is_local%wrap%NStateExp(n1), fldsTo(n1), &
-           subname//':To'//trim(compname(n1)), rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call shr_nuopc_fldList_Advertise(is_local%wrap%NStateExp(n1), fldsTo(n1), &
+            subname//':To'//trim(compname(n1)), rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     enddo
 
     if (dbug_flag > 5) then
@@ -1645,6 +1647,7 @@ module MED
               ESMF_StateIsCreated(is_local%wrap%NStateExp(n2),rc=rc)) then
             if (mastertask) write(llogunit,*) subname,' initializing FBs for '//trim(compname(n1))//'_'//trim(compname(n2))
 
+            ! TODO:
             ! Important Note - the NStateImp(n2) should be used here rather than NStateExp(n2), since
             ! the export state might only contain control data and no grid information if
             ! if the target component (n2) is not prognostic only receives control data back
@@ -1670,6 +1673,7 @@ module MED
       ! Initialize AtmOcn FBs
       !----------------------------------------------------------
 
+      ! TODO:
       ! Important Note - the NStateImp(compocn) or NStateImp(compatm) used here rather than NStateExp(n2), since
       ! the export state might only contain control data and no grid information if
       ! if the target component (n2) is not prognostic only receives control data back

@@ -22,6 +22,7 @@ module dice_comp_mod
   use shr_strdata_mod , only: shr_strdata_advance, shr_strdata_restWrite
   use shr_dmodel_mod  , only: shr_dmodel_gsmapcreate, shr_dmodel_rearrGGrid
   use shr_dmodel_mod  , only: shr_dmodel_translate_list, shr_dmodel_translateAV_list, shr_dmodel_translateAV
+  use shr_cal_mod     , only: shr_cal_ymdtod2string
   use seq_timemgr_mod , only: seq_timemgr_EClockGetData
 
   use dice_shr_mod    , only: datamode       ! namelist input
@@ -77,10 +78,14 @@ module dice_comp_mod
   real(R8),parameter  :: ax_nidr = ai_nidr*(1.0_R8-snwfrac) + as_nidr*snwfrac
   real(R8),parameter  :: ax_vsdr = ai_vsdr*(1.0_R8-snwfrac) + as_vsdr*snwfrac
 
+  integer(IN) :: km
   integer(IN) :: kswvdr,kswndr,kswvdf,kswndf,kq,kz,kua,kva,kptem,kshum,kdens,ktbot
-  integer(IN) :: km,kiFrac,kt,kavsdr,kanidr,kavsdf,kanidf,kswnet,kmelth,kmeltw
+  integer(IN) :: kiFrac,kt,kavsdr,kanidr,kavsdf,kanidf,kswnet,kmelth,kmeltw
   integer(IN) :: ksen,klat,klwup,kevap,ktauxa,ktauya,ktref,kqref,kswpen,ktauxo,ktauyo,ksalt
   integer(IN) :: ksalinity
+  integer(IN) :: kbcpho, kbcphi, kflxdst
+  integer(IN) :: kbcphidry, kbcphodry, kbcphiwet, kocphidry, kocphodry, kocphiwet
+  integer(IN) :: kdstdry1, kdstdry2, kdstdry3, kdstdry4, kdstwet1, kdstwet2, kdstwet3, kdstwet4
 
   ! optional per thickness category fields
   integer(IN) :: kiFrac_01,kswpen_iFrac_01
@@ -95,8 +100,8 @@ module dice_comp_mod
 
   !--------------------------------------------------------------------------
   integer(IN)  , parameter :: ktrans = 1
-  character(16), parameter :: avifld(1:ktrans) = (/"ifrac"/)
-  character(16), parameter :: avofld(1:ktrans) = (/"Si_ifrac"/)
+  character(16),parameter  :: avofld(1:ktrans) = (/"Si_ifrac        "/)
+  character(16),parameter  :: avifld(1:ktrans) = (/"ifrac           "/)
   !--------------------------------------------------------------------------
 
   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -257,6 +262,9 @@ CONTAINS
     ktauxo = mct_aVect_indexRA(i2x,'Fioi_taux')
     ktauyo = mct_aVect_indexRA(i2x,'Fioi_tauy')
     ksalt  = mct_aVect_indexRA(i2x,'Fioi_salt')
+    kbcpho = mct_aVect_indexRA(i2x,'Fioi_bcpho')
+    kbcphi = mct_aVect_indexRA(i2x,'Fioi_bcphi')
+    kflxdst= mct_aVect_indexRA(i2x,'Fioi_flxdst')
 
     ! optional per thickness category fields
 
@@ -268,19 +276,33 @@ CONTAINS
     call mct_aVect_init(x2i, rList=seq_flds_x2i_fields, lsize=lsize)
     call mct_aVect_zero(x2i)
 
-    kswvdr = mct_aVect_indexRA(x2i,'Faxa_swvdr')
-    kswndr = mct_aVect_indexRA(x2i,'Faxa_swndr')
-    kswvdf = mct_aVect_indexRA(x2i,'Faxa_swvdf')
-    kswndf = mct_aVect_indexRA(x2i,'Faxa_swndf')
-    kq     = mct_aVect_indexRA(x2i,'Fioo_q')
-    kz     = mct_aVect_indexRA(x2i,'Sa_z')
-    kua    = mct_aVect_indexRA(x2i,'Sa_u')
-    kva    = mct_aVect_indexRA(x2i,'Sa_v')
-    kptem  = mct_aVect_indexRA(x2i,'Sa_ptem')
-    kshum  = mct_aVect_indexRA(x2i,'Sa_shum')
-    kdens  = mct_aVect_indexRA(x2i,'Sa_dens')
-    ktbot  = mct_aVect_indexRA(x2i,'Sa_tbot')
+    kswvdr    = mct_aVect_indexRA(x2i,'Faxa_swvdr')
+    kswndr    = mct_aVect_indexRA(x2i,'Faxa_swndr')
+    kswvdf    = mct_aVect_indexRA(x2i,'Faxa_swvdf')
+    kswndf    = mct_aVect_indexRA(x2i,'Faxa_swndf')
+    kq        = mct_aVect_indexRA(x2i,'Fioo_q')
+    kz        = mct_aVect_indexRA(x2i,'Sa_z')
+    kua       = mct_aVect_indexRA(x2i,'Sa_u')
+    kva       = mct_aVect_indexRA(x2i,'Sa_v')
+    kptem     = mct_aVect_indexRA(x2i,'Sa_ptem')
+    kshum     = mct_aVect_indexRA(x2i,'Sa_shum')
+    kdens     = mct_aVect_indexRA(x2i,'Sa_dens')
+    ktbot     = mct_aVect_indexRA(x2i,'Sa_tbot')
     ksalinity = mct_aVect_indexRA(x2i,'So_s')
+    kbcphidry = mct_aVect_indexRA(x2i,'Faxa_bcphidry')
+    kbcphodry = mct_aVect_indexRA(x2i,'Faxa_bcphodry')
+    kbcphiwet = mct_aVect_indexRA(x2i,'Faxa_bcphiwet')
+    kocphidry = mct_aVect_indexRA(x2i,'Faxa_ocphidry')
+    kocphodry = mct_aVect_indexRA(x2i,'Faxa_ocphodry')
+    kocphiwet = mct_aVect_indexRA(x2i,'Faxa_ocphiwet')
+    kdstdry1  = mct_aVect_indexRA(x2i,'Faxa_dstdry1')
+    kdstdry2  = mct_aVect_indexRA(x2i,'Faxa_dstdry2')
+    kdstdry3  = mct_aVect_indexRA(x2i,'Faxa_dstdry3')
+    kdstdry4  = mct_aVect_indexRA(x2i,'Faxa_dstdry4')
+    kdstwet1  = mct_aVect_indexRA(x2i,'Faxa_dstwet1')
+    kdstwet2  = mct_aVect_indexRA(x2i,'Faxa_dstwet2')
+    kdstwet3  = mct_aVect_indexRA(x2i,'Faxa_dstwet3')
+    kdstwet4  = mct_aVect_indexRA(x2i,'Faxa_dstwet4')
 
     ! call mct_aVect_init(avstrm, rList=flds_strm, lsize=lsize)
     ! call mct_aVect_zero(avstrm)
@@ -424,6 +446,7 @@ CONTAINS
     real(R8)      :: cosarg            ! for setting ice temp pattern
     real(R8)      :: jday, jday0       ! elapsed day counters
     character(CS) :: calendar          ! calendar type
+    character(len=18) :: date_str
 
     character(*), parameter :: F00   = "('(dice_comp_run) ',8a)"
     character(*), parameter :: F04   = "('(dice_comp_run) ',2a,2i8,'s')"
@@ -516,9 +539,9 @@ CONTAINS
           !--- newly recv'd swdn goes with previously sent albedo ---
           !--- but albedos are (currently) time invariant         ---
           i2x%rAttr(kswnet,n) = (1.0_R8 - i2x%rAttr(kavsdr,n))*x2i%rAttr(kswvdr,n) &
-               &                   + (1.0_R8 - i2x%rAttr(kanidr,n))*x2i%rAttr(kswndr,n) &
-               &                   + (1.0_R8 - i2x%rAttr(kavsdf,n))*x2i%rAttr(kswvdf,n) &
-               &                   + (1.0_R8 - i2x%rAttr(kanidf,n))*x2i%rAttr(kswndf,n)
+                              + (1.0_R8 - i2x%rAttr(kanidr,n))*x2i%rAttr(kswndr,n) &
+                              + (1.0_R8 - i2x%rAttr(kavsdf,n))*x2i%rAttr(kswvdf,n) &
+                              + (1.0_R8 - i2x%rAttr(kanidf,n))*x2i%rAttr(kswndf,n)
 
           !--- compute melt/freeze water balance, adjust iFrac  -------------
           if ( .not. flux_Qacc ) then ! Q accumulation option is OFF
@@ -617,6 +640,16 @@ CONTAINS
           ! iFrac0(n) = i2x%rAttr(kiFrac,n)
        end do
 
+       ! Compute outgoing aerosol fluxes
+       do n = 1,lsize
+          i2x%rAttr(kbcpho ,n) = x2i%rAttr(kbcphodry,n)
+          i2x%rAttr(kbcphi ,n) = x2i%rAttr(kbcphidry,n) + x2i%rAttr(kbcphiwet,n)
+          i2x%rAttr(kflxdst,n) = x2i%rAttr(kdstdry1,n) + x2i%rAttr(kdstwet1,n) &
+                               + x2i%rAttr(kdstdry2,n) + x2i%rAttr(kdstwet2,n) &
+                               + x2i%rAttr(kdstdry3,n) + x2i%rAttr(kdstwet3,n) &
+                               + x2i%rAttr(kdstdry4,n) + x2i%rAttr(kdstwet4,n)
+       end do
+
     end select
 
     !-------------------------------------------------
@@ -638,12 +671,13 @@ CONTAINS
 
     if (write_restart) then
        call t_startf('dice_restart')
-       write(rest_file,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
-            trim(case_name), '.dice'//trim(inst_suffix)//'.r.', &
-            yy,'-',mm,'-',dd,'-',currentTOD,'.nc'
-       write(rest_file_strm,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
-            trim(case_name), '.dice'//trim(inst_suffix)//'.rs1.', &
-            yy,'-',mm,'-',dd,'-',currentTOD,'.bin'
+       call shr_cal_ymdtod2string(date_str, yy, mm, dd, currentTOD)
+       write(rest_file,"(6a)") &
+            trim(case_name), '.dice',trim(inst_suffix),'.r.', &
+            trim(date_str),'.nc'
+       write(rest_file_strm,"(6a)") &
+            trim(case_name), '.dice',trim(inst_suffix),'.rs1.', &
+            trim(date_str),'.bin'
        if (my_task == master_task) then
           nu = shr_file_getUnit()
           open(nu,file=trim(rpfile)//trim(inst_suffix),form='formatted')

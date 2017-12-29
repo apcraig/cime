@@ -20,6 +20,7 @@ module docn_comp_mod
   use shr_strdata_mod , only: shr_strdata_advance, shr_strdata_restWrite
   use shr_dmodel_mod  , only: shr_dmodel_gsmapcreate, shr_dmodel_rearrGGrid
   use shr_dmodel_mod  , only: shr_dmodel_translate_list, shr_dmodel_translateAV_list, shr_dmodel_translateAV
+  use shr_cal_mod     , only: shr_cal_ymdtod2string
   use seq_timemgr_mod , only: seq_timemgr_EClockGetData
 
   use docn_shr_mod   , only: datamode       ! namelist input
@@ -81,8 +82,6 @@ module docn_comp_mod
           "So_dhdy     ","So_s        ","strm_h      ","strm_qbot   "/)
   character(len=*), parameter :: flds_strm = 'strm_h:strm_qbot'
   !--------------------------------------------------------------------------
-
-  save
 
   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 CONTAINS
@@ -408,6 +407,7 @@ CONTAINS
     real(R8)      :: dt                    ! timestep
     integer(IN)   :: nu                    ! unit number
     real(R8)      :: hn                    ! h field
+    character(len=18) :: date_str
 
     real(R8), parameter :: &
          swp = 0.67_R8*(exp((-1._R8*shr_const_zsrflyr) /1.0_R8)) + 0.33_R8*exp((-1._R8*shr_const_zsrflyr)/17.0_R8)
@@ -612,12 +612,13 @@ CONTAINS
     if (write_restart) then
        call t_startf('docn_restart')
        call seq_timemgr_EClockGetData( EClock, curr_yr=yy, curr_mon=mm, curr_day=dd, curr_tod=tod)
-       write(rest_file,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
-            trim(case_name), '.docn'//trim(inst_suffix)//'.r.', &
-            yy,'-',mm,'-',dd,'-',tod,'.nc'
-       write(rest_file_strm,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
-            trim(case_name), '.docn'//trim(inst_suffix)//'.rs1.', &
-            yy,'-',mm,'-',dd,'-',tod,'.bin'
+       call shr_cal_ymdtod2string(date_str, yy,mm,dd,currentTOD)
+       write(rest_file,"(6a)") &
+            trim(case_name), '.docn',trim(inst_suffix),'.r.', &
+            trim(date_str),'.nc'
+       write(rest_file_strm,"(6a)") &
+            trim(case_name), '.docn',trim(inst_suffix),'.rs1.', &
+            trim(date_str),'.bin'
        if (my_task == master_task) then
           nu = shr_file_getUnit()
           open(nu,file=trim(rpfile)//trim(inst_suffix),form='formatted')

@@ -1,7 +1,7 @@
 module wav_comp_mct
 
   ! !USES:
-  
+
   use esmf
   use mct_mod
   use perf_mod
@@ -33,18 +33,16 @@ module wav_comp_mct
   ! Private module data
   !--------------------------------------------------------------------------
 
-  type(shr_strdata_type) :: SDWAV
-  integer(IN)            :: mpicom              ! mpi communicator
-  integer(IN)            :: my_task             ! my task in mpi communicator mpicom
-  integer                :: inst_index          ! number of current instance (ie. 1)
-  character(len=16)      :: inst_name           ! fullname of current instance (ie. "wav_0001")
-  character(len=16)      :: inst_suffix         ! char string associated with instance (ie. "_0001" or "")
-  integer(IN)            :: logunit             ! logging unit number
-  integer(IN)            :: compid              ! mct comp id
-
-  character(*), parameter :: F00   = "('(dwav_comp_init) ',8a)"
+  type(shr_strdata_type)  :: SDWAV
+  integer(IN)             :: mpicom        ! mpi communicator
+  integer(IN)             :: my_task       ! my task in mpi communicator mpicom
+  integer                 :: inst_index    ! number of current instance (ie. 1)
+  character(len=16)       :: inst_name     ! fullname of current instance (ie. "wav_0001")
+  character(len=16)       :: inst_suffix   ! char string associated with instance (ie. "_0001" or "")
+  integer(IN)             :: logunit       ! logging unit number
+  integer(IN)             :: compid        ! mct comp id
   integer(IN) , parameter :: master_task=0 ! task number of master task
-  character(*), parameter :: subName = "(wav_init_mct) "
+  integer     , parameter :: dbug = 10
 
   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 CONTAINS
@@ -69,13 +67,14 @@ CONTAINS
     integer           :: phase                     ! phase of method
     logical           :: wav_present               ! flag
     logical           :: wav_prognostic            ! flag
-    integer(IN)       :: shrlogunit                ! original log unit 
+    integer(IN)       :: shrlogunit                ! original log unit
     integer(IN)       :: shrloglev                 ! original log level
     logical           :: read_restart              ! start from restart
     integer(IN)       :: ierr                      ! error code
     logical           :: scmMode = .false.         ! single column mode
     real(R8)          :: scmLat  = shr_const_SPVAL ! single column lat
     real(R8)          :: scmLon  = shr_const_SPVAL ! single column lon
+    character(*), parameter :: F00   = "('(dwav_comp_init) ',8a)"
     character(*), parameter :: subName = "(wav_init_mct) "
     !-------------------------------------------------------------------------------
 
@@ -161,6 +160,14 @@ CONTAINS
          wav_ny=SDWAV%nyg )
 
     !----------------------------------------------------------------------------
+    ! diagnostics
+    !----------------------------------------------------------------------------
+
+    if (dbug > 1) then
+      call mct_aVect_info(2, w2x, istr="initial diag"//':AV')
+    endif
+
+    !----------------------------------------------------------------------------
     ! Reset shr logging to original values
     !----------------------------------------------------------------------------
 
@@ -174,6 +181,7 @@ CONTAINS
   end subroutine wav_init_mct
 
   !===============================================================================
+
   subroutine wav_run_mct( EClock, cdata, x2w, w2x)
 
     ! !DESCRIPTION: run method for dwav model
@@ -189,10 +197,13 @@ CONTAINS
     type(seq_infodata_type), pointer :: infodata
     type(mct_gsMap)        , pointer :: gsMap
     type(mct_gGrid)        , pointer :: ggrid
-    integer(IN)                      :: shrlogunit   ! original log unit 
-    integer(IN)                      :: shrloglev    ! original log level
-    logical                          :: read_restart ! start from restart
-    character(CL)                    :: case_name    ! case name
+    integer(IN)                      :: shrlogunit    ! original log unit
+    integer(IN)                      :: shrloglev     ! original log level
+    logical                          :: read_restart  ! start from restart
+    character(CL)                    :: case_name     ! case name
+    logical                          :: write_restart ! restart alarm is ringing
+    integer(IN)                      :: currentYMD    ! model date
+    integer(IN)                      :: currentTOD    ! model sec into model date
     character(*), parameter :: subName = "(wav_run_mct) "
     !-------------------------------------------------------------------------------
 
@@ -207,14 +218,21 @@ CONTAINS
          infodata=infodata)
 
     call seq_infodata_GetData(infodata, case_name=case_name)
-       
+
+    write_restart = seq_timemgr_RestartAlarmIsOn(EClock)
+
+    ! For mct - the component clock is advance at the beginning of the time interval
+    call seq_timemgr_EClockGetData( EClock, curr_ymd=CurrentYMD, curr_tod=CurrentTOD)
+
     call dwav_comp_run(EClock, x2w, w2x, &
        SDWAV, gsmap, ggrid, mpicom, compid, my_task, master_task, &
-       inst_suffix, logunit, read_restart, case_name)
+       inst_suffix, logunit, read_restart, write_restart, &
+       currentYMD, currentTOD, case_name=case_name)
+
+    call shr_sys_flush(logunit)
 
     call shr_file_setLogUnit (shrlogunit)
     call shr_file_setLogLevel(shrloglev)
-    call shr_sys_flush(logunit)
 
   end subroutine wav_run_mct
 
@@ -228,7 +246,7 @@ CONTAINS
     type(ESMF_Clock)            ,intent(inout) :: EClock     ! clock
     type(seq_cdata)             ,intent(inout) :: cdata
     type(mct_aVect)             ,intent(inout) :: x2w
-    type(mct_aVect)             ,intent(inout) :: w2x        
+    type(mct_aVect)             ,intent(inout) :: w2x
 
     !--- formats ---
     character(*), parameter :: subName = "(wav_final_mct) "

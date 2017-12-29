@@ -1462,7 +1462,7 @@ subroutine cime_init()
    ocnrun_count = 0
    cpl2ocn_first = .true.
 
-   ! TODO NUOPC - This is not the case for nuopc - hard-coding it to false here -
+   ! TODO NUOPC: - This is not the case for nuopc - hard-coding it to false here -
    ! not sure how to handle this in the nuopc case
    skip_ocean_run = .false.
 
@@ -1954,10 +1954,10 @@ subroutine cime_init()
    !  Data or dead atmosphere may just return on this phase.
    !----------------------------------------------------------
 
-   !TODO: should this not be an atm_prognostic flag - and have the datm have only 1 phase?
+   !TODO NUOPC: should this not be an atm_prognostic flag - and have the datm have only 1 phase?
    if (atm_prognostic) then
-      write(6,*)"DEBUG: should not be here if data atm"
   !if (atm_present) then
+
       call t_startf('comp_init_cc_atm2')
       call t_adj_detailf(+2)
 
@@ -2235,7 +2235,7 @@ end subroutine cime_init
          endif
       endif
 
-      ! TODO NUOPC: how is the following handled in NUOPC?
+      ! TODO NUOPC: how will nuopc handle a skip_ocean_run flag that should be true?
 
       ! override ocnrun_alarm and ocnnext_alarm for first ocn run
       ! skip_ocean_run is initialized above to true if it's a startup
@@ -2248,9 +2248,6 @@ end subroutine cime_init
          ocnrun_alarm = .false.
          ocnnext_alarm = .false.
       endif
-
-      !write(6,*)'DEBUG: ocnrun_alarm  = ',ocnrun_alarm
-      !write(6,*)'DEBUG: ocnnext_alarm = ',ocnnext_alarm
 
       if (iamroot_CPLID) then
          if (loglevel > 1) then

@@ -116,6 +116,7 @@ CONTAINS
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
+    call shr_file_setLogLevel(max(shrloglev,1))
     call shr_file_setLogUnit (logUnit)
 
     !----------------------------------------------------------------------------
@@ -185,6 +186,7 @@ CONTAINS
   end subroutine ocn_init_mct
 
   !===============================================================================
+
   subroutine ocn_run_mct( EClock, cdata,  x2o, o2x)
 
     ! !DESCRIPTION: run method for docn model

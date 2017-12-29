@@ -114,7 +114,6 @@ CONTAINS
     inst_index  = seq_comm_inst(compid)
     inst_suffix = seq_comm_suffix(compid)
 
-
     ! Determine communicator group
     call mpi_comm_rank(mpicom, my_task, ierr)
 
@@ -132,6 +131,7 @@ CONTAINS
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
+    call shr_file_setLogLevel(max(shrloglev,1))
     call shr_file_setLogUnit (logUnit)
 
     !----------------------------------------------------------------------------
@@ -139,6 +139,7 @@ CONTAINS
     !----------------------------------------------------------------------------
 
     call t_startf('datm_readnml')
+
     call datm_shr_read_namelists(mpicom, my_task, master_task, &
          inst_index, inst_suffix, inst_name, &
          logunit, shrlogunit, SDATM, atm_present, atm_prognostic)
@@ -146,6 +147,7 @@ CONTAINS
     call seq_infodata_PutData(infodata, &
          atm_present=atm_present, &
          atm_prognostic=atm_prognostic)
+
     call t_stopf('datm_readnml')
 
     !----------------------------------------------------------------------------
@@ -192,6 +194,7 @@ CONTAINS
     !----------------------------------------------------------------------------
 
     if (my_task == master_task) write(logunit,F00) 'datm_comp_init done'
+    call shr_sys_flush(logunit)
 
     call shr_file_setLogUnit (shrlogunit)
     call shr_file_setLogLevel(shrloglev)

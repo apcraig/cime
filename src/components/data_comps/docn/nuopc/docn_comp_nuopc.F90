@@ -1,8 +1,8 @@
 module docn_comp_nuopc
 
-!----------------------------------------------------------------------------
-! This is the NUOPC cap
-!----------------------------------------------------------------------------
+  !----------------------------------------------------------------------------
+  ! This is the NUOPC cap for DOCN
+  !----------------------------------------------------------------------------
 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
   use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
@@ -561,11 +561,6 @@ module docn_comp_nuopc
 
     call NUOPC_ModelGet(gcomp, modelClock=clock, importState=importState, exportState=exportState, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    ! TODO: is this right?
-    ! Advance the docn clock at the beginning of the time step loop - this will make the model clock one time
-    ! interval ahead of the driver clock at this point
-    !call ESMF_ClockAdvance( clock, rc=rc )
 
     if (dbug > 1) then
       call shr_nuopc_methods_Clock_TimePrint(clock,subname//'clock',rc=rc)

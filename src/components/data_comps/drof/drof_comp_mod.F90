@@ -17,6 +17,7 @@ module drof_comp_mod
   use shr_strdata_mod , only: shr_strdata_advance, shr_strdata_restWrite
   use shr_dmodel_mod  , only: shr_dmodel_gsmapcreate, shr_dmodel_rearrGGrid
   use shr_dmodel_mod  , only: shr_dmodel_translate_list, shr_dmodel_translateAV_list, shr_dmodel_translateAV
+  use shr_cal_mod     , only: shr_cal_ymdtod2string
   use seq_timemgr_mod , only: seq_timemgr_EClockGetData
 
   use drof_shr_mod   , only: datamode       ! namelist input
@@ -298,6 +299,8 @@ CONTAINS
     integer(IN)   :: lsize             ! size of attr vect
     integer(IN)   :: nu                ! unit number
     integer(IN)   :: nflds_r2x
+    character(len=18) :: date_str
+
     character(*), parameter :: F00   = "('(drof_comp_run) ',8a)"
     character(*), parameter :: F04   = "('(drof_comp_run) ',2a,2i8,'s')"
     character(*), parameter :: subName = "(drof_comp_run) "
@@ -364,13 +367,13 @@ CONTAINS
 
     if (write_restart) then
        call t_startf('drof_restart')
-       call seq_timemgr_EClockGetData( EClock, curr_yr=yy, curr_mon=mm, curr_day=dd, curr_tod=tod)
-       write(rest_file,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
-            trim(case_name), '.drof'//trim(inst_suffix)//'.r.', &
-            yy,'-',mm,'-',dd,'-',currentTOD,'.nc'
-       write(rest_file_strm,"(2a,i4.4,a,i2.2,a,i2.2,a,i5.5,a)") &
-            trim(case_name), '.drof'//trim(inst_suffix)//'.rs1.', &
-            yy,'-',mm,'-',dd,'-',currentTOD,'.bin'
+       call shr_cal_ymdtod2string(date_str, yy,mm,dd,currentTOD)
+       write(rest_file,"(6a)") &
+            trim(case_name), '.docn',trim(inst_suffix),'.r.', &
+            trim(date_str),'.nc'
+       write(rest_file_strm,"(6a)") &
+            trim(case_name), '.docn',trim(inst_suffix),'.rs1.', &
+            trim(date_str),'.bin'
        if (my_task == master_task) then
           nu = shr_file_getUnit()
           open(nu,file=trim(rpfile)//trim(inst_suffix),form='formatted')
