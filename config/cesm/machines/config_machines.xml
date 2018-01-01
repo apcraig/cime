@@ -943,7 +943,8 @@
     </module_system>
     <environment_variables>
       <env name="OMP_STACKSIZE">64M</env>
-      <env name="ESMFMKFILE">/home/fischer/ESMF_code/ESMF_7_1_0_beta/lib/libg/Linux.intel.64.mvapich2.default/esmf.mk</env>
+      <!-- <env name="ESMFMKFILE">/home/fischer/ESMF_code/ESMF_7_1_0_beta/lib/libg/Linux.intel.64.mvapich2.default/esmf.mk</env> -->
+      <env name="ESMFMKFILE">/home/fischer/ESMF_code/ESMF_7_1_0_beta_snapshot_42/lib/libg/Linux.intel.64.mvapich2.default/esmf.mk</env>
     </environment_variables>
   </machine>
 

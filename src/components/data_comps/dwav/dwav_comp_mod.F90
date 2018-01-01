@@ -115,7 +115,7 @@ CONTAINS
     ! Initialize pio
     !----------------------------------------------------------------------------
 
-    call shr_strdata_pioinit(SWAV, COMPID)
+    call shr_strdata_pioinit(SDWAV, COMPID)
 
     !----------------------------------------------------------------------------
     ! Initialize SDWAV

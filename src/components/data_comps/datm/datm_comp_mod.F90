@@ -51,7 +51,7 @@ module datm_comp_mod
 
   character(CS) :: myModelName = 'atm'   ! user defined model name
   logical       :: firstcall = .true.    ! first call logical
-  integer(IN)   :: dbug = 0              ! debug level (higher is more)
+  integer(IN)   :: dbug = 1              ! debug level (higher is more)
   real(R8)      :: tbotmax               ! units detector
   real(R8)      :: tdewmax               ! units detector
   real(R8)      :: anidrmax              ! existance detector
@@ -617,7 +617,7 @@ CONTAINS
     real(R8)      :: tbot,pbot,rtmp,vp,ea,e,qsat,frac,qsatT
 
     character(*), parameter :: F00   = "('(datm_comp_run) ',8a)"
-    character(*), parameter :: F01   = "('(datm_comp_run) ',a, i7,2x,d21.14)"
+    character(*), parameter :: F01   = "('(datm_comp_run) ',a, i7,2x,i5,2x,i5,2x,d21.14)"
     character(*), parameter :: F04   = "('(datm_comp_run) ',2a,2i8,'s')"
     character(*), parameter :: subName = "(datm_comp_run) "
     !-------------------------------------------------------------------------------
@@ -1099,29 +1099,32 @@ CONTAINS
     ! bias correction / anomaly forcing ( end block )
     !----------------------------------------------------------
 
+    !----------------------------------------------------------
     ! Debug output
-    if (dbug > 0) then
+    !----------------------------------------------------------
+
+    if (dbug > 0 .and. my_task == master_task) then
        do n = 1,lsize
-          write(logunit,F01)'n,Sa_z       = ',n,a2x%rAttr(kz,n)
-          write(logunit,F01)'n,Sa_topo    = ',n,a2x%rAttr(ktopo,n)
-          write(logunit,F01)'n,Sa_u       = ',n,a2x%rAttr(ku,n)
-          write(logunit,F01)'n,Sa_v       = ',n,a2x%rAttr(kv,n)
-          write(logunit,F01)'n,Sa_tbot    = ',n,a2x%rAttr(ktbot,n)
-          write(logunit,F01)'n,Sa_ptem    = ',n,a2x%rAttr(kptem,n)
-          write(logunit,F01)'n,Sa_shum    = ',n,a2x%rAttr(kshum,n)
-          write(logunit,F01)'n,Sa_dens    = ',n,a2x%rAttr(kdens,n)
-          write(logunit,F01)'n,Sa_pbot    = ',n,a2x%rAttr(kpbot,n)
-          write(logunit,F01)'n,Sa_pslv    = ',n,a2x%rAttr(kpslv,n)
-          write(logunit,F01)'n,Sa_lwdn    = ',n,a2x%rAttr(klwdn,n)
-          write(logunit,F01)'n,Faxa_rainc = ',n,a2x%rAttr(krc,n)
-          write(logunit,F01)'n,Faxa_rainl = ',n,a2x%rAttr(krl,n)
-          write(logunit,F01)'n,Faxa_snowc = ',n,a2x%rAttr(ksc,n)
-          write(logunit,F01)'n,Faxa_snowl = ',n,a2x%rAttr(ksl,n)
-          write(logunit,F01)'n,Faxa_swndr = ',n,a2x%rAttr(kswndr,n)
-          write(logunit,F01)'n,Faxa_swndf = ',n,a2x%rAttr(kswndf,n)
-          write(logunit,F01)'n,Faxa_swvdr = ',n,a2x%rAttr(kswvdr,n)
-          write(logunit,F01)'n,Faxa_swvdf = ',n,a2x%rAttr(kswvdf,n)
-          write(logunit,F01)'n,Faxa_swnet = ',n,a2x%rAttr(kswnet,n)
+          write(logunit,F01)'export: ymd,tod,n,Sa_z       = ',currentYMD, currentTOD, n,a2x%rAttr(kz,n)
+          write(logunit,F01)'export: ymd,tod,n,Sa_topo    = ',currentYMD, currentTOD, n,a2x%rAttr(ktopo,n)
+          write(logunit,F01)'export: ymd,tod,n,Sa_u       = ',currentYMD, currentTOD, n,a2x%rAttr(ku,n)
+          write(logunit,F01)'export: ymd,tod,n,Sa_v       = ',currentYMD, currentTOD, n,a2x%rAttr(kv,n)
+          write(logunit,F01)'export: ymd,tod,n,Sa_tbot    = ',currentYMD, currentTOD, n,a2x%rAttr(ktbot,n)
+          write(logunit,F01)'export: ymd,tod,n,Sa_ptem    = ',currentYMD, currentTOD, n,a2x%rAttr(kptem,n)
+          write(logunit,F01)'export: ymd,tod,n,Sa_shum    = ',currentYMD, currentTOD, n,a2x%rAttr(kshum,n)
+          write(logunit,F01)'export: ymd,tod,n,Sa_dens    = ',currentYMD, currentTOD, n,a2x%rAttr(kdens,n)
+          write(logunit,F01)'export: ymd,tod,n,Sa_pbot    = ',currentYMD, currentTOD, n,a2x%rAttr(kpbot,n)
+          write(logunit,F01)'export: ymd,tod,n,Sa_pslv    = ',currentYMD, currentTOD, n,a2x%rAttr(kpslv,n)
+          write(logunit,F01)'export: ymd,tod,n,Sa_lwdn    = ',currentYMD, currentTOD, n,a2x%rAttr(klwdn,n)
+          write(logunit,F01)'export: ymd,tod,n,Faxa_rainc = ',currentYMD, currentTOD, n,a2x%rAttr(krc,n)
+          write(logunit,F01)'export: ymd,tod,n,Faxa_rainl = ',currentYMD, currentTOD, n,a2x%rAttr(krl,n)
+          write(logunit,F01)'export: ymd,tod,n,Faxa_snowc = ',currentYMD, currentTOD, n,a2x%rAttr(ksc,n)
+          write(logunit,F01)'export: ymd,tod,n,Faxa_snowl = ',currentYMD, currentTOD, n,a2x%rAttr(ksl,n)
+          write(logunit,F01)'export: ymd,tod,n,Faxa_swndr = ',currentYMD, currentTOD, n,a2x%rAttr(kswndr,n)
+          write(logunit,F01)'export: ymd,tod,n,Faxa_swndf = ',currentYMD, currentTOD, n,a2x%rAttr(kswndf,n)
+          write(logunit,F01)'export: ymd,tod,n,Faxa_swvdr = ',currentYMD, currentTOD, n,a2x%rAttr(kswvdr,n)
+          write(logunit,F01)'export: ymd,tod,n,Faxa_swvdf = ',currentYMD, currentTOD, n,a2x%rAttr(kswvdf,n)
+          write(logunit,F01)'export: ymd,tod,n,Faxa_swnet = ',currentYMD, currentTOD, n,a2x%rAttr(kswnet,n)
        end do
     end if
 

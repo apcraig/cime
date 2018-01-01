@@ -10,6 +10,7 @@ module dwav_comp_nuopc
 
   use seq_flds_mod
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
+  use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
 
   use shr_nuopc_fldList_mod
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint

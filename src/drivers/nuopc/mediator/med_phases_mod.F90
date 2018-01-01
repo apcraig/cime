@@ -8,7 +8,8 @@ module med_phases_mod
 
   use ESMF
   use NUOPC
-  use shr_kind_mod          , only : CL=>shr_kind_cl
+  use shr_kind_mod          , only : CL=>SHR_KIND_CL, CS=>SHR_KIND_CS
+  use shr_sys_mod           , only : shr_sys_abort
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_init
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_reset
@@ -1649,8 +1650,14 @@ module med_phases_mod
     integer, intent(out) :: rc
 
     ! local variables
-    type(InternalState)        :: is_local
-    real(ESMF_KIND_R8)         :: nextsw_cday  ! calendar day of next atm shortwave
+    type(InternalState) :: is_local
+    type(ESMF_Clock)    :: clock
+    type(ESMF_Time)     :: currTime
+    character(CL)       :: cvalue
+    character(CS)       :: starttype     ! config start type
+    character(CL)       :: runtype       ! initial, continue, hybrid, branch
+    real(ESMF_KIND_R8)  :: nextsw_cday  ! calendar day of next atm shortwave
+    logical             :: first_time = .true.
     character(len=*),parameter :: subname='(med_phases_atmocn_ocnalb)'
     !---------------------------------------
 
@@ -1664,11 +1671,49 @@ module med_phases_mod
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    ! Determine nextsw_cday - note that shr_nuopc_methods_State_GetScalar includes a broadcast
-    ! to all other pets im mpicom
-    call shr_nuopc_methods_State_GetScalar(is_local%wrap%NstateImp(compatm), &
-        scalar_id=seq_flds_scalar_index_nextsw_cday, value=nextsw_cday, mpicom=is_local%wrap%mpicom, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    ! Note that in the mct version the atm was initialized first so that nextsw_cday could be passed to the other
+    ! components - this assumed that atmosphere component was ALWAYS initialized first.
+    ! In the nuopc version it will be easier to assume that on startup - nextsw_cday is just what cam was setting
+    ! it as the current calendar day
+    ! TODO: need to determine how to handle restart and branch runs - for now will just assume that nextsw_cday
+    ! is not computed on initialization and is read from the restart file.
+
+    if (first_time) then
+
+       call NUOPC_CompAttributeGet(gcomp, name='start_type', value=cvalue, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+       read(cvalue,*) starttype
+
+       if (trim(starttype) == trim('startup')) then
+          runtype = "initial"
+       else if (trim(starttype) == trim('continue') ) then
+          runtype = "continue"
+       else if (trim(starttype) == trim('branch')) then
+          runtype = "continue"
+       else
+          call shr_sys_abort( subname//' ERROR: unknown starttype' )
+       end if
+
+       if (trim(runtype) /= 'initial') then
+          nextsw_cday = -1.0_ESMF_KIND_R8
+       else
+          call ESMF_GridCompGet(gcomp, clock=clock)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+          call ESMF_ClockGet( clock, currTime=currTime, rc=rc )
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+          call ESMF_TimeGet( currTime, dayOfYear_r8=nextsw_cday, rc=rc )
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+       end if
+       first_time = .false.
+
+    else
+
+       ! Note that shr_nuopc_methods_State_GetScalar includes a broadcast to all other pets im mpicom
+       call shr_nuopc_methods_State_GetScalar(is_local%wrap%NstateImp(compatm), &
+            scalar_id=seq_flds_scalar_index_nextsw_cday, value=nextsw_cday, mpicom=is_local%wrap%mpicom, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    end if
 
     ! Calculate ocean albedoes
     call med_atmocn_ocnalb(gcomp, FBfrac_o=is_local%wrap%FBfrac(compocn), nextsw_cday=nextsw_cday, rc=rc)

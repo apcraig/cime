@@ -1720,6 +1720,9 @@ subroutine cime_init()
    !TODO NUOPC: setting areafract_samegrid to samegrid_alo - not sure why it is not set this way by default
    areafact_samegrid = samegrid_alo
 
+   !TODO NUOPC: for now removing all area factor corrections by always setting the following to true
+   areafact_samegrid = .true.
+
    call t_startf ('CPL:init_areacor')
    call t_adj_detailf(+2)
 

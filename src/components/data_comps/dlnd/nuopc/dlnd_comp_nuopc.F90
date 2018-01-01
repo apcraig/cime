@@ -74,6 +74,7 @@ module dlnd_comp_nuopc
   integer(IN),parameter      :: master_task=0             ! task number of master task
   logical                    :: lnd_prognostic            ! flag
   logical                    :: unpack_import
+    logical                  :: read_restart              ! start from restart
   integer                    :: dbrc
   integer, parameter         :: dbug = 10
   character(len=*),parameter :: grid_option = "mesh"      ! grid_de, grid_arb, grid_reg, mesh
@@ -299,7 +300,6 @@ module dlnd_comp_nuopc
     character(CL)            :: cvalue
     integer(IN)              :: shrlogunit                ! original log unit
     integer(IN)              :: shrloglev                 ! original log level
-    logical                  :: read_restart              ! start from restart
     integer(IN)              :: ierr                      ! error code
     logical                  :: scmMode = .false.         ! single column mode
     real(R8)                 :: scmLat  = shr_const_SPVAL ! single column lat

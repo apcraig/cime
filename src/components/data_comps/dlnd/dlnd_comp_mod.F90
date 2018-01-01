@@ -135,7 +135,6 @@ CONTAINS
     integer(IN)        :: currentYMD ! model date
     integer(IN)        :: currentTOD ! model sec into model date
     logical            :: write_restart
-    character(len=18) :: date_str
 
     !--- formats ---
     character(*), parameter :: F00   = "('(dlnd_comp_init) ',8a)"
@@ -363,6 +362,7 @@ CONTAINS
     real(R8)      :: dt                    ! timestep
     integer(IN)   :: nu                    ! unit number
     integer(IN)   :: lsize                 ! local size
+    character(len=18) :: date_str
 
     character(*), parameter :: F00   = "('(dlnd_comp_run) ',8a)"
     character(*), parameter :: F04   = "('(dlnd_comp_run) ',2a,2i8,'s')"

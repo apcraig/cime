@@ -8,6 +8,7 @@ module lnd_comp_mct
   use seq_cdata_mod   , only: seq_cdata, seq_cdata_setptrs
   use seq_infodata_mod, only: seq_infodata_type, seq_infodata_putdata, seq_infodata_getdata
   use seq_comm_mct    , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
+  use seq_timemgr_mod , only: seq_timemgr_RestartAlarmIsOn, seq_timemgr_EClockGetData
   use shr_kind_mod    , only: IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_strdata_mod , only: shr_strdata_type
   use shr_file_mod    , only: shr_file_getunit, shr_file_getlogunit, shr_file_getloglevel
