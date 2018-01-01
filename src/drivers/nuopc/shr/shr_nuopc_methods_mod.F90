@@ -199,8 +199,14 @@ module shr_nuopc_methods_mod
        bilnrfn, consffn, consdfn, patchfn, fcopyfn, spvalfn, mastertask, rc)
 
     ! ----------------------------------------------
-    ! Initialize Route Handles
+    ! Initialize Route Handles according to the following precedence rules:
+    !  (1) check fldlist mapping types - if there are no fldlists, then generate all RHs
+    !  (2) if a map filename is passed, generate that RH
+    !  (3) if fldlist field name mapping attribute matches, generate that RH
+    !  (4) if the map filename is spvalfn, do NOT generate that RH
+    !  (5) if the mapping rh is not passed, do NOT generate that RH
     ! ----------------------------------------------
+
     type(ESMF_FieldBundle)                 :: FBsrc
     type(ESMF_FieldBundle)                 :: FBdst
     type(ESMF_Routehandle)       ,optional :: bilnrmap
@@ -274,15 +280,10 @@ module shr_nuopc_methods_mod
     endif
 
     !---------------------------------------------------
-    !--- decide which map files to generate.
-    !--- check fldlist mapping types.
-    !--- if there are no fldlists, then generate them all RHs
-    !--- if a map filename is passed, generate that RH
-    !--- if fldlist field name mapping attribute matches, generate that RH
-    !--- if the mapping rh is not passed, do NOT generate that RH
-    !--- if the map filename is spvalfn, do NOT generate that RH
+    !--- decide which map files to generate (see above precedence rules)
     !---------------------------------------------------
 
+    ! (1) check fldlist mapping types - if there are no fldlists, then generate all RHs
     if (.not.present(fldlist1) .and. .not.present(fldlist2) .and. &
         .not.present(fldlist3) .and. .not.present(fldlist4)) then
       do_bilnr = .true.
@@ -298,12 +299,16 @@ module shr_nuopc_methods_mod
       do_fcopy = .false.
     endif
 
+    ! (2) if a map filename is passed, generate that RH
     if (present(bilnrfn)) do_bilnr = .true.
     if (present(consffn)) do_consf = .true.
     if (present(consdfn)) do_consd = .true.
     if (present(patchfn)) do_patch = .true.
     if (present(fcopyfn)) do_fcopy = .true.
 
+
+    ! (3) if fldlist field name mapping attribute matches, generate that RH
+    ! TODO: do we need four fldlist options? It seems that only one is needed.
     if (present(fldlist1)) then
       do n = 1,fldlist1%num
         if (fldlist1%mapping(n) == 'bilinear'    ) do_bilnr = .true.
@@ -311,10 +316,8 @@ module shr_nuopc_methods_mod
 	if (fldlist1%mapping(n) == "conservedst" ) do_consd = .true.
         if (fldlist1%mapping(n) == 'patch'       ) do_patch = .true.
         if (fldlist1%mapping(n) == 'copy'        ) do_fcopy = .true.
-        write(6,*)'DEBUG: n,name,mapping = ',n,fldlist1%shortname(n),fldlist1%mapping(n)
       enddo
     endif
-
     if (present(fldlist2)) then
       do n = 1,fldlist2%num
         if (fldlist2%mapping(n) == 'bilinear'    ) do_bilnr = .true.
@@ -324,7 +327,6 @@ module shr_nuopc_methods_mod
         if (fldlist2%mapping(n) == 'copy'        ) do_fcopy = .true.
       enddo
     endif
-
     if (present(fldlist3)) then
       do n = 1,fldlist3%num
         if (fldlist3%mapping(n) == 'bilinear'    ) do_bilnr = .true.
@@ -334,7 +336,6 @@ module shr_nuopc_methods_mod
         if (fldlist3%mapping(n) == 'copy'        ) do_fcopy = .true.
       enddo
     endif
-
     if (present(fldlist4)) then
       do n = 1,fldlist4%num
         if (fldlist4%mapping(n) == 'bilinear'    ) do_bilnr = .true.
@@ -345,12 +346,7 @@ module shr_nuopc_methods_mod
       enddo
     endif
 
-    write(6,*)'DEBUG1: do_patch = ',do_patch
-    write(6,*)'DEBUG1: bilnrfn = ',trim(bilnrfn)
-    write(6,*)'DEBUG1: consffn = ',trim(consffn)
-    write(6,*)'DEBUG1: consdfn = ',trim(consdfn)
-    write(6,*)'DEBUG1: patchfn = ',trim(patchfn)
-
+    ! (4) If the map filename is spvalfn, do NOT generate that RH
     if (present(spvalfn)) then
       if (present(bilnrfn)) then
         if (trim(bilnrfn) == trim(spvalfn)) do_bilnr = .false.
@@ -369,13 +365,12 @@ module shr_nuopc_methods_mod
       endif
     endif
 
+    ! (5) If the mapping rh is not passed, do NOT generate that RH
     if (.not.present(bilnrmap)) do_bilnr = .false.
     if (.not.present(consfmap)) do_consf = .false.
     if (.not.present(consdmap)) do_consd = .false.
     if (.not.present(patchmap)) do_patch = .false.
     if (.not.present(fcopymap)) do_fcopy = .false.
-
-    write(6,*)'DEBUG2: do_patch = ',do_patch
 
     !---------------------------------------------------
     !--- get single fields from bundles
@@ -389,57 +384,63 @@ module shr_nuopc_methods_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !---------------------------------------------------
-    !--- bilinear
+    !--- generate bilinear route handle
     !---------------------------------------------------
 
     if (do_bilnr) then
-      if (present(bilnrfn)) then
-        if (trim(bilnrfn) == "idmap") then
-          if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH bilnr redist idmap'
-          call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=bilnrmap, &
-            ignoreUnmatchedIndices = .true., rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        else
-          if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH bilnr regrid '
-          if (lmastertask) write(llogunit,'(3A)') subname,'   ',trim(bilnrfn)
-          call ESMF_FieldSMMStore(fldsrc, flddst, bilnrfn, routehandle=bilnrmap, &
-            ignoreUnmatchedIndices=.true., &
-            srcTermProcessing=srcTermProcessing_Value, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        endif
-      else
-        if(debug_mesh) then
-          call ESMF_FieldGet(fldsrc, mesh=srcmesh, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_MeshWrite(srcmesh, "med_srcmesh", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_FieldGet(flddst, mesh=dstmesh, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_MeshWrite(dstmesh, "med_dstmesh", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        endif
+       if (present(bilnrfn)) then
+          ! Read in RH
+          if (trim(bilnrfn) == "idmap") then
+             ! RH is redistribution
+             if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH bilnr redist idmap'
+             call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=bilnrmap, &
+                  ignoreUnmatchedIndices = .true., rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          else
+             ! RH is bilinear regrid
+             if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH bilnr regrid '
+             if (lmastertask) write(llogunit,'(3A)') subname,'   ',trim(bilnrfn)
+             call ESMF_FieldSMMStore(fldsrc, flddst, bilnrfn, routehandle=bilnrmap, &
+                  ignoreUnmatchedIndices=.true., &
+                  srcTermProcessing=srcTermProcessing_Value, rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          endif
+       else
+          ! Compute RH
+          ! TODO: if grids are the same and compute mapping on the fly - the need to determine if want
+          ! redist rather than bilinear
+          if(debug_mesh) then
+             call ESMF_FieldGet(fldsrc, mesh=srcmesh, rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+             call ESMF_MeshWrite(srcmesh, "med_srcmesh", rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+             call ESMF_FieldGet(flddst, mesh=dstmesh, rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+             call ESMF_MeshWrite(dstmesh, "med_dstmesh", rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          endif
 
-        if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH bilnr regrid computed on the fly'
-        call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=bilnrmap, &
-          srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
-          regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
-          polemethod=polemethod, &
-          srcTermProcessing=srcTermProcessing_Value, &
-          factorList=factorList, ignoreDegenerate=.true., &
-          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        if (rhprint_flag) then
-          call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_bilnr.nc", rc)
+          if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH bilnr regrid computed on the fly'
+          call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=bilnrmap, &
+               srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
+               regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+               polemethod=polemethod, &
+               srcTermProcessing=srcTermProcessing_Value, &
+               factorList=factorList, ignoreDegenerate=.true., &
+               unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call ESMF_RouteHandlePrint(bilnrmap, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        endif
-      endif
-      if (ESMF_RouteHandleIsCreated(bilnrmap, rc=rc)) then
-        call ESMF_LogWrite(trim(subname)//trim(lstring)//": computed RH bilnr", ESMF_LOGMSG_INFO, rc=dbrc)
-      else
-        call ESMF_LogWrite(trim(subname)//trim(lstring)//": failed   RH bilnr", ESMF_LOGMSG_INFO, rc=dbrc)
-      endif
+          if (rhprint_flag) then
+             call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_bilnr.nc", rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+             call ESMF_RouteHandlePrint(bilnrmap, rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          endif
+       endif
+       if (ESMF_RouteHandleIsCreated(bilnrmap, rc=rc)) then
+          call ESMF_LogWrite(trim(subname)//trim(lstring)//": computed RH bilnr", ESMF_LOGMSG_INFO, rc=dbrc)
+       else
+          call ESMF_LogWrite(trim(subname)//trim(lstring)//": failed   RH bilnr", ESMF_LOGMSG_INFO, rc=dbrc)
+       endif
     endif
 
     !---------------------------------------------------
@@ -645,19 +646,22 @@ module shr_nuopc_methods_mod
     !---------------------------------
 
     if (present(fieldNameList) .and. present(FBflds) .and. present(STflds)) then
-      call ESMF_LogWrite(trim(subname)//": ERROR only fieldNameList, FBflds, or STflds can be an argument", ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(trim(subname)//": ERROR only fieldNameList, FBflds, or STflds can be an argument", &
+            ESMF_LOGMSG_INFO, rc=rc)
       rc = ESMF_FAILURE
       return
     endif
 
     if (present(FBgeom) .and. present(STgeom)) then
-      call ESMF_LogWrite(trim(subname)//": ERROR FBgeom and STgeom cannot both be arguments", ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(trim(subname)//": ERROR FBgeom and STgeom cannot both be arguments", &
+            ESMF_LOGMSG_INFO, rc=rc)
       rc = ESMF_FAILURE
       return
     endif
 
     if (.not.present(FBgeom) .and. .not.present(STgeom)) then
-      call ESMF_LogWrite(trim(subname)//": ERROR FBgeom or STgeom must be an argument", ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(trim(subname)//": ERROR FBgeom or STgeom must be an argument", &
+            ESMF_LOGMSG_INFO, rc=rc)
       rc = ESMF_FAILURE
       return
     endif

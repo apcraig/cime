@@ -151,15 +151,14 @@ module med_phases_mod
     !---------------------------------------
 
     !tcraig, turn this off for ice2atm, use ice frac weighted mapping below
+    ! TODO: compice should be included in the map if the atm and ice grid are identical -
+    ! it should behave just like the land mapping - since all you are doing is redistributing
 
     n2 = compatm
     do n1 = 1,ncomps
-!#if (1 == 0)
-       !TODO: this is a hack
-       !if (n1/=compice .and. is_local%wrap%med_coupling_active(n1,n2)) then
-       !  compice should be included in the map if the atm and ice grid are identical -
-       !  it should behave just like the land mapping - since all you are doing is redistributing
-!#endif
+#if (1 == 0)
+       if (n1/=compice .and. is_local%wrap%med_coupling_active(n1,n2)) then
+#endif
        if (is_local%wrap%med_coupling_active(n1,n2)) then
           call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -211,9 +210,12 @@ module med_phases_mod
     !--- map ice to atm with frac weighting
     !---------------------------------------
 
-#if (1==0)
     !TODO: temporarily are not using this to verify bfb with F compset and everyone on the same grid
+    ! If the following mapping is applied when atm and ice are on the same grid - the results are wrong!
+    ! This can be verified by simply using using the mapping to create import fields on the atm grid above -
+    ! even for ice - so for now are not using this until it can be fixed
 
+#if (1 == 0)
     if (is_local%wrap%med_coupling_active(compice,compatm)) then
       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
