@@ -924,8 +924,9 @@
     </model_grid>
 
     <!-- The following grid is only used for ADWAV testing -->
-    <model_grid alias="ww3a" compset="_WW3|DWAV">
+    <model_grid alias="ww3a" compset="_WW3|_DWAV">
       <grid name="wav">ww3a</grid>
+      <mask>ww3a</mask>
     </model_grid>
 
   </grids>

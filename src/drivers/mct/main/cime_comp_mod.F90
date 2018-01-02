@@ -1462,6 +1462,10 @@ subroutine cime_init()
    ocnrun_count = 0
    cpl2ocn_first = .true.
 
+   ! TODO NUOPC: - This is not the case for nuopc - hard-coding it to false here -
+   ! not sure how to handle this in the nuopc case
+   skip_ocean_run = .false.
+
    do_histavg = .true.
    if (seq_timemgr_histavg_type == seq_timemgr_type_never) then
       do_histavg = .false.
@@ -1713,6 +1717,12 @@ subroutine cime_init()
 #endif
    if (single_column) areafact_samegrid = .true.
 
+   !TODO NUOPC: setting areafract_samegrid to samegrid_alo - not sure why it is not set this way by default
+   areafact_samegrid = samegrid_alo
+
+   !TODO NUOPC: for now removing all area factor corrections by always setting the following to true
+   areafact_samegrid = .true.
+
    call t_startf ('CPL:init_areacor')
    call t_adj_detailf(+2)
 
@@ -1947,7 +1957,10 @@ subroutine cime_init()
    !  Data or dead atmosphere may just return on this phase.
    !----------------------------------------------------------
 
-   if (atm_present) then
+   !TODO NUOPC: should this not be an atm_prognostic flag - and have the datm have only 1 phase?
+   if (atm_prognostic) then
+  !if (atm_present) then
+
       call t_startf('comp_init_cc_atm2')
       call t_adj_detailf(+2)
 
@@ -2224,6 +2237,8 @@ end subroutine cime_init
                  orb_lambm0=orb_lambm0,orb_mvelpp=orb_mvelpp)
          endif
       endif
+
+      ! TODO NUOPC: how will nuopc handle a skip_ocean_run flag that should be true?
 
       ! override ocnrun_alarm and ocnnext_alarm for first ocn run
       ! skip_ocean_run is initialized above to true if it's a startup

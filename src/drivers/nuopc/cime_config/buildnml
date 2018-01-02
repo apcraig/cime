@@ -47,7 +47,13 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     config['timer_level'] = 'pos' if case.get_value('TIMER_LEVEL') >= 1 else 'neg'
     config['bfbflag'] = 'on' if case.get_value('BFBFLAG') else 'off'
     config['continue_run'] = '.true.' if case.get_value('CONTINUE_RUN') else '.false.'
+    config['COMP_ATM'] = case.get_value("COMP_ATM")
+    config['COMP_ICE'] = case.get_value("COMP_ICE")
+    config['COMP_GLC'] = case.get_value("COMP_GLC")
+    config['COMP_LND'] = case.get_value("COMP_LND")
     config['COMP_OCN'] = case.get_value("COMP_OCN")
+    config['COMP_ROF'] = case.get_value("COMP_ROF")
+    config['COMP_WAV'] = case.get_value("COMP_WAV")
 
     if case.get_value('RUN_TYPE') == 'startup':
         config['run_type'] = 'startup'
@@ -172,7 +178,7 @@ def _create_drv_namelists(case, infile, confdir, nmlgen, files):
     #--------------------------------
     namelist_file = os.path.join(confdir, "drv_in")
     drv_namelist_groups = ["ccsm_pes", "papi_inparm", "pio_default_inparm", "prof_inparm",
-                           "seq_cplflds_inparm", "seq_cplflds_userspec", "seq_timemgr_inparm"]
+                           "seq_cplflds_inparm", "seq_cplflds_userspec"]
     nmlgen.write_output_file(namelist_file, data_list_path=data_list_path, groups=drv_namelist_groups)
 
     #--------------------------------

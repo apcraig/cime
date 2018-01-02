@@ -807,9 +807,12 @@ contains
 
        call seq_infodata_GetData(infodata,nextsw_cday=nextsw_cday,orb_eccen=eccen, &
           orb_mvelpp=mvelpp, orb_lambm0=lambm0, orb_obliqr=obliqr)
+
        if (nextsw_cday >= -0.5_r8) then
+
           calday = nextsw_cday
           call shr_orb_decl(calday, eccen, mvelpp,lambm0, obliqr, delta, eccf)
+
           ! Compute albedos
           do n=1,nloc_o
              rlat = const_deg2rad * lats(n)

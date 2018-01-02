@@ -40,6 +40,143 @@
           that have only a small number of allowed values.
   -->
 
+  <!-- =========================== -->
+  <!--  NUOPC driver run sequence  -->
+  <!-- =========================== -->
+
+  <entry id="runSeq">
+    <type>char</type>
+    <category>nuopc_attribute</category>
+    <group>nuopc_runseq</group>
+    <values>
+      <value>
+      @ocn_cpl_dt   #ocean coupling step
+	  MED med_phases_prep_ocn
+	  MED med_connectors_prep_med2ocn
+	  MED -> OCN :remapMethod=redist
+	  OCN
+	  @atm_cpl_dt   # atmosphere coupling step
+            MED med_phases_prep_ice
+            MED med_connectors_prep_med2ice
+            MED -> ICE :remapMethod=redist
+            MED med_phases_prep_wav
+            MED med_connectors_prep_med2wav
+            MED -> WAV :remapMethod=redist
+            MED med_phases_prep_lnd
+            MED med_connectors_prep_med2lnd
+            MED -> LND :remapMethod=redist
+            MED med_phases_prep_glc
+            MED med_connectors_prep_med2glc
+            MED -> GLC :remapMethod=redist
+            MED med_phases_prep_rof
+            MED med_connectors_prep_med2rof
+            MED -> ROF :remapMethod=redist
+            ICE
+            LND
+            ROF
+	    WAV
+            ROF -> MED :remapMethod=redist
+            MED med_connectors_post_rof2med
+            LND -> MED :remapMethod=redist
+            MED med_connectors_post_lnd2med
+            ICE -> MED :remapMethod=redist
+            MED med_connectors_post_ice2med
+            MED med_fraction_set
+	    MED med_phases_atmocn_flux
+	    MED med_phases_atmocn_ocnalb
+            MED med_phases_prep_atm
+            MED med_connectors_prep_med2atm
+            MED -> ATM :remapMethod=redist
+            ATM
+	    GLC
+            WAV -> MED :remapMethod=redist
+            MED med_connectors_post_wav2med
+            GLC -> MED :remapMethod=redist
+            MED med_connectors_post_glc2med
+            ATM -> MED :remapMethod=redist
+            MED med_connectors_post_atm2med
+            MED med_phases_accum_fast
+	  @
+  	  OCN -> MED :remapMethod=redist
+	  MED med_connectors_post_ocn2med
+      @
+      </value>
+      <value COMP_OCN="socn">
+  	  @atm_cpl_dt
+            MED med_phases_prep_ice
+            MED med_connectors_prep_med2ice
+            MED -> ICE :remapMethod=redist
+            MED med_phases_prep_wav
+            MED med_connectors_prep_med2wav
+            MED -> WAV :remapMethod=redist
+            MED med_phases_prep_lnd
+            MED med_connectors_prep_med2lnd
+            MED -> LND :remapMethod=redist
+            MED med_phases_prep_glc
+            MED med_connectors_prep_med2glc
+            MED -> GLC :remapMethod=redist
+            MED med_phases_prep_rof
+            MED med_connectors_prep_med2rof
+            MED -> ROF :remapMethod=redist
+            ICE
+            LND
+            ROF
+	    WAV
+            ROF -> MED :remapMethod=redist
+            MED med_connectors_post_rof2med
+            LND -> MED :remapMethod=redist
+            MED med_connectors_post_lnd2med
+            ICE -> MED :remapMethod=redist
+            MED med_connectors_post_ice2med
+            MED med_fraction_set
+            MED med_phases_prep_atm
+            MED med_connectors_prep_med2atm
+            MED -> ATM :remapMethod=redist
+            ATM
+	    GLC
+            WAV -> MED :remapMethod=redist
+            MED med_connectors_post_wav2med
+            GLC -> MED :remapMethod=redist
+            MED med_connectors_post_glc2med
+            ATM -> MED :remapMethod=redist
+            MED med_connectors_post_atm2med
+	  @
+      </value>
+      <value COMP_ATM="cam" COMP_OCN="docn" COMP_WAV="swav">
+  	  @atm_cpl_dt
+            MED med_phases_accum_fast
+	    MED med_phases_prep_ocn
+            MED med_connectors_prep_med2ocn
+	    MED -> OCN :remapMethod=redist
+	    MED med_phases_prep_lnd
+            MED med_connectors_prep_med2lnd
+	    MED -> LND :remapMethod=redist
+	    MED med_phases_prep_ice
+            MED med_connectors_prep_med2ice
+            MED -> ICE :remapMethod=redist
+	    ICE
+	    LND
+	    OCN
+  	    OCN -> MED :remapMethod=redist
+	    MED med_connectors_post_ocn2med
+            ICE -> MED :remapMethod=redist
+            MED med_connectors_post_ice2med
+	    MED med_fraction_set
+	    MED med_phases_atmocn_flux
+	    MED med_phases_atmocn_ocnalb
+  	    LND -> MED :remapMethod=redist
+	    MED med_connectors_post_lnd2med
+	    MED med_phases_prep_atm
+            MED med_connectors_prep_med2atm
+	    MED -> ATM :remapMethod=redist
+	    ATM
+	    ATM -> MED :remapMethod=redist
+	    MED med_connectors_post_atm2med
+	  @
+      </value>
+    </values>
+  </entry>
+
   <!-- ======================================== -->
   <!--  general nuopc variables and attributes  -->
   <!-- ======================================== -->
@@ -87,7 +224,7 @@
     <category>nuopc</category>
     <group>MED_attributes</group>
     <values>
-      <value>0</value>
+      <value>1</value>
     </values>
   </entry>
 
@@ -217,109 +354,6 @@
     </values>
   </entry>
 
-  <!-- =========================== -->
-  <!--  NUOPC driver run sequence  -->
-  <!-- =========================== -->
-
-  <entry id="runSeq">
-    <type>char</type>
-    <category>nuopc_attribute</category>
-    <group>nuopc_runseq</group>
-    <values>
-      <value>
-      @ocn_cpl_dt   #ocean coupling step
-	  MED med_phases_prep_ocn
-	  MED med_connectors_prep_med2ocn
-	  MED -> OCN :remapMethod=redist
-	  OCN
-	  @atm_cpl_dt   # atmosphere coupling step
-            MED med_phases_prep_ice
-            MED med_connectors_prep_med2ice
-            MED -> ICE :remapMethod=redist
-            MED med_phases_prep_wav
-            MED med_connectors_prep_med2wav
-            MED -> WAV :remapMethod=redist
-            MED med_phases_prep_lnd
-            MED med_connectors_prep_med2lnd
-            MED -> LND :remapMethod=redist
-            MED med_phases_prep_glc
-            MED med_connectors_prep_med2glc
-            MED -> GLC :remapMethod=redist
-            MED med_phases_prep_rof
-            MED med_connectors_prep_med2rof
-            MED -> ROF :remapMethod=redist
-            ICE
-            LND
-            ROF
-	    WAV
-            ROF -> MED :remapMethod=redist
-            MED med_connectors_post_rof2med
-            LND -> MED :remapMethod=redist
-            MED med_connectors_post_lnd2med
-            ICE -> MED :remapMethod=redist
-            MED med_connectors_post_ice2med
-            MED med_fraction_set
-            MED med_phases_prep_atm
-            MED med_connectors_prep_med2atm
-            MED -> ATM :remapMethod=redist
-            ATM
-	    GLC
-            WAV -> MED :remapMethod=redist
-            MED med_connectors_post_wav2med
-            GLC -> MED :remapMethod=redist
-            MED med_connectors_post_glc2med
-            ATM -> MED :remapMethod=redist
-            MED med_connectors_post_atm2med
-            MED med_phases_accum_fast
-	  @
-  	  OCN -> MED :remapMethod=redist
-	  MED med_connectors_post_ocn2med
-      @
-      </value>
-      <value COMP_OCN="socn">
-  	  @atm_cpl_dt   # atmosphere coupling step
-            MED med_phases_prep_ice
-            MED med_connectors_prep_med2ice
-            MED -> ICE :remapMethod=redist
-            MED med_phases_prep_wav
-            MED med_connectors_prep_med2wav
-            MED -> WAV :remapMethod=redist
-            MED med_phases_prep_lnd
-            MED med_connectors_prep_med2lnd
-            MED -> LND :remapMethod=redist
-            MED med_phases_prep_glc
-            MED med_connectors_prep_med2glc
-            MED -> GLC :remapMethod=redist
-            MED med_phases_prep_rof
-            MED med_connectors_prep_med2rof
-            MED -> ROF :remapMethod=redist
-            ICE
-            LND
-            ROF
-	    WAV
-            ROF -> MED :remapMethod=redist
-            MED med_connectors_post_rof2med
-            LND -> MED :remapMethod=redist
-            MED med_connectors_post_lnd2med
-            ICE -> MED :remapMethod=redist
-            MED med_connectors_post_ice2med
-            MED med_fraction_set
-            MED med_phases_prep_atm
-            MED med_connectors_prep_med2atm
-            MED -> ATM :remapMethod=redist
-            ATM
-	    GLC
-            WAV -> MED :remapMethod=redist
-            MED med_connectors_post_wav2med
-            GLC -> MED :remapMethod=redist
-            MED med_connectors_post_glc2med
-            ATM -> MED :remapMethod=redist
-            MED med_connectors_post_atm2med
-	  @
-      </value>
-    </values>
-  </entry>
-
   <!-- =========================================== -->
   <!-- driver info attributes                      -->
   <!-- (in mct driver this is seq_infodata_inparm) -->
@@ -333,7 +367,6 @@
     <desc>cime model</desc>
     <values>
       <value cime_model='cesm'>cesm</value>
-      <value cime_model='acme'>acme</value>
     </values>
   </entry>
 
@@ -852,18 +885,6 @@
     </desc>
     <values>
       <value>$WAV_GRID</value>
-    </values>
-  </entry>
-
-  <entry id="shr_map_dopole">
-    <type>logical</type>
-    <category>mapping</category>
-    <group>DRIVER_info_attributes</group>
-    <desc>
-      invoke pole averaging corrections in shr_map_mod weights generation (default: true)
-    </desc>
-    <values>
-      <value>.true.</value>
     </values>
   </entry>
 
@@ -1635,28 +1656,9 @@
     <category>mapping</category>
     <input_pathname>abs</input_pathname>
     <group>DRIVER_maps_attributes</group>
-    <desc>
-      atm to ocn flux mapping file for fluxes
-    </desc>
+    <desc>atm to ocn flux mapping file for fluxes</desc>
     <values>
       <value>$ATM2OCN_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="atm2ocn_fmaptype"    modify_via_xml="ATM2OCN_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1673,23 +1675,6 @@
     </values>
   </entry>
 
-  <entry id="atm2ocn_smaptype"    modify_via_xml="ATM2OCN_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="atm2ocn_vmapname"    modify_via_xml="ATM2OCN_VMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -1700,23 +1685,6 @@
     </desc>
     <values>
       <value>$ATM2OCN_VMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="atm2ocn_vmaptype"    modify_via_xml="ATM2OCN_VMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_VMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1733,23 +1701,6 @@
     </values>
   </entry>
 
-  <entry id="ocn2atm_fmaptype"    modify_via_xml="OCN2ATM_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$OCN2ATM_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="ocn2atm_smapname"    modify_via_xml="OCN2ATM_SMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -1760,23 +1711,6 @@
     </desc>
     <values>
       <value>$OCN2ATM_SMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="ocn2atm_smaptype"    modify_via_xml="OCN2ATM_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$OCN2ATM_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1793,23 +1727,6 @@
     </values>
   </entry>
 
-  <entry id="atm2ice_fmaptype"    modify_via_xml="ATM2ICE_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="atm2ice_smapname"    modify_via_xml="ATM2ICE_SMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -1820,23 +1737,6 @@
     </desc>
     <values>
       <value>$ATM2OCN_SMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="atm2ice_smaptype"    modify_via_xml="ATM2OCN_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1853,23 +1753,6 @@
     </values>
   </entry>
 
-  <entry id="atm2ice_vmaptype"    modify_via_xml="ATM2OCN_VMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2OCN_VMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="ice2atm_fmapname"    modify_via_xml="ICE2ATM_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -1880,23 +1763,6 @@
     </desc>
     <values>
       <value>$OCN2ATM_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="ice2atm_fmaptype"    modify_via_xml="OCN2ATM_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$OCN2ATM_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1913,23 +1779,6 @@
     </values>
   </entry>
 
-  <entry id="ice2atm_smaptype"    modify_via_xml="ICE2ATM_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$OCN2ATM_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="atm2lnd_fmapname"    modify_via_xml="ATM2LND_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -1940,23 +1789,6 @@
     </desc>
     <values>
       <value>$ATM2LND_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="atm2lnd_fmaptype"    modify_via_xml="ATM2LND_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2LND_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -1973,23 +1805,6 @@
     </values>
   </entry>
 
-  <entry id="atm2lnd_smaptype"    modify_via_xml="ATM2LND_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2LND_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="lnd2atm_fmapname"    modify_via_xml="LND2ATM_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2000,23 +1815,6 @@
     </desc>
     <values>
       <value>$LND2ATM_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="lnd2atm_fmaptype"    modify_via_xml="LND2ATM_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$LND2ATM_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2033,23 +1831,6 @@
     </values>
   </entry>
 
-  <entry id="lnd2atm_smaptype"   modify_via_xml="LND2ATM_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$LND2ATM_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="lnd2rof_fmapname"    modify_via_xml="LND2ROF_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2060,23 +1841,6 @@
     </desc>
     <values>
       <value>$LND2ROF_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="lnd2rof_fmaptype"    modify_via_xml="LND2ROF_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$LND2ROF_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2093,23 +1857,6 @@
     </values>
   </entry>
 
-  <entry id="rof2lnd_fmaptype"    modify_via_xml="ROF2LND_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ROF2LND_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="rof2ocn_fmapname"    modify_via_xml="ROF2OCN_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2120,23 +1867,6 @@
     </desc>
     <values>
       <value>$ROF2OCN_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="rof2ocn_fmaptype"    modify_via_xml="ROF2OCN_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ROF2OCN_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2153,23 +1883,6 @@
     </values>
   </entry>
 
-  <entry id="glc2ocn_rmaptype"    modify_via_xml="GLC2OCN_RMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$GLC2OCN_RMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="glc2ice_rmapname"    modify_via_xml="GLC2ICE_RMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2180,23 +1893,6 @@
     </desc>
     <values>
       <value>$GLC2ICE_RMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="glc2ice_rmaptype"    modify_via_xml="GLC2ICE_RMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$GLC2ICE_RMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2213,23 +1909,6 @@
     </values>
   </entry>
 
-  <entry id="rof2ocn_liq_rmaptype"    modify_via_xml="ROF2OCN_LIQ_RMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ROF2OCN_LIQ_RMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="rof2ocn_ice_rmapname"    modify_via_xml="ROF2OCN_ICE_RMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2243,24 +1922,6 @@
     </values>
   </entry>
 
-  <entry id="rof2ocn_ice_rmaptype"    modify_via_xml="ROF2OCN_ICE_RMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ROF2OCN_ICE_RMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
-
   <entry id="lnd2glc_fmapname"    modify_via_xml="LND2GLC_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2271,23 +1932,6 @@
     </desc>
     <values>
       <value>$LND2GLC_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="lnd2glc_fmaptype"    modify_via_xml="LND2GLC_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$LND2GLC_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2304,23 +1948,6 @@
     </values>
   </entry>
 
-  <entry id="lnd2glc_smaptype"    modify_via_xml="LND2GLC_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$LND2GLC_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="glc2lnd_fmapname"    modify_via_xml="GLC2LND_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2331,23 +1958,6 @@
     </desc>
     <values>
       <value>$GLC2LND_FMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="glc2lnd_fmaptype"    modify_via_xml="GLC2LND_FMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$GLC2LND_FMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2364,23 +1974,6 @@
     </values>
   </entry>
 
-  <entry id="glc2lnd_smaptype"    modify_via_xml="GLC2LND_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$GLC2LND_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="atm2wav_smapname"    modify_via_xml="ATM2WAV_SMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2391,23 +1984,6 @@
     </desc>
     <values>
       <value>$ATM2WAV_SMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="atm2wav_smaptype"    modify_via_xml="ATM2WAV_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ATM2WAV_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2424,23 +2000,6 @@
     </values>
   </entry>
 
-  <entry id="ocn2wav_smaptype"    modify_via_xml="OCN2WAV_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$OCN2WAV_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
-
   <entry id="ice2wav_smapname"    modify_via_xml="ICE2WAV_SMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -2451,23 +2010,6 @@
     </desc>
     <values>
       <value>$ICE2WAV_SMAPNAME</value>
-    </values>
-  </entry>
-
-  <entry id="ice2wav_smaptype"    modify_via_xml="ICE2WAV_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$ICE2WAV_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
     </values>
   </entry>
 
@@ -2484,22 +2026,6 @@
     </values>
   </entry>
 
-  <entry id="wav2ocn_smaptype"    modify_via_xml="WAV2OCN_SMAPTYPE">
-    <type>char</type>
-    <category>mapping</category>
-    <group>DRIVER_maps_attributes</group>
-    <desc>
-      The type of mapping desired, either "source" or "destination" mapping.
-      X is associated with rearrangement of the source grid to the
-      destination grid and then local mapping.  Y is associated with mapping
-      on the source grid and then rearrangement and sum to the destination
-      grid.
-    </desc>
-    <values>
-      <value>$WAV2OCN_SMAPTYPE</value>
-      <value bfbflag="on">X</value>
-    </values>
-  </entry>
 
   <!-- ===========================     -->
   <!-- group DRIVER_auxhist_attributes -->
@@ -2751,7 +2277,7 @@
   <entry id="atm_cpl_dt" modify_via_xml="ATM_NCPL" skip_default_entry="true">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       atm coupling interval in seconds
       set via ATM_NCPL in env_run.xml.
@@ -2764,7 +2290,7 @@
   <entry id="lnd_cpl_dt" modify_via_xml="LND_NCPL" skip_default_entry="true">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       lnd coupling interval in seconds
       set via LND_NCPL in env_run.xml.
@@ -2777,7 +2303,7 @@
   <entry id="rof_cpl_dt" modify_via_xml="ROF_NCPL" skip_default_entry="true">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       river runoff coupling interval in seconds
       currently set by default to 10800 seconds.
@@ -2788,7 +2314,7 @@
   <entry id="ice_cpl_dt" modify_via_xml="ICE_NCPL" skip_default_entry="true">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       ice coupling interval in seconds
       set via ICE_NCPL in env_run.xml.
@@ -2801,7 +2327,7 @@
   <entry id="ocn_cpl_dt" modify_via_xml="OCN_NCPL" skip_default_entry="true">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       ocn coupling interval in seconds
       set via OCN_NCPL in env_run.xml.
@@ -2814,7 +2340,7 @@
   <entry id="glc_cpl_dt" modify_via_xml="GLC_NCPL" skip_default_entry="true">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       glc coupling interval in seconds
       set via GLC_NCPL in env_run.xml.
@@ -2827,7 +2353,7 @@
   <entry id="glc_avg_period" modify_via_xml="GLC_AVG_PERIOD">
     <type>char</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <valid_values>glc_coupling_period,yearly</valid_values>
     <values>
       <value>$GLC_AVG_PERIOD</value>
@@ -2848,7 +2374,7 @@
   <entry id="wav_cpl_dt" modify_via_xml="WAV_NCPL" skip_default_entry="true">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       wav coupling interval in seconds
       set via WAV_NCPL in env_run.xml.
@@ -2861,7 +2387,7 @@
   <entry id="esp_cpl_dt" skip_default_entry="true">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       esp run interval in seconds
       esp_cpl_dt is the number of times the esp is run per NCPL_BASE_PERIOD
@@ -2875,94 +2401,10 @@
     </values>
   </entry>
 
-  <entry id="atm_cpl_offset">
-    <type>integer</type>
-    <category>time</category>
-    <group>seq_timemgr_inparm</group>
-    <desc>
-      atm coupling interval offset in seconds default: 0
-    </desc>
-    <values>
-      <value>0</value>
-    </values>
-  </entry>
-
-  <entry id="lnd_cpl_offset">
-    <type>integer</type>
-    <category>time</category>
-    <group>seq_timemgr_inparm</group>
-    <desc>
-      lnd coupling interval offset in seconds default: 0
-    </desc>
-    <values>
-      <value>0</value>
-    </values>
-  </entry>
-
-  <entry id="ice_cpl_offset">
-    <type>integer</type>
-    <category>time</category>
-    <group>seq_timemgr_inparm</group>
-    <desc>
-      ice coupling interval offset in seconds default: 0
-    </desc>
-    <values>
-      <value>0</value>
-    </values>
-  </entry>
-
-  <entry id="ocn_cpl_offset">
-    <type>integer</type>
-    <category>time</category>
-    <group>seq_timemgr_inparm</group>
-    <desc>
-      ocn coupling interval offset in seconds default: 0
-    </desc>
-    <values>
-      <value>0</value>
-    </values>
-  </entry>
-
-  <entry id="glc_cpl_offset">
-    <type>integer</type>
-    <category>time</category>
-    <group>seq_timemgr_inparm</group>
-    <desc>
-      glc coupling interval offset in seconds default: 0
-    </desc>
-    <values>
-      <value>0</value>
-    </values>
-  </entry>
-
-  <entry id="wav_cpl_offset">
-    <type>integer</type>
-    <category>time</category>
-    <group>seq_timemgr_inparm</group>
-    <desc>
-      wav coupling interval offset in seconds default: 0
-    </desc>
-    <values>
-      <value>0</value>
-    </values>
-  </entry>
-
-  <entry id="esp_cpl_offset">
-    <type>integer</type>
-    <category>time</category>
-    <group>seq_timemgr_inparm</group>
-    <desc>
-      esp coupling interval offset in seconds default: 0
-    </desc>
-    <values>
-      <value>0</value>
-    </values>
-  </entry>
-
   <entry id="esp_run_on_pause" modify_via_xml="ESP_RUN_ON_PAUSE">
     <type>logical</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       true => ESP component runs after driver 'pause cycle'
       If any component 'pauses' (see PAUSE_OPTION, PAUSE_N and
@@ -2980,7 +2422,7 @@
   <entry id="calendar" modify_via_xml="CALENDAR">
     <type>char</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <valid_values>NO_LEAP,GREGORIAN</valid_values>
     <desc>
       calendar in use.  [NO_LEAP, GREOGORIAN].
@@ -2994,7 +2436,7 @@
   <entry id="start_ymd" modify_via_xml="RUN_STARTDATE">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       Run start date in yyyymmdd format, only used for startup and hybrid runs.
       default: 00010101
@@ -3007,7 +2449,7 @@
   <entry id="start_tod" modify_via_xml="START_TOD">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       Start time-of-day in universal time (seconds), should be between zero and 86400
       default: 0
@@ -3020,7 +2462,7 @@
   <entry id="stop_option" modify_via_xml="STOP_OPTION">
     <type>char</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <valid_values>none,never,nsteps,nstep,nseconds,nsecond,nminutes,nminute,nhours,nhour,ndays,nday,monthly,nmonths,nmonth,nyears,nyear,date,ifdays0,end</valid_values>
     <desc>
       sets the run length with stop_n and stop_ymd
@@ -3046,7 +2488,7 @@
   <entry id="stop_n" modify_via_xml="STOP_N">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       Sets the run length with stop_option and stop_ymd
     </desc>
@@ -3058,7 +2500,7 @@
   <entry id="stop_ymd" modify_via_xml="STOP_YMD">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       date in yyyymmdd format, sets the run length with stop_option and stop_n,
       can be in addition to stop_option and stop_n, negative value implies off
@@ -3068,10 +2510,23 @@
     </values>
   </entry>
 
+  <entry id="stop_tod">
+    <type>integer</type>
+    <category>time</category>
+    <group>DRIVER_clock_attributes</group>
+    <desc>
+      Stop time-of-day in universal time (seconds), should be between zero and 86400
+      default: 0
+    </desc>
+    <values>
+      <value>0</value>
+    </values>
+  </entry>
+
   <entry id="restart_option" modify_via_xml="REST_OPTION">
     <type>char</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <valid_values>none,never,nsteps,nstep,nseconds,nsecond,nminutes,nminute,nhours,nhour,ndays,nday,nmonths,monthly,nmonth,nyears,nyear,date,ifdays0,end</valid_values>
     <desc>
       sets the restart frequency with restart_n and restart_ymd
@@ -3097,7 +2552,7 @@
   <entry id="restart_n" modify_via_xml="REST_N">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       Sets model restart writes with restart_option and restart_ymd (same options as stop_n)
     </desc>
@@ -3109,7 +2564,7 @@
   <entry id="restart_ymd" modify_via_xml="REST_YMD">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       Date in yyyymmdd format, sets model restart write date with rest_option and restart_n
       default: STOP_N
@@ -3119,10 +2574,36 @@
     </values>
   </entry>
 
+  <entry id="ref_ymd">
+    <type>integer</type>
+    <category>time</category>
+    <group>DRIVER_clock_attributes</group>
+    <desc>
+      Reference date in yyyymmdd format
+      default: 0
+    </desc>
+    <values>
+      <value>0</value>
+    </values>
+  </entry>
+
+  <entry id="ref_tod">
+    <type>integer</type>
+    <category>time</category>
+    <group>DRIVER_clock_attributes</group>
+    <desc>
+      Reference time of day in seconds
+      default: 0
+    </desc>
+    <values>
+      <value>0</value>
+    </values>
+  </entry>
+
   <entry id="end_restart">
     <type>logical</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       true => write restarts at end of run
       forces a restart write at the end of the run in addition to any
@@ -3138,7 +2619,7 @@
   <entry id="history_option" modify_via_xml="HIST_OPTION">
     <type>char</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <valid_values>none,never,nsteps,nstep,nseconds,nsecond,nminutes,nminute,nhours,nhour,ndays,nday,monthly,nmonths,nmonth,nyears,nyear,date,ifdays0,end</valid_values>
     <desc>
       coupler history snapshot option (used with history_n and history_ymd)
@@ -3165,7 +2646,7 @@
   <entry id="history_n" modify_via_xml="HIST_N">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       sets coupler snapshot history file frequency (like restart_n)
       set by HIST_N in env_run.xml.
@@ -3178,7 +2659,7 @@
   <entry id="history_ymd" modify_via_xml="HIST_YMD">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       date associated with history_option date.  yyyymmdd format.
       set by HIST_DATE in env_run.xml.
@@ -3191,7 +2672,7 @@
   <entry id="histavg_option" modify_via_xml="HISTAVG_OPTION">
     <type>char</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <valid_values>none,never,nsteps,nstep,nseconds,nsecond,nminutes,nminute,nhours,nhour,ndays,nday,monthly,nmonths,nmonth,nyears,nyear,date,ifdays0,end</valid_values>
     <desc>
       coupler time average history option (used with histavg_n and histavg_ymd)
@@ -3218,7 +2699,7 @@
   <entry id="histavg_n" modify_via_xml="HISTAVG_N">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       Sets coupler time-average history file frequency (like restart_option)
       set by AVGHIST_N in env_run.xml.
@@ -3231,7 +2712,7 @@
   <entry id="histavg_ymd" modify_via_xml="HISTAVG_YMD">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       date associated with histavg_option date.  yyyymmdd format.
       set by AVGHIST_DATE in env_run.xml.
@@ -3244,7 +2725,7 @@
   <entry id="barrier_option" modify_via_xml="BARRIER_OPTION">
     <type>char</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <valid_values>none,never,nsteps,nstep,nseconds,nsecond,nminutes,nminute,nhours,nhour,ndays,nday,nmonths,monthly,nmonth,nyears,nyear,date,ifdays0,end</valid_values>
     <desc>
       sets the driver barrier frequency to sync models across all tasks with barrier_n and barrier_ymd
@@ -3259,7 +2740,7 @@
   <entry id="barrier_n" modify_via_xml="BARRIER_N">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       Sets model barriers with barrier_option and barrier_ymd (same options as stop_n)
       default: 1
@@ -3272,7 +2753,7 @@
   <entry id="barrier_ymd" modify_via_xml="BARRIER_DATE">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       Date in yyyymmdd format, sets model barriers date with barrier_option and barrier_n
     </desc>
@@ -3284,7 +2765,7 @@
   <entry id="tprof_option">
     <type>char</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <valid_values>none,never,nsteps,nstep,nseconds,nsecond,nminutes,nminute,nhours,nhour,ndays,nday,monthly,nmonths,nmonth,nyears,nyear,date,ifdays0,end</valid_values>
     <desc>
       Sets timing output file frequency (like rest_option but relative to run start date)
@@ -3310,7 +2791,7 @@
   <entry id="tprof_n">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       Sets timing output file frequency (like restart_n)
     </desc>
@@ -3322,7 +2803,7 @@
   <entry id="tprof_ymd">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       yyyymmdd format, sets timing output file date (like restart_date)
     </desc>
@@ -3334,7 +2815,7 @@
   <entry id="pause_option" modify_via_xml="PAUSE_OPTION">
     <type>char</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <valid_values>none,never,nsteps,nstep,nseconds,nsecond,nminutes,nminute,nhours,nhour,ndays,nday,monthly,nmonths,nmonth,nyears,nyear</valid_values>
     <desc>
       sets the pause frequency with pause_n
@@ -3357,7 +2838,7 @@
   <entry id="pause_n" modify_via_xml="PAUSE_N">
     <type>integer</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       Sets the pause frequency with pause_option
     </desc>
@@ -3369,7 +2850,7 @@
   <entry id="pause_component_list" modify_via_xml="PAUSE_COMPONENT_LIST" skip_default_entry="true">
     <type>char</type>
     <category>time</category>
-    <group>seq_timemgr_inparm</group>
+    <group>DRIVER_clock_attributes</group>
     <desc>
       A colon-separated list of component types (e.g., ocn,atm) to receive a
       resume signal after a pause has happened. Special values "all" or "none"
