@@ -258,10 +258,7 @@ module dice_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (ice_prognostic) then
-       call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_states, "will provide", subname//":seq_flds_x2i_states", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_fluxes, "will provide", subname//":seq_flds_x2i_fluxes", rc=rc)
+       call shr_nuopc_fldList_fromseqflds(fldsToIce, flds_x2i, flds_x2i_map, "will provide", subname//":seq_flds_x2i_states", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -275,10 +272,7 @@ module dice_comp_nuopc
     call shr_nuopc_fldList_Zero(fldsFrIce, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_states, "will provide", subname//":seq_flds_i2x_states", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_fluxes, "will provide", subname//":seq_flds_i2x_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrIce, flds_i2x, flds_i2x_map, "will provide", subname//":seq_flds_i2x_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call shr_nuopc_fldList_Add(fldsFrIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
@@ -368,7 +362,7 @@ module dice_comp_nuopc
     read(cvalue,*) read_restart
 
     call dice_comp_init(clock, x2d, d2x, &
-         seq_flds_x2i_fields, seq_flds_i2x_fields, seq_flds_i2o_per_cat, &
+         flds_x2i, flds_i2x, seq_flds_i2o_per_cat, &
          SDICE, gsmap, ggrid, mpicom, compid, my_task, master_task, &
          inst_suffix, inst_name, logunit, read_restart, &
          scmMode, scmlat, scmlon)
@@ -423,7 +417,7 @@ module dice_comp_nuopc
     ! Set the coupling scalars
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_i2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_i2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     call shr_nuopc_methods_State_SetScalar(dble(ny_global),seq_flds_scalar_index_nx, exportState, mpicom, rc)
@@ -578,7 +572,7 @@ module dice_comp_nuopc
     ! Unpack export state
     !--------------------------------
 
-    call shr_nuopc_grid_StateToArray(importState, x2d%rattr, seq_flds_x2i_fields, grid_option, rc=rc)
+    call shr_nuopc_grid_StateToArray(importState, x2d%rattr, flds_x2i, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
@@ -614,7 +608,7 @@ module dice_comp_nuopc
     ! Pack export state
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_i2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_i2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------

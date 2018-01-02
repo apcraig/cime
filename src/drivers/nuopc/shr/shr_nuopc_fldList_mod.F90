@@ -8,7 +8,7 @@ module shr_nuopc_fldList_mod
   use shr_log_mod, only : logunit => shr_log_Unit
   use shr_mpi_mod, only : shr_mpi_bcast
   use shr_string_mod, only : shr_string_listGetNum, shr_string_listGetName
-  use seq_flds_mod, only : seq_flds_lookup, seq_flds_get_num_entries, seq_flds_get_entry
+  use seq_flds_mod, only : flds_lookup, flds_get_num_entries, flds_get_entry
   use seq_flds_mod, only : seq_flds_scalar_name, seq_flds_scalar_num
   use ESMF
   use NUOPC
@@ -57,10 +57,10 @@ contains
 
     rc = ESMF_SUCCESS
 
-    call seq_flds_get_num_entries(num)
+    call flds_get_num_entries(num)
 
     do n = 1,num
-      call seq_flds_get_entry(n,shortname=stdname,units=units)
+      call flds_get_entry(n,shortname=stdname,units=units)
       if (.not.NUOPC_FieldDictionaryHasEntry(stdname)) then
         call ESMF_LogWrite(subname//': Add:'//trim(stdname), ESMF_LOGMSG_INFO, rc=rc)
         call NUOPC_FieldDictionaryAddEntry(standardName=stdname, canonicalUnits=units, rc=rc)
@@ -72,35 +72,30 @@ contains
 
 !================================================================================
 
-  subroutine shr_nuopc_fldList_fromseqflds(fldlist, seq_flds_list, transferOffer, tag, mapping, rc)
+  subroutine shr_nuopc_fldList_fromseqflds(fldlist, flds_list, flds_list_maps, transferOffer, tag, rc)
     ! ----------------------------------------------
-    ! Build fldlist from seq_flds list
+    ! Build fldlist from flds and flds_maps list
     ! ----------------------------------------------
-    type(shr_nuopc_fldList_Type), intent(inout)  :: fldlist
-    character(len=*)            , intent(in)     :: seq_flds_list
-    character(len=*), intent(in)     :: transferOffer
-    character(len=*), intent(in)     :: tag
-    integer,          intent(inout)  :: rc
-    character(len=*), intent(in), optional :: mapping
+    type(shr_nuopc_fldList_Type) , intent(inout)        :: fldlist
+    character(len=*)             , intent(in)           :: flds_list
+    character(len=*)             , intent(in)           :: flds_list_maps
+    character(len=*)             , intent(in)           :: transferOffer
+    character(len=*)             , intent(in)           :: tag
+    integer                      , intent(inout)        :: rc
 
     ! local variables
-    integer :: n, num
+    integer           :: n, num
     character(len=CS) :: stdname
-    character(len=CS) :: lmapping
+    character(len=CS) :: mapname
     character(len=*), parameter :: subname='(shr_nuopc_fldList_fromseqflds)'
 
     rc = ESMF_SUCCESS
 
-    if (present(mapping)) then
-      lmapping = mapping
-    else
-      lmapping = "undefined"
-    endif
-
-    num = shr_string_listGetNum(seq_flds_list)
+    num = shr_string_listGetNum(flds_list)
     do n = 1,num
-      call shr_string_listGetName(seq_flds_list, n, stdname)
-      call shr_nuopc_fldList_Add(fldlist, stdname, transferOffer, tag, mapping=lmapping, rc=rc)
+      call shr_string_listGetName(flds_list     , n, stdname)
+      call shr_string_listGetName(flds_list_maps, n, mapname)
+      call shr_nuopc_fldList_Add(fldlist, stdname, transferOffer, tag, mapname=mapname, rc=rc)
     enddo
 
   end subroutine shr_nuopc_fldList_fromseqflds
@@ -111,8 +106,8 @@ contains
     ! ----------------------------------------------
     ! Zero out list of field information
     ! ----------------------------------------------
-    type(shr_nuopc_fldList_Type), intent(inout)  :: fldlist
-    integer,          intent(inout)  :: rc
+    type(shr_nuopc_fldList_Type) , intent(inout)  :: fldlist
+    integer                      , intent(inout)  :: rc
 
     ! local variables
     integer :: num
@@ -121,10 +116,12 @@ contains
     rc = ESMF_SUCCESS
 
     fldlist%num = 0
+
     if (associated(fldlist%stdname))       deallocate(fldlist%stdname)
     if (associated(fldlist%shortname))     deallocate(fldlist%shortname)
     if (associated(fldlist%transferOffer)) deallocate(fldlist%transferOffer)
     if (associated(fldlist%mapping))       deallocate(fldlist%mapping)
+
     allocate(fldlist%stdname(10))
     allocate(fldlist%shortname(10))
     allocate(fldlist%transferOffer(10))
@@ -134,17 +131,17 @@ contains
 
 !================================================================================
 
-  subroutine shr_nuopc_fldList_Add(fldlist, stdname, transferOffer, tag, shortname, mapping, rc)
+  subroutine shr_nuopc_fldList_Add(fldlist, stdname, transferOffer, tag, shortname, mapname, rc)
     ! ----------------------------------------------
     ! Set up a list of field information
     ! ----------------------------------------------
-    type(shr_nuopc_fldList_Type), intent(inout)  :: fldlist
-    character(len=*), intent(in)     :: stdname
-    character(len=*), intent(in)     :: transferOffer
-    character(len=*), intent(in)     :: tag
-    integer,          intent(inout)  :: rc
-    character(len=*), intent(in)   , optional :: shortname
-    character(len=*), intent(in)   , optional :: mapping
+    type(shr_nuopc_fldList_Type) , intent(inout)           :: fldlist
+    character(len=*)             , intent(in)              :: stdname
+    character(len=*)             , intent(in)              :: transferOffer
+    character(len=*)             , intent(in)              :: tag
+    integer                      , intent(inout)           :: rc
+    character(len=*)             , intent(in)   , optional :: mapname
+    character(len=*)             , intent(in)   , optional :: shortname
 
     ! local variables
     integer :: num,n
@@ -158,8 +155,9 @@ contains
          .not.associated(fldlist%shortname) .or. &
          .not.associated(fldlist%transferOffer) .or. &
          .not.associated(fldlist%mapping)) then
+
       call ESMF_LogWrite(trim(subname)//":"//trim(tag)//" ERROR in fldlist, call shr_nuopc_fldList_Zero first "//trim(stdname), &
-        ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
+           ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
       rc = ESMF_FAILURE
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
     endif
@@ -168,16 +166,18 @@ contains
     if ((size(fldlist%stdname) /= size(fldlist%shortname)) .or. &
         (size(fldlist%stdname) /= size(fldlist%transferOffer)) .or. &
         (size(fldlist%stdname) /= size(fldlist%mapping))) then
+
       call ESMF_LogWrite(trim(subname)//":"//trim(tag)//" ERROR in fldlist, size of arrays out of sync "//trim(stdname), &
-        ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
+           ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
       rc = ESMF_FAILURE
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
     endif
 
     ! make sure fldlist num has not gotten ahead of fldlist arrays
     if (fldlist%num > size(fldlist%stdname)) then
+
       call ESMF_LogWrite(trim(subname)//":"//trim(tag)//" ERROR fldlist%num gt size of fldlist%stdname "//trim(stdname), &
-        ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
+           ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
       rc = ESMF_FAILURE
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
     endif
@@ -215,16 +215,16 @@ contains
     num = fldlist%num
 
     fldlist%stdname(num)      = trim(stdname)
+    fldlist%transferOffer(num)= trim(transferOffer)
+    if (present(mapname)) then
+       fldlist%mapping(num)   = trim(mapname)
+    else
+       fldlist%mapping(num)   = 'undefined'
+    end if
     if (present(shortname)) then
        fldlist%shortname(num) = trim(shortname)
     else
        fldlist%shortname(num) = trim(stdname)
-    endif
-    fldlist%transferOffer(num)= trim(transferOffer)
-    if (present(mapping)) then
-       fldlist%mapping(num)   = trim(mapping)
-    else
-       fldlist%mapping(num)   = 'undefined'
     endif
 
   end subroutine shr_nuopc_fldList_Add
@@ -254,25 +254,27 @@ contains
       call ESMF_LogWrite(subname//':'//trim(tag)//':'//trim(fldlist%stdname(n)), ESMF_LOGMSG_INFO, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
 
-! adding to dictionary here not a good idea because will only be added on this PET.  needs
-! to be added to all PETs at the driver level.
-!      if (.not.NUOPC_FieldDictionaryHasEntry(fldlist%stdname(n))) then
-!        call ESMF_LogWrite(subname//':DictionaryAddEntry:'//trim(tag)//':'//trim(fldlist%stdname(n))//':'//trim(units), ESMF_LOGMSG_INFO, rc=rc)
-!        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-!        call seq_flds_lookup(fldlist%stdname(n), units=units)
-!        call NUOPC_FieldDictionaryAddEntry(standardName=fldlist%stdname(n), canonicalUnits=units, rc=rc)
-!        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-!        if (.not.NUOPC_FieldDictionaryHasEntry(fldlist%shortname(n))) then
-!          call ESMF_LogWrite(subname//':DictionaryAddEntry:'//trim(tag)//':'//trim(fldlist%shortname(n))//':'//trim(units), ESMF_LOGMSG_INFO, rc=rc)
-!          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-!          call NUOPC_FieldDictionaryAddEntry(standardName=fldlist%shortname(n), canonicalUnits=units, rc=rc)
-!          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-!!          if (fldlist%stdname(n) /= fldlist%shortname(n)) then
-!!            call NUOPC_FieldDictionarySetSyno( (/fldlist%stdname(n), fldlist%shortname(n)/), rc=rc)
-!!            if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-!!          endif
-!        endif
-!      endif
+      ! adding to dictionary here not a good idea because will only be added on this PET.  needs
+      ! to be added to all PETs at the driver level.
+      !      if (.not.NUOPC_FieldDictionaryHasEntry(fldlist%stdname(n))) then
+      !        call ESMF_LogWrite(subname//':DictionaryAddEntry:'//trim(tag)//':'//trim(fldlist%stdname(n))//':'//trim(units), &
+      !            ESMF_LOGMSG_INFO, rc=rc)
+      !        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      !        call flds_lookup(fldlist%stdname(n), units=units)
+      !        call NUOPC_FieldDictionaryAddEntry(standardName=fldlist%stdname(n), canonicalUnits=units, rc=rc)
+      !        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      !        if (.not.NUOPC_FieldDictionaryHasEntry(fldlist%shortname(n))) then
+      !          call ESMF_LogWrite(subname//':DictionaryAddEntry:'//trim(tag)//':'//trim(fldlist%shortname(n))//':'//trim(units), &
+      !             ESMF_LOGMSG_INFO, rc=rc)
+      !          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      !          call NUOPC_FieldDictionaryAddEntry(standardName=fldlist%shortname(n), canonicalUnits=units, rc=rc)
+      !          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      !!          if (fldlist%stdname(n) /= fldlist%shortname(n)) then
+      !!            call NUOPC_FieldDictionarySetSyno( (/fldlist%stdname(n), fldlist%shortname(n)/), rc=rc)
+      !!            if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+      !!          endif
+      !        endif
+      !      endif
 
       call NUOPC_Advertise(state, &
         standardName=trim(fldlist%stdname(n)), &
@@ -337,7 +339,8 @@ contains
     rc = ESMF_SUCCESS
 
     if (present(grid) .and. present(mesh)) then
-      call ESMF_LogWrite(trim(subname)//trim(tag)//": ERROR both grid and mesh not allowed", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//trim(tag)//": ERROR both grid and mesh not allowed", &
+            ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
       rc = ESMF_FAILURE
       return
     endif
@@ -369,16 +372,20 @@ contains
     call ESMF_LogWrite(trim(subname)//trim(tag)//" size = "//trim(infostr), ESMF_LOGMSG_INFO, rc=dbrc)
 
     do n = 1,size(StandardNameList)
-      call ESMF_LogWrite(trim(subname)//trim(tag)//" StandardNameList = "//trim(StandardNameList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//trim(tag)//" StandardNameList = "//trim(StandardNameList(n)), &
+            ESMF_LOGMSG_INFO, rc=dbrc)
     enddo
     do n = 1,size(ConnectedList)
-      call ESMF_LogWrite(trim(subname)//trim(tag)//" ConnectedList = "//trim(ConnectedList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//trim(tag)//" ConnectedList = "//trim(ConnectedList(n)), &
+            ESMF_LOGMSG_INFO, rc=dbrc)
     enddo
     do n = 1,size(NamespaceList)
-      call ESMF_LogWrite(trim(subname)//trim(tag)//" NamespaceList = "//trim(NamespaceList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//trim(tag)//" NamespaceList = "//trim(NamespaceList(n)), &
+            ESMF_LOGMSG_INFO, rc=dbrc)
     enddo
     do n = 1,size(ItemnameList)
-      call ESMF_LogWrite(trim(subname)//trim(tag)//" ItemnameList = "//trim(ItemnameList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//trim(tag)//" ItemnameList = "//trim(ItemnameList(n)), &
+            ESMF_LOGMSG_INFO, rc=dbrc)
     enddo
 #endif
 
@@ -394,7 +401,8 @@ contains
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
 
         if (trim(transferAction) == "accept") then
-          call ESMF_LogWrite(trim(subname)//trim(tag)//" Field = "//trim(fldlist%shortname(n))//" is connected, grid/mesh TBD", ESMF_LOGMSG_INFO, rc=dbrc)
+           call ESMF_LogWrite(trim(subname)//trim(tag)//" Field = "//trim(fldlist%shortname(n))//" is connected, grid/mesh TBD", &
+                ESMF_LOGMSG_INFO, rc=dbrc)
 
         else   ! provide
 
@@ -414,7 +422,8 @@ contains
             field = ESMF_FieldCreate(mesh, ESMF_TYPEKIND_R8, name=fldlist%shortname(n),meshloc=ESMF_MESHLOC_ELEMENT,rc=rc)
             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
           else
-            call ESMF_LogWrite(trim(subname)//trim(tag)//": ERROR grid or mesh expected", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
+             call ESMF_LogWrite(trim(subname)//trim(tag)//": ERROR grid or mesh expected", &
+                  ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
             rc = ESMF_FAILURE
             return
           endif

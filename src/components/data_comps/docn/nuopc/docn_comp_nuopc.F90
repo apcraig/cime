@@ -267,10 +267,7 @@ module docn_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (ocn_prognostic) then
-       call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_states, "will provide", subname//":seq_flds_x2o_states", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_fromseqflds(fldsToOcn, seq_flds_x2o_fluxes, "will provide", subname//":seq_flds_x2o_fluxes", rc=rc)
+       call shr_nuopc_fldList_fromseqflds(fldsToOcn, flds_x2o, flds_x2o_map, "will provide", subname//":seq_flds_x2o_states", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -284,10 +281,7 @@ module docn_comp_nuopc
     call shr_nuopc_fldList_Zero(fldsFrOcn, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_states, "will provide", subname//":seq_flds_o2x_states", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_fromseqflds(fldsFrOcn, seq_flds_o2x_fluxes, "will provide", subname//":seq_flds_o2x_fluxes", rc=rc)
+    call shr_nuopc_fldList_fromseqflds(fldsFrOcn, flds_o2x, flds_o2x_map, "will provide", subname//":seq_flds_o2x_states", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call shr_nuopc_fldList_Add(fldsFrOcn, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
@@ -377,7 +371,7 @@ module docn_comp_nuopc
     read(cvalue,*) read_restart
 
     call docn_comp_init(clock, x2d, d2x, &
-         seq_flds_x2o_fields, seq_flds_o2x_fields, &
+         flds_x2o, flds_o2x, &
          SDOCN, gsmap, ggrid, mpicom, compid, my_task, master_task, &
          inst_suffix, inst_name, logunit, read_restart, &
          scmMode, scmlat, scmlon)
@@ -435,7 +429,7 @@ module docn_comp_nuopc
     !TODO: add ocnrof_prognostic here - if this is true - then will need to route runoff to ocn model - and
     ! ocn model will need to be prognostic!!! How will this be handled?
 
-    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_o2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_o2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call shr_nuopc_methods_State_SetScalar(dble(ny_global),seq_flds_scalar_index_nx, exportState, mpicom, rc)
@@ -571,7 +565,7 @@ module docn_comp_nuopc
     !--------------------------------
 
     if (unpack_import) then
-       call shr_nuopc_grid_StateToArray(importState, x2d%rattr, seq_flds_x2o_fields, grid_option, rc=rc)
+       call shr_nuopc_grid_StateToArray(importState, x2d%rattr, flds_x2o, grid_option, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -607,7 +601,7 @@ module docn_comp_nuopc
     ! Pack export state
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_o2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_o2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     ! Need to reset scalars that will be used after initialization, since shr_nuopc_grid_ArrayToState calls
