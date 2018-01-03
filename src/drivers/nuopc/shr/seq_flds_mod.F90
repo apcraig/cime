@@ -170,7 +170,7 @@ module seq_flds_mod
    character(len=CX)  :: carma_fields        ! List of CARMA fields from lnd->atm
    character(len=CX)  :: ndep_fields         ! List of nitrogen deposition fields from atm->lnd/ocn
    integer            :: ice_ncat            ! number of sea ice thickness categories
-   logical            :: seq_flds_i2o_per_cat! .true. if select per ice thickness category fields are passed from ice to ocean
+   logical            :: flds_i2o_per_cat    ! .true. if select per ice thickness category fields are passed from ice to ocean
    logical            :: add_ndep_fields     ! .true. => add ndep fields
 
    !----------------------------------------------------------------------------
@@ -333,7 +333,7 @@ module seq_flds_mod
 
      namelist /seq_cplflds_inparm/  &
           flds_co2a, flds_co2b, flds_co2c, flds_co2_dmsa, flds_wiso, glc_nec, &
-          ice_ncat, seq_flds_i2o_per_cat, flds_bgc
+          ice_ncat, flds_i2o_per_cat, flds_bgc
 
      namelist /seq_cplflds_userspec/ &
           cplflds_custom
@@ -359,7 +359,7 @@ module seq_flds_mod
         flds_wiso = .false.
         glc_nec   = 0
         ice_ncat  = 1
-        seq_flds_i2o_per_cat = .false.
+        flds_i2o_per_cat = .false.
 
         unitn = shr_file_getUnit()
         write(llogunit, "(A)") subname//': read seq_cplflds_inparm namelist from: '&
@@ -384,7 +384,7 @@ module seq_flds_mod
      call shr_mpi_bcast(flds_wiso    , mpicom)
      call shr_mpi_bcast(glc_nec      , mpicom)
      call shr_mpi_bcast(ice_ncat     , mpicom)
-     call shr_mpi_bcast(seq_flds_i2o_per_cat, mpicom)
+     call shr_mpi_bcast(flds_i2o_per_cat, mpicom)
 
      call glc_elevclass_init(glc_nec)
 
@@ -1809,7 +1809,7 @@ module seq_flds_mod
      call fld_add(flds_x2l, flds_x2l_map,trim(name), longname=longname, stdname=stdname, units=units)
      call fld_add(flds_x2l_from_glc, flds_x2l_from_glc_map,trim(name), longname=longname, stdname=stdname, units=units)
 
-     name = 'Sg_icemask_coupled'
+     name = 'Sg_icemask_coupled_fluxes'
      longname = 'Ice sheet mask where we are potentially sending non-zero fluxes'
      stdname  = 'icemask_coupled'
      units    = '1'
@@ -2367,7 +2367,7 @@ module seq_flds_mod
      ! optional per thickness category fields
      !-----------------------------------------------------------------------------
 
-     if (seq_flds_i2o_per_cat) then
+     if (flds_i2o_per_cat) then
         do num = 1, ice_ncat
            write(cnum,'(i2.2)') num
 

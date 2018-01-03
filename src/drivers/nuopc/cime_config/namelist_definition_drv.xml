@@ -2228,7 +2228,7 @@
     </values>
   </entry>
 
-  <entry id="seq_flds_i2o_per_cat" modify_via_xml="CPL_I2O_PER_CAT">
+  <entry id="flds_i2o_per_cat" modify_via_xml="CPL_I2O_PER_CAT">
     <type>logical</type>
     <category>seq_flds</category>
     <group>seq_cplflds_inparm</group>

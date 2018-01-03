@@ -476,6 +476,7 @@ module med_fraction_mod
 
           ! Set ocean grid fractions
           if (is_local%wrap%comp_present(compocn)) then
+
              ! Map 'ifrac' from FBfrac(compice) to FBfrac(compocn)
              call shr_nuopc_methods_FB_FieldRegrid(&
                   is_local%wrap%FBfrac(compice), 'ifrac', &
@@ -493,6 +494,7 @@ module med_fraction_mod
 
           ! Set atm grid fractions for ice and ocean
           if (is_local%wrap%comp_present(compatm)) then
+
              ! Map 'ifrac' from FBfrac(compice) to FBfrac(compatm)
              call shr_nuopc_methods_FB_FieldRegrid(&
                   is_local%wrap%FBfrac(compice), 'ifrac', &

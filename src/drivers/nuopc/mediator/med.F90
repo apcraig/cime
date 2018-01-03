@@ -1801,6 +1801,10 @@ module MED
 
        if (.not. allDone) then  ! allDone is not true
 
+          ! initialize fractions
+          call med_fraction_set(gcomp, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
           ! do the merge to the atmospheric component
           call med_phases_prep_atm(gcomp, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
