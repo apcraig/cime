@@ -1,17 +1,22 @@
 module xice_comp_nuopc
 
-!----------------------------------------------------------------------------
-! This is the NUOPC cap
-!----------------------------------------------------------------------------
+  !----------------------------------------------------------------------------
+  ! This is the NUOPC cap for XICE
+  !----------------------------------------------------------------------------
 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
   use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod   ! shared system calls
 
-  use seq_flds_mod
+
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_timemgr_mod       , only: seq_timemgr_EClockGetData
+
   use shr_nuopc_fldList_mod
+  use shr_nuopc_flds_mod    , only: flds_i2x, flds_i2x_map, flds_x2i, flds_x2i_map
+  use shr_nuopc_flds_mod    , only: flds_scalar_name, flds_scalar_index_iceberg_prognostic
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint, shr_nuopc_methods_chkerr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Print_FieldExchInfo
@@ -74,15 +79,13 @@ module xice_comp_nuopc
 
   !----- formats -----
   character(*),parameter :: modName =  "(xice_comp_nuopc)"
-  character(*),parameter :: u_FILE_u = &
-    __FILE__
+  character(*),parameter :: u_FILE_u =  __FILE__
 
   !===============================================================================
   contains
   !===============================================================================
 
   subroutine SetServices(gcomp, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
     character(len=*),parameter  :: subname=trim(modName)//':(SetServices) '
@@ -183,7 +186,6 @@ module xice_comp_nuopc
   !===============================================================================
 
   subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
@@ -270,8 +272,8 @@ module xice_comp_nuopc
     call dead_init_nuopc('ice', mpicom, my_task, master_task, &
          inst_index, inst_suffix, inst_name, logunit, lsize, gbuf, nxg, nyg)
 
-    nflds_d2x = shr_string_listGetNum(seq_flds_i2x_fields)
-    nflds_x2d = shr_string_listGetNum(seq_flds_x2i_fields)
+    nflds_d2x = shr_string_listGetNum(flds_i2x)
+    nflds_x2d = shr_string_listGetNum(flds_x2i)
 
     allocate(gindex(lsize))
     allocate(lon(lsize))
@@ -303,13 +305,10 @@ module xice_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (ice_present) then
-       call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_states, "will provide", subname//":seq_flds_x2i_states", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsToIce, flds_x2i, flds_x2i_map, "will provide", subname//":flds_x2i", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-       call shr_nuopc_fldList_fromseqflds(fldsToIce, seq_flds_x2i_fluxes, "will provide", subname//":seq_flds_x2i_fluxes", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_Add(fldsToIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+       call shr_nuopc_fldList_Add(fldsToIce, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -321,13 +320,10 @@ module xice_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (ice_present) then
-       call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_states, "will provide", subname//":seq_flds_i2x_states", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsFrIce, flds_i2x, flds_i2x_map, "will provide", subname//":flds_i2x", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-       call shr_nuopc_fldList_fromseqflds(fldsFrIce, seq_flds_i2x_fluxes, "will provide", subname//":seq_flds_i2x_fluxes", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_Add(fldsFrIce, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+       call shr_nuopc_fldList_Add(fldsFrIce, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -355,7 +351,6 @@ module xice_comp_nuopc
   !===============================================================================
 
   subroutine InitializeRealize(gcomp, importState, exportState, clock, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
@@ -363,7 +358,7 @@ module xice_comp_nuopc
 
     ! local variables
     character(CL)          :: NLFilename, cvalue
-    integer(IN)            :: phase, lmpicom, ierr
+    integer(IN)            :: lmpicom, ierr
     character(ESMF_MAXSTR) :: convCIM, purpComp
     type(ESMF_Grid)        :: Egrid
     type(ESMF_Mesh)        :: Emesh
@@ -388,29 +383,8 @@ module xice_comp_nuopc
     call shr_file_getLogLevel(shrloglev)
     call shr_file_setLogUnit (logunit)
 
-    !----------------------------------------------------------------------------
-    ! If prognostic, than map import state to import attribute vector
-    !----------------------------------------------------------------------------
-
-    phase = 1  !TODO - this is hard-wired for now and needs to be generalized
-
-    if (phase .ne. 1) then
-       if (ice_prognostic) then
-          do n = 1,fldsToIce%num
-             connected = NUOPC_IsConnected(importState, fieldName=fldsToIce%shortname(n))
-             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) call shr_sys_abort()
-             if (.not. connected) then
-                call shr_sys_abort("Ice prognostic .true. requires connection for " // trim(fldsToIce%shortname(n)))
-             end if
-          end do
-          call shr_nuopc_grid_StateToArray(importState, x2d, seq_flds_x2i_fields, grid_option, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-       end if
-    endif
-
     !--------------------------------
     ! generate the mesh
-    ! grid_option specifies grid or mesh
     !--------------------------------
 
     call shr_nuopc_grid_MeshInit(gcomp, nxg, nyg, mpicom, compid, gindex, lon, lat, Emesh, rc)
@@ -420,23 +394,11 @@ module xice_comp_nuopc
     ! realize the actively coupled fields
     !--------------------------------
 
-    if (grid_option == 'mesh') then
+    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrIce, tag=subname//':diceExport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    else
-
-      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrIce, tag=subname//':diceExport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    endif
+    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrIce, tag=subname//':diceExport', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! Pack export state
@@ -444,16 +406,16 @@ module xice_comp_nuopc
     ! Set the coupling scalars
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x, seq_flds_i2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x, flds_i2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(dble(nyg),seq_flds_scalar_index_nx, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(nyg),flds_scalar_index_nx, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(dble(nxg),seq_flds_scalar_index_ny, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(nxg),flds_scalar_index_ny, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_dead_comps, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     if (iceberg_prognostic) then
@@ -461,7 +423,7 @@ module xice_comp_nuopc
     else
        scalar = 0.0_r8
     end if
-    call shr_nuopc_methods_State_SetScalar(scalar, seq_flds_scalar_index_iceberg_prognostic, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(scalar, flds_scalar_index_iceberg_prognostic, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
@@ -471,7 +433,7 @@ module xice_comp_nuopc
     if (dbug > 1) then
        if (my_task == master_task) then
           call shr_nuopc_methods_Print_FieldExchInfo(flag=2, values=d2x, logunit=logunit, &
-               fldlist=seq_flds_i2x_fields, nflds=nflds_d2x, istr="InitializeRealize: ice->mediator")
+               fldlist=flds_i2x, nflds=nflds_d2x, istr="InitializeRealize: ice->mediator")
        end if
        call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -522,7 +484,6 @@ module xice_comp_nuopc
 
 #if (1 == 0)
   subroutine SetClock(gcomp, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
 
@@ -569,7 +530,6 @@ module xice_comp_nuopc
   !===============================================================================
 
   subroutine ModelAdvance(gcomp, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
 
@@ -613,20 +573,20 @@ module xice_comp_nuopc
     ! Unpack export state
     !--------------------------------
 
-    call shr_nuopc_grid_StateToArray(importState, x2d, seq_flds_x2i_fields, grid_option, rc=rc)
+    call shr_nuopc_grid_StateToArray(importState, x2d, flds_x2i, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
     ! Run model
     !--------------------------------
 
-    call dead_run_nuopc('ice', clock, x2d, d2x, gbuf, seq_flds_i2x_fields, my_task, master_task, logunit)
+    call dead_run_nuopc('ice', clock, x2d, d2x, gbuf, flds_i2x, my_task, master_task, logunit)
 
     !--------------------------------
     ! Pack export state
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x, seq_flds_i2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x, flds_i2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
@@ -636,7 +596,7 @@ module xice_comp_nuopc
     if (dbug > 1) then
        if (my_task == master_task) then
           call shr_nuopc_methods_Print_FieldExchInfo(flag=2, values=d2x, logunit=logunit, &
-               fldlist=seq_flds_i2x_fields, nflds=nflds_d2x, istr="ModelAdvance: ice->mediator")
+               fldlist=flds_i2x, nflds=nflds_d2x, istr="ModelAdvance: ice->mediator")
        end if
        call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -666,7 +626,6 @@ module xice_comp_nuopc
   !===============================================================================
 
   subroutine ModelSetRunClock(gcomp, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
 
@@ -752,7 +711,6 @@ module xice_comp_nuopc
   !===============================================================================
 
   subroutine ModelFinalize(gcomp, rc)
-    implicit none
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
 

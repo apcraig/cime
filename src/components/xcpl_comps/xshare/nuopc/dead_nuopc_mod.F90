@@ -1,15 +1,14 @@
 module dead_nuopc_mod
 
-  use esmf            , only : esmf_clock
-  use shr_kind_mod    , only : IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
-  use shr_sys_mod     , only : shr_sys_abort, shr_sys_flush
-  use shr_const_mod   , only : shr_const_pi
-  use shr_string_mod  , only : shr_string_listGetIndexF
-  use dead_data_mod   , only : dead_grid_lat, dead_grid_lon, dead_grid_area
-  use dead_data_mod   , only : dead_grid_mask, dead_grid_frac, dead_grid_index
-  use dead_mod        , only : dead_setnewgrid, dead_read_inparms
-  use seq_flds_mod    , only : seq_flds_dom_coord, seq_flds_dom_other
-  use seq_timemgr_mod , only : seq_timemgr_EClockGetData
+ use esmf               , only : esmf_clock
+ use shr_kind_mod       , only : IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
+ use shr_sys_mod        , only : shr_sys_abort, shr_sys_flush
+ use shr_const_mod      , only : shr_const_pi
+ use shr_string_mod     , only : shr_string_listGetIndexF
+ use dead_data_mod      , only : dead_grid_lat, dead_grid_lon, dead_grid_area
+ use dead_data_mod      , only : dead_grid_mask, dead_grid_frac, dead_grid_index
+ use dead_mod           , only : dead_setnewgrid, dead_read_inparms
+ use seq_timemgr_mod    , only : seq_timemgr_EClockGetData
 
   implicit none
   private

@@ -19,13 +19,22 @@ module MED
     mediator_label_SetRunClock      => label_SetRunClock, &
     NUOPC_MediatorGet
 
-  use seq_flds_mod
   use seq_comm_mct          , only: llogunit => logunit
   use shr_kind_mod          , only: SHR_KIND_CL
   use shr_sys_mod           , only: shr_sys_flush, shr_sys_abort
 
+  use shr_nuopc_flds_mod    , only: flds_x2a, flds_x2a_map, flds_a2x, flds_a2x_map
+  use shr_nuopc_flds_mod    , only: flds_x2i, flds_x2i_map, flds_i2x, flds_i2x_map
+  use shr_nuopc_flds_mod    , only: flds_x2l, flds_x2l_map, flds_l2x, flds_l2x_map
+  use shr_nuopc_flds_mod    , only: flds_x2o, flds_x2o_map, flds_o2x, flds_o2x_map
+  use shr_nuopc_flds_mod    , only: flds_x2r, flds_x2r_map, flds_r2x, flds_r2x_map
+  use shr_nuopc_flds_mod    , only: flds_x2g, flds_x2g_map, flds_g2x, flds_g2x_map
+  use shr_nuopc_flds_mod    , only: flds_x2w, flds_x2w_map, flds_w2x, flds_w2x_map
+  use shr_nuopc_flds_mod    , only: flds_xao, flds_xao_map, flds_xao_albedo, flds_xao_albedo_map
+  use shr_nuopc_flds_mod    , only: flds_xao_diurnl, flds_xao_diurnl_map
+  use shr_nuopc_flds_mod    , only: flds_scalar_name
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Zero
-  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_fromseqflds
+  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_fromflds
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Add
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Realize
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Advertise
@@ -575,183 +584,183 @@ module MED
     ! Create fldsTo(compatm)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsTo(compatm), flds_x2a, flds_x2a_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsTo(compatm), flds_x2a, flds_x2a_map, "cannot provide", &
          subname//":flds_x2a", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsTo(compatm), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsTo(compatm), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFr(compatm)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsFr(compatm), flds_a2x, flds_a2x_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsFr(compatm), flds_a2x, flds_a2x_map, "cannot provide", &
          subname//":flds_a2x", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsFr(compatm), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFr(compatm), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsTo(compocn)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsTo(compocn), flds_x2o, flds_x2o_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsTo(compocn), flds_x2o, flds_x2o_map, "cannot provide", &
          subname//":flds_x2o", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsTo(compocn), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsTo(compocn), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFr(compocn)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsFr(compocn), flds_o2x, flds_o2x_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsFr(compocn), flds_o2x, flds_o2x_map, "cannot provide", &
          subname//":flds_o2x", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsFr(compocn), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFr(compocn), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsTo(compice)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsTo(compice), flds_x2i, flds_x2i_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsTo(compice), flds_x2i, flds_x2i_map, "cannot provide", &
          subname//":flds_x2i", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsTo(compice), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsTo(compice), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFr(compice)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsFr(compice), flds_i2x, flds_i2x_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsFr(compice), flds_i2x, flds_i2x_map, "cannot provide", &
          subname//":flds_i2x", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsFr(compice), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFr(compice), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsTo(complnd)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsTo(complnd), flds_x2l, flds_x2l_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsTo(complnd), flds_x2l, flds_x2l_map, "cannot provide", &
          subname//":flds_x2l", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsTo(complnd), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsTo(complnd), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFr(complnd)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsFr(complnd), flds_l2x, flds_l2x_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsFr(complnd), flds_l2x, flds_l2x_map, "cannot provide", &
          subname//":flds_l2x", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsFr(complnd), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFr(complnd), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsTo(comprof)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsTo(comprof), flds_x2r, flds_x2r_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsTo(comprof), flds_x2r, flds_x2r_map, "cannot provide", &
          subname//":flds_x2r", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsTo(comprof), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsTo(comprof), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFr(comprof)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsFr(comprof), flds_r2x, flds_r2x_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsFr(comprof), flds_r2x, flds_r2x_map, "cannot provide", &
          subname//":flds_r2x", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsFr(comprof), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFr(comprof), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsTo(compwav)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsTo(compwav), flds_x2w, flds_x2w_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsTo(compwav), flds_x2w, flds_x2w_map, "cannot provide", &
          subname//":flds_x2w", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsTo(compwav), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsTo(compwav), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFr(compwav)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsFr(compwav), flds_w2x, flds_w2x_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsFr(compwav), flds_w2x, flds_w2x_map, "cannot provide", &
          subname//":flds_w2x", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsFr(compwav), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFr(compwav), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsTo(compglc)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsTo(compglc), flds_x2g, flds_x2g_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsTo(compglc), flds_x2g, flds_x2g_map, "cannot provide", &
          subname//":flds_x2g", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsTo(compglc), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsTo(compglc), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsFr(compglc)
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsFr(compglc), flds_g2x, flds_g2x_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsFr(compglc), flds_g2x, flds_g2x_map, "cannot provide", &
          subname//":flds_g2x", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsFr(compglc), trim(seq_flds_scalar_name), "will provide", &
-         subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFr(compglc), trim(flds_scalar_name), "will provide", &
+         subname//":flds_scalar_name", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
     ! Create fldsAtmOcn
     !------------------
 
-    call shr_nuopc_fldList_fromseqflds(fldsAtmOcn, flds_xao, flds_xao_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsAtmOcn, flds_xao, flds_xao_map, "cannot provide", &
          subname//":flds_xao", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromseqflds(fldsAtmOcn, flds_xao_albedo, flds_xao_albedo_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsAtmOcn, flds_xao_albedo, flds_xao_albedo_map, "cannot provide", &
          subname//":flds_xao_albedo", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromseqflds(fldsAtmOcn, flds_xao_diurnl, flds_xao_diurnl_map, "cannot provide", &
+    call shr_nuopc_fldList_fromflds(fldsAtmOcn, flds_xao_diurnl, flds_xao_diurnl_map, "cannot provide", &
          subname//":flds_xao_diurnl", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 

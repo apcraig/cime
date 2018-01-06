@@ -129,6 +129,7 @@ module seq_flds_mod
    use shr_fire_emis_mod , only : shr_fire_emis_readnl, shr_fire_emis_mechcomps_n, shr_fire_emis_ztop_token
    use shr_carma_mod     , only : shr_carma_readnl
    use shr_ndep_mod      , only : shr_ndep_readnl
+   use shr_flds_mod      , only : shr_flds_dom_coord, shr_flds_dom_other
 
    implicit none
    public
@@ -150,6 +151,13 @@ module seq_flds_mod
    logical            :: add_ndep_fields     ! .true. => add ndep fields
 
    !----------------------------------------------------------------------------
+   ! domain
+   !----------------------------------------------------------------------------
+
+   character(CXX) :: seq_flds_dom_coord
+   character(CXX) :: seq_flds_dom_other
+
+   !----------------------------------------------------------------------------
    ! metadata
    !----------------------------------------------------------------------------
 
@@ -157,13 +165,6 @@ module seq_flds_mod
    integer         ,parameter :: nmax      = 1000        ! maximum number of entries in lookup_entry
    integer                    :: n_entries = 0           ! actual number of entries in lookup_entry
    character(len=CSS), dimension(nmax, 4) :: lookup_entry = undef
-
-   !----------------------------------------------------------------------------
-   ! for the domain
-   !----------------------------------------------------------------------------
-
-   character(CXX) :: seq_flds_dom_coord
-   character(CXX) :: seq_flds_dom_other
 
    !----------------------------------------------------------------------------
    ! state + flux fields
@@ -3182,7 +3183,15 @@ module seq_flds_mod
      ! state + flux fields
      !----------------------------------------------------------------------------
 
+     ! This sets the contents of shr_flds_mod
+     shr_flds_dom_coord  = trim(dom_coord )
+     shr_flds_dom_other  = trim(dom_other )
+
+     ! This sets the module variables
      seq_flds_dom_coord  = trim(dom_coord )
+     seq_flds_dom_other  = trim(dom_other )
+     call catFields(seq_flds_dom_fields, seq_flds_dom_coord , seq_flds_dom_other )
+
      seq_flds_a2x_states = trim(a2x_states)
      seq_flds_x2a_states = trim(x2a_states)
      seq_flds_i2x_states = trim(i2x_states)
@@ -3204,7 +3213,6 @@ module seq_flds_mod
      seq_flds_w2x_states = trim(w2x_states)
      seq_flds_x2w_states = trim(x2w_states)
 
-     seq_flds_dom_other  = trim(dom_other )
      seq_flds_a2x_fluxes = trim(a2x_fluxes)
      seq_flds_x2a_fluxes = trim(x2a_fluxes)
      seq_flds_i2x_fluxes = trim(i2x_fluxes)
@@ -3261,7 +3269,6 @@ module seq_flds_mod
         write(logunit,"(A)") subname//': seq_flds_x2w_fluxes= ',trim(seq_flds_x2w_fluxes)
      end if
 
-     call catFields(seq_flds_dom_fields, seq_flds_dom_coord , seq_flds_dom_other )
      call catFields(seq_flds_a2x_fields, seq_flds_a2x_states, seq_flds_a2x_fluxes)
      call catFields(seq_flds_x2a_fields, seq_flds_x2a_states, seq_flds_x2a_fluxes)
      call catFields(seq_flds_i2x_fields, seq_flds_i2x_states, seq_flds_i2x_fluxes)

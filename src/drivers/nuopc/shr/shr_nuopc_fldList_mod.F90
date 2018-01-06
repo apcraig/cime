@@ -1,24 +1,25 @@
 !================================================================================
 module shr_nuopc_fldList_mod
 
-  use shr_kind_mod,only : r8 => shr_kind_r8
-  use shr_kind_mod,only : CL => SHR_KIND_CL, CX => SHR_KIND_CX, CS => SHR_KIND_CS
-  use shr_sys_mod, only : shr_sys_abort
-  use shr_log_mod, only : loglev  => shr_log_Level
-  use shr_log_mod, only : logunit => shr_log_Unit
-  use shr_mpi_mod, only : shr_mpi_bcast
-  use shr_string_mod, only : shr_string_listGetNum, shr_string_listGetName
-  use seq_flds_mod, only : flds_lookup, flds_get_num_entries, flds_get_entry
-  use seq_flds_mod, only : seq_flds_scalar_name, seq_flds_scalar_num
   use ESMF
   use NUOPC
+
+  use shr_kind_mod       , only : r8 => shr_kind_r8
+  use shr_kind_mod       , only : CL => SHR_KIND_CL, CX => SHR_KIND_CX, CS => SHR_KIND_CS
+  use shr_sys_mod        , only : shr_sys_abort
+  use shr_log_mod        , only : loglev  => shr_log_Level
+  use shr_log_mod        , only : logunit => shr_log_Unit
+  use shr_mpi_mod        , only : shr_mpi_bcast
+  use shr_string_mod     , only : shr_string_listGetNum, shr_string_listGetName
+  use shr_nuopc_flds_mod , only : flds_lookup, flds_scalar_name, flds_scalar_num
+  use shr_nuopc_flds_mod , only : shr_nuopc_flds_get_num_entries, shr_nuopc_flds_get_entry
 
   implicit none
   save
   private
 
-  public :: shr_nuopc_fldList_setDict_fromseqflds
-  public :: shr_nuopc_fldList_fromseqflds
+  public :: shr_nuopc_fldList_setDict_fromflds
+  public :: shr_nuopc_fldList_fromflds
   public :: shr_nuopc_fldList_Type
   public :: shr_nuopc_fldList_Zero
   public :: shr_nuopc_fldList_Add
@@ -43,9 +44,9 @@ module shr_nuopc_fldList_mod
 contains
 !================================================================================
 
-  subroutine shr_nuopc_fldList_setDict_fromseqflds(rc)
+  subroutine shr_nuopc_fldList_setDict_fromflds(rc)
     ! ----------------------------------------------
-    ! Build NUOPC dictionary from seq_flds data
+    ! Build NUOPC dictionary from flds data
     ! ----------------------------------------------
     integer,          intent(inout)  :: rc
 
@@ -53,26 +54,26 @@ contains
     integer :: n, num
     character(CS) :: stdname
     character(CS) :: units
-    character(len=*), parameter :: subname='(shr_nuopc_fldList_setDict_fromseqflds)'
+    character(len=*), parameter :: subname='(shr_nuopc_fldList_setDict_fromflds)'
 
     rc = ESMF_SUCCESS
 
-    call flds_get_num_entries(num)
+    call shr_nuopc_flds_get_num_entries(num)
 
     do n = 1,num
-      call flds_get_entry(n,shortname=stdname,units=units)
-      if (.not.NUOPC_FieldDictionaryHasEntry(stdname)) then
-        call ESMF_LogWrite(subname//': Add:'//trim(stdname), ESMF_LOGMSG_INFO, rc=rc)
-        call NUOPC_FieldDictionaryAddEntry(standardName=stdname, canonicalUnits=units, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+       call shr_nuopc_flds_get_entry(n,shortname=stdname,units=units)
+       if (.not.NUOPC_FieldDictionaryHasEntry(stdname)) then
+          call ESMF_LogWrite(subname//': Add:'//trim(stdname), ESMF_LOGMSG_INFO, rc=rc)
+          call NUOPC_FieldDictionaryAddEntry(standardName=stdname, canonicalUnits=units, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
       endif
     enddo
 
-  end subroutine shr_nuopc_fldList_setDict_fromseqflds
+  end subroutine shr_nuopc_fldList_setDict_fromflds
 
 !================================================================================
 
-  subroutine shr_nuopc_fldList_fromseqflds(fldlist, flds_list, flds_list_maps, transferOffer, tag, rc)
+  subroutine shr_nuopc_fldList_fromflds(fldlist, flds_list, flds_list_maps, transferOffer, tag, rc)
     ! ----------------------------------------------
     ! Build fldlist from flds and flds_maps list
     ! ----------------------------------------------
@@ -87,7 +88,7 @@ contains
     integer           :: n, num
     character(len=CS) :: stdname
     character(len=CS) :: mapname
-    character(len=*), parameter :: subname='(shr_nuopc_fldList_fromseqflds)'
+    character(len=*), parameter :: subname='(shr_nuopc_fldList_fromflds)'
 
     rc = ESMF_SUCCESS
 
@@ -98,7 +99,7 @@ contains
       call shr_nuopc_fldList_Add(fldlist, stdname, transferOffer, tag, mapname=mapname, rc=rc)
     enddo
 
-  end subroutine shr_nuopc_fldList_fromseqflds
+  end subroutine shr_nuopc_fldList_fromflds
 
 !================================================================================
 
@@ -406,7 +407,7 @@ contains
 
         else   ! provide
 
-          if (fldlist%shortname(n) == trim(seq_flds_scalar_name)) then
+          if (fldlist%shortname(n) == trim(flds_scalar_name)) then
             call ESMF_LogWrite(trim(subname)//trim(tag)//" Field = "//trim(fldlist%shortname(n))//" is connected on root pe", &
               ESMF_LOGMSG_INFO, rc=dbrc)
             call shr_nuopc_fldList_SetScalarField(field, rc=rc)
@@ -475,10 +476,10 @@ contains
     grid = ESMF_GridCreate(distgrid, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
 
-    field = ESMF_FieldCreate(name=trim(seq_flds_scalar_name), &
+    field = ESMF_FieldCreate(name=trim(flds_scalar_name), &
          grid=grid, &
          typekind=ESMF_TYPEKIND_R8, &
-         ungriddedLBound=(/1/), ungriddedUBound=(/seq_flds_scalar_num/), & ! num of scalar values
+         ungriddedLBound=(/1/), ungriddedUBound=(/flds_scalar_num/), & ! num of scalar values
          rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
 
@@ -504,17 +505,17 @@ contains
     rc = ESMF_SUCCESS
 
     call MPI_COMM_RANK(mpicom, mytask, rc)
-    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+    call ESMF_StateGet(State, itemName=trim(flds_scalar_name), field=field, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
     if (mytask == 0) then
       call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-      if (size(data) < seq_flds_scalar_num .or. size(farrayptr) < seq_flds_scalar_num) then
+      if (size(data) < flds_scalar_num .or. size(farrayptr) < flds_scalar_num) then
         call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
         rc = ESMF_FAILURE
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
       endif
-      data(1:seq_flds_scalar_num) = farrayptr(1:seq_flds_scalar_num)
+      data(1:flds_scalar_num) = farrayptr(1:flds_scalar_num)
     endif
     call shr_mpi_bcast(data, mpicom)
 
@@ -540,17 +541,17 @@ contains
     rc = ESMF_SUCCESS
 
     call MPI_COMM_RANK(mpicom, mytask, rc)
-    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+    call ESMF_StateGet(State, itemName=trim(flds_scalar_name), field=field, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
     if (mytask == 0) then
       call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-      if (size(data) < seq_flds_scalar_num .or. size(farrayptr) < seq_flds_scalar_num) then
+      if (size(data) < flds_scalar_num .or. size(farrayptr) < flds_scalar_num) then
         call ESMF_LogWrite(trim(subname)//": ERROR on data size", ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
         rc = ESMF_FAILURE
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
       endif
-      farrayptr(1:seq_flds_scalar_num) = data(1:seq_flds_scalar_num)
+      farrayptr(1:flds_scalar_num) = data(1:flds_scalar_num)
     endif
 
   end subroutine shr_nuopc_fldList_CopyScalarToState

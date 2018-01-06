@@ -6,9 +6,9 @@ module shr_nuopc_methods_mod
 
   use ESMF
   use NUOPC
-  use shr_nuopc_fldList_mod, only : shr_nuopc_fldList_Type
   use shr_string_mod       , only : shr_string_listGetName
-  use seq_flds_mod         , only : seq_flds_scalar_name, seq_flds_scalar_num
+  use shr_nuopc_fldList_mod, only : shr_nuopc_fldList_Type
+  use shr_nuopc_flds_mod   , only : flds_scalar_name, flds_scalar_num
   use seq_comm_mct         , only : llogunit => logunit
   use mpi
 
@@ -726,7 +726,7 @@ module shr_nuopc_methods_mod
     !---------------------------------
 
     do n = 1, fieldCount
-      if (trim(lfieldnamelist(n)) == trim(seq_flds_scalar_name) .or. &
+      if (trim(lfieldnamelist(n)) == trim(flds_scalar_name) .or. &
           trim(lfieldnamelist(n)) == '') then
         do n1 = n, fieldCount-1
           lfieldnamelist(n1) = lfieldnamelist(n1+1)
@@ -1361,7 +1361,7 @@ module shr_nuopc_methods_mod
     ! the fldlist%mapping setting and apply it
     do n = 1,fldlist%num
 
-      if (fldlist%shortname(n) == trim(seq_flds_scalar_name)) then
+      if (fldlist%shortname(n) == trim(flds_scalar_name)) then
         if (dbug_flag > 1) then
            call ESMF_LogWrite(trim(subname)//trim(lstring)//": skip : fld="//trim(fldlist%shortname(n)), &
                 ESMF_LOGMSG_INFO, rc=dbrc)
@@ -3823,13 +3823,13 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call MPI_COMM_RANK(mpicom, mytask, rc)
-    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+    call ESMF_StateGet(State, itemName=trim(flds_scalar_name), field=field, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (mytask == 0) then
       call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      if (scalar_id < 0 .or. scalar_id > seq_flds_scalar_num) then
+      if (scalar_id < 0 .or. scalar_id > flds_scalar_num) then
         call ESMF_LogWrite(trim(subname)//": ERROR in scalar_id", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
         rc = ESMF_FAILURE
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
@@ -3869,13 +3869,13 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     call MPI_COMM_RANK(mpicom, mytask, rc)
-    call ESMF_StateGet(State, itemName=trim(seq_flds_scalar_name), field=field, rc=rc)
+    call ESMF_StateGet(State, itemName=trim(flds_scalar_name), field=field, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (mytask == 0) then
       call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      if (scalar_id < 0 .or. scalar_id > seq_flds_scalar_num) then
+      if (scalar_id < 0 .or. scalar_id > flds_scalar_num) then
         call ESMF_LogWrite(trim(subname)//": ERROR in scalar_id", ESMF_LOGMSG_INFO, line=__LINE__, file=u_FILE_u, rc=dbrc)
         rc = ESMF_FAILURE
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return

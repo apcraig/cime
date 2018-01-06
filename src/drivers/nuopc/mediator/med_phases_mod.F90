@@ -90,7 +90,7 @@ module med_phases_mod
     real(ESMF_KIND_R8), pointer :: ocnwgt(:),icewgt(:),customwgt(:)
     integer                     :: i, j, n, n1, n2, ncnt, lsize, is, ie
     logical                     :: first_call = .true.
-    type(ESMF_FieldBundle       :: FBtmp1
+    type(ESMF_FieldBundle)      :: FBtmp1
     character(len=*),parameter  :: subname='(med_phases_prep_atm)'
     !---------------------------------------
 
@@ -1659,7 +1659,7 @@ module med_phases_mod
   !-----------------------------------------------------------------------------
 
   subroutine med_phases_atmocn_ocnalb(gcomp, rc)
-    use seq_flds_mod  , only : seq_flds_scalar_index_nextsw_cday
+    use shr_nuopc_flds_mod  , only : flds_scalar_index_nextsw_cday
 
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
@@ -1725,7 +1725,7 @@ module med_phases_mod
 
        ! Note that shr_nuopc_methods_State_GetScalar includes a broadcast to all other pets im mpicom
        call shr_nuopc_methods_State_GetScalar(is_local%wrap%NstateImp(compatm), &
-            scalar_id=seq_flds_scalar_index_nextsw_cday, value=nextsw_cday, mpicom=is_local%wrap%mpicom, rc=rc)
+            scalar_id=flds_scalar_index_nextsw_cday, value=nextsw_cday, mpicom=is_local%wrap%mpicom, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     end if
@@ -1744,7 +1744,7 @@ module med_phases_mod
   !-----------------------------------------------------------------------------
 
   subroutine med_phases_atmocn_flux(gcomp, rc)
-    use seq_flds_mod  , only : seq_flds_scalar_index_dead_comps
+    use shr_nuopc_flds_mod  , only : flds_scalar_index_dead_comps
 
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
@@ -1774,12 +1774,12 @@ module med_phases_mod
 
     ! Determine dead_comps
     call shr_nuopc_methods_State_GetScalar(is_local%wrap%NStateImp(compatm), &
-         scalar_id=seq_flds_scalar_index_dead_comps, value=rdead_comps, mpicom=is_local%wrap%mpicom, rc=rc)
+         scalar_id=flds_scalar_index_dead_comps, value=rdead_comps, mpicom=is_local%wrap%mpicom, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     dead_comps = (rdead_comps /= 0._ESMF_KIND_r8)
 
     call shr_nuopc_methods_State_GetScalar(is_local%wrap%NStateImp(compocn), &
-         scalar_id=seq_flds_scalar_index_dead_comps, value=rdead_comps, mpicom=is_local%wrap%mpicom, rc=rc)
+         scalar_id=flds_scalar_index_dead_comps, value=rdead_comps, mpicom=is_local%wrap%mpicom, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     dead_comps = (rdead_comps /= 0._ESMF_KIND_r8)
 

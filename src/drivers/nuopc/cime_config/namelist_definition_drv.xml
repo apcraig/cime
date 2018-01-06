@@ -356,7 +356,6 @@
 
   <!-- =========================================== -->
   <!-- driver info attributes                      -->
-  <!-- (in mct driver this is seq_infodata_inparm) -->
   <!-- =========================================== -->
 
   <entry id="cime_model" modify_via_xml="CIME_MODEL">
@@ -2109,7 +2108,7 @@
 
   <entry id="flds_co2a">
     <type>logical</type>
-    <category>seq_flds</category>
+    <category>flds</category>
     <group>seq_cplflds_inparm</group>
     <desc>
       Previously, new fields that were needed to be passed between components
@@ -2126,7 +2125,7 @@
 
   <entry id="flds_co2b">
     <type>logical</type>
-    <category>seq_flds</category>
+    <category>flds</category>
     <group>seq_cplflds_inparm</group>
     <desc>
       Previously, new fields that were needed to be passed between components
@@ -2143,7 +2142,7 @@
 
   <entry id="flds_co2c">
     <type>logical</type>
-    <category>seq_flds</category>
+    <category>flds</category>
     <group>seq_cplflds_inparm</group>
     <desc>
       Previously, new fields that were needed to be passed between components
@@ -2158,43 +2157,9 @@
     </values>
   </entry>
 
-  <entry id="flds_co2_dmsa">
-    <type>logical</type>
-    <category>seq_flds</category>
-    <group>seq_cplflds_inparm</group>
-    <desc>
-      Previously, new fields that were needed to be passed between components
-      for certain compsets were specified by cpp-variables. This has been
-      modified to now be use cases. This use cases are specified in the
-      namelist cpl_flds_inparm and are currently triggered by the xml variable CCSM_BGC.
-      If CCSM_BGC is set to 'CO2_DMSA', then flds_co2_dmsa will be set to .true.
-    </desc>
-    <values>
-      <value>.false.</value>
-      <value BGC_MODE="CO2_DMSA">.true.</value>
-    </values>
-  </entry>
-
-  <entry id="flds_bgc">
-    <type>logical</type>
-    <category>seq_flds</category>
-    <group>seq_cplflds_inparm</group>
-    <desc>
-      Previously, new fields that were needed to be passed between components
-      for certain compsets were specified by cpp-variables. This has been
-      modified to now be use cases. This use cases are specified in the
-      namelist cpl_flds_inparm and are currently triggered by the xml variable ACME_BGC.
-      This is a new master switch for turning ACME BGC off and on, just for testing.
-      If ACME_BGC is set to 'TRUE', then flds_bgc will be set to .true.
-    </desc>
-    <values>
-      <value>.false.</value>
-    </values>
-  </entry>
-
   <entry  id="flds_wiso" modify_via_xml="FLDS_WISO">
     <type>logical</type>
-    <category>seq_flds</category>
+    <category>flds</category>
     <group>seq_cplflds_inparm</group>
     <desc>
       Pass water isotopes between components
@@ -2206,7 +2171,7 @@
 
   <entry  id="glc_nec" modify_via_xml="GLC_NEC">
     <type>integer</type>
-    <category>seq_flds</category>
+    <category>flds</category>
     <group>seq_cplflds_inparm</group>
     <desc>
       Number of cism elevation classes. Set by the xml variable GLC_NEC in env_run.xml
@@ -2218,7 +2183,7 @@
 
   <entry id="ice_ncat" modify_via_xml="ICE_NCAT">
     <type>integer</type>
-    <category>seq_flds</category>
+    <category>flds</category>
     <group>seq_cplflds_inparm</group>
     <desc>
       Number of sea ice thickness categories. Set by the xml variable ICE_NCAT in env_build.xml
@@ -2230,7 +2195,7 @@
 
   <entry id="flds_i2o_per_cat" modify_via_xml="CPL_I2O_PER_CAT">
     <type>logical</type>
-    <category>seq_flds</category>
+    <category>flds</category>
     <group>seq_cplflds_inparm</group>
     <desc>
       .true. if select per ice thickness category fields are passed to the ocean.
@@ -2247,16 +2212,16 @@
 
   <entry id="cplflds_custom">
     <type>char(200)</type>
-    <category>seq_flds</category>
+    <category>flds</category>
     <group>seq_cplflds_userspec</group>
     <desc>
       New fields that are user specidied can be added as namelist variables
-      by the user in the cpl namelist seq_flds_user using the namelist variable
+      by the user in the cpl namelist flds_user using the namelist variable
       array cplflds_customs. The user specified new fields must follow the
       above naming convention.
       As an example, say you want to add a new state 'foo' that is passed
       from the land to the atm - you would do this as follows
-      &amp;seq_flds_user
+      &amp;flds_user
       cplflds_custom = 'Sa_foo->a2x', 'Sa_foo->x2a'
       /
       This would add the field 'Sa_foo' to the character strings defining the

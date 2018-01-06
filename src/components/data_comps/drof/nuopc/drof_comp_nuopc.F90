@@ -8,11 +8,16 @@ module drof_comp_nuopc
   use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod   ! shared system calls
 
-  use seq_flds_mod
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
 
   use shr_nuopc_fldList_mod
+  use shr_nuopc_flds_mod    , only: flds_r2x, flds_r2x_map, flds_x2r, flds_x2r_map
+  use shr_nuopc_flds_mod    , only: flds_scalar_name
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_rofice_present
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_flood_present
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
   use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
@@ -247,11 +252,11 @@ module drof_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (rof_prognostic) then
-       call shr_nuopc_fldList_fromseqflds(fldsToRof, flds_x2r, flds_x2r_map, "will provide", subname//":seq_flds_x2r_states", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsToRof, flds_x2r, flds_x2r_map, "will provide", subname//":flds_x2r", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
-    call shr_nuopc_fldList_Add(fldsToRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsToRof, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
@@ -261,10 +266,10 @@ module drof_comp_nuopc
     call shr_nuopc_fldList_Zero(fldsFrRof, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromseqflds(fldsFrRof, flds_r2x, flds_r2x_map, "will provide", subname//":seq_flds_r2x_states", rc=rc)
+    call shr_nuopc_fldList_fromflds(fldsFrRof, flds_r2x, flds_r2x_map, "will provide", subname//":flds_r2x", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsFrRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFrRof, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
@@ -396,26 +401,26 @@ module drof_comp_nuopc
     call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_r2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(dble(ny_global),seq_flds_scalar_index_nx, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(ny_global),flds_scalar_index_nx, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(dble(nx_global),seq_flds_scalar_index_ny, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(nx_global),flds_scalar_index_ny, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_dead_comps, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     if (flood_present) then
-       call shr_nuopc_methods_State_SetScalar(1.0_r8, seq_flds_scalar_index_flood_present, exportState, mpicom, rc)
+       call shr_nuopc_methods_State_SetScalar(1.0_r8, flds_scalar_index_flood_present, exportState, mpicom, rc)
     else
-       call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_flood_present, exportState, mpicom, rc)
+       call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_flood_present, exportState, mpicom, rc)
     end if
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     if (rofice_present) then
-       call shr_nuopc_methods_State_SetScalar(1.0_r8, seq_flds_scalar_index_rofice_present, exportState, mpicom, rc)
+       call shr_nuopc_methods_State_SetScalar(1.0_r8, flds_scalar_index_rofice_present, exportState, mpicom, rc)
     else
-       call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_rofice_present, exportState, mpicom, rc)
+       call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_rofice_present, exportState, mpicom, rc)
     end if
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
