@@ -374,7 +374,14 @@ module shr_nuopc_methods_mod
 
     !---------------------------------------------------
     !--- get single fields from bundles
-    !--- assumes all fields in the bundle are on identical grids
+    !--- 1) ASSUMES all fields in the bundle are on identical grids
+    !--- 2) MULTIPLE route handles are going to be generated for
+    !---    given field bundle source and destination grids
+    !--- 3) EACH field, n, in a field bundle will have a mapping type
+    !---    associated it that is specified by fldlist%mapping(n)
+    !--- 4) Regridding is done on each field in the bundle by
+    !---    having the fldlist%mapping(n) use one of the supported
+    !---    route handles for the supported for the mapping
     !---------------------------------------------------
 
     call shr_nuopc_methods_FB_getFieldN(FBsrc, 1, fldsrc, rc)
@@ -393,13 +400,17 @@ module shr_nuopc_methods_mod
           if (trim(bilnrfn) == "idmap") then
              ! RH is redistribution
              if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH bilnr redist idmap'
+             call ESMF_LogWrite(trim(subname) // trim(string) // ' RH bilnr redist idmap', ESMF_LOGMSG_INFO, rc=dbrc)
              call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=bilnrmap, &
                   ignoreUnmatchedIndices = .true., rc=rc)
              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           else
-             ! RH is bilinear regrid
-             if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH bilnr regrid '
-             if (lmastertask) write(llogunit,'(3A)') subname,'   ',trim(bilnrfn)
+             ! RH is bilinear regrid via input file
+             if (lmastertask) write(llogunit,'(4A)') subname,trim(string),' RH bilnr via input file ', &
+                  trim(bilnrfn)
+             call ESMF_LogWrite(subname // trim(string) // ' RH bilnr via input file '// &
+                  trim(bilnrfn), ESMF_LOGMSG_INFO, rc=dbrc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
              call ESMF_FieldSMMStore(fldsrc, flddst, bilnrfn, routehandle=bilnrmap, &
                   ignoreUnmatchedIndices=.true., &
                   srcTermProcessing=srcTermProcessing_Value, rc=rc)
@@ -420,7 +431,8 @@ module shr_nuopc_methods_mod
              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           endif
 
-          if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH bilnr regrid computed on the fly'
+          if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH bilnr regrid computed on the fly '
+          call ESMF_LogWrite(subname // trim(string) //' RH bilnr regrid computed on the fly', ESMF_LOGMSG_INFO, rc=dbrc)
           call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=bilnrmap, &
                srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
                regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
@@ -451,26 +463,30 @@ module shr_nuopc_methods_mod
       if (present(consffn)) then
         if (trim(consffn) == "idmap") then
           if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH consf redist idmap'
+          call ESMF_LogWrite(subname // trim(string)//' RH consf redist idmap', ESMF_LOGMSG_INFO, rc=dbrc)
           call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=consfmap, &
             ignoreUnmatchedIndices = .true., rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         else
-          if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH consf regrid '
-          if (lmastertask) write(llogunit,'(3A)') subname,'   ',trim(consffn)
+          if (lmastertask) write(llogunit,'(4A)') subname,trim(string),' RH consf via input file ', &
+               trim(consffn)
+          call ESMF_LogWrite(subname // trim(string) //' RH consf via input file ' // &
+               trim(consffn), ESMF_LOGMSG_INFO, rc=dbrc)
           call ESMF_FieldSMMStore(fldsrc, flddst, consffn, routehandle=consfmap, &
-            ignoreUnmatchedIndices=.true., &
-            srcTermProcessing=srcTermProcessing_Value, rc=rc)
+               ignoreUnmatchedIndices=.true., &
+               srcTermProcessing=srcTermProcessing_Value, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       else
         if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH consf regrid computed on the fly'
+        call ESMF_LogWrite(subname // trim(string) //' RH consf regrid computed on the fly', ESMF_LOGMSG_INFO, rc=dbrc)
         call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=consfmap, &
-          srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
-          regridmethod=ESMF_REGRIDMETHOD_CONSERVE, &
-          normType=ESMF_NORMTYPE_FRACAREA, &
-          srcTermProcessing=srcTermProcessing_Value, &
-          factorList=factorList, ignoreDegenerate=.true., &
-          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
+             srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
+             regridmethod=ESMF_REGRIDMETHOD_CONSERVE, &
+             normType=ESMF_NORMTYPE_FRACAREA, &
+             srcTermProcessing=srcTermProcessing_Value, &
+             factorList=factorList, ignoreDegenerate=.true., &
+             unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (rhprint_flag) then
           call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_consf.nc", rc)
@@ -494,12 +510,15 @@ module shr_nuopc_methods_mod
       if (present(consdfn)) then
         if (trim(consdfn) == "idmap") then
           if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH consd redist idmap'
+          call ESMF_LogWrite(subname // trim(string) // ' RH consd redist idmap', ESMF_LOGMSG_INFO, rc=dbrc)
           call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=consdmap, &
             ignoreUnmatchedIndices = .true., rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         else
-          if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH consd regrid '
-          if (lmastertask) write(llogunit,'(3A)') subname,'   ',trim(consdfn)
+           if (lmastertask) write(llogunit,'(4A)') subname,trim(string),' RH consd via input file ', &
+                trim(consdfn)
+          call ESMF_LogWrite(subname // trim(string) //' RH consf via input file ' // &
+               trim(consdfn), ESMF_LOGMSG_INFO, rc=dbrc)
           call ESMF_FieldSMMStore(fldsrc, flddst, consdfn, routehandle=consdmap, &
             ignoreUnmatchedIndices=.true., &
             srcTermProcessing=srcTermProcessing_Value, rc=rc)
@@ -507,13 +526,14 @@ module shr_nuopc_methods_mod
         endif
       else
         if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH consd regrid computed on the fly'
+        call ESMF_LogWrite(subname // trim(string) //' RH consd regrid computed on the fly', ESMF_LOGMSG_INFO, rc=dbrc)
         call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=consdmap, &
-          srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
-          regridmethod=ESMF_REGRIDMETHOD_CONSERVE, &
-          normType=ESMF_NORMTYPE_DSTAREA, &
-          srcTermProcessing=srcTermProcessing_Value, &
-          factorList=factorList, ignoreDegenerate=.true., &
-          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
+             srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
+             regridmethod=ESMF_REGRIDMETHOD_CONSERVE, &
+             normType=ESMF_NORMTYPE_DSTAREA, &
+             srcTermProcessing=srcTermProcessing_Value, &
+             factorList=factorList, ignoreDegenerate=.true., &
+             unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (rhprint_flag) then
           call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_consd.nc", rc)
@@ -537,12 +557,15 @@ module shr_nuopc_methods_mod
       if (present(patchfn)) then
         if (trim(patchfn) == "idmap") then
           if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH patch redist idmap'
+          call ESMF_LogWrite(subname // trim(string) // ' RH patch redist idmap', ESMF_LOGMSG_INFO, rc=dbrc)
           call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=patchmap, &
             ignoreUnmatchedIndices = .true., rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         else
-          if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH patch regrid '
-          if (lmastertask) write(llogunit,'(3A)') subname,'   ',trim(patchfn)
+           if (lmastertask) write(llogunit,'(4A)') subname,trim(string),' RH patch via input file ', &
+                trim(patchfn)
+          call ESMF_LogWrite(subname // trim(string) //' RH patch via input file ' // &
+               trim(patchfn), ESMF_LOGMSG_INFO, rc=dbrc)
           call ESMF_FieldSMMStore(fldsrc, flddst, patchfn, routehandle=patchmap, &
             ignoreUnmatchedIndices=.true., &
             srcTermProcessing=srcTermProcessing_Value, rc=rc)
@@ -550,13 +573,15 @@ module shr_nuopc_methods_mod
         endif
       else
         if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH patch regrid computed on the fly'
+        call ESMF_LogWrite(subname // trim(string) // ' RH patch regrid computed on the fly ', &
+             ESMF_LOGMSG_INFO, rc=dbrc)
         call ESMF_FieldRegridStore(fldsrc, flddst, routehandle=patchmap, &
-          srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
-          regridmethod=ESMF_REGRIDMETHOD_PATCH, &
-          polemethod=polemethod, &
-          srcTermProcessing=srcTermProcessing_Value, &
-          factorList=factorList, ignoreDegenerate=.true., &
-          unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
+             srcMaskValues=(/lsrcMaskValue/), dstMaskValues=(/ldstMaskValue/), &
+             regridmethod=ESMF_REGRIDMETHOD_PATCH, &
+             polemethod=polemethod, &
+             srcTermProcessing=srcTermProcessing_Value, &
+             factorList=factorList, ignoreDegenerate=.true., &
+             unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (rhprint_flag) then
           call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_patch.nc", rc)
@@ -578,9 +603,9 @@ module shr_nuopc_methods_mod
 
     if (do_fcopy) then
       if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH fcopy redist'
-      call ESMF_FieldRedistStore(fldsrc, flddst, &
-        routehandle=fcopymap, &
-        ignoreUnmatchedIndices=.true., rc=rc)
+      call ESMF_LogWrite(subname // trim(string) // ' RH fcopy redist', ESMF_LOGMSG_INFO, rc=dbrc)
+      call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=fcopymap, &
+           ignoreUnmatchedIndices=.true., rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (rhprint_flag) then
         call ESMF_RouteHandlePrint(fcopymap, rc=rc)

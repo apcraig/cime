@@ -1423,17 +1423,18 @@ module MED
         if (is_local%wrap%comp_present(n1) .and. ESMF_StateIsCreated(is_local%wrap%NStateImp(n1),rc=rc)) then
           call shr_nuopc_methods_State_GetNumFields(is_local%wrap%NStateImp(n1), cntn1, rc=rc) ! Import Field Count
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          do n2 = 1,ncomps
-             if (cntn1 > 0 .and. &
-                  is_local%wrap%comp_present(n2) .and. med_coupling_allowed(n1,n2) .and. &
-                  ESMF_StateIsCreated(is_local%wrap%NStateExp(n2),rc=rc)) then
-              call shr_nuopc_methods_State_GetNumFields(is_local%wrap%NStateExp(n2), cntn2, rc=rc) ! Import Field Count
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-              if (cntn2 > 0) then
-                is_local%wrap%med_coupling_active(n1,n2) = .true.
-              endif
-            endif
-          enddo
+          if (cntn1 > 0) then
+             do n2 = 1,ncomps
+                if (is_local%wrap%comp_present(n2) .and. ESMF_StateIsCreated(is_local%wrap%NStateExp(n2),rc=rc) &
+                     .and. med_coupling_allowed(n1,n2)) then
+                   call shr_nuopc_methods_State_GetNumFields(is_local%wrap%NStateExp(n2), cntn2, rc=rc) ! Import Field Count
+                   if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                   if (cntn2 > 0) then
+                      is_local%wrap%med_coupling_active(n1,n2) = .true.
+                   endif
+                endif
+             enddo
+          end if
         endif
       enddo
 
@@ -1583,103 +1584,163 @@ module MED
 
       if (mastertask) write(llogunit,*) ' '
       do n1 = 1, ncomps
-      do n2 = 1, ncomps
-        rhname = trim(compname(n1))//"2"//trim(compname(n2))
-        dstMaskValue = ispval_mask
-        srcMaskValue = ispval_mask
-        if (n1 == compocn .or. n1 == compice) srcMaskValue = 0
-        if (n2 == compocn .or. n2 == compice) dstMaskValue = 0
+         do n2 = 1, ncomps
 
-        if (n1 /= n2) then
-          if (is_local%wrap%med_coupling_active(n1,n2)) then
+            dstMaskValue = ispval_mask
+            srcMaskValue = ispval_mask
+            if (n1 == compocn .or. n1 == compice) srcMaskValue = 0
+            if (n2 == compocn .or. n2 == compice) dstMaskValue = 0
 
-            ! tcraig, this is all temporary until we can fix the input map names
+            ! ----------------------------------------------------
+            ! Determine route handle names
+            ! ----------------------------------------------------
+            rhname = trim(compname(n1))//"2"//trim(compname(n2))
 
-            rhname_file = rhname
-            ! tcraig, special cases for CESM
-            if (rhname == 'rof2ice') rhname_file='rof2ocn'
-            if (rhname == 'glc2ice') rhname_file='glc2ocn'
+            if (n1 /= n2) then
+               ! If coupling is active between n1 and n2
 
-            ! tcraig, the rmapfile is needed for an input file for now
-            call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_fmapname", value=fmapfile, rc=rc)
-            if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) fmapfile=med_constants_spval_rhfile
-            call ESMF_LogWrite(trim(rhname)//"_fmapname = "//trim(fmapfile), ESMF_LOGMSG_INFO)
+               if (is_local%wrap%med_coupling_active(n1,n2)) then
 
-            call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_smapname", value=smapfile, rc=rc)
-            if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) smapfile=med_constants_spval_rhfile
-            call ESMF_LogWrite(trim(rhname)//"_smapname = "//trim(smapfile), ESMF_LOGMSG_INFO)
+                  ! ----------------------------------------------------
+                  ! Determine route handle filenames if appropriate
+                  ! Currently this involves specifying the filenames:
+                  !     smapfile, vmapfile, fmapfile and dmapfile
+                  ! route handles will not be create if:
+                  ! bilnrfn = med_constants_spval_rhfile, then a bilnr route handle is not created
+                  ! patchfn = med_constants_spval_rhfile, then a patch route handle is not created
+                  ! consdfn = med_constants_spval_rhfile, then a consd route handle is not created
+                  ! consffn = med_constants_spval_rhfile, then a consf route handle is not created
+                  ! ----------------------------------------------------
 
-            dmapfile = med_constants_spval_rhfile
-            pmapfile = med_constants_spval_rhfile
+                  ! TODO: the following encapsulates specific assumptions CESM - this needs to be generalized - or
+                  ! be implemented in a CESM specific section
 
-            ! tcraig, special cases for CESM
-            if (n1 == compocn .and. n2 == compice) smapfile='idmap'
-            if (n1 == compocn .and. n2 == compice) fmapfile='idmap'
-            if (n1 == compice .and. n2 == compocn) smapfile='idmap'
-            if (n1 == compice .and. n2 == compocn) fmapfile='idmap'
-            if (n1 == comprof .and. n2 == compocn) smapfile=fmapfile
-            if (n1 == comprof .and. n2 == compice) smapfile=fmapfile
-            if (n1 == complnd .and. n2 == comprof) smapfile=fmapfile
-            if (n1 == compatm .and. n2 == compwav) fmapfile=smapfile
-            if (n1 == compocn .and. n2 == compwav) fmapfile=smapfile
-            if (n1 == compice .and. n2 == compwav) fmapfile=smapfile
+                  if (rhname == 'rof2ocn' .or. rhname == 'rof2ice') then
 
-            ! tcraig, skip this for now, file too big and slow to read
-            ! if (rhname_file == 'glc2ocn') then
-            !   call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_rmapname", value=smapfile, rc=rc)
-            !   if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) fmapfile=med_constants_spval_rhfile
-            !   call ESMF_LogWrite(trim(rhname)//"_fmapname = "//trim(fmapfile), ESMF_LOGMSG_INFO)
+                     ! TODO: the rmapfile is needed for an input file for now - it cannot be computed on the fly
+                     ! The following is a temporary had to get run->ocn mapping files read into one of the
+                     ! accepted mapping file categories
+                     ! TODO: rof2ocn has 2 mapping files specified by rof2ocn_liq_rmapname and rof2ocn_ice_rmapname
+                     ! To get the mapping to work correctly, the mapping type specified in shr_nuopc_flds_mod for
+                     ! rof2ocn_ice is set to bilinear - and thereby will work with the smapfile setting below
 
-            !   call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_rmapname", value=fmapfile, rc=rc)
-            !   if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) fmapfile=med_constants_spval_rhfile
-            !   call ESMF_LogWrite(trim(rhname)//"_fmapname = "//trim(fmapfile), ESMF_LOGMSG_INFO)
-            ! endif
+                     rhname_file='rof2ocn_liq'
+                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_rmapname", value=fmapfile, rc=rc)
+                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) fmapfile=med_constants_spval_rhfile
+                     call ESMF_LogWrite(trim(rhname_file)//"_rmapname = "//trim(fmapfile), ESMF_LOGMSG_INFO)
 
-            if (mastertask) write(llogunit,*) subname,' calling RH_init for '//trim(rhname)
+                     rhname_file='rof2ocn_ice'
+                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_rmapname", value=smapfile, rc=rc)
+                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) smapfile=med_constants_spval_rhfile
+                     call ESMF_LogWrite(trim(rhname_file)//"_rmapname = "//trim(smapfile), ESMF_LOGMSG_INFO)
 
-            call shr_nuopc_methods_RH_Init( &
-                 FBsrc=is_local%wrap%FBImp(n1,n1), &
-                 FBdst=is_local%wrap%FBImp(n1,n2), &
-                 bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-                 consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-                 consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-                 patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-                 fcopymap=is_local%wrap%RH(n1,n2,mapfcopy), &
-                 srcMaskValue=srcMaskValue, &
-                 dstMaskValue=dstMaskValue, &
-                 fldlist1=FldsFr(n1), &
-                 string=trim(rhname)//'_weights', &
-                 bilnrfn=trim(smapfile), &
-                 consffn=trim(fmapfile), &
-                 consdfn=trim(dmapfile), &
-                 patchfn=trim(pmapfile), &
-                 spvalfn=med_constants_spval_rhfile, &
-                 mastertask=mastertask, &
-                 rc=rc)
-            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                     pmapfile = med_constants_spval_rhfile
+                     dmapfile = med_constants_spval_rhfile
 
-          elseif (is_local%wrap%comp_present(n1) .and. is_local%wrap%comp_present(n2)) then
+                  else if (rhname == 'ocn2ice' .or. rhname == 'ice2ocn') then
 
-            call NUOPC_CompAttributeGet(gcomp, name=trim(rhname)//"_fmapname", value=fmapfile, rc=rc)
-            if (.not. shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) then
-               call ESMF_LogWrite(trim(rhname)//"_fmapname = "//trim(fmapfile), ESMF_LOGMSG_INFO)
+                     smapfile = 'idmap'
+                     fmapfile = 'idmap'
+                     pmapfile = med_constants_spval_rhfile
+                     dmapfile = med_constants_spval_rhfile
 
-               call shr_nuopc_methods_RH_Init(&
-                    FBsrc=is_local%wrap%FBfrac(n1), &
-                    FBdst=is_local%wrap%FBfrac(n2), &
-                    consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-                    srcMaskValue=srcMaskValue, &
-                    dstMaskValue=dstMaskValue, &
-                    string=trim(rhname)//'_weights_for_fraction', &
-                    consffn=trim(fmapfile), &
-                    spvalfn=med_constants_spval_rhfile, &
-                    mastertask=mastertask, &
-                    rc=rc)
-              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                  else if (rhname == 'glc2ocn') then
+
+                     ! TODO: the glc2ocn files below are too big to read in right now - so skip reading them
+                     rhname_file='glc2ocn_rmapname'
+                     smapfile = med_constants_spval_rhfile
+                     fmapfile = med_constants_spval_rhfile
+                     pmapfile = med_constants_spval_rhfile
+                     dmapfile = med_constants_spval_rhfile
+
+                  else if (rhname == 'glc2ice') then
+
+                     ! TODO: the glc2ice files below are too big to read in right now - so skip reading them
+                     rhname_file='glc2ice_rmapname'
+                     smapfile = med_constants_spval_rhfile
+                     fmapfile = med_constants_spval_rhfile
+                     pmapfile = med_constants_spval_rhfile
+                     dmapfile = med_constants_spval_rhfile
+
+                  else
+
+                     rhname_file = rhname
+
+                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_fmapname", value=fmapfile, rc=rc)
+                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) fmapfile=med_constants_spval_rhfile
+                     call ESMF_LogWrite(trim(rhname)//"_fmapname = "//trim(fmapfile), ESMF_LOGMSG_INFO)
+
+                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_smapname", value=smapfile, rc=rc)
+                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) smapfile=med_constants_spval_rhfile
+                     call ESMF_LogWrite(trim(rhname)//"_smapname = "//trim(smapfile), ESMF_LOGMSG_INFO)
+
+                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_vmapname", value=pmapfile, rc=rc)
+                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) pmapfile=med_constants_spval_rhfile
+                     call ESMF_LogWrite(trim(rhname)//"_vmapname = "//trim(pmapfile), ESMF_LOGMSG_INFO)
+
+                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_dmapname", value=dmapfile, rc=rc)
+                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) dmapfile=med_constants_spval_rhfile
+                     call ESMF_LogWrite(trim(rhname)//"_dmapname = "//trim(dmapfile), ESMF_LOGMSG_INFO)
+
+                     if (n1 == compocn .and. n2 == compwav) fmapfile = smapfile
+                     if (n1 == compice .and. n2 == compwav) fmapfile = smapfile
+                     if (n1 == compatm .and. n2 == compwav) fmapfile = smapfile
+                     if (n1 == complnd .and. n2 == comprof) smapfile = fmapfile
+
+                  end if
+
+                  ! ----------------------------------------------------
+                  ! Initialize route handles
+                  ! ----------------------------------------------------
+
+                  if (mastertask) write(llogunit,*) subname,' calling RH_init for '//trim(rhname)
+
+                  call shr_nuopc_methods_RH_Init( &
+                       FBsrc=is_local%wrap%FBImp(n1,n1), &
+                       FBdst=is_local%wrap%FBImp(n1,n2), &
+                       bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
+                       consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+                       consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
+                       patchmap=is_local%wrap%RH(n1,n2,mappatch), &
+                       fcopymap=is_local%wrap%RH(n1,n2,mapfcopy), &
+                       srcMaskValue=srcMaskValue, &
+                       dstMaskValue=dstMaskValue, &
+                       fldlist1=FldsFr(n1), &
+                       string=trim(rhname)//'_weights', &
+                       bilnrfn=trim(smapfile), &
+                       consffn=trim(fmapfile), &
+                       consdfn=trim(dmapfile), &
+                       patchfn=trim(pmapfile), &
+                       spvalfn=med_constants_spval_rhfile, &
+                       mastertask=mastertask, &
+                       rc=rc)
+                  if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+               elseif (is_local%wrap%comp_present(n1) .and. is_local%wrap%comp_present(n2)) then
+
+                  ! If coupling is not active between n1 and n2 - but the two components are present
+
+                  call NUOPC_CompAttributeGet(gcomp, name=trim(rhname)//"_fmapname", value=fmapfile, rc=rc)
+                  if (.not. shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) then
+                     call ESMF_LogWrite(trim(rhname)//"_fmapname = "//trim(fmapfile), ESMF_LOGMSG_INFO)
+
+                     call shr_nuopc_methods_RH_Init(&
+                          FBsrc=is_local%wrap%FBfrac(n1), &
+                          FBdst=is_local%wrap%FBfrac(n2), &
+                          consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
+                          srcMaskValue=srcMaskValue, &
+                          dstMaskValue=dstMaskValue, &
+                          string=trim(rhname)//'_weights_for_fraction', &
+                          consffn=trim(fmapfile), &
+                          spvalfn=med_constants_spval_rhfile, &
+                          mastertask=mastertask, &
+                          rc=rc)
+                     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                  endif
+
+               endif
             endif
-          endif
-        endif
-      enddo
+         enddo
       enddo
       if (mastertask) call shr_sys_flush(llogunit)
 
@@ -1694,10 +1755,13 @@ module MED
            call med_infodata_CopyStateToInfodata(is_local%wrap%NStateImp(n1), infodata, trim(compname(n1))//'2cpli', &
                 is_local%wrap%mpicom, rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
           call shr_nuopc_methods_FB_reset(is_local%wrap%FBImpAccum(n1), value=czero, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
           call shr_nuopc_methods_FB_reset(is_local%wrap%FBExpAccum(n1), value=czero, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
           call shr_nuopc_methods_FB_copy(is_local%wrap%FBImp(n1,n1), is_local%wrap%NStateImp(n1), rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif

@@ -1223,30 +1223,30 @@ contains
     call fld_add(flds_x2r, flds_x2r_map, "Frxx_irrig", longname=longname, stdname=stdname, units=units)
 
     !-----------------------------
-    ! rof->ocn (runoff) and rof->lnd (flooding)
+    ! rof->ocn (liquid and frozen), rof->ice (frozen) and  rof->lnd (flooding)
     !-----------------------------
 
-    longname = 'Water flux due to runoff (liquid)'
+    longname = 'Water flux into sea water due to runoff (liquid)'
     stdname  = 'water_flux_into_sea_water'
     units    = 'kg m-2 s-1'
     call fld_add(flds_r2x, flds_r2x_map,'Forr_rofl', longname=longname, stdname=stdname, units=units)
     call fld_add(flds_x2o, flds_x2o_map,'Foxx_rofl', longname=longname, stdname=stdname, units=units)
     call fld_add(flds_r2o_liq, flds_r2o_liq_map,'Forr_rofl', longname=longname, stdname=stdname, units=units)
 
-    longname = 'Water flux due to runoff (frozen)'
+    longname = 'Water flux into sea water due to runoff (frozen)'
     stdname  = 'frozen_water_flux_into_sea_water'
     units    = 'kg m-2 s-1'
     call fld_add(flds_r2x, flds_r2x_map,'Forr_rofi', longname=longname, stdname=stdname, units=units)
     call fld_add(flds_x2o, flds_x2o_map,'Foxx_rofi', longname=longname, stdname=stdname, units=units)
     call fld_add(flds_r2o_ice, flds_r2o_ice_map,'Forr_rofi', longname=longname, stdname=stdname, units=units)
 
-    longname = 'Water flux due to runoff (frozen)'
+    longname = 'Water flux into sea ice due to runoff (frozen)'
     stdname  = 'frozen_water_flux_into_sea_ice'
     units    = 'kg m-2 s-1'
     call fld_add(flds_r2x, flds_r2x_map,'Firr_rofi', longname=longname, stdname=stdname, units=units)
     call fld_add(flds_x2i, flds_x2i_map,'Fixx_rofi', longname=longname, stdname=stdname, units=units)
 
-    longname = 'Waterrflux due to flooding'
+    longname = 'Waterrflux back to land due to flooding'
     stdname  = 'flooding_water_flux'
     units    = 'kg m-2 s-1'
     call fld_add(flds_r2x, flds_r2x_map,'Flrr_flood', longname=longname, stdname=stdname, units=units)
@@ -2245,13 +2245,19 @@ contains
     do n = 1,num
        call shr_string_listGetName(fldname, n, tempname)
        if (tempname(1:1) == 'S') then
-         ! if (fldname(1:4) == 'Sa_u' .or. fldname(1:4) == 'Sa_v') then
-         !    mapname = 'patch' ! TODO: add this - currently turned off
-         ! else
-          mapname = 'bilinear'
-         ! endif
+          if (tempname(1:4) == 'Sa_u' .or. tempname(1:4) == 'Sa_v') then
+             mapname = 'patch'
+          else
+             mapname = 'bilinear'
+          endif
        else if (tempname(1:1) == 'F')  then
-          mapname = 'conservefrac'
+          ! TODO: the following is a hack to work with the way that mapping files are
+          ! defined in med.F90 - this needs to be reworked!!!
+          if (trim(tempname) == 'Forr_rofi') then
+             mapname = 'bilinear'
+          else
+             mapname = 'conservefrac'
+          end if
        else if (tempname(1:2) == 'PF') then
           mapname = 'conservedst'
        else
@@ -2264,9 +2270,6 @@ contains
           maplist = trim(maplist)//':'//trim(mapname)
        end if
     end do
-    if (seq_comm_iamroot(1)) then
-       write(6,*)' DEBUG: fldname= ',fldname, ' mapname= ',mapname
-    end if
 
     if (len_trim(maplist) >= CXX) then
        write(llogunit,*)'fields are = ',trim(maplist)
