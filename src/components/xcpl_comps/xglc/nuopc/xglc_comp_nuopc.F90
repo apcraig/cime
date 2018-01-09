@@ -13,9 +13,11 @@ module xglc_comp_nuopc
 
   use shr_nuopc_fldList_mod
   use shr_nuopc_flds_mod    , only: flds_g2x, flds_g2x_map, flds_x2g, flds_x2g_map
-  use shr_nuopc_flds_mod    , only: flds_scalar_name, flds_scalar_index_nextsw_cday
+  use shr_nuopc_flds_mod    , only: flds_scalar_name, flds_scalar_index_dead_comps
   use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_glcocn_present
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_glcice_present
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_glclnd_present
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint, shr_nuopc_methods_chkerr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Print_FieldExchInfo
@@ -80,8 +82,7 @@ module xglc_comp_nuopc
 
   !----- formats -----
   character(*),parameter :: modName =  "(xglc_comp_nuopc)"
-  character(*),parameter :: u_FILE_u = &
-    __FILE__
+  character(*),parameter :: u_FILE_u = __FILE__
 
   !===============================================================================
   contains
@@ -277,8 +278,8 @@ module xglc_comp_nuopc
     call dead_init_nuopc('glc', mpicom, my_task, master_task, &
          inst_index, inst_suffix, inst_name, logunit, lsize, gbuf, nxg, nyg)
 
-    nflds_d2x = shr_string_listGetNum(seq_flds_g2x_fields)
-    nflds_x2d = shr_string_listGetNum(seq_flds_x2g_fields)
+    nflds_d2x = shr_string_listGetNum(flds_g2x)
+    nflds_x2d = shr_string_listGetNum(flds_x2g)
 
     allocate(gindex(lsize))
     allocate(lon(lsize))
@@ -314,13 +315,10 @@ module xglc_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (glc_present) then
-       call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2g_states, "will provide", subname//":seq_flds_x2g_states", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsToGlc, flds_x2g, flds_x2g_map, "will provide", subname//":flds_x2g", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-       call shr_nuopc_fldList_fromseqflds(fldsToGlc, seq_flds_x2g_fluxes, "will provide", subname//":seq_flds_x2g_fluxes", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_Add(fldsToGlc, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+       call shr_nuopc_fldList_Add(fldsToGlc, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -332,13 +330,10 @@ module xglc_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (glc_present) then
-       call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_g2x_states, "will provide", subname//":seq_flds_g2x_states", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsFrGlc, flds_g2x, flds_g2x_map, "will provide", subname//":flds_g2x", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-       call shr_nuopc_fldList_fromseqflds(fldsFrGlc, seq_flds_g2x_fluxes, "will provide", subname//":seq_flds_g2x_fluxes", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_Add(fldsFrGlc, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+       call shr_nuopc_fldList_Add(fldsFrGlc, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -414,7 +409,7 @@ module xglc_comp_nuopc
                 call shr_sys_abort("Glc prognostic .true. requires connection for " // trim(fldsToGlc%shortname(n)))
              end if
           end do
-          call shr_nuopc_grid_StateToArray(importState, x2d, seq_flds_x2g_fields, grid_option, rc=rc)
+          call shr_nuopc_grid_StateToArray(importState, x2d, flds_x2g, grid_option, rc=rc)
           if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
        end if
     endif
@@ -455,16 +450,16 @@ module xglc_comp_nuopc
     ! Set the coupling scalars
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x, seq_flds_g2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x, flds_g2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(dble(nyg),seq_flds_scalar_index_nx, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(nyg),flds_scalar_index_nx, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(dble(nxg),seq_flds_scalar_index_ny, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(nxg),flds_scalar_index_ny, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_dead_comps, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     if (glcocn_present) then
@@ -472,7 +467,7 @@ module xglc_comp_nuopc
     else
        scalar = 0.0_r8
     end if
-    call shr_nuopc_methods_State_SetScalar(scalar, seq_flds_scalar_index_glcocn_present, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(scalar, flds_scalar_index_glcocn_present, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     if (glcice_present) then
@@ -480,7 +475,7 @@ module xglc_comp_nuopc
     else
        scalar = 0.0_r8
     end if
-    call shr_nuopc_methods_State_SetScalar(scalar, seq_flds_scalar_index_glcice_present, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(scalar, flds_scalar_index_glcice_present, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     if (glclnd_present) then
@@ -488,7 +483,7 @@ module xglc_comp_nuopc
     else
        scalar = 0.0_r8
     end if
-    call shr_nuopc_methods_State_SetScalar(scalar, seq_flds_scalar_index_glclnd_present, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(scalar, flds_scalar_index_glclnd_present, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
@@ -498,7 +493,7 @@ module xglc_comp_nuopc
     if (dbug > 1) then
        if (my_task == master_task) then
           call shr_nuopc_methods_Print_FieldExchInfo(flag=2, values=d2x, logunit=logunit, &
-               fldlist=seq_flds_g2x_fields, nflds=nflds_d2x, istr="InitializeRealize: glc->mediator")
+               fldlist=flds_g2x, nflds=nflds_d2x, istr="InitializeRealize: glc->mediator")
        end if
        call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -639,20 +634,20 @@ module xglc_comp_nuopc
     ! Unpack export state
     !--------------------------------
 
-    call shr_nuopc_grid_StateToArray(importState, x2d, seq_flds_x2g_fields, grid_option, rc=rc)
+    call shr_nuopc_grid_StateToArray(importState, x2d, flds_x2g, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
     ! Run model
     !--------------------------------
 
-    call dead_run_nuopc('glc', clock, x2d, d2x, gbuf, seq_flds_g2x_fields, my_task, master_task, logunit)
+    call dead_run_nuopc('glc', clock, x2d, d2x, gbuf, flds_g2x, my_task, master_task, logunit)
 
     !--------------------------------
     ! Pack export state
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x, seq_flds_g2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x, flds_g2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
@@ -662,7 +657,7 @@ module xglc_comp_nuopc
     if (dbug > 1) then
        if (my_task == master_task) then
           call shr_nuopc_methods_Print_FieldExchInfo(flag=2, values=d2x, logunit=logunit, &
-               fldlist=seq_flds_g2x_fields, nflds=nflds_d2x, istr="ModelAdvance: glc->mediator")
+               fldlist=flds_g2x, nflds=nflds_d2x, istr="ModelAdvance: glc->mediator")
        end if
        call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out

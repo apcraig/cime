@@ -13,9 +13,9 @@ module xocn_comp_nuopc
 
   use shr_nuopc_fldList_mod
   use shr_nuopc_flds_mod    , only: flds_o2x, flds_o2x_map, flds_x2o, flds_x2o_map
-  use shr_nuopc_flds_mod    , only: flds_scalar_name
+  use shr_nuopc_flds_mod    , only: flds_scalar_name, flds_scalar_index_dead_comps
   use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_ocnrof_prognostic
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint, shr_nuopc_methods_chkerr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Print_FieldExchInfo
@@ -309,7 +309,7 @@ module xocn_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (ocn_present) then
-       call shr_nuopc_fldList_fromflds(fldsToOcn, flds_x2o, "will provide", subname//":flds_x2o", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsToOcn, flds_x2o, flds_x2o_map, "will provide", subname//":flds_x2o", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
        call shr_nuopc_fldList_Add(fldsToOcn, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
@@ -324,7 +324,7 @@ module xocn_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (ocn_present) then
-       call shr_nuopc_fldList_fromflds(fldsFrOcn, flds_o2x, "will provide", subname//":flds_o2x", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsFrOcn, flds_o2x, flds_o2x_map, "will provide", subname//":flds_o2x", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
        call shr_nuopc_fldList_Add(fldsFrOcn, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)

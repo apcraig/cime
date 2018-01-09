@@ -2104,22 +2104,71 @@ contains
 
     if (seq_comm_iamroot(ID)) then
        write(llogunit, "(A)") subname//': flds_a2x        = ',trim(flds_a2x)
+       write(llogunit, "(A)") subname//': flds_a2x_map    = ',trim(flds_a2x_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_x2a        = ',trim(flds_x2a)
+       write(llogunit, "(A)") subname//': flds_x2a_map    = ',trim(flds_x2a_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_l2x        = ',trim(flds_l2x)
+       write(llogunit, "(A)") subname//': flds_l2x_map    = ',trim(flds_l2x_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_x2l        = ',trim(flds_x2l)
+       write(llogunit, "(A)") subname//': flds_x2l_map    = ',trim(flds_x2l_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_i2x        = ',trim(flds_i2x)
+       write(llogunit, "(A)") subname//': flds_i2x_map    = ',trim(flds_i2x_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_x2i        = ',trim(flds_x2i)
+       write(llogunit, "(A)") subname//': flds_x2i_map    = ',trim(flds_x2i_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_o2x        = ',trim(flds_o2x)
+       write(llogunit, "(A)") subname//': flds_o2x_map    = ',trim(flds_o2x_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_x2o        = ',trim(flds_x2o)
+       write(llogunit, "(A)") subname//': flds_x2o_map    = ',trim(flds_x2o_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_g2x        = ',trim(flds_g2x)
+       write(llogunit, "(A)") subname//': flds_g2x_map    = ',trim(flds_g2x_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_x2g        = ',trim(flds_x2g)
+       write(llogunit, "(A)") subname//': flds_x2g_map    = ',trim(flds_x2g_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_xao        = ',trim(flds_xao)
-       write(llogunit, "(A)") subname//': flds_xao_albedo = ',trim(flds_xao_albedo)
-       write(llogunit, "(A)") subname//': flds_xao_diurnl = ',trim(flds_xao_diurnl)
+       write(llogunit, "(A)") subname//': flds_xao_map    = ',trim(flds_xao_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
+       write(llogunit, "(A)") subname//': flds_xao_albedo     = ',trim(flds_xao_albedo)
+       write(llogunit, "(A)") subname//': flds_xao_albedo_map = ',trim(flds_xao_albedo_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
+       write(llogunit, "(A)") subname//': flds_xao_diurnl     = ',trim(flds_xao_diurnl)
+       write(llogunit, "(A)") subname//': flds_xao_diurnl_map = ',trim(flds_xao_diurnl_map)
+
        write(llogunit, "(A)") subname//': flds_r2x        = ',trim(flds_r2x)
+       write(llogunit, "(A)") subname//': flds_r2x_map    = ',trim(flds_r2x_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_x2r        = ',trim(flds_x2r)
+       write(llogunit, "(A)") subname//': flds_x2r_map    = ',trim(flds_x2r_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_w2x        = ',trim(flds_w2x)
+       write(llogunit, "(A)") subname//': flds_w2x_map    = ',trim(flds_w2x_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
+
        write(llogunit, "(A)") subname//': flds_x2w        = ',trim(flds_x2w)
+       write(llogunit, "(A)") subname//': flds_x2w_map    = ',trim(flds_x2w_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
     end if
 
   end subroutine shr_nuopc_flds_set

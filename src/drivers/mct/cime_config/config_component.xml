@@ -1697,7 +1697,9 @@
   <entry id="VECT_MAP">
     <type>char</type>
     <valid_values>none,npfix,cart3d,cart3d_diag,cart3d_uvw,cart3d_uvw_diag</valid_values>
-    <default_value>cart3d</default_value>
+    <!-- <default_value>cart3d</default_value> -->
+    <!-- TODO NUOPC: - currently must have this value set to none to have valid comparisons with nuopc -->
+    <default_value>none</default_value>
     <group>run_domain</group>
     <file>env_run.xml</file>
     <desc>vector mapping option</desc>

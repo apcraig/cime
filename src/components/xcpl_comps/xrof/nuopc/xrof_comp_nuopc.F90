@@ -12,7 +12,7 @@ module xrof_comp_nuopc
   use seq_timemgr_mod       , only: seq_timemgr_EClockGetData
 
   use shr_nuopc_fldList_mod
-  use shr_nuopc_flds_mod    , only: flds_scalar_name
+  use shr_nuopc_flds_mod    , only: flds_r2x, flds_r2x_map, flds_x2r, flds_x2r_map
   use shr_nuopc_flds_mod    , only: flds_scalar_name
   use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
   use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
