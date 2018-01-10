@@ -8,7 +8,7 @@ module datm_shr_mod
   use shr_sys_mod    , only : shr_sys_flush, shr_sys_abort
   use shr_strdata_mod, only : shr_strdata_readnml
   use shr_dmodel_mod , only : shr_dmodel_mapset
-  use seq_flds_mod   , only : seq_flds_dom_coord, seq_flds_dom_other
+  use shr_flds_mod   , only : shr_flds_dom_coord, shr_flds_dom_other
   use shr_cal_mod    , only : shr_cal_date2julian
   use shr_ncread_mod , only : shr_ncread_varExists, shr_ncread_varDimSizes, shr_ncread_field4dG
   use shr_strdata_mod, only : shr_strdata_type
@@ -421,8 +421,8 @@ CONTAINS
     deallocate(start,length)
     lsizei = mct_gsmap_lsize(gsmapi,mpicom)
     lsizeo = mct_gsmap_lsize(gsmapo,mpicom)
-    call mct_gGrid_init(GGrid=gGridi, CoordChars=trim(seq_flds_dom_coord), &
-         OtherChars=trim(seq_flds_dom_other), lsize=lsizei )
+    call mct_gGrid_init(GGrid=gGridi, CoordChars=trim(shr_flds_dom_coord), &
+         OtherChars=trim(shr_flds_dom_other), lsize=lsizei )
     call mct_aVect_init(avi,rList="wind:windd:qsat",lsize=lsizei)
     avi%rAttr = SHR_CONST_SPVAL
 

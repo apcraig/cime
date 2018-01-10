@@ -8,11 +8,14 @@ module dwav_comp_nuopc
   use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod   ! shared system calls
 
-  use seq_flds_mod
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
 
   use shr_nuopc_fldList_mod
+  use shr_nuopc_flds_mod    , only: flds_w2x, flds_w2x_map, flds_x2w, flds_x2w_map
+  use shr_nuopc_flds_mod    , only: flds_scalar_name
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
@@ -28,7 +31,6 @@ module dwav_comp_nuopc
   use NUOPC
   use NUOPC_Model, &
     model_routine_SS      => SetServices, &
-    model_label_SetClock  => label_SetClock, &
     model_label_Advance   => label_Advance, &
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Finalize  => label_Finalize
@@ -115,10 +117,6 @@ module dwav_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     ! attach specializing method(s)
-#if (1 == 0)
-    call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetClock, specRoutine=SetClock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-#endif
 
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Advance, specRoutine=ModelAdvance, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
@@ -244,14 +242,11 @@ module dwav_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (wav_prognostic) then
-       call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2w_states, "will provide", subname//":seq_flds_x2w_states", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_fromseqflds(fldsToWav, seq_flds_x2w_fluxes, "will provide", subname//":seq_flds_x2w_fluxes", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsToWav, flds_x2w, flds_x2w_map, "will provide", subname//":flds_x2w", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
-    call shr_nuopc_fldList_Add(fldsToWav, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsToWav, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
@@ -261,13 +256,10 @@ module dwav_comp_nuopc
     call shr_nuopc_fldList_Zero(fldsFrWav, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_w2x_states, "will provide", subname//":seq_flds_w2x_states", rc=rc)
+    call shr_nuopc_fldList_fromflds(fldsFrWav, flds_w2x, flds_w2x_map, "will provide", subname//":flds_w2x", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromseqflds(fldsFrWav, seq_flds_w2x_fluxes, "will provide", subname//":seq_flds_w2x_fluxes", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFrWav, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFrWav, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
@@ -344,7 +336,7 @@ module dwav_comp_nuopc
     call dwav_comp_init(clock, x2d, d2x, &
          SDWAV, gsmap, ggrid, mpicom, compid, my_task, master_task, &
          inst_suffix, inst_name, logunit, read_restart, &
-         seq_flds_w2x_fields, seq_flds_x2w_fields)
+         flds_w2x, flds_x2w)
 
     !--------------------------------
     ! generate the grid or mesh from the gsmap and ggrid
@@ -397,16 +389,16 @@ module dwav_comp_nuopc
     ! Set the coupling scalars
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_w2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_w2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(dble(ny_global),seq_flds_scalar_index_nx, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(ny_global),flds_scalar_index_nx, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(dble(nx_global),seq_flds_scalar_index_ny, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(nx_global),flds_scalar_index_ny, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_dead_comps, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
@@ -454,40 +446,6 @@ module dwav_comp_nuopc
 
   !===============================================================================
 
-#if (1 == 0)
-  subroutine SetClock(gcomp, rc)
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-
-    ! local variables
-    type(ESMF_Clock)            :: mclock,dclock
-    type(ESMF_Time)             :: dcurrtime, dstarttime, dstoptime
-    type(ESMF_TimeInterval)     :: dtimestep
-    character(len=*),parameter  :: subname=trim(modName)//':(SetClock) '
-
-    rc = ESMF_SUCCESS
-    if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
-
-    ! query the Component for its clock, importState and exportState
-    call NUOPC_ModelGet(gcomp, driverClock=dclock, modelClock=mclock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call ESMF_ClockGet(dclock, currtime=dcurrtime, starttime=dstarttime, stoptime=dstoptime, timestep=dtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call ESMF_ClockSet(mclock, currtime=dcurrtime, starttime=dstarttime, stoptime=dstoptime, timestep=dtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call NUOPC_CompSetClock(gcomp, mclock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
-
-  end subroutine SetClock
-#endif
-
-  !===============================================================================
-
   subroutine ModelAdvance(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
@@ -531,7 +489,7 @@ module dwav_comp_nuopc
     !--------------------------------
 
     if (unpack_import) then
-       call shr_nuopc_grid_StateToArray(importState, x2d%rattr, seq_flds_x2w_fields, grid_option, rc=rc)
+       call shr_nuopc_grid_StateToArray(importState, x2d%rattr, flds_x2w, grid_option, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
     end if
 
@@ -567,7 +525,7 @@ module dwav_comp_nuopc
     ! Pack export state
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_w2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_w2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------

@@ -15,7 +15,7 @@ module dice_flux_atmice_mod
   real(R8) :: loc_latice = shr_const_latice
   real(R8) :: loc_stebol = shr_const_stebol
 
-  integer,parameter :: dbug = 2 ! internal debug level
+  integer,parameter :: dbug = 0 ! internal debug level
 
 !===============================================================================
 contains

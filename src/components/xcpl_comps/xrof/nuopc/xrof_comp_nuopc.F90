@@ -8,10 +8,16 @@ module xrof_comp_nuopc
   use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod   ! shared system calls
 
-  use seq_flds_mod
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_timemgr_mod       , only: seq_timemgr_EClockGetData
+
   use shr_nuopc_fldList_mod
+  use shr_nuopc_flds_mod    , only: flds_r2x, flds_r2x_map, flds_x2r, flds_x2r_map
+  use shr_nuopc_flds_mod    , only: flds_scalar_name
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_rofice_present
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_flood_present
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint, shr_nuopc_methods_chkerr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Print_FieldExchInfo
@@ -272,8 +278,8 @@ module xrof_comp_nuopc
     call dead_init_nuopc('rof', mpicom, my_task, master_task, &
          inst_index, inst_suffix, inst_name, logunit, lsize, gbuf, nxg, nyg)
 
-    nflds_d2x = shr_string_listGetNum(seq_flds_r2x_fields)
-    nflds_x2d = shr_string_listGetNum(seq_flds_x2r_fields)
+    nflds_d2x = shr_string_listGetNum(flds_r2x)
+    nflds_x2d = shr_string_listGetNum(flds_x2r)
 
     allocate(gindex(lsize))
     allocate(lon(lsize))
@@ -307,13 +313,10 @@ module xrof_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (rof_present) then
-       call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_states, "will provide", subname//":seq_flds_x2r_states", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsToRof, flds_x2r, flds_x2r_map, "will provide", subname//":flds_x2r", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-       call shr_nuopc_fldList_fromseqflds(fldsToRof, seq_flds_x2r_fluxes, "will provide", subname//":seq_flds_x2r_fluxes", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_Add(fldsToRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+       call shr_nuopc_fldList_Add(fldsToRof, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -325,13 +328,10 @@ module xrof_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (rof_present) then
-       call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_states, "will provide", subname//":seq_flds_r2x_states", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsFrRof, flds_r2x, flds_r2x_map, "will provide", subname//":flds_r2x", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-       call shr_nuopc_fldList_fromseqflds(fldsFrRof, seq_flds_r2x_fluxes, "will provide", subname//":seq_flds_r2x_fluxes", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_Add(fldsFrRof, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+       call shr_nuopc_fldList_Add(fldsFrRof, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -367,9 +367,8 @@ module xrof_comp_nuopc
 
     ! local variables
     character(CL)          :: NLFilename, cvalue
-    integer(IN)            :: phase, lmpicom, ierr
+    integer(IN)            :: lmpicom, ierr
     character(ESMF_MAXSTR) :: convCIM, purpComp
-    type(ESMF_Grid)        :: Egrid
     type(ESMF_Mesh)        :: Emesh
     integer(IN)            :: shrlogunit                ! original log unit
     integer(IN)            :: shrloglev                 ! original log level
@@ -391,29 +390,8 @@ module xrof_comp_nuopc
     call shr_file_getLogLevel(shrloglev)
     call shr_file_setLogUnit (logunit)
 
-    !----------------------------------------------------------------------------
-    ! If prognostic, than map import state to import attribute vector
-    !----------------------------------------------------------------------------
-
-    phase = 1  !TODO - this is hard-wired for now and needs to be generalized
-
-    if (phase .ne. 1) then
-       if (rof_prognostic) then
-          do n = 1,fldsToRof%num
-             connected = NUOPC_IsConnected(importState, fieldName=fldsToRof%shortname(n))
-             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) call shr_sys_abort()
-             if (.not. connected) then
-                call shr_sys_abort("Rof prognostic .true. requires connection for " // trim(fldsToRof%shortname(n)))
-             end if
-          end do
-          call shr_nuopc_grid_StateToArray(importState, x2d, seq_flds_x2r_fields, grid_option, rc=rc)
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-       end if
-    endif
-
     !--------------------------------
     ! generate the mesh
-    ! grid_option specifies grid or mesh
     !--------------------------------
 
     call shr_nuopc_grid_MeshInit(gcomp, nxg, nyg, mpicom, compid, gindex, lon, lat, Emesh, rc)
@@ -423,23 +401,11 @@ module xrof_comp_nuopc
     ! realize the actively coupled fields
     !--------------------------------
 
-    if (grid_option == 'mesh') then
+    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToRof, tag=subname//':drofImport', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-      call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToRof, tag=subname//':drofImport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-      call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrRof, tag=subname//':drofExport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    else
-
-      call shr_nuopc_fldList_Realize(importState, grid=Egrid, fldlist=fldsToRof, tag=subname//':drofImport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-      call shr_nuopc_fldList_Realize(exportState, grid=Egrid, fldlist=fldsFrRof, tag=subname//':drofExport', rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    endif
+    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrRof, tag=subname//':drofExport', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! Pack export state
@@ -447,16 +413,16 @@ module xrof_comp_nuopc
     ! Set the coupling scalars
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x, seq_flds_r2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x, flds_r2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(dble(nyg),seq_flds_scalar_index_nx, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(nyg),flds_scalar_index_nx, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(dble(nxg),seq_flds_scalar_index_ny, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(nxg),flds_scalar_index_ny, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
-    call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_dead_comps, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     if (rofice_present) then
@@ -464,7 +430,7 @@ module xrof_comp_nuopc
     else
        scalar = 0.0_r8
     end if
-    call shr_nuopc_methods_State_SetScalar(1.0_r8, seq_flds_scalar_index_rofice_present, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(1.0_r8, flds_scalar_index_rofice_present, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     if (flood_present) then
@@ -472,7 +438,7 @@ module xrof_comp_nuopc
     else
        scalar = 0.0_r8
     end if
-    call shr_nuopc_methods_State_SetScalar(1.0_r8, seq_flds_scalar_index_flood_present, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(1.0_r8, flds_scalar_index_flood_present, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
@@ -482,7 +448,7 @@ module xrof_comp_nuopc
     if (dbug > 1) then
        if (my_task == master_task) then
           call shr_nuopc_methods_Print_FieldExchInfo(flag=2, values=d2x, logunit=logunit, &
-               fldlist=seq_flds_r2x_fields, nflds=nflds_d2x, istr="InitializeRealize: rof->mediator")
+               fldlist=flds_r2x, nflds=nflds_d2x, istr="InitializeRealize: rof->mediator")
        end if
        call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
@@ -623,20 +589,20 @@ module xrof_comp_nuopc
     ! Unpack export state
     !--------------------------------
 
-    call shr_nuopc_grid_StateToArray(importState, x2d, seq_flds_x2r_fields, grid_option, rc=rc)
+    call shr_nuopc_grid_StateToArray(importState, x2d, flds_x2r, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
     ! Run model
     !--------------------------------
 
-    call dead_run_nuopc('rof', clock, x2d, d2x, gbuf, seq_flds_r2x_fields, my_task, master_task, logunit)
+    call dead_run_nuopc('rof', clock, x2d, d2x, gbuf, flds_r2x, my_task, master_task, logunit)
 
     !--------------------------------
     ! Pack export state
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x, seq_flds_r2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x, flds_r2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
 
     !--------------------------------
@@ -646,7 +612,7 @@ module xrof_comp_nuopc
     if (dbug > 1) then
        if (my_task == master_task) then
           call shr_nuopc_methods_Print_FieldExchInfo(flag=2, values=d2x, logunit=logunit, &
-               fldlist=seq_flds_r2x_fields, nflds=nflds_d2x, istr="ModelAdvance: rof->mediator")
+               fldlist=flds_r2x, nflds=nflds_d2x, istr="ModelAdvance: rof->mediator")
        end if
        call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out

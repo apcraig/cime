@@ -8,11 +8,14 @@ module datm_comp_nuopc
   use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod   ! shared system calls
 
-  use seq_flds_mod
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
 
   use shr_nuopc_fldList_mod
+  use shr_nuopc_flds_mod    , only: flds_a2x, flds_a2x_map, flds_x2a, flds_x2a_map
+  use shr_nuopc_flds_mod    , only: flds_scalar_name, flds_scalar_index_nextsw_cday
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
+  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar
@@ -29,7 +32,6 @@ module datm_comp_nuopc
   use NUOPC
   use NUOPC_Model, &
     model_routine_SS      => SetServices, &
-    model_label_SetClock  => label_SetClock, &
     model_label_Advance   => label_Advance, &
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Finalize  => label_Finalize
@@ -124,11 +126,6 @@ module datm_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     ! attach specializing method(s)
-#if (1 == 0)
-    call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetClock, &
-         specRoutine=SetClock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-#endif
 
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Advance, &
          specRoutine=ModelAdvance, rc=rc)
@@ -268,14 +265,11 @@ module datm_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (atm_prognostic) then
-       call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_states, "will provide", subname//":seq_flds_x2a_states", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-       call shr_nuopc_fldList_fromseqflds(fldsToAtm, seq_flds_x2a_fluxes, "will provide", subname//":seq_flds_x2a_fluxes", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsToAtm, flds_x2a, flds_x2a_map, "will provide", subname//":flds_x2a", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
-    call shr_nuopc_fldList_Add(fldsToAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsToAtm, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
@@ -285,13 +279,10 @@ module datm_comp_nuopc
     call shr_nuopc_fldList_Zero(fldsFrAtm, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_states, "will provide", subname//":seq_flds_a2x_states", rc=rc)
+    call shr_nuopc_fldList_fromflds(fldsFrAtm, flds_a2x, flds_a2x_map, "will provide", subname//":flds_a2x", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromseqflds(fldsFrAtm, seq_flds_a2x_fluxes, "will provide", subname//":seq_flds_a2x_fluxes", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFrAtm, trim(seq_flds_scalar_name), "will provide", subname//":seq_flds_scalar_name", rc=rc)
+    call shr_nuopc_fldList_Add(fldsFrAtm, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
@@ -411,7 +402,7 @@ module datm_comp_nuopc
     read(cvalue,*) read_restart
 
     call datm_comp_init(clock, x2d, d2x, &
-         seq_flds_x2a_fields, seq_flds_a2x_fields, &
+         flds_x2a, flds_a2x, &
          SDATM, gsmap, ggrid, mpicom, compid, my_task, master_task, &
          inst_suffix, inst_name, logunit, read_restart, &
          scmMode, scmlat, scmlon, &
@@ -467,29 +458,21 @@ module datm_comp_nuopc
     ! Set the coupling scalars
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_a2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_a2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !TODO: do we still need the nx and ny scalars?
-    call shr_nuopc_methods_State_SetScalar(dble(ny_global),seq_flds_scalar_index_nx, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(ny_global),flds_scalar_index_nx, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_methods_State_SetScalar(dble(nx_global),seq_flds_scalar_index_ny, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(dble(nx_global),flds_scalar_index_ny, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !TODO: do we really need the dead_comps scalar
-    call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_dead_comps, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_dead_comps, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_methods_State_SetScalar(nextsw_cday, seq_flds_scalar_index_nextsw_cday, exportState, mpicom, rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    !TODO: rmeove presaero flag below
-    if (presaero) then
-       call shr_nuopc_methods_State_SetScalar(1.0_r8, seq_flds_scalar_index_atm_aero, exportState, mpicom, rc)
-    else
-       call shr_nuopc_methods_State_SetScalar(0.0_r8, seq_flds_scalar_index_atm_aero, exportState, mpicom, rc)
-    end if
+    call shr_nuopc_methods_State_SetScalar(nextsw_cday, flds_scalar_index_nextsw_cday, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
@@ -538,44 +521,6 @@ module datm_comp_nuopc
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine InitializeRealize
-
-  !===============================================================================
-
-#if (1 == 0)
-  subroutine SetClock(gcomp, rc)
-    implicit none
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-
-    ! local variables
-    type(ESMF_Clock)            :: mclock,dclock
-    type(ESMF_Time)             :: dcurrtime, dstarttime, dstoptime
-    type(ESMF_TimeInterval)     :: dtimestep
-    character(len=*),parameter  :: subname=trim(modName)//':(SetClock) '
-    !-------------------------------------------------------------------------------
-
-    rc = ESMF_SUCCESS
-    if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
-
-    ! query the Component for its clock, importState and exportState
-    call NUOPC_ModelGet(gcomp, driverClock=dclock, modelClock=mclock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call ESMF_ClockGet(dclock, currtime=dcurrtime, starttime=dstarttime, &
-         stoptime=dstoptime, timestep=dtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call ESMF_ClockSet(mclock, currtime=dcurrtime, starttime=dstarttime, &
-         stoptime=dstoptime, timestep=dtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call NUOPC_CompSetClock(gcomp, mclock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
-
-  end subroutine SetClock
-#endif
 
   !===============================================================================
 
@@ -629,7 +574,7 @@ module datm_comp_nuopc
     !--------------------------------
 
     if (unpack_import) then
-       call shr_nuopc_grid_StateToArray(importState, x2d%rattr, seq_flds_x2a_fields, grid_option, rc=rc)
+       call shr_nuopc_grid_StateToArray(importState, x2d%rattr, flds_x2a, grid_option, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -667,10 +612,10 @@ module datm_comp_nuopc
     ! Pack export state
     !--------------------------------
 
-    call shr_nuopc_grid_ArrayToState(d2x%rattr, seq_flds_a2x_fields, exportState, grid_option, rc=rc)
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_a2x, exportState, grid_option, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_methods_State_SetScalar(nextsw_cday, seq_flds_scalar_index_nextsw_cday, exportState, mpicom, rc)
+    call shr_nuopc_methods_State_SetScalar(nextsw_cday, flds_scalar_index_nextsw_cday, exportState, mpicom, rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
