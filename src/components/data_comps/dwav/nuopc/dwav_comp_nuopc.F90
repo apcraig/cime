@@ -31,7 +31,6 @@ module dwav_comp_nuopc
   use NUOPC
   use NUOPC_Model, &
     model_routine_SS      => SetServices, &
-    model_label_SetClock  => label_SetClock, &
     model_label_Advance   => label_Advance, &
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Finalize  => label_Finalize
@@ -118,10 +117,6 @@ module dwav_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     ! attach specializing method(s)
-#if (1 == 0)
-    call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetClock, specRoutine=SetClock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-#endif
 
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Advance, specRoutine=ModelAdvance, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
@@ -448,40 +443,6 @@ module dwav_comp_nuopc
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine InitializeRealize
-
-  !===============================================================================
-
-#if (1 == 0)
-  subroutine SetClock(gcomp, rc)
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-
-    ! local variables
-    type(ESMF_Clock)            :: mclock,dclock
-    type(ESMF_Time)             :: dcurrtime, dstarttime, dstoptime
-    type(ESMF_TimeInterval)     :: dtimestep
-    character(len=*),parameter  :: subname=trim(modName)//':(SetClock) '
-
-    rc = ESMF_SUCCESS
-    if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
-
-    ! query the Component for its clock, importState and exportState
-    call NUOPC_ModelGet(gcomp, driverClock=dclock, modelClock=mclock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call ESMF_ClockGet(dclock, currtime=dcurrtime, starttime=dstarttime, stoptime=dstoptime, timestep=dtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call ESMF_ClockSet(mclock, currtime=dcurrtime, starttime=dstarttime, stoptime=dstoptime, timestep=dtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call NUOPC_CompSetClock(gcomp, mclock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
-
-  end subroutine SetClock
-#endif
 
   !===============================================================================
 

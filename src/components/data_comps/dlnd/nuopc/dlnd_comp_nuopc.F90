@@ -12,7 +12,7 @@ module dlnd_comp_nuopc
   use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
 
   use shr_nuopc_fldList_mod
-  use shr_nuopc_flds_mod    , only: flds_l2x, flds_l2x_map, flds_x2l, flds_l2x_map
+  use shr_nuopc_flds_mod    , only: flds_l2x, flds_l2x_map, flds_x2l, flds_x2l_map
   use shr_nuopc_flds_mod    , only: flds_scalar_name
   use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
   use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
@@ -32,7 +32,6 @@ module dlnd_comp_nuopc
   use NUOPC
   use NUOPC_Model, &
     model_routine_SS      => SetServices, &
-    model_label_SetClock  => label_SetClock, &
     model_label_Advance   => label_Advance, &
     model_label_SetRunClock => label_SetRunClock, &
     model_label_Finalize  => label_Finalize
@@ -245,7 +244,7 @@ module dlnd_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (lnd_prognostic) then
-       call shr_nuopc_fldList_fromflds(fldsToLnd, flds_x2l, flds_x2l_maps, "will provide", subname//":flds_x2l", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsToLnd, flds_x2l, flds_x2l_map, "will provide", subname//":flds_x2l", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     end if
 
@@ -259,7 +258,7 @@ module dlnd_comp_nuopc
     call shr_nuopc_fldList_Zero(fldsFrLnd, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromflds(fldsFrLnd, flds_l2x, flds_l2x_maps, "will provide", subname//":flds_l2x", rc=rc)
+    call shr_nuopc_fldList_fromflds(fldsFrLnd, flds_l2x, flds_l2x_map, "will provide", subname//":flds_l2x", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     call shr_nuopc_fldList_Add(fldsFrLnd, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
@@ -443,40 +442,6 @@ module dlnd_comp_nuopc
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine InitializeRealize
-
-  !===============================================================================
-
-#if (1 == 0)
-  subroutine SetClock(gcomp, rc)
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-
-    ! local variables
-    type(ESMF_Clock)            :: mclock,dclock
-    type(ESMF_Time)             :: dcurrtime, dstarttime, dstoptime
-    type(ESMF_TimeInterval)     :: dtimestep
-    character(len=*),parameter  :: subname=trim(modName)//':(SetClock) '
-
-    rc = ESMF_SUCCESS
-    if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
-
-    ! query the Component for its clock, importState and exportState
-    call NUOPC_ModelGet(gcomp, driverClock=dclock, modelClock=mclock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call ESMF_ClockGet(dclock, currtime=dcurrtime, starttime=dstarttime, stoptime=dstoptime, timestep=dtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call ESMF_ClockSet(mclock, currtime=dcurrtime, starttime=dstarttime, stoptime=dstoptime, timestep=dtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call NUOPC_CompSetClock(gcomp, mclock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
-
-  end subroutine SetClock
-#endif
 
   !===============================================================================
 
