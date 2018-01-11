@@ -121,8 +121,7 @@ module MED
   real(ESMF_KIND_R8), parameter :: spval       = med_constants_spval
   real(ESMF_KIND_R8), parameter :: czero       = med_constants_czero
   integer           , parameter :: ispval_mask = med_constants_ispval_mask
-  character(*),parameter :: u_FILE_u = &
-    __FILE__
+  character(*),parameter :: u_FILE_u = __FILE__
 
   public SetServices
 
@@ -1483,11 +1482,9 @@ module MED
       is_local%wrap%conn_prep_cnt(:) = 0
       is_local%wrap%conn_post_cnt(:) = 0
 
-      call med_fraction_setupflds(rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
       !----------------------------------------------------------
-      ! Allocate various FBs, FBImp, FBExp, FBImpAccum, FBExpAccum, FBfrac
+      ! Create various field bundles (FBs)
+      ! FBImp(n,n), FBExp(n), FBImpAccum(n), FBExpAccum(n)
       !----------------------------------------------------------
 
       do n1 = 1,ncomps
@@ -1512,17 +1509,36 @@ module MED
           call shr_nuopc_methods_FB_init(is_local%wrap%FBExpAccum(n1), STgeom=is_local%wrap%NStateExp(n1), &
             STflds=is_local%wrap%NStateExp(n1), name='FBExpAccum'//trim(compname(n1)), rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          ! Initialize FBfrac for component n1 - the field names will be fraclist(:,n1)
-          ! Note - must use import state here - since export state might not contain anything other
-          ! than scalar data if the component is not prognostic
-          call shr_nuopc_methods_FB_init(is_local%wrap%FBfrac(n1), STgeom=is_local%wrap%NStateImp(n1), &
-            fieldNameList=fraclist(:,n1), name='FBfrac'//trim(compname(n1)), rc=rc)
         endif
       enddo
       if (mastertask) call shr_sys_flush(llogunit)
 
-      ! These are the FBImp mapped to different grids, FBImp(n1,n1) is handled above
+      !----------------------------------------------------------
+      ! Create field bundle fractions - FBfrac
+      !----------------------------------------------------------
+
+      call med_fraction_setupflds(rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      do n1 = 1,ncomps
+         if (is_local%wrap%comp_present(n1) .and. &
+            ESMF_StateIsCreated(is_local%wrap%NStateImp(n1),rc=rc) .and. &
+            ESMF_StateIsCreated(is_local%wrap%NStateExp(n1),rc=rc)) then
+
+            ! Initialize FBfrac for component n1 - the field names will be fraclist(:,n1) set in
+            ! the call to med_fraction_setupflds above
+            ! Note - must use import state here - since export state might not contain anything other
+            ! than scalar data if the component is not prognostic
+
+            call shr_nuopc_methods_FB_init(is_local%wrap%FBfrac(n1), STgeom=is_local%wrap%NStateImp(n1), &
+                 fieldNameList=fraclist(:,n1), name='FBfrac'//trim(compname(n1)), rc=rc)
+         end if
+      end do
+
+      !----------------------------------------------------------
+      ! Create field bundles on different grids, FBImp(n1,:), note that FBImp(n1,n1) is handled above
+      !----------------------------------------------------------
+
       do n1 = 1,ncomps
         do n2 = 1,ncomps
           if (n1 /= n2 .and. is_local%wrap%med_coupling_active(n1,n2) .and. &
@@ -1556,25 +1572,24 @@ module MED
       ! Initialize AtmOcn FBs
       !----------------------------------------------------------
 
-      ! TODO:
-      ! Important Note - the NStateImp(compocn) or NStateImp(compatm) used here rather than NStateExp(n2), since
-      ! the export state might only contain control data and no grid information if
-      ! if the target component (n2) is not prognostic only receives control data back
+      ! NOTE: the NStateImp(compocn) or NStateImp(compatm) used here rather than the correspodning NStateExp,
+      ! since the export state might only contain control data and no grid information if
+      ! if the target component is not prognostic only receives control data back
 
       call shr_nuopc_methods_FB_init(is_local%wrap%FBAtmOcn_o, STgeom=is_local%wrap%NStateImp(compocn), &
-        fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_o', rc=rc)
+           fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_o', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       call shr_nuopc_methods_FB_init(is_local%wrap%FBAtmOcn_a, STgeom=is_local%wrap%NStateImp(compatm), &
-        fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_a', rc=rc)
+           fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_a', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumAtmOcn, STgeom=is_local%wrap%NStateImp(compocn), &
-        fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBaccumAtmOcn', rc=rc)
+           fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBaccumAtmOcn', rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !----------------------------------------------------------
-      !--- Initialize route handles
+      ! Initialize route handles
       !----------------------------------------------------------
 
       if (dbug_flag > 1) then
@@ -1745,7 +1760,7 @@ module MED
       if (mastertask) call shr_sys_flush(llogunit)
 
       !---------------------------------------
-      ! Initialize infodata, Accums (to zero), and FBImp (from NStateImp)
+      ! Initialize scalar data (infodata), Accums (to zero), and FBImp (from NStateImp)
       !---------------------------------------
 
       do n1 = 1,ncomps
@@ -1799,7 +1814,7 @@ module MED
 #endif
 
       !---------------------------------------
-      ! Carry out atmocn init if appropriate
+      ! Carry out atmocn initialization if appropriate
       !---------------------------------------
 
       if (is_local%wrap%med_coupling_active(compocn,compatm) .and. &

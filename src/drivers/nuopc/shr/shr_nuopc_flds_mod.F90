@@ -2153,6 +2153,7 @@ contains
 
        write(llogunit, "(A)") subname//': flds_xao_diurnl     = ',trim(flds_xao_diurnl)
        write(llogunit, "(A)") subname//': flds_xao_diurnl_map = ',trim(flds_xao_diurnl_map)
+       write(llogunit, "(A)") '-------------------------------------------------'
 
        write(llogunit, "(A)") subname//': flds_r2x        = ',trim(flds_r2x)
        write(llogunit, "(A)") subname//': flds_r2x_map    = ',trim(flds_r2x_map)

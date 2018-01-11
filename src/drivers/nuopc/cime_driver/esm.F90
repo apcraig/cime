@@ -68,7 +68,7 @@ module ESM
 #ifdef ESMFUSE_NOTYET_rtm
   use  rtm_comp_nuopc, only:   rtm_SS => SetServices
 #endif
-#ifdef ESMFUSE_NOTYET_mosart
+#ifdef ESMFUSE_mosart
   use mosart_comp_nuopc, only: mosart_SS => SetServices
 #endif
 #ifdef ESMFUSE_NOTYET_mom6
@@ -874,7 +874,7 @@ module ESM
           return  ! bail out
 #endif
         elseif (trim(model) == "mosart") then
-#ifdef ESMFUSE_NOTYET_mosart
+#ifdef ESMFUSE_mosart
           call NUOPC_DriverAddComp(driver, "ROF", mosart_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 #else

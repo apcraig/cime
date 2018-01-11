@@ -835,6 +835,15 @@ module med_phases_mod
         call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+        !DEBUG
+        ! call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,complnd), 'Flrl_rofsur', fldptr1=dataPtr1, rc=rc)
+        ! write(6,*)'DEBUG: lnd Flrl_rofsur= ',dataPtr1
+        ! call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,complnd), 'Flrl_rofsub', fldptr1=dataPtr1, rc=rc)
+        ! write(6,*)'DEBUG: lnd Flrl_rofsub= ',dataPtr1
+        ! call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,complnd), 'Flrl_rofgwl', fldptr1=dataPtr1, rc=rc)
+        ! write(6,*)'DEBUG: lnd Flrl_rofgwl= ',dataPtr1
+        !DEBUG
+
         call shr_nuopc_methods_FB_Regrid(fldsFr(n1), &
              is_local%wrap%FBImp(n1,n1), &
              is_local%wrap%FBImp(n1,n2), &
@@ -844,6 +853,25 @@ module med_phases_mod
              patchmap=is_local%wrap%RH(n1,n2,mappatch), &
              string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+        !DEBUG
+        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,comprof), 'Flrl_rofsur', fldptr1=dataPtr1, rc=rc)
+        do n = 1,size(dataPtr1)
+           if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, rof2 Flrl_rofsur= ',n,dataPtr1(n)
+        end do
+        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,comprof), 'Flrl_rofsub', fldptr1=dataPtr1, rc=rc)
+        do n = 1,size(dataPtr1)
+           if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, rof2 Flrl_rofsub= ',n, dataPtr1(n)
+        end do
+        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,comprof), 'Flrl_rofgwl', fldptr1=dataPtr1, rc=rc)
+        do n = 1,size(dataPtr1)
+           if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, rof2 Flrl_rofgwl= ',n, dataPtr1(n)
+        end do
+        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBfrac(comprof), 'lfrac', fldptr1=dataPtr1, rc=rc)
+        do n = 1,size(dataPtr1)
+           if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, rof2 lfrac= ',n, dataPtr1(n)
+        end do
+        !DEBUG
 
         if (dbug_flag > 1) then
            call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), &
@@ -861,9 +889,25 @@ module med_phases_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call med_merge_auto(is_local%wrap%FBExp(comprof), &
-         FB1=is_local%wrap%FBImp(complnd,comprof), FB1w=is_local%wrap%FBfrac(comprof), fldw1='lfrac', &
+         FB1=is_local%wrap%FBImp(complnd,comprof), &
+         FB1w=is_local%wrap%FBfrac(comprof), fldw1='lfrac', &
          document=first_call, string=subname, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !DEBUG
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(comprof), 'Frxx_rofsur', fldptr1=dataPtr1, rc=rc)
+    do n = 1,size(dataPtr1)
+       if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, Frxx_rofsur = ',n, dataPtr1(n)
+    end do
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(comprof), 'Frxx_rofsur', fldptr1=dataPtr1, rc=rc)
+    do n = 1,size(dataPtr1)
+       if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, Frxx_rofsur = ',n, dataPtr1(n)
+    end do
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(comprof), 'Frxx_rofgwl', fldptr1=dataPtr1, rc=rc)
+    do n = 1,size(dataPtr1)
+       if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, Frxx_rofgwl = ',n, dataPtr1(n)
+    end do
+    !DEBUG
 
     !---------------------------------------
     !--- custom calculations

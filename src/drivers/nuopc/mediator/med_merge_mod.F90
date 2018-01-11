@@ -328,6 +328,7 @@ module med_merge_mod
         endif
 
       elseif (index(FBoutpre,'x') > 0 .and. trim(FBname) == trim(FBoutname)) then
+
         ! this is a merge, FBoutpre must have an x in it.
 
         ! this checks whether a character in FBoutpre matches a character in FBpre that is NOT F or x.
@@ -335,6 +336,7 @@ module med_merge_mod
         ! "a" matches and a merge is fine.  If FBoutpre=Faxx and FBpre is Fioi then there is not match and
         ! that term should not be merged.  This only happens for "F" merges.  If FBpre has an x in it, then
         ! it can always be merged.
+
         match = .true.
         if (index(FBoutpre,'F') > 0) match = .false.
         if (index(FBpre,'x') > 0) match = .true.
@@ -345,24 +347,31 @@ module med_merge_mod
         enddo
 
         if (match) then
-          call shr_nuopc_methods_FB_GetFldPtr(FB, trim(FBfld), dpf1, dpf2, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          if (present(FBw) .and. present(fldw)) then
-            if (document) call ESMF_LogWrite(trim(subname)//":"//trim(lstring)//":"//trim(FBoutfld)//"+="//trim(FBfld)//"*"//trim(fldw), ESMF_LOGMSG_INFO, rc=dbrc)
-            if (lrank == 1) then
-              dp1(:) = dp1(:) + dpf1(:)*dpw1(:)
-            else
-              dp2 = dp2 + dpf2*dpw2
-            endif
-          else
-            if (document) call ESMF_LogWrite(trim(subname)//":"//trim(lstring)//":"//trim(FBoutfld)//"+="//trim(FBfld), ESMF_LOGMSG_INFO, rc=dbrc)
-            if (lrank == 1) then
-              dp1 = dp1 + dpf1
-            else
-              dp2 = dp2 + dpf2
-            endif
-          endif
+           call shr_nuopc_methods_FB_GetFldPtr(FB, trim(FBfld), dpf1, dpf2, rc=rc)
+           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           if (present(FBw) .and. present(fldw)) then
+              if (document) then
+                 call ESMF_LogWrite(trim(subname)//":"//trim(lstring)//":"//&
+                      trim(FBoutfld)//"+="//trim(FBfld)//"*"//trim(fldw), ESMF_LOGMSG_INFO, rc=dbrc)
+              end if
+              if (lrank == 1) then
+                 dp1(:) = dp1(:) + dpf1(:)*dpw1(:)
+              else
+                 dp2 = dp2 + dpf2*dpw2
+              endif
+           else
+              if (document) then
+                 call ESMF_LogWrite(trim(subname)//":"//trim(lstring)//":"//&
+                      trim(FBoutfld)//"+="//trim(FBfld), ESMF_LOGMSG_INFO, rc=dbrc)
+              end if
+              if (lrank == 1) then
+                 dp1 = dp1 + dpf1
+              else
+                 dp2 = dp2 + dpf2
+              endif
+           endif
         endif
+
       endif
     enddo
 
