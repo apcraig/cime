@@ -1856,6 +1856,19 @@
     </values>
   </entry>
 
+  <entry id="rof2lnd_smapname"    modify_via_xml="ROF2LND_FMAPNAME">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>DRIVER_maps_attributes</group>
+    <desc>
+      runoff to lnd conservative mapping file
+    </desc>
+    <values>
+      <value>$ROF2LND_FMAPNAME</value>
+    </values>
+  </entry>
+
   <entry id="rof2lnd_fmapname"    modify_via_xml="ROF2LND_FMAPNAME">
     <type>char</type>
     <category>mapping</category>
@@ -1987,6 +2000,19 @@
   </entry>
 
   <entry id="atm2wav_smapname"    modify_via_xml="ATM2WAV_SMAPNAME">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>DRIVER_maps_attributes</group>
+    <desc>
+      atm to wav state mapping file for states
+    </desc>
+    <values>
+      <value>$ATM2WAV_SMAPNAME</value>
+    </values>
+  </entry>
+
+  <entry id="atm2wav_vmapname"    modify_via_xml="ATM2WAV_SMAPNAME">
     <type>char</type>
     <category>mapping</category>
     <input_pathname>abs</input_pathname>

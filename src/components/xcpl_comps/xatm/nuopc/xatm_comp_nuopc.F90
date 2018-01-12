@@ -318,7 +318,7 @@ module xatm_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     if (atm_present) then
-       call shr_nuopc_fldList_fromflds(fldsFrAtm, flds_a2x, flds_x2a_map, "will provide", subname//":flds_a2x", rc=rc)
+       call shr_nuopc_fldList_fromflds(fldsFrAtm, flds_a2x, flds_a2x_map, "will provide", subname//":flds_a2x", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
        call shr_nuopc_fldList_Add(fldsFrAtm, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
