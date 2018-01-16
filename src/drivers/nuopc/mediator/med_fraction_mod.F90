@@ -1,8 +1,8 @@
 module med_fraction_mod
 
   !-----------------------------------------------------------------------------
-  ! Mediator Component.
-  ! Sets fracations on all component grids
+  ! Mediator Component
+  ! Sets fractions on all component grids
   !-----------------------------------------------------------------------------
 
   use ESMF
@@ -18,19 +18,25 @@ module med_fraction_mod
 
   private
 
+  ! public methods
+
+  public :: med_fraction_setupflds
+  public :: med_fraction_init
+  public :: med_fraction_set
+
+  ! private methods
+
+  private :: med_fraction_check
+
+  ! private module data
+
   integer                       :: dbrc
   integer           , parameter :: dbug_flag   = med_constants_dbug_flag
-  logical           , parameter :: statewrite_flag = med_constants_statewrite_flag
   real(ESMF_KIND_R8), parameter :: spval_init  = med_constants_spval_init
   real(ESMF_KIND_R8), parameter :: spval       = med_constants_spval
   real(ESMF_KIND_R8), parameter :: czero       = med_constants_czero
+  logical           , parameter :: statewrite_flag = med_constants_statewrite_flag
   character(*),parameter :: u_FILE_u = __FILE__
-
-  public med_fraction_setupflds
-  public med_fraction_init
-  public med_fraction_set
-
-  private med_fraction_check
 
   integer, parameter, public :: nfracs = 5
   character(len=5),public :: fraclist(nfracs,ncomps)
@@ -61,9 +67,9 @@ module med_fraction_mod
   !  real(ESMF_KIND_R8),parameter :: eps_fraclim = 1.0e-20   ! truncation limit in fractions_a(lfrac)
   !  logical ,parameter :: atm_frac_correct = .true. ! turn on frac correction on atm grid
 
-  !-----------------------------------------------------------------------------
-  contains
-  !-----------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
+contains
+!-----------------------------------------------------------------------------
 
   subroutine med_fraction_setupflds(rc)
     integer, intent(out) :: rc
@@ -191,16 +197,17 @@ module med_fraction_mod
     !---------------------------------------
 
     if (is_local%wrap%comp_present(complnd)) then
-       call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(complnd), 'lfrin', dataPtr1, rc=rc)
+       call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBImp(complnd,complnd) , 'Sl_lfrin' , dataPtr1, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBImp(complnd,complnd) , 'Sl_lfrin' , dataPtr2, rc=rc)
+       call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(complnd), 'lfrin', dataPtr2, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        ! set lfrin to Sl_lfrin in FBfrac(complnd)
-       dataPtr1(:) = dataPtr2(:)
+       dataPtr2(:) = dataPtr1(:)
 
        if (is_local%wrap%comp_present(compatm)) then
-          ! map lnd 'lfrin' to atm 'lfrin' conservatively
+          ! TODO: ERROR - the following mapping does not seem to take place in the PET0 file
+          ! map lnd 'lfrin' to atm 'lfrin' conservatively if datm is not prognostic
           call shr_nuopc_methods_FB_FieldRegrid(&
                is_local%wrap%FBfrac(complnd), 'lfrin', &
                is_local%wrap%FBfrac(compatm), 'lfrin', &
@@ -226,11 +233,6 @@ module med_fraction_mod
 
        ! Set 'frac' to 1 in FBfrac(comprof)
        dataPtr1(:) = 1.0_ESMF_KIND_R8
-
-       ! call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBImp(comprof,comprof) , 'frac' , dataPtr2, rc=rc)
-       ! if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       !   dataPtr1 = dataPtr2
-       ! endif
     endif
 
     !---------------------------------------
@@ -316,14 +318,14 @@ module med_fraction_mod
     !---------------------------------------
 
     if (is_local%wrap%comp_present(compatm)) then
-       call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(compatm), 'ofrac', dataPtr1, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(compatm), 'lfrac', dataPtr2, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
        if (is_local%wrap%comp_present(compocn) .or. is_local%wrap%comp_present(compice)) then
 
           ! if either ocn or ice is present then set 'lfrac' to 1. - 'ofrac'
+          call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(compatm), 'ofrac', dataPtr1, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(compatm), 'lfrac', dataPtr2, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
           do n = 1,size(dataPtr1)
              dataPtr2(n) = 1.0_ESMF_KIND_R8 - dataPtr1(n)
              if (dataPtr2(n) < eps_fraclim) dataPtr2(n) = 0.0_ESMF_KIND_R8
@@ -348,6 +350,7 @@ module med_fraction_mod
                 if (atm_frac_correct) dataPtr2(n) = 1.0_ESMF_KIND_R8
              end if
           end do
+
        endif
     end if
 
@@ -361,25 +364,27 @@ module med_fraction_mod
 
        ! set fractions_l(lfrac)
        if (is_local%wrap%comp_present(compatm)) then
+
           ! if the atmosphere is present, set fractions_l(lfrac) from fractions_a(lfrac)
           call shr_nuopc_methods_FB_FieldRegrid(&
                is_local%wrap%FBfrac(compatm), 'lfrac', &
                is_local%wrap%FBfrac(complnd), 'lfrac', &
                is_local%wrap%RH(compatm,complnd,mapconsf), rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
        else
+
           ! if the atmosphere is absent, then simply set fractions_l(lfrac) = fractions_l(lfrin)
           call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(complnd), 'lfrin', dataPtr1, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(complnd), 'lfrac', dataPtr2, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           dataPtr2 = dataPtr1
+
        endif
 
        ! now set fractions_r(lfrac) from fractions_l(lfrac)
        if (is_local%wrap%comp_present(comprof)) then
-          call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBfrac(complnd), 'lfrac', &
-               fldptr1=dataPtr1, rc=rc)
 
           call shr_nuopc_methods_FB_FieldRegrid(&
                is_local%wrap%FBfrac(complnd), 'lfrac', &
@@ -387,11 +392,6 @@ module med_fraction_mod
                is_local%wrap%RH(complnd,comprof,mapconsf), rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBfrac(comprof), 'lfrac', &
-               fldptr1=dataPtr1, rc=rc)
-!!$          do n = 1, size(dataPtr1)
-!!$             if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, rof1 lfrac= ',n,dataPtr1(n)
-!!$          end do
        endif
 
        ! now set fractions_g(lfrac) from fractions_l(lfrac)

@@ -16,6 +16,7 @@ module med_phases_mod
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_clean
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_diagnose
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_Regrid
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_Regrid_FracWeights
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_FieldRegrid
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_GetFldPtr
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_accum
@@ -24,7 +25,7 @@ module med_phases_mod
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_copy
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_GetScalar
   use med_internalstate_mod , only : InternalState
-  use med_internalstate_mod , only : ncomps, compname
+  use med_internalstate_mod , only : ncomps, compname, nmappers
   use med_internalstate_mod , only : compmed, compatm, complnd, compocn
   use med_internalstate_mod , only : compice, comprof, compwav, compglc
   use med_internalstate_mod , only : fldsFr, fldsAtmOcn
@@ -49,6 +50,8 @@ module med_phases_mod
   real(ESMF_KIND_R8), parameter :: czero           = med_constants_czero
   integer           , parameter :: ispval_mask     = med_constants_ispval_mask
   character(len=*)  , parameter :: ice_fraction_name = 'Si_ifrac'
+  character(len=*)  , parameter :: ocn_fraction_name = 'So_ofrac'
+  character(len=*)  , parameter :: lnd_fraction_name = 'Sl_lfrin'
   character(*)      , parameter :: u_FILE_u = __FILE__
   integer                       :: dbrc
 
@@ -64,11 +67,9 @@ module med_phases_mod
   public med_phases_atmocn_ocnalb
   public med_phases_atmocn_flux
 
-  private med_phases_map_frac
-
-  !-----------------------------------------------------------------------------
-  contains
-  !-----------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
+contains
+!-----------------------------------------------------------------------------
 
   subroutine med_phases_prep_atm(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
@@ -81,14 +82,9 @@ module med_phases_mod
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
-    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    real(ESMF_KIND_R8), pointer :: ifrac_i(:)   ! ice fraction on ice grid
-    real(ESMF_KIND_R8), pointer :: ifrac_a(:)   ! ice fraction on atm grid
-    real(ESMF_KIND_R8), pointer :: ifrac_ar(:)  ! 1./ifrac_a
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:)
     real(ESMF_KIND_R8), pointer :: ocnwgt(:),icewgt(:),customwgt(:)
-    integer                     :: mapindex
     integer                     :: i, j, n, n1, n2, ncnt, lsize, is, ie
-    type(ESMF_FieldBundle)      :: FBtmp1
     logical                     :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_atm)'
     !---------------------------------------
@@ -208,127 +204,24 @@ module med_phases_mod
        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-       ! Map ice fraction field from ice grid to atm grid - also compute the reverse
-       !--- Need to weight the ice2atm regrid by the ice fraction
-       !--- need to compute weight by the frac mapped with the correct mapping
-       !--- first compute the ice fraction on the atm grid for all active mappings
+       if (shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compice), ice_fraction_name, rc=rc)) then
 
-       if (shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), rc=rc)) then
+          ! ice fraction name exists as a field in is_local%wrap%FBImp(compice,compice)
+          ! Map ice fraction field from ice grid to atm grid - also compute the reverse
+          !--- Need to weight the ice2atm regrid by the ice fraction
+          !--- need to compute weight by the frac mapped with the correct mapping
+          !--- first compute the ice fraction on the atm grid for all active mappings
 
-          ! ice_fraction name exists as a field in is_local%wrap%FBImp(compice,compice)
-
-          !--- multiply FBImp(compice,compice) by Si_ifrac and set the result in FBtmp1 -
-
-          call shr_nuopc_methods_FB_init(FBtmp1, &
-                                         fbgeom=is_local%wrap%FBImp(compice,compice), &
-                                         fbflds=is_local%wrap%FBImp(compice,compice), &
-                                         name='FBtmp1_ice_x_frac', rc=rc)
-          if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
-
-          ! Note: this resets Si_ifrac in FBtmp1 and this does not get overwritten
-          call shr_nuopc_methods_FB_reset(FBtmp1, value=czero, rc=rc)
-          if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
-
-          call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), &
-               fldptr1=dataPtr1, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          do n = 1,fldsFr(compice)%num
-             if (fldsFr(compice)%shortname(n) /= trim(ice_fraction_name) .and. &
-                  shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compice), fldsFr(compice)%shortname(n), rc=rc) .and. &
-                  shr_nuopc_methods_FB_FldChk(FBtmp1, fldsFr(compice)%shortname(n), rc=rc)) then
-
-                ! dataptr3 is a pointer to the field in FBimp
-                call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compice) , &
-                     fldsFr(compice)%shortname(n), dataPtr3, rc=rc)
-
-                ! dataPtr4 is a pointer to the field in FBtmp1
-                call shr_nuopc_methods_FB_GetFldPtr(FBtmp1, &
-                     fldsFr(compice)%shortname(n), dataPtr4, rc=rc)
-
-                ! avoid non array fields like the scalars
-                if (size(dataptr1) == size(dataptr3)) then
-                   do i = 1,size(dataptr1)
-                      dataPtr4(i) = dataPtr3(i) * dataPtr1(i)
-                   enddo
-                end if
-             end if
-          end do
-
-          !--- regrid FBtmp1 (FBImp(compice,compice)*frac) to FBImp(compice,compatm), fields with fraction multiplied
-
-          call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          ! note: this regrids FBtmp1 to FBImp(compice, compatm - but
-          ! at this point Si_ifrac in FBImp is zero - because of above
-
-          call shr_nuopc_methods_FB_Regrid(fldsFr(compice), &
-               FBtmp1, &
+          call shr_nuopc_methods_FB_Regrid_FracWeights( &
+               is_local%wrap%FBImp(compice,compice), &
                is_local%wrap%FBImp(compice,compatm), &
-               consfmap=is_local%wrap%RH(compice,compatm,mapconsf), &
-               consdmap=is_local%wrap%RH(compice,compatm,mapconsd), &
-               bilnrmap=is_local%wrap%RH(compice,compatm,mapbilnr), &
-               patchmap=is_local%wrap%RH(compice,compatm,mappatch), &
-               string=trim(compname(compice))//'2'//trim(compname(compatm)), rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          call shr_nuopc_methods_FB_clean(FBtmp1, rc=rc)
-          if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
-
-          !--- divide FBImp(compice,compatm) by ice_fraction, interpolated ice fraction
-
-          do n = 1,fldsFr(compice)%num
-
-             if (fldsFr(compice)%shortname(n) /= trim(ice_fraction_name) .and. &
-                 shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compatm), fldsFr(compice)%shortname(n), rc=rc)) then
-
-                call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compatm), fldsFr(compice)%shortname(n), &
-                     dataPtr3, rc=rc)
-
-                ! TODO: this needs to be implemented?
-                ! NOTE: here dataPtr3 is an array on the atm grid, above it is on the ice grid
-                !--- make sure ifrac_a in the mapped bundle is correct
-                !--- this is handled by ice_fraction_name check in the mult/divide phases to avoid ice_fraction weighting
-                ! call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compatm), trim(ice_fraction_name), &
-                !    dataPtr3, rc=rc)
-                ! do i=1,size(dataPtr3)
-                !    dataPtr3(i) = ifrac_af(i)
-                ! enddo
-
-                ! avoid non array fields like the scalars
-                if (fldsFr(compice)%mapping(n) == "conservefrac") then
-                   mapindex=mapconsf
-                elseif (fldsFr(compice)%mapping(n) == "conservedst") then
-                   mapindex=mapconsd
-                elseif (fldsFr(compice)%mapping(n) == "bilinear") then
-                   mapindex=mapbilnr
-                elseif (fldsFr(compice)%mapping(n) == "patch") then
-                   mapindex=mappatch
-                else
-                   call ESMF_LogWrite(trim(subname)//": mapping name error "//trim(fldsFr(compice)%mapping(n)), &
-                        ESMF_LOGMSG_INFO, rc=rc)
-                   rc = ESMF_FAILURE
-                   if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-                end if
-
-                call med_phases_map_frac(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), &
-                                         is_local%wrap%FBImp(compice,compatm), trim(ice_fraction_name), &
-                                         is_local%wrap%RH(compice,compatm,mapindex), ifrac_a, ifrac_ar, rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-                if (size(ifrac_ar) == size(dataptr3)) then
-                   do i = 1,size(dataptr3)
-                      dataPtr3(i) = dataPtr3(i) * ifrac_ar(i)
-                   end do
-                end if
-             endif
-          enddo
+               is_local%wrap%RH, &
+               fldsFr(compice), ice_fraction_name, compice, compatm, &
+               mapbilnr, mapconsf, mapconsd, mappatch, compname, rc=rc)
 
        else
 
           ! ice_fraction name does not exist as a field in is_local%wrap%FBImp(compice,compice)
-
           call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -463,7 +356,9 @@ module med_phases_mod
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
-    real(ESMF_KIND_R8), pointer :: dataPtr1(:), dataPtr2(:), dataPtr3(:), dataPtr4(:)
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:)
+    real(ESMF_KIND_R8), pointer :: dataPtr2(:)
+    real(ESMF_KIND_R8), pointer :: dataPtr3(:)
     integer                     :: i,n,n1,n2,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_ice)'
@@ -634,7 +529,7 @@ module med_phases_mod
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
-    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:)
     integer                     :: i,j,n,n1,n2,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_lnd)'
@@ -768,7 +663,7 @@ module med_phases_mod
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
-    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:)
     integer                     :: i,j,n,n1,n2,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_rof)'
@@ -826,60 +721,27 @@ module med_phases_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !---------------------------------------
-    !--- map to create FBimp(:,comprof)
+    !--- map to create FBimp(complnd,comprof)
     !---------------------------------------
+    ! NOTE: it is assumed that only lnd feeds to river (rof) component
 
-    n2 = comprof
-    do n1 = 1,ncomps
-      if (is_local%wrap%med_coupling_active(n1,n2)) then
-        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (is_local%wrap%med_coupling_active(complnd,comprof)) then
+       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(complnd,comprof), value=czero, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        !DEBUG
-        ! call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,complnd), 'Flrl_rofsur', fldptr1=dataPtr1, rc=rc)
-        ! write(6,*)'DEBUG: lnd Flrl_rofsur= ',dataPtr1
-        ! call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,complnd), 'Flrl_rofsub', fldptr1=dataPtr1, rc=rc)
-        ! write(6,*)'DEBUG: lnd Flrl_rofsub= ',dataPtr1
-        ! call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,complnd), 'Flrl_rofgwl', fldptr1=dataPtr1, rc=rc)
-        ! write(6,*)'DEBUG: lnd Flrl_rofgwl= ',dataPtr1
-        !DEBUG
+       call shr_nuopc_methods_FB_Regrid_FracWeights( &
+            is_local%wrap%FBImp(complnd,complnd), &
+            is_local%wrap%FBImp(complnd,comprof), &
+            is_local%wrap%RH, &
+            fldsFr(complnd), lnd_fraction_name, complnd, comprof, &
+            mapbilnr, mapconsf, mapconsd, mappatch, compname, rc=rc)
 
-        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), &
-             is_local%wrap%FBImp(n1,n1), &
-             is_local%wrap%FBImp(n1,n2), &
-             consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-             consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-             bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-             patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-             string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        !DEBUG
-        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,comprof), 'Flrl_rofsur', fldptr1=dataPtr1, rc=rc)
-        do n = 1,size(dataPtr1)
-           if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, rof2 Flrl_rofsur= ',n,dataPtr1(n)
-        end do
-        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,comprof), 'Flrl_rofsub', fldptr1=dataPtr1, rc=rc)
-        do n = 1,size(dataPtr1)
-           if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, rof2 Flrl_rofsub= ',n, dataPtr1(n)
-        end do
-        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(complnd,comprof), 'Flrl_rofgwl', fldptr1=dataPtr1, rc=rc)
-        do n = 1,size(dataPtr1)
-           if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, rof2 Flrl_rofgwl= ',n, dataPtr1(n)
-        end do
-        call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBfrac(comprof), 'lfrac', fldptr1=dataPtr1, rc=rc)
-        do n = 1,size(dataPtr1)
-           if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, rof2 lfrac= ',n, dataPtr1(n)
-        end do
-        !DEBUG
-
-        if (dbug_flag > 1) then
-           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), &
-                string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+       if (dbug_flag > 1) then
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(complnd,comprof), &
+               string=trim(subname)//' FBImp('//trim(compname(complnd))//','//trim(compname(comprof))//') ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        endif
-      endif
-    enddo
+       endif
+    endif
 
     !---------------------------------------
     !--- auto merges
@@ -893,21 +755,6 @@ module med_phases_mod
          FB1w=is_local%wrap%FBfrac(comprof), fldw1='lfrac', &
          document=first_call, string=subname, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !DEBUG
-    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(comprof), 'Frxx_rofsur', fldptr1=dataPtr1, rc=rc)
-    do n = 1,size(dataPtr1)
-       if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, Frxx_rofsur = ',n, dataPtr1(n)
-    end do
-    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(comprof), 'Frxx_rofsur', fldptr1=dataPtr1, rc=rc)
-    do n = 1,size(dataPtr1)
-       if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, Frxx_rofsur = ',n, dataPtr1(n)
-    end do
-    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(comprof), 'Frxx_rofgwl', fldptr1=dataPtr1, rc=rc)
-    do n = 1,size(dataPtr1)
-       if (dataPtr1(n) /= 0.0) write(6,*)'DEBUG: n, Frxx_rofgwl = ',n, dataPtr1(n)
-    end do
-    !DEBUG
 
     !---------------------------------------
     !--- custom calculations
@@ -944,7 +791,7 @@ module med_phases_mod
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
-    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:)
     integer                     :: i,j,n,n1,n2,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_wav)'
@@ -1075,7 +922,7 @@ module med_phases_mod
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
-    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:)
     integer                     :: i,j,n,n1,n2,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_glc)'
@@ -1208,7 +1055,7 @@ module med_phases_mod
     type(InternalState)         :: is_local
     integer                     :: i,j,n,n1,n2,ncnt
     character(ESMF_MAXSTR)      :: fieldname1(10),fieldname2(10),fieldname3(10)
-    real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:)
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:)
     real(ESMF_KIND_R8), pointer :: atmwgt(:),icewgt(:),customwgt(:)
     logical                     :: checkOK, checkOK1, checkOK2
     logical,save                :: first_call = .true.
@@ -1515,61 +1362,6 @@ module med_phases_mod
 
   !-----------------------------------------------------------------------------
 
-  subroutine med_phases_map_frac(FBin, fldin, FBout, fldout, RH, iarr, iarr_r, rc)
-
-    ! Map field bundles with appropriate fraction weighting
-
-    type(ESMF_FieldBundle)      :: FBin      ! input FB
-    character(len=*)            :: fldin     ! input fieldname
-    type(ESMF_FieldBundle)      :: FBout     ! output FB
-    character(len=*)            :: fldout    ! output fieldname
-    type(ESMF_RouteHandle)      :: RH        ! RH
-    real(ESMF_KIND_R8), pointer :: iarr(:)   ! mapped field
-    real(ESMF_KIND_R8), pointer :: iarr_r(:) ! reciprical of mapped field
-    integer                     :: rc        ! return code
-
-    ! local
-    integer :: i
-    real(ESMF_KIND_R8), pointer :: dataPtr2(:)
-    character(len=*),parameter :: subname='(med_phases_map_frac)'
-    !---------------------------------------
-
-    if (dbug_flag > 5) then
-      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
-    endif
-    rc = ESMF_SUCCESS
-
-    if (ESMF_RouteHandleIsCreated(RH, rc=rc)) then
-      call shr_nuopc_methods_FB_FieldRegrid(FBin, fldin, FBout, fldout, RH, rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-      !--- copy out the ifrac on ice grid and ifrac on atm grid
-      call shr_nuopc_methods_FB_GetFldPtr(FBout, fldout, fldptr1=dataPtr2, rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-      allocate(iarr  (lbound(dataptr2,1):ubound(dataptr2,1)))
-      allocate(iarr_r(lbound(dataptr2,1):ubound(dataptr2,1)))
-
-      do i=lbound(dataptr2,1),ubound(dataptr2,1)
-        !--- compute ice fraction on atm grid and reciprocal
-        if (dataPtr2(i) == 0.0_ESMF_KIND_R8) then
-          iarr(i)   = 0.0_ESMF_KIND_R8
-          iarr_r(i) = 0.0_ESMF_KIND_R8
-        else
-          iarr(i)   = dataPtr2(i)
-          iarr_r(i) = 1.0_ESMF_KIND_R8/dataPtr2(i)
-        endif
-      enddo
-    endif
-
-    if (dbug_flag > 5) then
-      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
-    endif
-
-  end subroutine med_phases_map_frac
-
-  !-----------------------------------------------------------------------------
-
   subroutine med_phases_atmocn_init(gcomp, rc)
     ! Initialize atm/ocn module variables
 
@@ -1798,5 +1590,6 @@ module med_phases_mod
     end if
 
   end subroutine med_phases_atmocn_flux
+
 
 end module med_phases_mod

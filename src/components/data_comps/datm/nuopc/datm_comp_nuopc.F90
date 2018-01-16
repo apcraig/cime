@@ -247,6 +247,10 @@ module datm_comp_nuopc
          inst_index, inst_suffix, inst_name, &
          logunit, shrlogunit, SDATM, atm_present, atm_prognostic)
 
+    !DEBUG:
+    atm_prognostic = .true.
+    !DEBUG
+
     ! NOTE: atm_present flag is not needed - since the run sequence will have no call to this routine
     ! for the atm_present flag being set to false (i.e. null mode)
     ! NOTE: only the atm_prognostic flag is needed below

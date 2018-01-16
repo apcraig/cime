@@ -70,6 +70,7 @@ module shr_nuopc_methods_mod
   public shr_nuopc_methods_FB_clean
   public shr_nuopc_methods_FB_diagnose
   public shr_nuopc_methods_FB_Regrid
+  public shr_nuopc_methods_FB_Regrid_FracWeights
   public shr_nuopc_methods_FB_FldChk
   public shr_nuopc_methods_FB_FieldRegrid
   public shr_nuopc_methods_FB_FieldMerge_1D
@@ -741,7 +742,8 @@ module shr_nuopc_methods_mod
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" fieldNameList from STflds", ESMF_LOGMSG_INFO, rc=rc)
     else
-      call ESMF_LogWrite(trim(subname)//": ERROR fieldNameList, FBflds, STflds, FBgeom, or STgeom must be passed", ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(trim(subname)//": ERROR fieldNameList, FBflds, STflds, FBgeom, or STgeom must be passed", &
+            ESMF_LOGMSG_INFO, rc=rc)
       rc = ESMF_FAILURE
       return
     endif
@@ -1000,7 +1002,8 @@ module shr_nuopc_methods_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (fieldnum > fieldCount) then
-      call ESMF_LogWrite(trim(subname)//": ERROR fieldnum > fieldCount ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//": ERROR fieldnum > fieldCount ", &
+            ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
       rc = ESMF_FAILURE
       return
     endif
@@ -1272,14 +1275,16 @@ module shr_nuopc_methods_mod
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       if (lrankIn /= lrankOut) then
-        call ESMF_LogWrite(trim(subname)//": ERROR FBin and FBout different rank", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+         call ESMF_LogWrite(trim(subname)//": ERROR FBin and FBout different rank", &
+              ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
         rc = ESMF_FAILURE
         return
       endif
 
       if (lrankIn == 1 .and. lrankOut == 1) then
         if (.not.shr_nuopc_methods_FieldPtr_Compare(dataPtrIn1, dataPtrOut1, subname, rc)) then
-          call ESMF_LogWrite(trim(subname)//": ERROR data1d different sizes", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+           call ESMF_LogWrite(trim(subname)//": ERROR data1d different sizes", &
+                ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
           return
         endif
@@ -1288,7 +1293,8 @@ module shr_nuopc_methods_mod
 
       elseif (lrankIn == 2 .and. lrankOut == 2) then
         if (.not.shr_nuopc_methods_FieldPtr_Compare(dataPtrIn2, dataPtrOut2, subname, rc)) then
-          call ESMF_LogWrite(trim(subname)//": ERROR data2d different sizes", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+           call ESMF_LogWrite(trim(subname)//": ERROR data2d different sizes", &
+                ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
           return
         endif
@@ -1296,7 +1302,8 @@ module shr_nuopc_methods_mod
         dataPtrOut2 = dataPtrIn2
 
       elseif (lrankIn == 2 .and. lrankOut == 2) then
-        call ESMF_LogWrite(trim(subname)//": ERROR raskIn and rankOut invalid", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+         call ESMF_LogWrite(trim(subname)//": ERROR raskIn and rankOut invalid", &
+              ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
         rc = ESMF_FAILURE
         return
 
@@ -1305,7 +1312,8 @@ module shr_nuopc_methods_mod
     else
 
        if (dbug_flag > 1) then
-         call ESMF_LogWrite(trim(subname)//" field not found: "//trim(fldin)//","//trim(fldout), ESMF_LOGMSG_INFO, rc=dbrc)
+          call ESMF_LogWrite(trim(subname)//" field not found: "//trim(fldin)//","//trim(fldout), &
+               ESMF_LOGMSG_INFO, rc=dbrc)
        endif
 
     endif
@@ -1483,7 +1491,8 @@ module shr_nuopc_methods_mod
 
       else
         if (dbug_flag > 1) then
-          call ESMF_LogWrite(trim(subname)//" field not found in FB: "//trim(fldlist%shortname(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+           call ESMF_LogWrite(trim(subname)//" field not found in FB: "//trim(fldlist%shortname(n)), &
+                ESMF_LOGMSG_INFO, rc=dbrc)
         endif
       endif
     enddo
@@ -1493,6 +1502,161 @@ module shr_nuopc_methods_mod
     endif
 
   end subroutine shr_nuopc_methods_FB_Regrid
+
+  !-----------------------------------------------------------------------------
+
+  subroutine shr_nuopc_methods_FB_Regrid_FracWeights(FBSrc, FBDst, RouteHandles, fldsSrc, &
+       fraction_name, compsrc, compdst, mapbilnr, mapconsf, mapconsd, mappatch, compname, rc)
+
+    ! ----------------------------------------------
+    ! Map field bundles with appropriate fraction weighting
+    ! ----------------------------------------------
+
+    type(ESMF_FieldBundle)        , intent(inout) :: FBSrc
+    type(ESMF_FieldBundle)        , intent(inout) :: FBDst
+    type(ESMF_RouteHandle)        , intent(inout) :: RouteHandles(:,:,:)
+    type (shr_nuopc_fldList_Type) , intent(in)    :: fldsSrc
+    character(len=*)              , intent(in)    :: fraction_name
+    integer                       , intent(in)    :: compsrc
+    integer                       , intent(in)    :: compdst
+    integer                       , intent(in)    :: mapbilnr
+    integer                       , intent(in)    :: mapconsf
+    integer                       , intent(in)    :: mapconsd
+    integer                       , intent(in)    :: mappatch
+    character(len=*)              , intent(in)    :: compname(:)
+    integer                       , intent(out)   :: rc
+
+    ! local variables
+    type(ESMF_FieldBundle)      :: FBtmp1
+    real(ESMF_KIND_R8), pointer :: dataPtr1(:)  ! temporary
+    real(ESMF_KIND_R8), pointer :: dataPtr2(:)  ! temporary
+    real(ESMF_KIND_R8), pointer :: dataPtr3(:)  ! temporary
+    real(ESMF_KIND_R8), pointer :: frac_dstr(:) ! 1./frac_dst
+    integer                     :: lsize
+    integer                     :: mapindex
+    integer                     :: i, n
+    character(len=*),parameter  :: subname='(med_phases_FB_Regrid_FracWeights)'
+    !---------------------------------------
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    ! create a temporary field bundle, FBtmp1 that has the same geometry and fields as FBSrc
+    call shr_nuopc_methods_FB_init(FBtmp1, fbgeom=FBSrc, fbflds=FBSrc, name='FBtmp1_frac', rc=rc)
+    if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+
+    ! Note: the following resets the fraction field FBtmp1 and this does not get overwritten later
+    call shr_nuopc_methods_FB_reset(FBtmp1, value=czero, rc=rc)
+    if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+
+    ! dataPtr1 is a pointer to the fraction field array in FBSrc
+    call shr_nuopc_methods_FB_GetFldPtr(FBSrc, trim(fraction_name), fldptr1=dataPtr1, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+    ! (1) multiply each field in FBtmp1 by the fraction field in FBSrc
+    !---------------------------------------
+    do n = 1,fldsSrc%num
+       if (fldsSrc%shortname(n) /= trim(fraction_name) .and. &
+            shr_nuopc_methods_FB_FldChk(FBSrc , fldsSrc%shortname(n), rc=rc) .and. &
+            shr_nuopc_methods_FB_FldChk(FBtmp1, fldsSrc%shortname(n), rc=rc)) then
+
+          call shr_nuopc_methods_FB_GetFldPtr(FBSrc , fldsSrc%shortname(n), dataptr2, rc=rc)
+          call shr_nuopc_methods_FB_GetFldPtr(FBtmp1, fldsSrc%shortname(n), dataptr3, rc=rc)
+
+          ! avoid non array fields like the scalars
+          if (size(dataptr1) == size(dataptr2)) then
+             do i = 1,size(dataptr1)
+                dataptr3(i) = dataptr2(i) * dataPtr1(i)
+             enddo
+          end if
+       end if
+    end do
+
+    !---------------------------------------
+    ! (2) regrid FBtmp1 to FBSrc fields with fraction multiplied
+    !---------------------------------------
+    ! note: this regrids FBtmp1 to FBSrc - but at this point the fraction field in FBSrc is zero -
+    ! because of above
+
+    call shr_nuopc_methods_FB_reset(FBDst, value=czero, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call shr_nuopc_methods_FB_Regrid(fldsSrc, FBtmp1, FBDst, &
+         consfmap=RouteHandles(compsrc,compdst,mapconsf), &
+         consdmap=RouteHandles(compsrc,compdst,mapconsd), &
+         bilnrmap=RouteHandles(compsrc,compdst,mapbilnr), &
+         patchmap=RouteHandles(compsrc,compdst,mappatch), &
+         string=trim(compname(compsrc))//'2'//trim(compname(compdst)), rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    ! Clean up memory in FBtmp1
+    call shr_nuopc_methods_FB_clean(FBtmp1, rc=rc)
+    if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+
+    !---------------------------------------
+    ! (3) divide FBDst by interpolated fraction
+    !---------------------------------------
+    do n = 1,fldsSrc%num
+       if (fldsSrc%shortname(n) /= trim(fraction_name) .and. &
+           shr_nuopc_methods_FB_FldChk(FBDst, fldsSrc%shortname(n), rc=rc)) then
+
+          ! determine mapping type for source field - then map fraction with same type
+          if (fldsSrc%mapping(n) == "conservefrac") then
+             mapindex=mapconsf
+          elseif (fldsSrc%mapping(n) == "conservedst") then
+             mapindex=mapconsd
+          elseif (fldsSrc%mapping(n) == "bilinear") then
+             mapindex=mapbilnr
+          elseif (fldsSrc%mapping(n) == "patch") then
+             mapindex=mappatch
+          else
+             call ESMF_LogWrite(trim(subname)//": mapping name error "//trim(fldsSrc%mapping(n)), &
+                  ESMF_LOGMSG_INFO, rc=rc)
+             rc = ESMF_FAILURE
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          end if
+
+          ! map fraction from source grid to destination grid
+          call shr_nuopc_methods_FB_FieldRegrid(&
+               FBSrc, trim(fraction_name), &
+               FBDst, trim(fraction_name), &
+               RouteHandles(compsrc,compdst,mapindex), rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+          ! get pointer to mapped fraction on destination grid
+          call shr_nuopc_methods_FB_GetFldPtr(FBDst, fraction_name, fldptr1=dataPtr1, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+          ! compute reciprocal of mapped fraction on destination grid
+          lsize = size(dataPtr1)
+          allocate(frac_dstr(lsize))
+          do i= 1,size(frac_dstr)
+             if (dataPtr1(i) == 0.0_ESMF_KIND_R8) then
+                frac_dstr(i) = 0.0_ESMF_KIND_R8
+             else
+                frac_dstr(i) = 1.0_ESMF_KIND_R8/dataPtr1(i)
+             endif
+          enddo
+
+          ! multiply interpolated field by reciprocal of fraction on destinatino grid and avoid
+          ! non array fields like the scalars
+          ! NOTE: here dataptr2 is an array on the destination grid, above it is on the source grid
+          call shr_nuopc_methods_FB_GetFldPtr(FBDst, fldsSrc%shortname(n), dataptr2, rc=rc)
+
+          if (size(frac_dstr) == size(dataptr2)) then
+             do i = 1,size(dataptr2)
+                dataptr2(i) = dataptr2(i) *frac_dstr(i)
+             end do
+          end if
+
+          deallocate(frac_dstr)
+       endif
+    enddo
+
+  end subroutine shr_nuopc_methods_FB_Regrid_FracWeights
 
   !-----------------------------------------------------------------------------
 
@@ -1532,7 +1696,8 @@ module shr_nuopc_methods_mod
     else
 
       if (dbug_flag > 1) then
-        call ESMF_LogWrite(trim(subname)//" field not found: "//trim(fldin)//","//trim(fldout), ESMF_LOGMSG_INFO, rc=dbrc)
+         call ESMF_LogWrite(trim(subname)//" field not found: "//trim(fldin)//","//trim(fldout), &
+              ESMF_LOGMSG_INFO, rc=dbrc)
       endif
 
     endif
@@ -1589,7 +1754,8 @@ module shr_nuopc_methods_mod
     rc=ESMF_SUCCESS
 
     if (.not. shr_nuopc_methods_FB_FldChk(FBout, trim(fnameout), rc=rc)) then
-      call ESMF_LogWrite(trim(subname)//": WARNING field not in FBout, skipping merge "//trim(fnameout), ESMF_LOGMSG_WARNING, line=__LINE__, file=u_FILE_u, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//": WARNING field not in FBout, skipping merge "//trim(fnameout), &
+            ESMF_LOGMSG_WARNING, line=__LINE__, file=u_FILE_u, rc=dbrc)
       return
     endif
 
@@ -1609,7 +1775,8 @@ module shr_nuopc_methods_mod
         (present(FBinC) .and. .not.present(fnameC)) .or. &
         (present(FBinD) .and. .not.present(fnameD)) .or. &
         (present(FBinE) .and. .not.present(fnameE))) then
-      call ESMF_LogWrite(trim(subname)//": ERROR fname not present with FBin", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//": ERROR fname not present with FBin", &
+            ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
       rc = ESMF_FAILURE
       return
     endif
@@ -1632,7 +1799,8 @@ module shr_nuopc_methods_mod
       if (.not. shr_nuopc_methods_FB_FldChk(FBinE, trim(fnameE), rc=rc)) FBinfound = .false.
     endif
     if (.not. FBinfound) then
-      call ESMF_LogWrite(trim(subname)//": WARNING field not found in FBin, skipping merge "//trim(fnameout), ESMF_LOGMSG_WARNING, line=__LINE__, file=u_FILE_u, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//": WARNING field not found in FBin, skipping merge "//trim(fnameout), &
+            ESMF_LOGMSG_WARNING, line=__LINE__, file=u_FILE_u, rc=dbrc)
       return
     endif
 
@@ -1690,14 +1858,16 @@ module shr_nuopc_methods_mod
 
       if (FBinfound) then
         if (.not.shr_nuopc_methods_FieldPtr_Compare(dataPtr, dataOut, subname, rc)) then
-          call ESMF_LogWrite(trim(subname)//": ERROR FBin wrong size", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+           call ESMF_LogWrite(trim(subname)//": ERROR FBin wrong size", &
+                ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
           return
         endif
 
         if (wgtfound) then
           if (.not.shr_nuopc_methods_FieldPtr_Compare(dataPtr, wgt, subname, rc)) then
-            call ESMF_LogWrite(trim(subname)//": ERROR wgt wrong size", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+             call ESMF_LogWrite(trim(subname)//": ERROR wgt wrong size", &
+                  ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
             rc = ESMF_FAILURE
             return
           endif
@@ -1812,7 +1982,8 @@ module shr_nuopc_methods_mod
       if (.not. shr_nuopc_methods_FB_FldChk(FBinE, trim(fnameE), rc=rc)) FBinfound = .false.
     endif
     if (.not. FBinfound) then
-      call ESMF_LogWrite(trim(subname)//": WARNING field not found in FBin, skipping merge "//trim(fnameout), ESMF_LOGMSG_WARNING, line=__LINE__, file=u_FILE_u, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//": WARNING field not found in FBin, skipping merge "//trim(fnameout), &
+            ESMF_LOGMSG_WARNING, line=__LINE__, file=u_FILE_u, rc=dbrc)
       return
     endif
 
@@ -1870,14 +2041,16 @@ module shr_nuopc_methods_mod
 
       if (FBinfound) then
         if (.not.shr_nuopc_methods_FieldPtr_Compare(dataPtr, dataOut, subname, rc)) then
-          call ESMF_LogWrite(trim(subname)//": ERROR FBin wrong size", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+           call ESMF_LogWrite(trim(subname)//": ERROR FBin wrong size", &
+                ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
           return
         endif
 
         if (wgtfound) then
           if (.not.shr_nuopc_methods_FieldPtr_Compare(dataPtr, wgt, subname, rc)) then
-            call ESMF_LogWrite(trim(subname)//": ERROR wgt wrong size", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+             call ESMF_LogWrite(trim(subname)//": ERROR wgt wrong size", &
+                  ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
             rc = ESMF_FAILURE
             return
           endif
@@ -2004,7 +2177,8 @@ module shr_nuopc_methods_mod
           enddo
           enddo
         else
-          call ESMF_LogWrite(trim(subname)//": ERROR rank not supported ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+           call ESMF_LogWrite(trim(subname)//": ERROR rank not supported ", &
+                ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
           return
         endif
@@ -2353,7 +2527,8 @@ module shr_nuopc_methods_mod
         if (lranki == 1 .and. lranko == 1) then
 
           if (.not.shr_nuopc_methods_FieldPtr_Compare(dataPtro1, dataPtri1, subname, rc)) then
-            call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr1 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=rc)
+             call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr1 size ", &
+                  ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=rc)
             rc = ESMF_FAILURE
             return
           endif
@@ -2394,7 +2569,8 @@ module shr_nuopc_methods_mod
 
           write(msgString,'(a,2i8)') trim(subname)//": ranki, ranko = ",lranki,lranko
           call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-          call ESMF_LogWrite(trim(subname)//": ERROR ranki ranko not supported "//trim(lfieldnamelist(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+          call ESMF_LogWrite(trim(subname)//": ERROR ranki ranko not supported "//trim(lfieldnamelist(n)), &
+               ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
           return
 
@@ -2573,7 +2749,8 @@ module shr_nuopc_methods_mod
         elseif (lrankB == 1 .and. lrankS == 1) then
 
           if (.not.shr_nuopc_methods_FieldPtr_Compare(dataPtrS1, dataPtrB1, subname, rc)) then
-            call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr1 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=rc)
+             call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr1 size ", &
+                  ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=rc)
             rc = ESMF_FAILURE
             return
           endif
@@ -2591,7 +2768,8 @@ module shr_nuopc_methods_mod
         elseif (lrankB == 2 .and. lrankS == 2) then
 
           if (.not.shr_nuopc_methods_FieldPtr_Compare(dataPtrS2, dataPtrB2, subname, rc)) then
-            call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr2 size ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=rc)
+             call ESMF_LogWrite(trim(subname)//": ERROR in dataPtr2 size ", &
+                  ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=rc)
             rc = ESMF_FAILURE
             return
           endif
@@ -2614,7 +2792,8 @@ module shr_nuopc_methods_mod
 
           write(msgString,'(a,2i8)') trim(subname)//": rankB, ranks = ",lrankB,lrankS
           call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
-          call ESMF_LogWrite(trim(subname)//": ERROR rankB rankS not supported "//trim(lfieldnamelist(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+          call ESMF_LogWrite(trim(subname)//": ERROR rankB rankS not supported "//trim(lfieldnamelist(n)), &
+               ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
           return
 
@@ -3567,7 +3746,8 @@ module shr_nuopc_methods_mod
     call ESMF_FieldGet(field, status=status, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     if (status == ESMF_FIELDSTATUS_EMPTY) then
-      call ESMF_LogWrite(trim(subname)//":"//trim(string)//": ERROR field does not have a geom yet ", ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//":"//trim(string)//": ERROR field does not have a geom yet ", &
+            ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
       rc = ESMF_FAILURE
       return
     endif

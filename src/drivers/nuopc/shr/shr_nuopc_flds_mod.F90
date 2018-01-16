@@ -1206,15 +1206,6 @@ contains
     call fld_add(flds_l2x, flds_l2x_map,'Flrl_rofi', longname=longname, stdname=stdname, units=units)
     call fld_add(flds_x2r, flds_x2r_map,'Frxx_rofi', longname=longname, stdname=stdname, units=units)
 
-    ! Currently only the CESM land and runoff models treat irrigation as a separate
-    ! field: in ACME, this field is folded in to the other runoff fields. Eventually,
-    ! ACME may want to update its land and runoff models to map irrigation specially, as
-    ! CESM does.
-    ! (Once ACME is using this irrigation field, all that needs to be done is to remove
-    ! this conditional: Code in other places in the mediator is written to trigger off of
-    ! whether Flrl_irrig has been added to the field list, so it should Just Work if this
-    ! conditional is removed.)
-
     ! Irrigation flux (land/rof only)
     longname = 'Irrigation flux (withdrawal from rivers)'
     stdname  = 'irrigation'
