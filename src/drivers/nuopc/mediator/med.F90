@@ -568,9 +568,9 @@ module MED
     ! actually set them to anything
     !------------------
 
-    do n1 = 1,ncomps
-      call shr_nuopc_fldList_Zero(fldsFr(n1), rc=rc)
-      call shr_nuopc_fldList_Zero(fldsTo(n1), rc=rc)
+    do ncomp = 1,ncomps
+      call shr_nuopc_fldList_Zero(medFldsFr(ncomp)%fldlist, rc=rc)
+      call shr_nuopc_fldList_Zero(medFldsTo(ncomp)%fldlist, rc=rc)
     enddo
     call shr_nuopc_fldList_Zero(fldsAtmOcn,rc=rc)
 
@@ -581,172 +581,55 @@ module MED
     ! from generated input
 
     !------------------
-    ! Create fldsTo(compatm)
+    ! Create fldsTo(1:ncomp) and fldsFr(1:ncomp)
     !------------------
 
-    call shr_nuopc_fldList_fromflds(fldsTo(compatm), flds_x2a, flds_x2a_map, "cannot provide", &
-         subname//":flds_x2a", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    ! the following should be arrays in med_internal_state and can be reused
+    fldsto_string(compatm) = trim(flds_x2a)
+    fldsfr_string(compatm) = trim(flds_a2x)
+    fldsto_string(complnd) = trim(flds_x2l)
+    fldsfr_string(complnd) = trim(flds_l2x)
+    fldsto_string(compice) = trim(flds_x2i)
+    fldsfr_string(compice) = trim(flds_i2x)
+    fldsto_string(compocn) = trim(flds_x2o)
+    fldsfr_string(compocn) = trim(flds_o2x)
+    fldsto_string(comprof) = trim(flds_x2r)
+    fldsfr_string(comprof) = trim(flds_r2x)
+    fldsto_string(compwav) = trim(flds_x2w)
+    fldsfr_string(compwav) = trim(flds_w2x)
+    fldsto_string(compglc) = trim(flds_x2g)
+    fldsfr_string(compglc) = trim(flds_g2x)
+    fldsto_tag(compatm)    = 'flds_x2a'
+    fldsfr_tag(compatm)    = 'flds_a2x'
+    fldsto_tag(complnd)    = 'flds_x2l'
+    fldsfr_tag(complnd)    = 'flds_l2x'
+    fldsto_tag(compice)    = 'flds_x2i'
+    fldsfr_tag(compice)    = 'flds_i2x'
+    fldsto_tag(compocn)    = 'flds_x2o'
+    fldsfr_tag(compocn)    = 'flds_o2x'
+    fldsto_tag(comprof)    = 'flds_x2r'
+    fldsfr_tag(comprof)    = 'flds_r2x'
+    fldsto_tag(compwav)    = 'flds_x2w'
+    fldsfr_tag(compwav)    = 'flds_w2x'
+    fldsto_tag(compglc)    = 'flds_x2g'
+    fldsfr_tag(compglc)    = 'flds_g2x'
 
-    call shr_nuopc_fldList_Add(fldsTo(compatm), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_fldList_fromflds(medFldsTo(ncomp)%fldlist, flds=fldsto_string, transferOffer="cannot provide", &
+            flds_maps=flds_x2a_map, ncomps=ncomps, tag=subname//":"//trim(fldsto_tag), rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    !------------------
-    ! Create fldsFr(compatm)
-    !------------------
+       call shr_nuopc_fldList_fromflds(medFldsFr(ncomp), flds=fldsfr_string, transferOffer="cannot provide", &
+            flds_maps=flds_a2x_map, ncomps=ncomps, tag=subname//":"//trim(fldsfr_tag), rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_fromflds(fldsFr(compatm), flds_a2x, flds_a2x_map, "cannot provide", &
-         subname//":flds_a2x", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_fldList_Add(medFldsTo(ncomp), flds=trim(flds_scalar_name), transferOffer="will provide", &
+            tag=subname//":flds_scalar_name", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Add(fldsFr(compatm), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsTo(compocn)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsTo(compocn), flds_x2o, flds_x2o_map, "cannot provide", &
-         subname//":flds_x2o", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsTo(compocn), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsFr(compocn)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsFr(compocn), flds_o2x, flds_o2x_map, "cannot provide", &
-         subname//":flds_o2x", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFr(compocn), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsTo(compice)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsTo(compice), flds_x2i, flds_x2i_map, "cannot provide", &
-         subname//":flds_x2i", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsTo(compice), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsFr(compice)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsFr(compice), flds_i2x, flds_i2x_map, "cannot provide", &
-         subname//":flds_i2x", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFr(compice), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsTo(complnd)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsTo(complnd), flds_x2l, flds_x2l_map, "cannot provide", &
-         subname//":flds_x2l", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsTo(complnd), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsFr(complnd)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsFr(complnd), flds_l2x, flds_l2x_map, "cannot provide", &
-         subname//":flds_l2x", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFr(complnd), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsTo(comprof)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsTo(comprof), flds_x2r, flds_x2r_map, "cannot provide", &
-         subname//":flds_x2r", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsTo(comprof), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsFr(comprof)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsFr(comprof), flds_r2x, flds_r2x_map, "cannot provide", &
-         subname//":flds_r2x", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFr(comprof), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsTo(compwav)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsTo(compwav), flds_x2w, flds_x2w_map, "cannot provide", &
-         subname//":flds_x2w", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsTo(compwav), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsFr(compwav)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsFr(compwav), flds_w2x, flds_w2x_map, "cannot provide", &
-         subname//":flds_w2x", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFr(compwav), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsTo(compglc)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsTo(compglc), flds_x2g, flds_x2g_map, "cannot provide", &
-         subname//":flds_x2g", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsTo(compglc), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !------------------
-    ! Create fldsFr(compglc)
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsFr(compglc), flds_g2x, flds_g2x_map, "cannot provide", &
-         subname//":flds_g2x", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFr(compglc), trim(flds_scalar_name), "will provide", &
-         subname//":flds_scalar_name", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_fldList_Add(medFldsFr(ncomp), flds=trim(flds_scalar_name), transferOffer="will provide", &
+            tag=subname//":flds_scalar_name", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
 
     !------------------
     ! Create fldsAtmOcn
@@ -1695,6 +1578,12 @@ module MED
 
                   if (mastertask) write(llogunit,*) subname,' calling RH_init for '//trim(rhname)
 
+                  nflds = size(medFldsFr(n1))
+                  allocate(mappings(nflds))
+                  do n = 1,nflds
+                     mappings(n) = medFldsFr(n1)%fldlist(n)%mapping(n2)
+                  end do
+
                   call shr_nuopc_methods_RH_Init( &
                        FBsrc=is_local%wrap%FBImp(n1,n1), &
                        FBdst=is_local%wrap%FBImp(n1,n2), &
@@ -1705,7 +1594,7 @@ module MED
                        fcopymap=is_local%wrap%RH(n1,n2,mapfcopy), &
                        srcMaskValue=srcMaskValue, &
                        dstMaskValue=dstMaskValue, &
-                       fldlist1=FldsFr(n1), &
+                       mappings1=mappings, &
                        string=trim(rhname)//'_weights', &
                        bilnrfn=trim(smapfile), &
                        consffn=trim(fmapfile), &
@@ -1715,6 +1604,8 @@ module MED
                        mastertask=mastertask, &
                        rc=rc)
                   if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+                  deallocate(mappings)
 
                elseif (is_local%wrap%comp_present(n1) .and. is_local%wrap%comp_present(n2)) then
 

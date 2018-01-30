@@ -7,13 +7,11 @@ module shr_nuopc_methods_mod
   use ESMF
   use NUOPC
   use shr_string_mod       , only : shr_string_listGetName
-  use shr_nuopc_fldList_mod, only : shr_nuopc_fldList_Type
   use shr_nuopc_flds_mod   , only : flds_scalar_name, flds_scalar_num
   use seq_comm_mct         , only : llogunit => logunit
   use mpi
 
   implicit none
-
   private
 
   interface shr_nuopc_methods_FB_accum ; module procedure &
@@ -195,14 +193,14 @@ module shr_nuopc_methods_mod
   subroutine shr_nuopc_methods_RH_init(FBsrc, FBdst, &
        bilnrmap, consfmap, consdmap, patchmap, fcopymap, &
        srcMaskValue, dstMaskValue, &
-       fldlist1, fldlist2, fldlist3, fldlist4, string, &
+       mappings1, mappings2, mappings3, mappings4, string, &
        bilnrfn, consffn, consdfn, patchfn, fcopyfn, spvalfn, mastertask, rc)
 
     ! ----------------------------------------------
     ! Initialize Route Handles according to the following precedence rules:
-    !  (1) check fldlist mapping types - if there are no fldlists, then generate all RHs
+    !  (1) check input mappings - if there are no mappingss, then generate all RHs
     !  (2) if a map filename is passed, generate that RH
-    !  (3) if fldlist field name mapping attribute matches, generate that RH
+    !  (3) if field name mapping attribute matches, generate that RH
     !  (4) if the map filename is spvalfn, do NOT generate that RH
     !  (5) if the mapping rh is not passed, do NOT generate that RH
     ! ----------------------------------------------
@@ -216,10 +214,10 @@ module shr_nuopc_methods_mod
     type(ESMF_Routehandle)       ,optional :: fcopymap
     integer                      ,optional :: srcMaskValue
     integer                      ,optional :: dstMaskValue
-    type(shr_nuopc_fldList_Type) ,optional :: fldlist1
-    type(shr_nuopc_fldList_Type) ,optional :: fldlist2
-    type(shr_nuopc_fldList_Type) ,optional :: fldlist3
-    type(shr_nuopc_fldList_Type) ,optional :: fldlist4
+    character(len=*)             ,optional :: mappings1(:)
+    character(len=*)             ,optional :: mappings2(:)
+    character(len=*)             ,optional :: mappings3(:)
+    character(len=*)             ,optional :: mappings3(:)
     character(len=*)             ,optional :: string
     character(len=*)             ,optional :: bilnrfn
     character(len=*)             ,optional :: consffn
@@ -283,9 +281,9 @@ module shr_nuopc_methods_mod
     !--- decide which map files to generate (see above precedence rules)
     !---------------------------------------------------
 
-    ! (1) check fldlist mapping types - if there are no fldlists, then generate all RHs
-    if (.not.present(fldlist1) .and. .not.present(fldlist2) .and. &
-        .not.present(fldlist3) .and. .not.present(fldlist4)) then
+    ! (1) check mappings input - if there are none , then generate all RHs
+    if (.not.present(mappings1) .and. .not.present(mappings2) .and. &
+        .not.present(mappings3) .and. .not.present(mappings4)) then
       do_bilnr = .true.
       do_consf = .true.
       do_consd = .true.
@@ -307,42 +305,41 @@ module shr_nuopc_methods_mod
     if (present(fcopyfn)) do_fcopy = .true.
 
 
-    ! (3) if fldlist field name mapping attribute matches, generate that RH
-    ! TODO: do we need four fldlist options? It seems that only one is needed.
-    if (present(fldlist1)) then
-      do n = 1,fldlist1%num
-        if (fldlist1%mapping(n) == 'bilinear'    ) do_bilnr = .true.
-        if (fldlist1%mapping(n) == "conservefrac") do_consf = .true.
-	if (fldlist1%mapping(n) == "conservedst" ) do_consd = .true.
-        if (fldlist1%mapping(n) == 'patch'       ) do_patch = .true.
-        if (fldlist1%mapping(n) == 'copy'        ) do_fcopy = .true.
+    ! (3) if mappings name mapping attribute matches, generate that RH
+    if (present(mappings1)) then
+      do n = 1,size(mappings1)
+        if (mappings1(n) == 'bilinear'    ) do_bilnr = .true.
+        if (mappings1(n) == "conservefrac") do_consf = .true.
+	if (mappings1(n) == "conservedst" ) do_consd = .true.
+        if (mappings1(n) == 'patch'       ) do_patch = .true.
+        if (mappings1(n) == 'copy'        ) do_fcopy = .true.
       enddo
     endif
-    if (present(fldlist2)) then
-      do n = 1,fldlist2%num
-        if (fldlist2%mapping(n) == 'bilinear'    ) do_bilnr = .true.
-        if (fldlist2%mapping(n) == "conservefrac") do_consf = .true.
-        if (fldlist2%mapping(n) == "conservedst" ) do_consd = .true.
-	if (fldlist2%mapping(n) == 'patch'       ) do_patch = .true.
-        if (fldlist2%mapping(n) == 'copy'        ) do_fcopy = .true.
+    if (present(mappings2)) then
+      do n = 1,size(mappings2)
+        if (mappings2(n) == 'bilinear'    ) do_bilnr = .true.
+        if (mappings2(n) == "conservefrac") do_consf = .true.
+        if (mappings2(n) == "conservedst" ) do_consd = .true.
+	if (mappings2(n) == 'patch'       ) do_patch = .true.
+        if (mappings2(n) == 'copy'        ) do_fcopy = .true.
       enddo
     endif
-    if (present(fldlist3)) then
-      do n = 1,fldlist3%num
-        if (fldlist3%mapping(n) == 'bilinear'    ) do_bilnr = .true.
-        if (fldlist3%mapping(n) == "conservefrac") do_consf = .true.
-        if (fldlist3%mapping(n) == "conservedst" ) do_consd = .true.
-        if (fldlist3%mapping(n) == 'patch'       ) do_patch = .true.
-        if (fldlist3%mapping(n) == 'copy'        ) do_fcopy = .true.
+    if (present(mappings3)) then
+      do n = 1,size(mappings3)
+        if (mappings3(n) == 'bilinear'    ) do_bilnr = .true.
+        if (mappings3(n) == "conservefrac") do_consf = .true.
+        if (mappings3(n) == "conservedst" ) do_consd = .true.
+        if (mappings3(n) == 'patch'       ) do_patch = .true.
+        if (mappings3(n) == 'copy'        ) do_fcopy = .true.
       enddo
     endif
     if (present(fldlist4)) then
-      do n = 1,fldlist4%num
-        if (fldlist4%mapping(n) == 'bilinear'    ) do_bilnr = .true.
-        if (fldlist4%mapping(n) == "conservefrac") do_consf = .true.
-        if (fldlist4%mapping(n) == "conservedst" ) do_consd = .true.
-        if (fldlist4%mapping(n) == 'patch'       ) do_patch = .true.
-        if (fldlist4%mapping(n) == 'copy'        ) do_fcopy = .true.
+      do n = 1,size(mappings4)
+        if (mappings4(n) == 'bilinear'    ) do_bilnr = .true.
+        if (mappings4(n) == "conservefrac") do_consf = .true.
+        if (mappings4(n) == "conservedst" ) do_consd = .true.
+        if (mappings4(n) == 'patch'       ) do_patch = .true.
+        if (mappings4(n) == 'copy'        ) do_fcopy = .true.
       enddo
     endif
 
@@ -378,9 +375,9 @@ module shr_nuopc_methods_mod
     !--- 2) MULTIPLE route handles are going to be generated for
     !---    given field bundle source and destination grids
     !--- 3) EACH field, n, in a field bundle will have a mapping type
-    !---    associated it that is specified by fldlist%mapping(n)
+    !---    associated it that is specified by mappings(n)
     !--- 4) Regridding is done on each field in the bundle by
-    !---    having the fldlist%mapping(n) use one of the supported
+    !---    having the mappings(n) use one of the supported
     !---    route handles for the supported for the mapping
     !---------------------------------------------------
 
@@ -1318,20 +1315,22 @@ module shr_nuopc_methods_mod
 
   !-----------------------------------------------------------------------------
 
-  subroutine shr_nuopc_methods_FB_Regrid(fldlist, FBin, FBout, &
+  subroutine shr_nuopc_methods_FB_Regrid(shortnames, mappings, &
+       FBin, FBout, &
        consfmap, consdmap, bilnrmap, patchmap, &
        fcopymap, string, rc)
 
-    type(shr_nuopc_fldList_Type)    :: fldlist
-    type(ESMF_FieldBundle)          :: FBin
-    type(ESMF_FieldBundle)          :: FBout
-    type(ESMF_Routehandle),optional :: consfmap
-    type(ESMF_Routehandle),optional :: consdmap
-    type(ESMF_Routehandle),optional :: bilnrmap
-    type(ESMF_Routehandle),optional :: patchmap
-    type(ESMF_Routehandle),optional :: fcopymap
-    character(len=*)      ,optional :: string
-    integer               ,optional :: rc
+    character(len=*)       , intent(in)            :: shortnames(:)
+    character(len=*)       , intent(in)            :: mappings(:)
+    type(ESMF_FieldBundle) , intent(in)            :: FBin
+    type(ESMF_FieldBundle) , intent(inout)         :: FBout
+    type(ESMF_Routehandle) , intent(in),  optional :: consfmap
+    type(ESMF_Routehandle) , intent(in),  optional :: consdmap
+    type(ESMF_Routehandle) , intent(in),  optional :: bilnrmap
+    type(ESMF_Routehandle) , intent(in),  optional :: patchmap
+    type(ESMF_Routehandle) , intent(in),  optional :: fcopymap
+    character(len=*)       , intent(in),  optional :: string
+    integer                , intent(out), optional :: rc
 
     ! local variables
     integer           :: n
@@ -1340,10 +1339,10 @@ module shr_nuopc_methods_mod
     character(len=*),parameter :: subname='(shr_nuopc_methods_FB_Regrid)'
     ! ----------------------------------------------
 
-    if (present(string)) then
-      lstring = trim(string)
-    else
-      lstring = " "
+    if (.not.present(rc)) then
+      call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR rc expected", ESMF_LOGMSG_INFO, rc=rc)
+      rc = ESMF_FAILURE
+      return
     endif
 
     rc = ESMF_SUCCESS
@@ -1351,10 +1350,10 @@ module shr_nuopc_methods_mod
       call ESMF_LogWrite(trim(subname)//trim(lstring)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
-    if (.not.present(rc)) then
-      call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR rc expected", ESMF_LOGMSG_INFO, rc=rc)
-      rc = ESMF_FAILURE
-      return
+    if (present(string)) then
+      lstring = trim(string)
+    else
+      lstring = " "
     endif
 
     okconsf = .false.
@@ -1383,107 +1382,95 @@ module shr_nuopc_methods_mod
     endif
 
     ! Loop over all fields in the field bundle - determine the mapping for the target field from
-    ! the fldlist%mapping setting and apply it
-    do n = 1,fldlist%num
+    ! the mappings setting and apply it
+    do n = 1,size(shortnames)
 
-      if (fldlist%shortname(n) == trim(flds_scalar_name)) then
+      if (shortnames(n) == trim(flds_scalar_name)) then
         if (dbug_flag > 1) then
-           call ESMF_LogWrite(trim(subname)//trim(lstring)//": skip : fld="//trim(fldlist%shortname(n)), &
+           call ESMF_LogWrite(trim(subname)//trim(lstring)//": skip : fld="//trim(shortnames(n)), &
                 ESMF_LOGMSG_INFO, rc=dbrc)
         endif
 
-      elseif (shr_nuopc_methods_FB_FldChk(FBin , fldlist%shortname(n), rc=rc) .and. &
-              shr_nuopc_methods_FB_FldChk(FBout, fldlist%shortname(n), rc=rc)) then
+      elseif (shr_nuopc_methods_FB_FldChk(FBin , shortnames(n), rc=rc) .and. &
+              shr_nuopc_methods_FB_FldChk(FBout, shortnames(n), rc=rc)) then
 
         if (dbug_flag > 1) then
-          call ESMF_LogWrite(trim(subname)//trim(lstring)//": map="//trim(fldlist%mapping(n))// &
-            ": fld="//trim(fldlist%shortname(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+          call ESMF_LogWrite(trim(subname)//trim(lstring)//": map="//trim(mappings(n))// &
+            ": fld="//trim(shortnames(n)), ESMF_LOGMSG_INFO, rc=dbrc)
         endif
 
-        if (fldlist%mapping(n) == 'bilinear') then
+        if (mappings(n) == 'bilinear') then
           if (.not. okbilnr) then
-            call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR RH not available for "//trim(fldlist%mapping(n))// &
-              ": fld="//trim(fldlist%shortname(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+            call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR RH not available for "//trim(mappings(n))// &
+              ": fld="//trim(shortnames(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
             rc = ESMF_FAILURE
             return
           endif
-          call shr_nuopc_methods_FB_FieldRegrid(FBin, fldlist%shortname(n), &
-                                                FBout,fldlist%shortname(n), &
-                                                bilnrmap,rc)
+          call shr_nuopc_methods_FB_FieldRegrid(FBin, shortname(n), FBout,shortname(n), bilnrmap,rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        elseif (fldlist%mapping(n) == "conservefrac") then
+        elseif (mappings(n) == "conservefrac") then
           if (.not. okconsf) then
-            call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR RH not available for "//trim(fldlist%mapping(n))// &
-              ": fld="//trim(fldlist%shortname(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+            call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR RH not available for "//trim(mappings(n))// &
+              ": fld="//trim(shortnames(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
             rc = ESMF_FAILURE
             return
           endif
-          call shr_nuopc_methods_FB_FieldRegrid(FBin, fldlist%shortname(n), &
-                                                FBout,fldlist%shortname(n), &
-                                                consfmap, rc)
+          call shr_nuopc_methods_FB_FieldRegrid(FBin, shortnames(n), FBout,shortnames(n), consfmap, rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        elseif (fldlist%mapping(n) == "conservedst") then
+        elseif (mappings(n) == "conservedst") then
           if (.not. okconsd) then
-            call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR RH not available for "//trim(fldlist%mapping(n))// &
-              ": fld="//trim(fldlist%shortname(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+            call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR RH not available for "//trim(mappings(n))// &
+              ": fld="//trim(shortnames(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
             rc = ESMF_FAILURE
             return
           endif
-          call shr_nuopc_methods_FB_FieldRegrid(FBin, fldlist%shortname(n), &
-                                                FBout,fldlist%shortname(n), &
-                                                consdmap, rc)
+          call shr_nuopc_methods_FB_FieldRegrid(FBin, shortnames(n), FBout,shortnames(n), consdmap, rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        elseif (fldlist%mapping(n) == 'patch') then
+        elseif (mappings(n) == 'patch') then
           if (.not. okpatch) then
-            call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR RH not available for "//trim(fldlist%mapping(n))// &
-              ": fld="//trim(fldlist%shortname(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+            call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR RH not available for "//trim(mappings(n))// &
+              ": fld="//trim(shortnames(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
             rc = ESMF_FAILURE
             return
           endif
-          call shr_nuopc_methods_FB_FieldRegrid(FBin, fldlist%shortname(n), &
-                                                FBout,fldlist%shortname(n), &
-                                                patchmap,rc)
+          call shr_nuopc_methods_FB_FieldRegrid(FBin, shortnames(n), FBout,shortnames(n), patchmap,rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        elseif (fldlist%mapping(n) == 'copy') then
+        elseif (mappings(n) == 'copy') then
           !-------------------------------------------
           ! copy will not exist for some grid combinations
           ! so fall back to conservative frac as a secondary option
           !-------------------------------------------
           if (.not. okfcopy) then
             if (.not. okconsf) then
-              call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR RH not available for "//trim(fldlist%mapping(n))// &
-                ": fld="//trim(fldlist%shortname(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+              call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR RH not available for "//trim(mappings(n))// &
+                ": fld="//trim(shortnames(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
               rc = ESMF_FAILURE
               return
             else
               call ESMF_LogWrite(trim(subname)//trim(lstring)//": NOTE using conservative instead of copy for"// &
-                " fld="//trim(fldlist%shortname(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
-              call shr_nuopc_methods_FB_FieldRegrid(FBin ,fldlist%shortname(n), &
-                                           FBout,fldlist%shortname(n), &
-                                           consfmap,rc)
+                " fld="//trim(shortnames(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+              call shr_nuopc_methods_FB_FieldRegrid(FBin ,shortnames(n), FBout, shortnames(n), consfmap,rc)
               if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
             endif
           else
-            call shr_nuopc_methods_FB_FieldRegrid(FBin ,fldlist%shortname(n), &
-                                         FBout,fldlist%shortname(n), &
-                                         fcopymap,rc)
+            call shr_nuopc_methods_FB_FieldRegrid(FBin ,shortnames(n), FBout,shortnames(n), fcopymap,rc)
             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           endif
 
         else
-          call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR unrecognized mapping "//trim(fldlist%mapping(n))// &
-            ": fld="//trim(fldlist%shortname(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+          call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR unrecognized mapping "//trim(mappings(n))// &
+            ": fld="//trim(shortnames(n)), ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
           return
         endif
 
       else
         if (dbug_flag > 1) then
-          call ESMF_LogWrite(trim(subname)//" field not found in FB: "//trim(fldlist%shortname(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+          call ESMF_LogWrite(trim(subname)//" field not found in FB: "//trim(shortnames(n)), ESMF_LOGMSG_INFO, rc=dbrc)
         endif
       endif
     enddo
@@ -4022,7 +4009,7 @@ module shr_nuopc_methods_mod
        do n = 1, nflds
           minl(n) = minval(values(n,:))
           maxl(n) = maxval(values(n,:))
-          call shr_string_listGetName(fldlist, n, name)
+          name = fldlist(n)%shortname
           write(logunit,F03) 'l min/max ',minl(n),maxl(n),n,trim(name)
        enddo
     endif

@@ -64,9 +64,12 @@ module med_internalstate_mod
   integer, parameter :: mapfcopy=5
 
   !--- fld lists ---
-  type (shr_nuopc_fldList_Type) :: fldsTo(ncomps)
-  type (shr_nuopc_fldList_Type) :: fldsFr(ncomps)
-  type (shr_nuopc_fldList_Type) :: fldsAtmOcn
+  type med_fldlist_type
+     type (shr_nuopc_fldListType), pointer :: fldlist(:)
+  end type med_fldlist_type
+  type (med_fldlist_type) :: medFldsTo(ncomps)
+  type (med_fldlist_type) :: medFldsFr(ncomps)
+  type (shr_nuopc_fldListType), pointer :: fldsAtmOcn(:)
 
   ! private internal state to keep instance data
   type InternalStateStruct
