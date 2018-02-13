@@ -51,7 +51,7 @@ module med_ocnalb_mod
 contains
 !===============================================================================
 
-  subroutine med_ocnalb_init(gcomp, FBAtm_o, FBXao_ocnalb_o_o, rc)
+  subroutine med_ocnalb_init(gcomp, FBAtm_o, FBXao_ocnalb_o, rc)
     !-----------------------------------------------------------------------
     ! Initialize pointers to the module variables and then use the module
     ! variables in the med_ocnalb_run phase

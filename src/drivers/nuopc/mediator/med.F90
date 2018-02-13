@@ -1675,7 +1675,7 @@ module MED
          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
          ! Initialize atm/ocn fluxes and ocean albedo
-         call med_phases_atmocn_init(gcomp, rc=rc)
+         call med_phases_ocnatm_init(gcomp, rc=rc)
          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
          ! Compute ocean albedoes

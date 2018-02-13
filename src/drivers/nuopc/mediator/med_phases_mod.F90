@@ -1,9 +1,7 @@
 module med_phases_mod
 
   !-----------------------------------------------------------------------------
-  ! Mediator Component.
-  ! This mediator operates on two timescales and keeps two internal Clocks to
-  ! do so.
+  ! Mediator Phases
   !-----------------------------------------------------------------------------
 
   use ESMF
@@ -12,11 +10,10 @@ module med_phases_mod
   use shr_sys_mod           , only : shr_sys_abort
   use shr_nuopc_fldList_mod , only : compmed, compatm, complnd, compocn
   use shr_nuopc_fldList_mod , only : compice, comprof, compwav, compglc
-  use shr_nuopc_fldList_mod , only : ncomps, compname
+  use shr_nuopc_fldList_mod , only : ncomps, compname, mapnames
   use shr_nuopc_fldList_mod , only : fldListFr, fldListTo
   use shr_nuopc_fldList_mod , only : fldListXao_fluxes_a, fldListXao_fluxes_o
   use shr_nuopc_fldList_mod , only : fldListXao_ocnalb_a, fldListXao_ocnalb_o
-  use shr_nuopc_fldList_mod , only : mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_init
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_reset
@@ -1381,31 +1378,7 @@ module med_phases_mod
 
   !-----------------------------------------------------------------------------
 
-  subroutine med_phases_ocnalb_init(gcomp, rc)
-    ! Initialize atm/ocn module variables
-
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-
-    ! local variables
-    character(CL)       :: cvalue
-    character(CL)       :: aoflux_grid
-    type(InternalState) :: is_local
-    character(len=*),parameter :: subname='(med_phases_atmocn_init)'
-    !---------------------------------------
-
-    call med_ocnalb_init(gcomp,          &
-         FBAtmOcn=is_local%wrap%FBAtmOcn(compdst)    &
-         FBAtm=is_local%wrap%FBImp(compsrc,compdst), &
-         FBOcn=is_local%wrap%FBImp(compdst,compdst), &
-         FBfrac=is_local%wrap%FBfrac(compdst), rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-  end subroutine med_phases_ocnalb_init
-
-  !-----------------------------------------------------------------------------
-
-  subroutine med_phases_ocnatm_flux_init(gcomp, rc)
+  subroutine med_phases_ocnatm_init(gcomp, rc)
     ! Initialize atm/ocn module variables
 
     type(ESMF_GridComp)  :: gcomp
@@ -1463,7 +1436,14 @@ module med_phases_mod
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
-    call med_atmocn_init(gcomp, aoflux_grid,         &
+    call med_ocnalb_init(gcomp,          &
+         FBAtmOcn=is_local%wrap%FBAtmOcn(compdst)    &
+         FBAtm=is_local%wrap%FBImp(compsrc,compdst), &
+         FBOcn=is_local%wrap%FBImp(compdst,compdst), &
+         FBfrac=is_local%wrap%FBfrac(compdst), rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call med_atmocn_fluxes_init(gcomp, aoflux_grid,         &
          FBAtmOcn=is_local%wrap%FBAtmOcn(compdst)    &
          FBAtm=is_local%wrap%FBImp(compsrc,compdst), &
          FBOcn=is_local%wrap%FBImp(compdst,compdst), &
@@ -1550,20 +1530,33 @@ module med_phases_mod
     end if
 
     ! Map relevant atm fluxes to the ocean grid
-    ! TODO: must add a normalization of one here
-    call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swvdf', FBAtmOcn_o, 'Faxa_swvdf', consfmap, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swndf', FBAtmOcn_o, 'Faxa_swndf', consfmap, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swvdr', FBAtmOcn_o, 'Faxa_swvdr', consfmap, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swndr', FBAtmOcn_o, 'Faxa_swndr', consfmap, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    ! NOTE: there are already pointers in place as module variables in med_ocnalb_mod.F90
+    ! to the arrays in FBAtmOcn_o below - so do not need to pass them as arguments to med_ocnalb_run
+
+    if (ESMF_RouteHandleIsCreated(is_local%wrap%RouteHandles(compatm,compocn,mapconsf), rc=rc)) then
+       call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swvdf', FBAtmOcn_o, 'Faxa_swvdf', &
+            is_local%wrap%RH(compatm,compocn,mapconsf), rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swndf', FBAtmOcn_o, 'Faxa_swndf', &
+            is_local%wrap%RH(compatm,compocn,mapconsf), rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swvdr', FBAtmOcn_o, 'Faxa_swvdr', &
+            is_local%wrap%RH(compatm,compocn,mapconsf), rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swndr', FBAtmOcn_o, 'Faxa_swndr', &
+            is_local%wrap%RH(compatm,compocn,mapconsf), rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    else
+       call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR RH not available for "//trim(mapnames(mapconsf)), &
+               ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+       rc = ESMF_FAILURE
+    end if
 
     ! Calculate ocean albedoes on the ocean grid
-    call med_atmocn_ocnalb(gcomp, FBfrac_o=is_local%wrap%FBfrac(compocn), nextsw_cday=nextsw_cday, rc=rc)
-
-    ! ***** TODO: map the ocean albedos to the atm grid *****
+    call med_ocnalb_run(gcomp, FBfrac_o=is_local%wrap%FBfrac(compocn), nextsw_cday=nextsw_cday, rc=rc)
 
     if (dbug_flag > 1) then
        call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtmOcn_o, &
