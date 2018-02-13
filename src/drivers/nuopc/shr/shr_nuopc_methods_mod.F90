@@ -555,17 +555,15 @@ module shr_nuopc_methods_mod
         if (trim(patchfn) == "idmap") then
           if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH patch redist idmap'
           call ESMF_LogWrite(subname // trim(string) // ' RH patch redist idmap', ESMF_LOGMSG_INFO, rc=dbrc)
-          call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=patchmap, &
-            ignoreUnmatchedIndices = .true., rc=rc)
+          call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=patchmap, ignoreUnmatchedIndices = .true., rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         else
            if (lmastertask) write(llogunit,'(4A)') subname,trim(string),' RH patch via input file ', &
                 trim(patchfn)
           call ESMF_LogWrite(subname // trim(string) //' RH patch via input file ' // &
                trim(patchfn), ESMF_LOGMSG_INFO, rc=dbrc)
-          call ESMF_FieldSMMStore(fldsrc, flddst, patchfn, routehandle=patchmap, &
-            ignoreUnmatchedIndices=.true., &
-            srcTermProcessing=srcTermProcessing_Value, rc=rc)
+          call ESMF_FieldSMMStore(fldsrc, flddst, patchfn, routehandle=patchmap, ignoreUnmatchedIndices=.true., &
+               srcTermProcessing=srcTermProcessing_Value, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       else
@@ -601,8 +599,7 @@ module shr_nuopc_methods_mod
     if (do_fcopy) then
       if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH fcopy redist'
       call ESMF_LogWrite(subname // trim(string) // ' RH fcopy redist', ESMF_LOGMSG_INFO, rc=dbrc)
-      call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=fcopymap, &
-           ignoreUnmatchedIndices=.true., rc=rc)
+      call ESMF_FieldRedistStore(fldsrc, flddst, routehandle=fcopymap, ignoreUnmatchedIndices=.true., rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       if (rhprint_flag) then
         call ESMF_RouteHandlePrint(fcopymap, rc=rc)
@@ -1339,6 +1336,12 @@ module shr_nuopc_methods_mod
     character(len=*),parameter :: subname='(shr_nuopc_methods_FB_Regrid)'
     ! ----------------------------------------------
 
+    if (present(string)) then
+      lstring = trim(string)
+    else
+      lstring = " "
+    endif
+
     if (.not.present(rc)) then
       call ESMF_LogWrite(trim(subname)//trim(lstring)//": ERROR rc expected", ESMF_LOGMSG_INFO, rc=rc)
       rc = ESMF_FAILURE
@@ -1348,12 +1351,6 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//trim(lstring)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
-    endif
-
-    if (present(string)) then
-      lstring = trim(string)
-    else
-      lstring = " "
     endif
 
     okconsf = .false.

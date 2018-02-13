@@ -23,23 +23,23 @@ module MED
   use shr_kind_mod          , only: SHR_KIND_CL
   use shr_sys_mod           , only: shr_sys_flush, shr_sys_abort
 
-  use shr_nuopc_flds_mod    , only: flds_x2a, flds_x2a_map, flds_a2x, flds_a2x_map
-  use shr_nuopc_flds_mod    , only: flds_x2i, flds_x2i_map, flds_i2x, flds_i2x_map
-  use shr_nuopc_flds_mod    , only: flds_x2l, flds_x2l_map, flds_l2x, flds_l2x_map
-  use shr_nuopc_flds_mod    , only: flds_x2o, flds_x2o_map, flds_o2x, flds_o2x_map
-  use shr_nuopc_flds_mod    , only: flds_x2r, flds_x2r_map, flds_r2x, flds_r2x_map
-  use shr_nuopc_flds_mod    , only: flds_x2g, flds_x2g_map, flds_g2x, flds_g2x_map
-  use shr_nuopc_flds_mod    , only: flds_x2w, flds_x2w_map, flds_w2x, flds_w2x_map
-  use shr_nuopc_flds_mod    , only: flds_xao, flds_xao_map, flds_xao_albedo, flds_xao_albedo_map
-  use shr_nuopc_flds_mod    , only: flds_xao_diurnl, flds_xao_diurnl_map
-  use shr_nuopc_flds_mod    , only: flds_scalar_name
-  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Zero
-  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_fromflds
-  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Add
+  use shr_nuopc_fldList_mod , only: flds_scalar_name
+  use shr_nuopc_fldList_mod , only: flds_x2a, flds_a2x
+  use shr_nuopc_fldList_mod , only: flds_x2i, flds_i2x
+  use shr_nuopc_fldList_mod , only: flds_x2l, flds_l2x
+  use shr_nuopc_fldList_mod , only: flds_x2o, flds_o2x
+  use shr_nuopc_fldList_mod , only: flds_x2r, flds_r2x
+  use shr_nuopc_fldList_mod , only: flds_x2g, flds_g2x
+  use shr_nuopc_fldList_mod , only: flds_x2w, flds_w2x
+  use shr_nuopc_fldList_mod , only: fldListFr, fldListTo
+  use shr_nuopc_fldList_mod , only: fldListXao_fluxes_a, fldListXao_fluxes_o
+  use shr_nuopc_fldList_mod , only: fldListXao_ocnalb_a, fldListXao_ocnalb_o
+  use shr_nuopc_fldList_mod , only: ncomps, compmed, compatm, compocn
+  use shr_nuopc_fldList_mod , only: compice, complnd, comprof, compwav, compglc, compname
+  use shr_nuopc_fldList_mod , only: mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy, mapnames
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Realize
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Advertise
 
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_RH_Init
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_Init
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_Reset
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_Copy
@@ -52,16 +52,11 @@ module MED
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_clock_timeprint
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_Diagnose
 
-  use med_infodata_mod      , only: med_infodata_CopyStateToInfodata, infodata=>med_infodata
+  use med_infodata_mod      , only: med_infodata_CopyStateToInfodata
+  use med_infodata_mod      , only: infodata=>med_infodata
 
   use med_internalstate_mod , only: InternalState
-  use med_internalstate_mod , only: mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy
-  use med_internalstate_mod , only: ncomps, compmed, compatm, compocn, compice, complnd, comprof, compwav, compglc
-  use med_internalstate_mod , only: compname
   use med_internalstate_mod , only: med_coupling_allowed
-  use med_internalstate_mod , only: fldsTo
-  use med_internalstate_mod , only: fldsFr
-  use med_internalstate_mod , only: fldsAtmOcn
 
   use med_connectors_mod    , only: med_connectors_prep_med2atm
   use med_connectors_mod    , only: med_connectors_prep_med2ocn
@@ -97,7 +92,6 @@ module MED
   use med_fraction_mod      , only: med_fraction_set
 
   use med_constants_mod     , only: med_constants_dbug_flag
-  use med_constants_mod     , only: med_constants_statewrite_flag
   use med_constants_mod     , only: med_constants_spval_init
   use med_constants_mod     , only: med_constants_spval
   use med_constants_mod     , only: med_constants_czero
@@ -410,7 +404,7 @@ module MED
       userRoutine=mediator_routine_Run, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
-      specPhaseLabel="med_phases_atmocn_ocnalb", specRoutine=med_phases_atmocn_ocnalb, rc=rc)
+      specPhaseLabel="med_phases_atmocn_ocnalb", specRoutine=med_phases_atmocn_ocnalb_run, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
@@ -418,7 +412,7 @@ module MED
       userRoutine=mediator_routine_Run, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
-      specPhaseLabel="med_phases_atmocn_flux", specRoutine=med_phases_atmocn_flux, rc=rc)
+      specPhaseLabel="med_phases_atmocn_flux", specRoutine=med_phases_atmocn_flux_run, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
@@ -562,107 +556,32 @@ module MED
          nestedState=is_local%wrap%NStateExp(compglc), rc=rc)
 
     !------------------
-    ! Zero out list of field information in for shr_nuopc_fldList_Type entries in the InternalState
-    ! Note that this simply deallocates any existing allocated arrays in the shr_nuopc_fldslist_Type entries
-    ! below and then allocate character arrays in the shr_nuopc_fldList_Type but does not
-    ! actually set them to anything
+    ! Advertise mediator field names
     !------------------
 
     do ncomp = 1,ncomps
-      call shr_nuopc_fldList_Zero(medFldsFr(ncomp)%fldlist, rc=rc)
-      call shr_nuopc_fldList_Zero(medFldsTo(ncomp)%fldlist, rc=rc)
-    enddo
-    call shr_nuopc_fldList_Zero(fldsAtmOcn,rc=rc)
+       do n = 1,size(fldListFr(ncomp)%flds)
+          if (trim(fldListFr(ncomp)%flds(n)%shortname) == flds_scalar_name) then
+             transferOffer = 'will provide'
+          else
+             transferOffer = 'cannot provide'
+          end if
+          call shr_nuopc_flds_Advertise(is_local%wrap%NStateImp(ncomp), fldListFr(ncomp)%flds(n), &
+               transferOffer='cannot provide', subname//':Fr'//trim(compname(ncomp)), rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end do
 
-    ! TODO: The following sets all states to be mapped with bilinear and all fluxes to be mapped
-    ! with conservefrac - this needs to be generalized
-    ! TODO: also there is an inconsistency - what if the mapping file is a patch file - but the mapping
-    ! below specifies bilinear? - this is hard-wired in the code below - and it should be obtained
-    ! from generated input
-
-    !------------------
-    ! Create fldsTo(1:ncomp) and fldsFr(1:ncomp)
-    !------------------
-
-    ! the following should be arrays in med_internal_state and can be reused
-    fldsto_string(compatm) = trim(flds_x2a)
-    fldsfr_string(compatm) = trim(flds_a2x)
-    fldsto_string(complnd) = trim(flds_x2l)
-    fldsfr_string(complnd) = trim(flds_l2x)
-    fldsto_string(compice) = trim(flds_x2i)
-    fldsfr_string(compice) = trim(flds_i2x)
-    fldsto_string(compocn) = trim(flds_x2o)
-    fldsfr_string(compocn) = trim(flds_o2x)
-    fldsto_string(comprof) = trim(flds_x2r)
-    fldsfr_string(comprof) = trim(flds_r2x)
-    fldsto_string(compwav) = trim(flds_x2w)
-    fldsfr_string(compwav) = trim(flds_w2x)
-    fldsto_string(compglc) = trim(flds_x2g)
-    fldsfr_string(compglc) = trim(flds_g2x)
-    fldsto_tag(compatm)    = 'flds_x2a'
-    fldsfr_tag(compatm)    = 'flds_a2x'
-    fldsto_tag(complnd)    = 'flds_x2l'
-    fldsfr_tag(complnd)    = 'flds_l2x'
-    fldsto_tag(compice)    = 'flds_x2i'
-    fldsfr_tag(compice)    = 'flds_i2x'
-    fldsto_tag(compocn)    = 'flds_x2o'
-    fldsfr_tag(compocn)    = 'flds_o2x'
-    fldsto_tag(comprof)    = 'flds_x2r'
-    fldsfr_tag(comprof)    = 'flds_r2x'
-    fldsto_tag(compwav)    = 'flds_x2w'
-    fldsfr_tag(compwav)    = 'flds_w2x'
-    fldsto_tag(compglc)    = 'flds_x2g'
-    fldsfr_tag(compglc)    = 'flds_g2x'
-
-       call shr_nuopc_fldList_fromflds(medFldsTo(ncomp)%fldlist, flds=fldsto_string, transferOffer="cannot provide", &
-            flds_maps=flds_x2a_map, ncomps=ncomps, tag=subname//":"//trim(fldsto_tag), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call shr_nuopc_fldList_fromflds(medFldsFr(ncomp), flds=fldsfr_string, transferOffer="cannot provide", &
-            flds_maps=flds_a2x_map, ncomps=ncomps, tag=subname//":"//trim(fldsfr_tag), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call shr_nuopc_fldList_Add(medFldsTo(ncomp), flds=trim(flds_scalar_name), transferOffer="will provide", &
-            tag=subname//":flds_scalar_name", rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call shr_nuopc_fldList_Add(medFldsFr(ncomp), flds=trim(flds_scalar_name), transferOffer="will provide", &
-            tag=subname//":flds_scalar_name", rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       do n = 1,size(fldListTo(ncomp)%flds)
+          if (trim(fldListTo(ncomp)%flds(n)%shortname) == flds_scalar_name) then
+             transferOffer = 'will provide'
+          else
+             transferOffer = 'cannot provide'
+          end if
+          call shr_nuopc_flds_Advertise(is_local%wrap%NStateImp(ncomp), fldListTo(ncomp)%flds(n), &
+               transferOffer=trim(transferOffer), subname//':Fr'//trim(compname(ncomp)), rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end do
     end do
-
-    !------------------
-    ! Create fldsAtmOcn
-    !------------------
-
-    call shr_nuopc_fldList_fromflds(fldsAtmOcn, flds_xao, flds_xao_map, "cannot provide", &
-         subname//":flds_xao", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_fromflds(fldsAtmOcn, flds_xao_albedo, flds_xao_albedo_map, "cannot provide", &
-         subname//":flds_xao_albedo", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_fldList_fromflds(fldsAtmOcn, flds_xao_diurnl, flds_xao_diurnl_map, "cannot provide", &
-         subname//":flds_xao_diurnl", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-
-    !------------------
-    ! Mediator advertisement
-    !------------------
-
-    ! Call NUOPC_Advertise from the mediator for each entry in the flds[Fr,To]XXX
-
-    do n1 = 1,ncomps
-       call shr_nuopc_fldList_Advertise(is_local%wrap%NStateImp(n1), fldsFr(n1), &
-            subname//':Fr'//trim(compname(n1)), rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call shr_nuopc_fldList_Advertise(is_local%wrap%NStateExp(n1), fldsTo(n1), &
-            subname//':To'//trim(compname(n1)), rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    enddo
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
@@ -689,8 +608,8 @@ module MED
     real(ESMF_KIND_R8)              :: intervalSec
     type(ESMF_TimeInterval)         :: timeStep
     ! tcx XGrid
-    !    type(ESMF_Field)               :: fieldX, fieldA, fieldO
-    !    type(ESMF_XGrid)               :: xgrid
+    ! type(ESMF_Field)              :: fieldX, fieldA, fieldO
+    ! type(ESMF_XGrid)              :: xgrid
     integer                         :: n, n1, n2
     character(SHR_KIND_CL)          :: cvalue
     logical                         :: connected
@@ -716,13 +635,13 @@ module MED
     !------------------
 
     do n1 = 1,ncomps
-      if (ESMF_StateIsCreated(is_local%wrap%NStateImp(n1),rc=rc)) then
-         call shr_nuopc_fldList_Realize(is_local%wrap%NStateImp(n1), fldlist=fldsFr(n1), &
+      if (ESMF_StateIsCreated(is_local%wrap%NStateImp(n1), rc=rc)) then
+         call shr_nuopc_fldList_Realize(is_local%wrap%NStateImp(n1), fldListFr=fldListFr(n1), &
               tag=subname//':Fr'//trim(compname(n1)), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       endif
-      if (ESMF_StateIsCreated(is_local%wrap%NStateExp(n1),rc=rc)) then
-         call shr_nuopc_fldList_Realize(is_local%wrap%NStateExp(n1), fldlist=fldsTo(n1), &
+      if (ESMF_StateIsCreated(is_local%wrap%NStateExp(n1), rc=rc)) then
+         call shr_nuopc_fldList_Realize(is_local%wrap%NStateExp(n1), fldListTo=fldListTo(n1), &
               tag=subname//':To'//trim(compname(n1)), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       endif
@@ -838,7 +757,6 @@ module MED
       call ESMF_StateGet(State, itemNameList=fieldNameList, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-!     do n=1, fieldCount
       do n=1, min(fieldCount,1)
 
         call ESMF_StateGet(State, field=field, itemName=fieldNameList(n), rc=rc)
@@ -1087,7 +1005,7 @@ module MED
 
         endif   ! fieldStatus
 
-      enddo   ! nflds
+      enddo   ! n fld loop
 
       deallocate(fieldNameList)
 
@@ -1237,8 +1155,13 @@ module MED
     integer                     :: len
     integer                     :: ierr
     logical                     :: first_call = .true.
-    character(ESMF_MAXSTR),allocatable :: fieldNameList(:)
-    character(MPI_MAX_ERROR_STRING)    :: lstring
+    character(ESMF_MAXSTR),allocatable    :: fieldNameList(:)
+    character(MPI_MAX_ERROR_STRING)       :: lstring
+    integer                               :: n1, n2
+    type(ESMF_PoleMethod_Flag), parameter :: polemethod=ESMF_POLEMETHOD_ALLAVG
+    type(ESMF_Field)                      :: fldsrc, flddst
+    integer                               :: lsrcMaskValue, ldstMaskValue
+    real(ESMF_KIND_R8), pointer           :: factorList(:)
     character(len=*), parameter :: subname='(module_MEDIATOR:DataInitialize)'
     !-----------------------------------------------------------
 
@@ -1285,7 +1208,8 @@ module MED
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         is_local%wrap%comp_present(n1) = (value == "true")
-        write(msgString,'(A,L4)') trim(subname)//' comp_present(comp'//trim(compname(n1))//') = ',is_local%wrap%comp_present(n1)
+        write(msgString,'(A,L4)') trim(subname)//' comp_present(comp'//trim(compname(n1))//') = ',&
+             is_local%wrap%comp_present(n1)
         call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
       enddo
 
@@ -1323,35 +1247,36 @@ module MED
 
       ! create tables of output
       if (mastertask) then
-        if (dbug_flag > 5) then
-          write(llogunit,*) ' '
-          write(llogunit,'(A)') subname//' Allowed coupling flags'
-          write(llogunit,'(2x,A10,20(A5))') '|from to->',(compname(n2),n2=1,ncomps)
-          do n1 = 1,ncomps
-            write(msgString,'(2x,a1,A,5x,20(L5))') '|',trim(compname(n1)),(med_coupling_allowed(n1,n2),n2=1,ncomps)
-            do n2 = 1,len_trim(msgString)
-              if (msgString(n2:n2) == 'F') msgString(n2:n2)='-'
+         if (dbug_flag > 5) then
+            write(llogunit,*) ' '
+            write(llogunit,'(A)') subname//' Allowed coupling flags'
+            write(llogunit,'(2x,A10,20(A5))') '|from to->',(compname(n2),n2=1,ncomps)
+            do n1 = 1,ncomps
+               write(msgString,'(2x,a1,A,5x,20(L5))') '|',trim(compname(n1)),(med_coupling_allowed(n1,n2),n2=1,ncomps)
+               do n2 = 1,len_trim(msgString)
+                  if (msgString(n2:n2) == 'F') msgString(n2:n2)='-'
+               enddo
+               write(llogunit,'(A)') trim(msgString)
             enddo
-            write(llogunit,'(A)') trim(msgString)
-          enddo
-          write(llogunit,*) ' '
-          call shr_sys_flush(llogunit)
-        endif
+            write(llogunit,*) ' '
+            call shr_sys_flush(llogunit)
+         endif
 
-        if (dbug_flag >= 0) then
-          write(llogunit,*) ' '
-          write(llogunit,'(A)') subname//' Active coupling flags'
-          write(llogunit,'(2x,A10,20(A5))') '|from to->',(compname(n2),n2=1,ncomps)
-          do n1 = 1,ncomps
-            write(msgString,'(2x,a1,A,5x,20(L5))') '|',trim(compname(n1)),(is_local%wrap%med_coupling_active(n1,n2),n2=1,ncomps)
-            do n2 = 1,len_trim(msgString)
-              if (msgString(n2:n2) == 'F') msgString(n2:n2)='-'
+         if (dbug_flag >= 0) then
+            write(llogunit,*) ' '
+            write(llogunit,'(A)') subname//' Active coupling flags'
+            write(llogunit,'(2x,A10,20(A5))') '|from to->',(compname(n2),n2=1,ncomps)
+            do n1 = 1,ncomps
+               write(msgString,'(2x,a1,A,5x,20(L5))') '|',trim(compname(n1)),&
+                    (is_local%wrap%med_coupling_active(n1,n2),n2=1,ncomps)
+               do n2 = 1,len_trim(msgString)
+                  if (msgString(n2:n2) == 'F') msgString(n2:n2)='-'
+               enddo
+               write(llogunit,'(A)') trim(msgString)
             enddo
-            write(llogunit,'(A)') trim(msgString)
-          enddo
-          write(llogunit,*) ' '
-          call shr_sys_flush(llogunit)
-        endif
+            write(llogunit,*) ' '
+            call shr_sys_flush(llogunit)
+         endif
       endif
 
       !----------------------------------------------------------
@@ -1399,18 +1324,19 @@ module MED
           ! Initialize FBfrac for component n1 - the field names will be fraclist(:,n1)
           ! Note - must use import state here - since export state might not contain anything other
           ! than scalar data if the component is not prognostic
+
           call shr_nuopc_methods_FB_init(is_local%wrap%FBfrac(n1), STgeom=is_local%wrap%NStateImp(n1), &
             fieldNameList=fraclist(:,n1), name='FBfrac'//trim(compname(n1)), rc=rc)
-        endif
-      enddo
-      if (mastertask) call shr_sys_flush(llogunit)
 
-      ! These are the FBImp mapped to different grids, FBImp(n1,n1) is handled above
-      do n1 = 1,ncomps
+        endif
+        if (mastertask) call shr_sys_flush(llogunit)
+
+        ! These are the FBImp mapped to different grids, FBImp(n1,n1) is handled above
         do n2 = 1,ncomps
-          if (n1 /= n2 .and. is_local%wrap%med_coupling_active(n1,n2) .and. &
-              ESMF_StateIsCreated(is_local%wrap%NStateImp(n1),rc=rc) .and. &
-              ESMF_StateIsCreated(is_local%wrap%NStateExp(n2),rc=rc)) then
+           if (n1 /= n2 .and. &
+                is_local%wrap%med_coupling_active(n1,n2) .and. &
+                ESMF_StateIsCreated(is_local%wrap%NStateImp(n1),rc=rc) .and. &
+                ESMF_StateIsCreated(is_local%wrap%NStateExp(n2),rc=rc)) then
             if (mastertask) write(llogunit,*) subname,' initializing FBs for '//trim(compname(n1))//'_'//trim(compname(n2))
 
             ! TODO:
@@ -1436,25 +1362,49 @@ module MED
       if (mastertask) call shr_sys_flush(llogunit)
 
       !----------------------------------------------------------
-      ! Initialize AtmOcn FBs
+      ! Initialize Mediator field bundles
       !----------------------------------------------------------
 
-      ! TODO:
-      ! Important Note - the NStateImp(compocn) or NStateImp(compatm) used here rather than NStateExp(n2), since
-      ! the export state might only contain control data and no grid information if
-      ! if the target component (n2) is not prognostic only receives control data back
+      ! FBs for ocean albedo and ocn/atm flux calculations
 
-      call shr_nuopc_methods_FB_init(is_local%wrap%FBAtmOcn_o, STgeom=is_local%wrap%NStateImp(compocn), &
-        fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_o', rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (is_local%wrap%comp_present(compatm) .and. is_local%wrap%comp_present(compocn)) then
+         ! NOTE: the NStateImp(compocn) or NStateImp(compatm) used here
+         ! rather than NStateExp(n2), since the export state might only
+         ! contain control data and no grid information if if the target
+         ! component (n2) is not prognostic only receives control data back
 
-      call shr_nuopc_methods_FB_init(is_local%wrap%FBAtmOcn_a, STgeom=is_local%wrap%NStateImp(compatm), &
-        fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBAtmOcn_a', rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+         call shr_nuopc_methods_FB_init(is_local%wrap%FBXao_ocnalb_a, &
+              STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=flds_xao_ocnalb, name='FBMed_ocnalb_a', rc=rc)
+         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      call shr_nuopc_methods_FB_init(is_local%wrap%FBaccumAtmOcn, STgeom=is_local%wrap%NStateImp(compocn), &
-        fieldnamelist=fldsAtmOcn%shortname(1:fldsAtmOcn%num), name='FBaccumAtmOcn', rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+         call shr_nuopc_methods_FB_init(is_local%wrap%FBXao_ocnalb_o, &
+              STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=flds_xao_ocnalb, name='FBMed_ocnalb_o', rc=rc)
+         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+         call shr_nuopc_methods_FB_init(is_local%wrap%FBXao_fluxes_a, &
+              STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=flds_xao_fluxes, name='FBMed_ocnatm_fluxes_a', rc=rc)
+         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+         call shr_nuopc_methods_FB_init(is_local%wrap%FBXao_fluxes_o, &
+              STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=flds_xao_fluxes, name='FBMed_ocnatm_fluxes_o', rc=rc)
+         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+         call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_accum_ocnatm_fluxes_o, &
+              STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=flds_xao_fluxes, name='FBMed_ocnatm_fluxes_o_accum', rc=rc)
+         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      end if
+
+      ! FBs for lnd <-> glc accumulation and elevation class downscaling
+
+      if (is_local%wrap%comp_present(complnd) .and. is_local%wrap%comp_present(compglc)) then
+         call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_l2g_l_accum, &
+              STgeom=is_local%wrap%NStateImp(complnd), fieldnamelist=flds_l2x_to_glc, name='FBMed_l2g_l_accum', rc=rc)
+         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+         call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_g2x_to_lnd, &
+              STgeom=is_local%wrap%NStateImp(complnd), fieldnamelist=flds_g2x_to_lnd, name='FBMed_g2x_to_lnd', rc=rc)
+         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      end if
 
       !----------------------------------------------------------
       !--- Initialize route handles
@@ -1474,138 +1424,122 @@ module MED
             if (n1 == compocn .or. n1 == compice) srcMaskValue = 0
             if (n2 == compocn .or. n2 == compice) dstMaskValue = 0
 
-            ! ----------------------------------------------------
-            ! Determine route handle names
-            ! ----------------------------------------------------
-            rhname = trim(compname(n1))//"2"//trim(compname(n2))
+            !--- get single fields from bundles
+            !--- 1) ASSUMES all fields in the bundle are on identical grids
+            !--- 2) MULTIPLE route handles are going to be generated for
+            !---    given field bundle source and destination grids
+
+            call shr_nuopc_methods_FB_getFieldN(FBsrc, 1, fldsrc, rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            call shr_nuopc_methods_FB_getFieldN(FBdst, 1, flddst, rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
             if (n1 /= n2) then
-               ! If coupling is active between n1 and n2
+               if (is_local%wrap%med_coupling_active(n1,n2)) then ! If coupling is active between n1 and n2
 
-               if (is_local%wrap%med_coupling_active(n1,n2)) then
+                  ! Determine route handle names
+                  rhname = trim(compname(n1))//"2"//trim(compname(n2))
+                  if (mastertask) write(llogunit,*) subname,' initialize RH for '//trim(rhname)
 
-                  ! ----------------------------------------------------
-                  ! Determine route handle filenames if appropriate
-                  ! Currently this involves specifying the filenames:
-                  !     smapfile, vmapfile, fmapfile and dmapfile
-                  ! route handles will not be create if:
-                  ! bilnrfn = med_constants_spval_rhfile, then a bilnr route handle is not created
-                  ! patchfn = med_constants_spval_rhfile, then a patch route handle is not created
-                  ! consdfn = med_constants_spval_rhfile, then a consd route handle is not created
-                  ! consffn = med_constants_spval_rhfile, then a consf route handle is not created
-                  ! ----------------------------------------------------
+                  ! Loop over fields in
+                  do n = 1,size(FldsFr(n1)%flds)
+                     mapindex = trim(FldsFr(n1)%flds(n)%mapindex(n2))
 
-                  ! TODO: the following encapsulates specific assumptions CESM - this needs to be generalized - or
-                  ! be implemented in a CESM specific section
+                     ! Create route handle for target mapindex if route handle is required
+                     ! (i.e. mapindex /= mapunset) and route handle has not already been created
+                     if (mapindex /= mapunset .and. &
+                          .not. ESMF_RouteHandleIsCreated(is_local%wrap%RH(n1,n2,mapindex), rc=rc)) then
+                        mapname  = trim(mapnames(mapindex))
+                        mapfile  = trim(FldsFr(n1)%flds(n)%mapfile(n2))
+                        string   = trim(rhname)//'_weights'
 
-                  if (rhname == 'rof2ocn' .or. rhname == 'rof2ice') then
-
-                     ! TODO: the rmapfile is needed for an input file for now - it cannot be computed on the fly
-                     ! The following is a temporary had to get run->ocn mapping files read into one of the
-                     ! accepted mapping file categories
-                     ! TODO: rof2ocn has 2 mapping files specified by rof2ocn_liq_rmapname and rof2ocn_ice_rmapname
-                     ! To get the mapping to work correctly, the mapping type specified in shr_nuopc_flds_mod for
-                     ! rof2ocn_ice is set to bilinear - and thereby will work with the smapfile setting below
-
-                     rhname_file='rof2ocn_liq'
-                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_rmapname", value=fmapfile, rc=rc)
-                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) fmapfile=med_constants_spval_rhfile
-                     call ESMF_LogWrite(trim(rhname_file)//"_rmapname = "//trim(fmapfile), ESMF_LOGMSG_INFO)
-
-                     rhname_file='rof2ocn_ice'
-                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_rmapname", value=smapfile, rc=rc)
-                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) smapfile=med_constants_spval_rhfile
-                     call ESMF_LogWrite(trim(rhname_file)//"_rmapname = "//trim(smapfile), ESMF_LOGMSG_INFO)
-
-                     pmapfile = med_constants_spval_rhfile
-                     dmapfile = med_constants_spval_rhfile
-
-                  else if (rhname == 'ocn2ice' .or. rhname == 'ice2ocn') then
-
-                     smapfile = 'idmap'
-                     fmapfile = 'idmap'
-                     pmapfile = med_constants_spval_rhfile
-                     dmapfile = med_constants_spval_rhfile
-
-                  else if (rhname == 'glc2ocn') then
-
-                     ! TODO: the glc2ocn files below are too big to read in right now - so skip reading them
-                     rhname_file='glc2ocn_rmapname'
-                     smapfile = med_constants_spval_rhfile
-                     fmapfile = med_constants_spval_rhfile
-                     pmapfile = med_constants_spval_rhfile
-                     dmapfile = med_constants_spval_rhfile
-
-                  else if (rhname == 'glc2ice') then
-
-                     ! TODO: the glc2ice files below are too big to read in right now - so skip reading them
-                     rhname_file='glc2ice_rmapname'
-                     smapfile = med_constants_spval_rhfile
-                     fmapfile = med_constants_spval_rhfile
-                     pmapfile = med_constants_spval_rhfile
-                     dmapfile = med_constants_spval_rhfile
-
-                  else
-
-                     rhname_file = rhname
-
-                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_fmapname", value=fmapfile, rc=rc)
-                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) fmapfile=med_constants_spval_rhfile
-                     call ESMF_LogWrite(trim(rhname)//"_fmapname = "//trim(fmapfile), ESMF_LOGMSG_INFO)
-
-                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_smapname", value=smapfile, rc=rc)
-                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) smapfile=med_constants_spval_rhfile
-                     call ESMF_LogWrite(trim(rhname)//"_smapname = "//trim(smapfile), ESMF_LOGMSG_INFO)
-
-                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_vmapname", value=pmapfile, rc=rc)
-                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) pmapfile=med_constants_spval_rhfile
-                     call ESMF_LogWrite(trim(rhname)//"_vmapname = "//trim(pmapfile), ESMF_LOGMSG_INFO)
-
-                     call NUOPC_CompAttributeGet(gcomp, name=trim(rhname_file)//"_dmapname", value=dmapfile, rc=rc)
-                     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU)) dmapfile=med_constants_spval_rhfile
-                     call ESMF_LogWrite(trim(rhname)//"_dmapname = "//trim(dmapfile), ESMF_LOGMSG_INFO)
-
-                     if (n1 == compocn .and. n2 == compwav) fmapfile = smapfile
-                     if (n1 == compice .and. n2 == compwav) fmapfile = smapfile
-                     if (n1 == compatm .and. n2 == compwav) fmapfile = smapfile
-                     if (n1 == complnd .and. n2 == comprof) smapfile = fmapfile
-
-                  end if
-
-                  ! ----------------------------------------------------
-                  ! Initialize route handles
-                  ! ----------------------------------------------------
-
-                  if (mastertask) write(llogunit,*) subname,' calling RH_init for '//trim(rhname)
-
-                  nflds = size(medFldsFr(n1))
-                  allocate(mappings(nflds))
-                  do n = 1,nflds
-                     mappings(n) = medFldsFr(n1)%fldlist(n)%mapping(n2)
-                  end do
-
-                  call shr_nuopc_methods_RH_Init( &
-                       FBsrc=is_local%wrap%FBImp(n1,n1), &
-                       FBdst=is_local%wrap%FBImp(n1,n2), &
-                       bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-                       consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-                       consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-                       patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-                       fcopymap=is_local%wrap%RH(n1,n2,mapfcopy), &
-                       srcMaskValue=srcMaskValue, &
-                       dstMaskValue=dstMaskValue, &
-                       mappings1=mappings, &
-                       string=trim(rhname)//'_weights', &
-                       bilnrfn=trim(smapfile), &
-                       consffn=trim(fmapfile), &
-                       consdfn=trim(dmapfile), &
-                       patchfn=trim(pmapfile), &
-                       spvalfn=med_constants_spval_rhfile, &
-                       mastertask=mastertask, &
-                       rc=rc)
-                  if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-                  deallocate(mappings)
+                        if (mapindex == mapfcopy) then
+                           if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH redist '
+                           call ESMF_LogWrite(trim(subname) // trim(string) // ' RH redist ', ESMF_LOGMSG_INFO, rc=dbrc)
+                           call ESMF_FieldRedistStore(fldsrc, flddst, &
+                                routehandle=is_local%wrap%RH(n1,n2,mapindex), &
+                                ignoreUnmatchedIndices = .true., rc=rc)
+                           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                        else if (mapfile /= 'unset') then
+                           if (mastertask) then
+                              write(llogunit,'(4A)') subname,trim(string),&
+                                   ' RH '//trim(mapname)//' via input file ',trim(mapfile)
+                           end if
+                           call ESMF_LogWrite(subname // trim(string) //&
+                                ' RH '//trim(mapname)//' via input file ',trim(mapfile), ESMF_LOGMSG_INFO, rc=dbrc)
+                           call ESMF_FieldSMMStore(fldsrc, flddst, &
+                                trim(filename), &
+                                routehandle=is_local%wrap%RH(n1,n2,mapindex), &
+                                ignoreUnmatchedIndices=.true., &
+                                srcTermProcessing=srcTermProcessing_Value, rc=rc)
+                           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                        else
+                           if (lmastertask) write(llogunit,'(3A)') subname,trim(string),' RH consf regrid computed on the fly'
+                           call ESMF_LogWrite(subname // trim(string) //' RH consf regrid computed on the fly', ESMF_LOGMSG_INFO, rc=dbrc)
+                           if (mapindex == mapbilnr) then
+                              srcTermProcessing_Value = 0
+                              call ESMF_FieldRegridStore(fldsrc, flddst, &
+                                   routehandle=is_local%wrap%RH(n1,n2,mapindex), &
+                                   srcMaskValues=(/lsrcMaskValue/), &
+                                   dstMaskValues=(/ldstMaskValue/), &
+                                   regridmethod=ESMF_REGRIDMETHOD_BILINEAR, &
+                                   polemethod=polemethod, &
+                                   srcTermProcessing=srcTermProcessing_Value, &
+                                   factorList=factorList, &
+                                   ignoreDegenerate=.true., &
+                                   unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
+                           else if (mapindex == mapconsf) then
+                              call ESMF_FieldRegridStore(fldsrc, flddst, &
+                                   routehandle=is_local%wrap%RH(n1,n2,mapindex), &
+                                   srcMaskValues=(/lsrcMaskValue/), &
+                                   dstMaskValues=(/ldstMaskValue/), &
+                                   regridmethod=ESMF_REGRIDMETHOD_CONSERVE, &
+                                   normType=ESMF_NORMTYPE_FRACAREA, &
+                                   srcTermProcessing=srcTermProcessing_Value, &
+                                   factorList=factorList, &
+                                   ignoreDegenerate=.true., &
+                                   unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
+                           else if (mapindex == mapconsd) then
+                              call ESMF_FieldRegridStore(fldsrc, flddst, &
+                                   routehandle=is_local%wrap%RH(n1,n2,mapindex), &
+                                   srcMaskValues=(/lsrcMaskValue/), &
+                                   dstMaskValues=(/ldstMaskValue/), &
+                                   regridmethod=ESMF_REGRIDMETHOD_CONSERVE, &
+                                   normType=ESMF_NORMTYPE_DSTAREA, &
+                                   srcTermProcessing=srcTermProcessing_Value, &
+                                   factorList=factorList, &
+                                   ignoreDegenerate=.true., &
+                                   unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
+                           else if (mapindex == mappatch) then
+                              call ESMF_FieldRegridStore(fldsrc, flddst, &
+                                   routehandle=is_local%wrap%RH(n1,n2,mapindex), &
+                                   srcMaskValues=(/lsrcMaskValue/), &
+                                   dstMaskValues=(/ldstMaskValue/), &
+                                   regridmethod=ESMF_REGRIDMETHOD_PATCH, &
+                                   polemethod=polemethod, &
+                                   srcTermProcessing=srcTermProcessing_Value, &
+                                   factorList=factorList, &
+                                   ignoreDegenerate=.true., &
+                                   unmappedaction=ESMF_UNMAPPEDACTION_IGNORE, rc=rc)
+                           end if
+                           if (rhprint_flag) then
+                              call NUOPC_Write(factorList, "array_med_"//trim(lstring)//"_consf.nc", rc)
+                              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                              call ESMF_RouteHandlePrint(consfmap, rc=rc)
+                              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                           endif
+                           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                        end if
+                        ! Check that a valid route handle has been created
+                        if (ESMF_RouteHandleIsCreated(, rc=rc)) then
+                           call ESMF_LogWrite(trim(subname)//trim(lstring)//": computed RH "//trim(mapname), &
+                                ESMF_LOGMSG_INFO, rc=dbrc)
+                        else
+                           call ESMF_LogWrite(trim(subname)//trim(lstring)//": failed   RH "//trim(mapname), &
+                                ESMF_LOGMSG_INFO, rc=dbrc)
+                        endif
+                     end if  !end of route handle needs to be created
 
                elseif (is_local%wrap%comp_present(n1) .and. is_local%wrap%comp_present(n2)) then
 
@@ -1664,6 +1598,46 @@ module MED
 
       call med_fraction_init(gcomp,rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+      !---------------------------------------
+      ! Initialize field bundles for normalization
+      !---------------------------------------
+      ! Also do the mapping for unity normalization up front
+
+      fldname = 'one'
+      do n1 = 1,ncomps
+         do n2 = 1,ncomps
+            if (n1 /= n2 .and. is_local%wrap%med_coupling_active(n1,n2)) then
+               do m = 1,nmappers
+                  if (ESMF_RouteHandleIsCreated(is_local%wrap%RH(n1,n2,m), rc=rc)) then
+                     call shr_nuopc_methods_FB_init(FBout=is_local%wrap%FBNormOne(n1,n2,m), &
+                          FBgeom=is_local%wrap%FBImp(n1,n2), fieldNameList=/trim(fldname)/, rc=rc)
+                     if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+
+                     call shr_nuopc_methods_FB_reset(is_local%wrap%FBNormOne(n1,n2,m), value=czero, rc=rc)
+                     if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+
+                     call shr_nuopc_methods_FB_init( FBout=is_local%wrap%FBTmp, &
+                          STgeom=is_local%wrap%NStateImp(n1), fieldNameList=/trim(fldname)/, rc=rc)
+                     if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+
+                     call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBTmp, trim(fldname), fldptr1=dataPtr1, rc=rc)
+                     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                     dataptr1(:) = 1.0_ESMF_KIND_R8
+
+                     call shr_nuopc_methods_FB_FieldRegrid(&
+                          is_local%warp%FBTmp             , fldname, &
+                          is_local%wrap%FBNormOne(n1,n2,m), fldname, &
+                          RH(n1,n2,m), rc)
+                     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+                     call shr_nuopc_methods_FB_clean(FBTmp, rc=rc)
+                     if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+                  end if
+               end do
+            end if
+         end do
+      end do
 
 #if (1 == 0)
       !---------------------------------------

@@ -10,12 +10,18 @@ module med_phases_mod
   use NUOPC
   use shr_kind_mod          , only : CL=>SHR_KIND_CL, CS=>SHR_KIND_CS
   use shr_sys_mod           , only : shr_sys_abort
+  use shr_nuopc_fldList_mod , only : compmed, compatm, complnd, compocn
+  use shr_nuopc_fldList_mod , only : compice, comprof, compwav, compglc
+  use shr_nuopc_fldList_mod , only : ncomps, compname
+  use shr_nuopc_fldList_mod , only : fldListFr, fldListTo
+  use shr_nuopc_fldList_mod , only : fldListXao_fluxes_a, fldListXao_fluxes_o
+  use shr_nuopc_fldList_mod , only : fldListXao_ocnalb_a, fldListXao_ocnalb_o
+  use shr_nuopc_fldList_mod , only : mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_init
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_reset
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_clean
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_diagnose
-  use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_Regrid
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_FieldRegrid
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_GetFldPtr
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_accum
@@ -24,11 +30,6 @@ module med_phases_mod
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_copy
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_GetScalar
   use med_internalstate_mod , only : InternalState
-  use med_internalstate_mod , only : ncomps, compname
-  use med_internalstate_mod , only : compmed, compatm, complnd, compocn
-  use med_internalstate_mod , only : compice, comprof, compwav, compglc
-  use med_internalstate_mod , only : fldsFr, fldsAtmOcn
-  use med_internalstate_mod , only : mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy
   use med_constants_mod     , only : med_constants_dbug_flag
   use med_constants_mod     , only : med_constants_statewrite_flag
   use med_constants_mod     , only : med_constants_spval_init
@@ -36,7 +37,8 @@ module med_phases_mod
   use med_constants_mod     , only : med_constants_czero
   use med_constants_mod     , only : med_constants_ispval_mask
   use med_merge_mod         , only : med_merge_auto
-  use med_atmocn_mod        , only : med_atmocn_init, med_atmocn_ocnalb, med_atmocn_flux
+  use med_ocnatm_flux_mod   , only : med_ocnatm_flux_init, med_ocnatm_flux_run
+  use med_ocnalb_mod        , only : med_ocnalb_init, med_ocnalb_run
 
   implicit none
 
@@ -60,9 +62,10 @@ module med_phases_mod
   public med_phases_prep_wav
   public med_phases_prep_glc
   public med_phases_accum_fast
-  public med_phases_atmocn_init
-  public med_phases_atmocn_ocnalb
-  public med_phases_atmocn_flux
+  public med_phases_ocnalb_init
+  public med_phases_ocnatm_flux_init
+  public med_phases_ocnalb
+  public med_phases_ocnatm_flux
 
   private med_phases_map_frac
 
@@ -87,7 +90,7 @@ module med_phases_mod
     real(ESMF_KIND_R8), pointer :: ifrac_ar(:)  ! 1./ifrac_a
     real(ESMF_KIND_R8), pointer :: ocnwgt(:),icewgt(:),customwgt(:)
     integer                     :: mapindex
-    integer                     :: i, j, n, n1, n2, ncnt, lsize, is, ie
+    integer                     :: i, j, n, n1, ncnt, lsize, is, ie
     type(ESMF_FieldBundle)      :: FBtmp1
     logical                     :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_atm)'
@@ -148,209 +151,69 @@ module med_phases_mod
     !--- Map to create import field bundle on atm grid - FBimp(:,compatm)
     !---------------------------------------
 
-    ! Do not do the regridding here for ice2atm, use ice frac weighted mapping below
-
-    n2 = compatm
     do n1 = 1,ncomps
-       if (n1/=compice .and. is_local%wrap%med_coupling_active(n1,n2)) then
-          call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+       if (is_local%wrap%med_coupling_active(n1,compatm)) then
+          call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,compatm), value=czero, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          call shr_nuopc_methods_FB_Regrid( fldsFr(n1), &
+          call shr_nuopc_methods_FB_Regrid_Norm( &
+               fldListFr(n1)%flds, &
                is_local%wrap%FBImp(n1,n1), &
-               is_local%wrap%FBImp(n1,n2), &
-               consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-               consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-               bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-               patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-               string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+               is_local%wrap%FBImp(n1,compatm), &
+               is_local%wrap%FBNormOne(n1,compatm,:), &
+               is_local%wrap%RH(n1,compatm,:), &
+               string=trim(compname(n1))//'2'//trim(compname(compatm)), rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
           if (dbug_flag > 1) then
-             call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), &
-                  string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+             call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,compatm), &
+                  string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(compatm))//') ', rc=rc)
              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           endif
        endif
     enddo
 
     !---------------------------------------
-    !--- map FBAtmOcn_o to FBAtmOcn_a
+    !--- map FBXao_ocnalb_o and FBXao_fluxes_o to atm grid
     !---------------------------------------
 
     if (is_local%wrap%med_coupling_active(compocn,compatm)) then
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBAtmOcn_a, value=czero, rc=rc)
+       call shr_nuopc_methods_FB_reset(is_local%wrap%Xao_ocnalb_a, value=czero, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-       call shr_nuopc_methods_FB_Regrid( fldsAtmOcn, &
-            is_local%wrap%FBAtmOcn_o, &
-            is_local%wrap%FBAtmOcn_a, &
-            consfmap=is_local%wrap%RH(compocn,compatm,mapconsf), &
-            consdmap=is_local%wrap%RH(compocn,compatm,mapconsd), &
-            bilnrmap=is_local%wrap%RH(compocn,compatm,mapbilnr), &
-            patchmap=is_local%wrap%RH(compocn,compatm,mappatch), &
-            string='FBAtmOcn_o_To_FBAtmOcn_a', rc=rc)
+       call shr_nuopc_methods_FB_Regrid_Norm(&
+            fldListXao_ocnalb%flds, &
+            is_local%wrap%FBXao_ocnalb_o, &
+            is_local%wrap%FBXao_ocnalb_a, &
+            is_local%wrap%FBNormOne(compatm,compocn,:), &
+            is_local%wrap%RH(compatm,compocn,:), &
+            string='FBAXao_ocnalb_o_To_FBXao_ocnalb_a', rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtmOcn_a, &
-               string=trim(subname)//' FBAtmOcn_a ', rc=rc)
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBXao_ocnalb_a, string=trim(subname)//&
+               ' FBXao_ocnalb_a ', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       endif
+
+       call shr_nuopc_methods_FB_reset(is_local%wrap%Xao_fluxes_a, value=czero, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call shr_nuopc_methods_FB_Regrid_Norm(&
+            fldListXao_ocnalb%flds, &
+            is_local%wrap%FBXao_fluxes_o, &
+            is_local%wrap%FBXao_fluxes_a, &
+            is_local%wrap%FBNormOne(compocn,compatm,:), &
+            is_local%wrap%RH(compocn,compatm,:), &
+            string='FBAXao_fluxes_o_To_FBXao_fluxes_a', rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       if (dbug_flag > 1) then
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBXao_fluxes_a, string=trim(subname)//&
+               ' FBXao_fluxes_a ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        endif
     endif
-
-    !---------------------------------------
-    !--- map ice to atm with frac weighting
-    !---------------------------------------
-
-    if (is_local%wrap%med_coupling_active(compice,compatm)) then
-
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       ! Map ice fraction field from ice grid to atm grid - also compute the reverse
-       !--- Need to weight the ice2atm regrid by the ice fraction
-       !--- need to compute weight by the frac mapped with the correct mapping
-       !--- first compute the ice fraction on the atm grid for all active mappings
-
-       if (shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), rc=rc)) then
-
-          ! ice_fraction name exists as a field in is_local%wrap%FBImp(compice,compice)
-
-          !--- multiply FBImp(compice,compice) by Si_ifrac and set the result in FBtmp1 -
-
-          call shr_nuopc_methods_FB_init(FBtmp1, &
-                                         fbgeom=is_local%wrap%FBImp(compice,compice), &
-                                         fbflds=is_local%wrap%FBImp(compice,compice), &
-                                         name='FBtmp1_ice_x_frac', rc=rc)
-          if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
-
-          ! Note: this resets Si_ifrac in FBtmp1 and this does not get overwritten
-          call shr_nuopc_methods_FB_reset(FBtmp1, value=czero, rc=rc)
-          if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
-
-          call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), &
-               fldptr1=dataPtr1, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          do n = 1,fldsFr(compice)%num
-             if (fldsFr(compice)%shortname(n) /= trim(ice_fraction_name) .and. &
-                  shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compice), fldsFr(compice)%shortname(n), rc=rc) .and. &
-                  shr_nuopc_methods_FB_FldChk(FBtmp1, fldsFr(compice)%shortname(n), rc=rc)) then
-
-                ! dataptr3 is a pointer to the field in FBimp
-                call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compice) , &
-                     fldsFr(compice)%shortname(n), dataPtr3, rc=rc)
-
-                ! dataPtr4 is a pointer to the field in FBtmp1
-                call shr_nuopc_methods_FB_GetFldPtr(FBtmp1, &
-                     fldsFr(compice)%shortname(n), dataPtr4, rc=rc)
-
-                ! avoid non array fields like the scalars
-                if (size(dataptr1) == size(dataptr3)) then
-                   do i = 1,size(dataptr1)
-                      dataPtr4(i) = dataPtr3(i) * dataPtr1(i)
-                   enddo
-                end if
-             end if
-          end do
-
-          !--- regrid FBtmp1 (FBImp(compice,compice)*frac) to FBImp(compice,compatm), fields with fraction multiplied
-
-          call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          ! note: this regrids FBtmp1 to FBImp(compice, compatm - but
-          ! at this point Si_ifrac in FBImp is zero - because of above
-
-          call shr_nuopc_methods_FB_Regrid(fldsFr(compice), &
-               FBtmp1, &
-               is_local%wrap%FBImp(compice,compatm), &
-               consfmap=is_local%wrap%RH(compice,compatm,mapconsf), &
-               consdmap=is_local%wrap%RH(compice,compatm,mapconsd), &
-               bilnrmap=is_local%wrap%RH(compice,compatm,mapbilnr), &
-               patchmap=is_local%wrap%RH(compice,compatm,mappatch), &
-               string=trim(compname(compice))//'2'//trim(compname(compatm)), rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          call shr_nuopc_methods_FB_clean(FBtmp1, rc=rc)
-          if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
-
-          !--- divide FBImp(compice,compatm) by ice_fraction, interpolated ice fraction
-
-          do n = 1,fldsFr(compice)%num
-
-             if (fldsFr(compice)%shortname(n) /= trim(ice_fraction_name) .and. &
-                 shr_nuopc_methods_FB_FldChk(is_local%wrap%FBImp(compice,compatm), fldsFr(compice)%shortname(n), rc=rc)) then
-
-                call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compatm), fldsFr(compice)%shortname(n), &
-                     dataPtr3, rc=rc)
-
-                ! TODO: this needs to be implemented?
-                ! NOTE: here dataPtr3 is an array on the atm grid, above it is on the ice grid
-                !--- make sure ifrac_a in the mapped bundle is correct
-                !--- this is handled by ice_fraction_name check in the mult/divide phases to avoid ice_fraction weighting
-                ! call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compice,compatm), trim(ice_fraction_name), &
-                !    dataPtr3, rc=rc)
-                ! do i=1,size(dataPtr3)
-                !    dataPtr3(i) = ifrac_af(i)
-                ! enddo
-
-                ! avoid non array fields like the scalars
-                if (fldsFr(compice)%mapping(n) == "conservefrac") then
-                   mapindex=mapconsf
-                elseif (fldsFr(compice)%mapping(n) == "conservedst") then
-                   mapindex=mapconsd
-                elseif (fldsFr(compice)%mapping(n) == "bilinear") then
-                   mapindex=mapbilnr
-                elseif (fldsFr(compice)%mapping(n) == "patch") then
-                   mapindex=mappatch
-                else
-                   call ESMF_LogWrite(trim(subname)//": mapping name error "//trim(fldsFr(compice)%mapping(n)), &
-                        ESMF_LOGMSG_INFO, rc=rc)
-                   rc = ESMF_FAILURE
-                   if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-                end if
-
-                call med_phases_map_frac(is_local%wrap%FBImp(compice,compice), trim(ice_fraction_name), &
-                                         is_local%wrap%FBImp(compice,compatm), trim(ice_fraction_name), &
-                                         is_local%wrap%RH(compice,compatm,mapindex), ifrac_a, ifrac_ar, rc=rc)
-                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-                if (size(ifrac_ar) == size(dataptr3)) then
-                   do i = 1,size(dataptr3)
-                      dataPtr3(i) = dataPtr3(i) * ifrac_ar(i)
-                   end do
-                end if
-             endif
-          enddo
-
-       else
-
-          ! ice_fraction name does not exist as a field in is_local%wrap%FBImp(compice,compice)
-
-          call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compice,compatm), value=czero, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          call shr_nuopc_methods_FB_Regrid(fldsFr(compice), &
-               is_local%wrap%FBImp(compice,compice), &
-               is_local%wrap%FBImp(compice,compatm), &
-               consfmap=is_local%wrap%RH(compice,compatm,mapconsf), &
-               consdmap=is_local%wrap%RH(compice,compatm,mapconsd), &
-               bilnrmap=is_local%wrap%RH(compice,compatm,mapbilnr), &
-               patchmap=is_local%wrap%RH(compice,compatm,mappatch), &
-               string=trim(compname(compice))//'2'//trim(compname(compatm)), rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       endif
-
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compice,compatm), &
-               string=trim(subname)//' FBImp(compice,compatm) ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       endif
-
-    endif !end of if coupling is active between ice => atm
 
     !---------------------------------------
     !--- auto merges
@@ -361,20 +224,20 @@ module med_phases_mod
 
     call med_merge_auto(is_local%wrap%FBExp(compatm), &
          FB1=is_local%wrap%FBImp(compocn,compatm), FB1w=is_local%wrap%FBfrac(compatm), fldw1='ofrac', &
-         FB2=is_local%wrap%FBAtmOcn_a            , FB2w=is_local%wrap%FBfrac(compatm), fldw2='ofrac', &
-         FB3=is_local%wrap%FBImp(compice,compatm), FB3w=is_local%wrap%FBfrac(compatm), fldw3='ifrac', &
-         FB4=is_local%wrap%FBImp(complnd,compatm), FB4w=is_local%wrap%FBfrac(compatm), fldw4='lfrac', &
+         FB2=is_local%wrap%FBXao_ocnalb_a        , FB2w=is_local%wrap%FBfrac(compatm), fldw2='ofrac', &
+         FB3=is_local%wrap%FBXao_fluxes_a        , FB3w=is_local%wrap%FBfrac(compatm), fldw2='ofrac', &
+         FB4=is_local%wrap%FBImp(compice,compatm), FB4w=is_local%wrap%FBfrac(compatm), fldw3='ifrac', &
+         FB5=is_local%wrap%FBImp(complnd,compatm), FB5w=is_local%wrap%FBfrac(compatm), fldw4='lfrac', &
          document=first_call, string=subname, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 1) then
-       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExp(compatm), &
-            string=trim(subname)//' FBexp(compatm) ', rc=rc)
+       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBExp(compatm), string=trim(subname)//' FBexp(compatm) ', rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     !---------------------------------------
-    !--- set fractions back to atm
+    !--- set fractions to send back to atm
     !---------------------------------------
 
     if (shr_nuopc_methods_FB_FldChk(is_local%wrap%FBExp(compatm), 'So_ofrac', rc=rc)) then
@@ -464,7 +327,7 @@ module med_phases_mod
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:), dataPtr2(:), dataPtr3(:), dataPtr4(:)
-    integer                     :: i,n,n1,n2,ncnt
+    integer                     :: i,n,n1,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_ice)'
     !---------------------------------------
@@ -524,25 +387,23 @@ module med_phases_mod
     !--- map to create FBimp(:,compice)
     !---------------------------------------
 
-    n2 = compice
     do n1 = 1,ncomps
-      if (is_local%wrap%med_coupling_active(n1,n2)) then
-        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+      if (is_local%wrap%med_coupling_active(n1,compice)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,compice), value=czero, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        call shr_nuopc_methods_FB_Regrid( fldsFr(n1), &
+        call shr_nuopc_methods_FB_Regrid_Norm( &
+             fldListFr(n1)%flds, &
              is_local%wrap%FBImp(n1,n1), &
-             is_local%wrap%FBImp(n1,n2), &
-             consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-             consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-             bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-             patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-             string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+             is_local%wrap%FBImp(n1,compice), &
+             is_local%wrap%FBNormOne(n1,compice,:), &
+             is_local%wrap%RH(n1,compice,:), &
+             string=trim(compname(n1))//'2'//trim(compname(compice)), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (dbug_flag > 1) then
-           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), &
-                string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,compice), &
+                string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(compice))//') ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       endif
@@ -635,7 +496,7 @@ module med_phases_mod
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    integer                     :: i,j,n,n1,n2,ncnt
+    integer                     :: i,j,n,n1,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_lnd)'
     !---------------------------------------
@@ -695,25 +556,23 @@ module med_phases_mod
     !--- map to create FBimp(:,complnd)
     !---------------------------------------
 
-    n2 = complnd
     do n1 = 1,ncomps
-      if (is_local%wrap%med_coupling_active(n1,n2)) then
-        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+      if (is_local%wrap%med_coupling_active(n1,complnd)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,complnd), value=czero, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), &
+        call shr_nuopc_methods_FB_Regrid_Norm( &
+             fldListFr(n1)%flds, &
              is_local%wrap%FBImp(n1,n1), &
-             is_local%wrap%FBImp(n1,n2), &
-             consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-             consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-             bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-             patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-             string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+             is_local%wrap%FBImp(n1,complnd), &
+             is_local%wrap%FBNormOne(n1,complnd,:), &
+             is_local%wrap%RH(n1,complnd,:), &
+             string=trim(compname(n1))//'2'//trim(compname(complnd)), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (dbug_flag > 1) then
-           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), &
-                string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,complnd), &
+                string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(complnd))//') ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       endif
@@ -769,7 +628,7 @@ module med_phases_mod
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    integer                     :: i,j,n,n1,n2,ncnt
+    integer                     :: i,j,n,n1,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_rof)'
     !---------------------------------------
@@ -829,25 +688,23 @@ module med_phases_mod
     !--- map to create FBimp(:,comprof)
     !---------------------------------------
 
-    n2 = comprof
     do n1 = 1,ncomps
-      if (is_local%wrap%med_coupling_active(n1,n2)) then
-        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+      if (is_local%wrap%med_coupling_active(n1,comprof)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,comprof), value=czero, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), &
+        call shr_nuopc_methods_FB_Regrid_Norm( &
+             fldListFr(n1)%flds, &
              is_local%wrap%FBImp(n1,n1), &
-             is_local%wrap%FBImp(n1,n2), &
-             consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-             consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-             bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-             patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-             string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+             is_local%wrap%FBImp(n1,comprof), &
+             is_local%wrap%FBNormOne(n1,comprof,:), &
+             is_local%wrap%RH(n1,comprof,:), &
+             string=trim(compname(n1))//'2'//trim(compname(comprof)), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (dbug_flag > 1) then
-           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), &
-                string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,comprof), &
+                string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(comprof))//') ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       endif
@@ -901,7 +758,7 @@ module med_phases_mod
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    integer                     :: i,j,n,n1,n2,ncnt
+    integer                     :: i,j,n,n1,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_wav)'
     !---------------------------------------
@@ -961,23 +818,23 @@ module med_phases_mod
     !--- map to create FBimp(:,compwav)
     !---------------------------------------
 
-    n2 = compwav
     do n1 = 1,ncomps
-      if (is_local%wrap%med_coupling_active(n1,n2)) then
-        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+      if (is_local%wrap%med_coupling_active(n1,compwav)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,compwav), value=czero, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), is_local%wrap%FBImp(n1,n1), is_local%wrap%FBImp(n1,n2), &
-           consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-           consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-           bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-           patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-           string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+        call shr_nuopc_methods_FB_Regrid_Norm( &
+             fldListFr(n1)%flds, &
+             is_local%wrap%FBImp(n1,n1), &
+             is_local%wrap%FBImp(n1,compwav), &
+             is_local%wrap%FBNormOne(n1,compwav,:), &
+             is_local%wrap%RH(n1,compwav,:), &
+             string=trim(compname(n1))//'2'//trim(compname(compwav)), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (dbug_flag > 1) then
-           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), &
-                string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,compwav), &
+                string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(compwav))//') ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       endif
@@ -1032,7 +889,7 @@ module med_phases_mod
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:),dataPtr4(:)
-    integer                     :: i,j,n,n1,n2,ncnt
+    integer                     :: i,j,n,n1,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter  :: subname='(med_phases_prep_glc)'
     !---------------------------------------
@@ -1092,23 +949,23 @@ module med_phases_mod
     !--- mapping
     !---------------------------------------
 
-    n2 = compglc
     do n1 = 1,ncomps
-      if (is_local%wrap%med_coupling_active(n1,n2)) then
-        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+      if (is_local%wrap%med_coupling_active(n1,compglc)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,compglc), value=czero, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), is_local%wrap%FBImp(n1,n1), is_local%wrap%FBImp(n1,n2), &
-           consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-           consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-           bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-           patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-           string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+        call shr_nuopc_methods_FB_Regrid_Norm( &
+             fldListFr(n1)%flds, &
+             is_local%wrap%FBImp(n1,n1), &
+             is_local%wrap%FBImp(n1,compglc), &
+             is_local%wrap%FBNormOne(n1,compglc,:), &
+             is_local%wrap%RH(n1,compglc,:), &
+             string=trim(compname(n1))//'2'//trim(compname(compglc)), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (dbug_flag > 1) then
-           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), &
-                string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,compglc), &
+                string=trim(subname)//' FBImp('//trim(compname(n1))//','//trim(compname(compglc))//') ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       endif
@@ -1162,7 +1019,7 @@ module med_phases_mod
     character(len=64)           :: timestr
     type(ESMF_StateItem_Flag)   :: itemType
     type(InternalState)         :: is_local
-    integer                     :: i,j,n,n1,n2,ncnt
+    integer                     :: i,j,n,n1,ncnt
     character(ESMF_MAXSTR)      :: fieldname1(10),fieldname2(10),fieldname3(10)
     real(ESMF_KIND_R8), pointer :: dataPtr1(:),dataPtr2(:),dataPtr3(:)
     real(ESMF_KIND_R8), pointer :: atmwgt(:),icewgt(:),customwgt(:)
@@ -1295,7 +1152,7 @@ module med_phases_mod
     type(ESMF_Time)             :: time
     character(len=64)           :: timestr
     type(InternalState)         :: is_local
-    integer                     :: i,j,n,n1,n2,ncnt
+    integer                     :: i,j,n,n1,ncnt
     logical,save                :: first_call = .true.
     character(len=*),parameter :: subname='(med_phases_accum_fast)'
     !---------------------------------------
@@ -1356,25 +1213,23 @@ module med_phases_mod
     !--- coupling to the ocean to the ocean grid
     !---------------------------------------
 
-    n2 = compocn
     do n1 = 1,ncomps
-      if (is_local%wrap%med_coupling_active(n1,n2)) then
-        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,n2), value=czero, rc=rc)
+      if (is_local%wrap%med_coupling_active(n1,compocn)) then
+        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,compocn), value=czero, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        call shr_nuopc_methods_FB_Regrid(fldsFr(n1), &
+        call shr_nuopc_methods_FB_Regrid_Norm( &
+             fldListFr(n1)%flds, &
              is_local%wrap%FBImp(n1,n1), &
-             is_local%wrap%FBImp(n1,n2), &
-             consfmap=is_local%wrap%RH(n1,n2,mapconsf), &
-             consdmap=is_local%wrap%RH(n1,n2,mapconsd), &
-             bilnrmap=is_local%wrap%RH(n1,n2,mapbilnr), &
-             patchmap=is_local%wrap%RH(n1,n2,mappatch), &
-             string=trim(compname(n1))//'2'//trim(compname(n2)), rc=rc)
+             is_local%wrap%FBImp(n1,compocn), &
+             is_local%wrap%FBNormOne(n1,compocn,:), &
+             is_local%wrap%RH(n1,compocn,:), &
+             string=trim(compname(n1))//'2'//trim(compname(compocn)), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         if (dbug_flag > 1) then
-           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,n2), &
-                string=trim(subname) //' FBImp('//trim(compname(n1))//','//trim(compname(n2))//') ', rc=rc)
+           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,compocn), &
+                string=trim(subname) //' FBImp('//trim(compname(n1))//','//trim(compname(compocn))//') ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         endif
       endif
@@ -1526,7 +1381,31 @@ module med_phases_mod
 
   !-----------------------------------------------------------------------------
 
-  subroutine med_phases_atmocn_init(gcomp, rc)
+  subroutine med_phases_ocnalb_init(gcomp, rc)
+    ! Initialize atm/ocn module variables
+
+    type(ESMF_GridComp)  :: gcomp
+    integer, intent(out) :: rc
+
+    ! local variables
+    character(CL)       :: cvalue
+    character(CL)       :: aoflux_grid
+    type(InternalState) :: is_local
+    character(len=*),parameter :: subname='(med_phases_atmocn_init)'
+    !---------------------------------------
+
+    call med_ocnalb_init(gcomp,          &
+         FBAtmOcn=is_local%wrap%FBAtmOcn(compdst)    &
+         FBAtm=is_local%wrap%FBImp(compsrc,compdst), &
+         FBOcn=is_local%wrap%FBImp(compdst,compdst), &
+         FBfrac=is_local%wrap%FBfrac(compdst), rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+  end subroutine med_phases_ocnalb_init
+
+  !-----------------------------------------------------------------------------
+
+  subroutine med_phases_ocnatm_flux_init(gcomp, rc)
     ! Initialize atm/ocn module variables
 
     type(ESMF_GridComp)  :: gcomp
@@ -1549,75 +1428,57 @@ module med_phases_mod
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+    ! Determine src and dst comps depending on the aoflux_grid setting
     call NUOPC_CompAttributeGet(gcomp, name='aoflux_grid', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) aoflux_grid
 
     if (trim(aoflux_grid) == 'ocn') then
-
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compatm,compocn), value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call shr_nuopc_methods_FB_Regrid( &
-            fldsFr(compatm), is_local%wrap%FBImp(compatm,compatm), is_local%wrap%FBImp(compatm,compocn), &
-            consfmap=is_local%wrap%RH(compatm,compocn,mapconsf), &
-            consdmap=is_local%wrap%RH(compatm,compocn,mapconsd), &
-            bilnrmap=is_local%wrap%RH(compatm,compocn,mapbilnr), &
-            patchmap=is_local%wrap%RH(compatm,compocn,mappatch), &
-            string=trim(compname(compatm))//'2'//trim(compname(compocn)), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compatm,compocn), &
-               string=trim(subname) //' FBImp('//trim(compname(compatm))//','//trim(compname(compocn))//') ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
-
-       call med_atmocn_init(gcomp, aoflux_grid,         &
-            FBAtmOcn=is_local%wrap%FBAtmOcn_o,          &
-            FBAtm=is_local%wrap%FBImp(compatm,compocn), &
-            FBOcn=is_local%wrap%FBImp(compocn,compocn), &
-            FBfrac=is_local%wrap%FBfrac(compocn), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    elseif (trim(aoflux_grid) == 'atm') then
-
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compocn,compatm), value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call shr_nuopc_methods_FB_Regrid( &
-            fldsFr(compocn), is_local%wrap%FBImp(compocn,compocn), is_local%wrap%FBImp(compocn,compatm), &
-            consfmap=is_local%wrap%RH(compocn,compatm,mapconsf), &
-            consdmap=is_local%wrap%RH(compocn,compatm,mapconsd), &
-            bilnrmap=is_local%wrap%RH(compocn,compatm,mapbilnr), &
-            patchmap=is_local%wrap%RH(compocn,compatm,mappatch), &
-            string=trim(compname(compocn))//'2'//trim(compname(compatm)), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compocn,compatm), &
-               string=trim(subname) //' FBImp('//trim(compname(compocn))//','//trim(compname(compatm))//') ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
-
-       call med_atmocn_init(gcomp, aoflux_grid,         &
-            FBAtmOcn=is_local%wrap%FBAtmOcn_a,          &
-            FBAtm=is_local%wrap%FBImp(compatm,compatm), &
-            FBOcn=is_local%wrap%FBImp(compocn,compatm), &
-            FBfrac=is_local%wrap%FBfrac(compatm), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
+       compsrc = compatm
+       compdst = compocn
+    else if (trim(aoflux_grid) == 'atm')
+       compsrc = compocn
+       compdst = compatm
     else
-
-       call ESMF_LogWrite(trim(subname)//' aoflux_grid = '//trim(aoflux_grid)//' not available', ESMF_LOGMSG_INFO, rc=dbrc)
+       call ESMF_LogWrite(trim(subname)//' aoflux_grid = '//trim(aoflux_grid)//' not available', &
+            ESMF_LOGMSG_INFO, rc=dbrc)
        return
+    end if
 
-    endif
+    call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compsrc,compdst), value=czero, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call shr_nuopc_methods_FB_Regrid_Norm( &
+         fldListFr(compsrc)%flds, &
+         is_local%wrap%FBImp(compsrc,compsrc), &
+         is_local%wrap%FBImp(compsrc,compdst), &
+         is_local%wrap%FBNormOne(compsrc,compdst,:), &
+         is_local%wrap%RH(compsrc,compdst,:), &
+         string=trim(compname(compsrc))//'2'//trim(compname(compdst)), rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (dbug_flag > 1) then
+       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compsrc,compdst), &
+            string=trim(subname) //' FBImp('//trim(compname(compsrc))//','//trim(compname(compdst))//') ', rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
+
+    call med_atmocn_init(gcomp, aoflux_grid,         &
+         FBAtmOcn=is_local%wrap%FBAtmOcn(compdst)    &
+         FBAtm=is_local%wrap%FBImp(compsrc,compdst), &
+         FBOcn=is_local%wrap%FBImp(compdst,compdst), &
+         FBfrac=is_local%wrap%FBfrac(compdst), rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
   end subroutine med_phases_atmocn_init
 
   !-----------------------------------------------------------------------------
 
-  subroutine med_phases_atmocn_ocnalb(gcomp, rc)
+  subroutine med_phases_ocnalb(gcomp, rc)
+
     use shr_nuopc_flds_mod  , only : flds_scalar_index_nextsw_cday
+
+    ! Compute ocean albedos (on the ocean grid)
 
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
@@ -1688,8 +1549,21 @@ module med_phases_mod
 
     end if
 
-    ! Calculate ocean albedoes
+    ! Map relevant atm fluxes to the ocean grid
+    ! TODO: must add a normalization of one here
+    call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swvdf', FBAtmOcn_o, 'Faxa_swvdf', consfmap, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swndf', FBAtmOcn_o, 'Faxa_swndf', consfmap, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swvdr', FBAtmOcn_o, 'Faxa_swvdr', consfmap, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_FieldRegrid(FBAtmOcn_a, 'Faxa_swndr', FBAtmOcn_o, 'Faxa_swndr', consfmap, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    ! Calculate ocean albedoes on the ocean grid
     call med_atmocn_ocnalb(gcomp, FBfrac_o=is_local%wrap%FBfrac(compocn), nextsw_cday=nextsw_cday, rc=rc)
+
+    ! ***** TODO: map the ocean albedos to the atm grid *****
 
     if (dbug_flag > 1) then
        call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtmOcn_o, &
@@ -1744,8 +1618,44 @@ module med_phases_mod
     ! Determine ocn_prognostic
     ocn_prognostic = NUOPC_IsConnected(is_local%wrap%NStateImp(compocn))
 
-    ! Calculate atm/ocn fluxes
+    ! Determine src and dst comps depending on the aoflux_grid setting
+    call NUOPC_CompAttributeGet(gcomp, name='aoflux_grid', value=cvalue, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    read(cvalue,*) aoflux_grid
+
+    if (trim(aoflux_grid) == 'ocn') then
+       compsrc = compatm
+       compdst = compocn
+    else if (trim(aoflux_grid) == 'atm')
+       compsrc = compocn
+       compdst = compatm
+    else
+       call ESMF_LogWrite(trim(subname)//' aoflux_grid = '//trim(aoflux_grid)//' not available', &
+            ESMF_LOGMSG_INFO, rc=dbrc)
+       return
+    end if
+
+    call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compsrc,compdst), value=czero, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call shr_nuopc_methods_FB_Regrid_Norm( &
+         fldListFr(compsrc)%flds, &
+         is_local%wrap%FBImp(compsrc,compsrc), &
+         is_local%wrap%FBImp(compsrc,compdst), &
+         is_local%wrap%FBNormOne(compsrc,compdst,:), &
+         is_local%wrap%RH(compsrc,compdst,:), &
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (dbug_flag > 1) then
+       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compsrc,compdst), &
+            string=trim(subname) //' FBImp('//trim(compname(compsrc))//','//trim(compname(compdst))//') ', rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
+
+    ! Calculate atm/ocn fluxes on the ocean grid - for now)
     call med_atmocn_flux(gcomp, clock, ocn_prognostic=ocn_prognostic, dead_comps=dead_comps, rc=rc)
+
+    ! TODO: map the atm/ocn fluxes to the atmosphere grid
 
     if (dbug_flag > 1) then
        call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBAtmOcn_o, &
@@ -1754,5 +1664,209 @@ module med_phases_mod
     end if
 
   end subroutine med_phases_atmocn_flux
+
+  !-----------------------------------------------------------------------------
+
+  subroutine shr_nuopc_methods_FB_Regrid_Norm(fldsSrc, FBSrc, FBDst, FBNormOne, RouteHandles, string, rc)
+
+    ! ----------------------------------------------
+    ! Map field bundles with appropriate fraction weighting
+    ! ----------------------------------------------
+
+    type (shr_nuopc_src_entry_type)   , intent(in)    :: fldsSrc(:)
+    type(ESMF_FieldBundle)            , intent(inout) :: FBSrc
+    type(ESMF_FieldBundle)            , intent(inout) :: FBDst
+    type(ESMF_FieldBundle)            , intent(in)    :: FBFrac
+    type(ESMF_FieldBundle)            , intent(in)    :: FBNormOne(:)
+    type(ESMF_RouteHandle)            , intent(inout) :: RouteHandles(:)
+    character(len=*), optional        , intent(in)    :: string
+    integer                           , intent(out)   :: rc
+
+    ! local variables
+    type(ESMF_FieldBundle)      :: FBSrcTmp        ! temporary
+    type(ESMF_FieldBundle)      :: FBNormSrc       ! temporary
+    type(ESMF_FieldBundle)      :: FBNormDst       ! temporary
+    real(ESMF_KIND_R8), pointer :: data_srctmp(:)  ! temporary
+    real(ESMF_KIND_R8), pointer :: data_src(:)     ! temporary
+    real(ESMF_KIND_R8), pointer :: data_dst(:)     ! temporary
+    real(ESMF_KIND_R8), pointer :: data_srcnorm(:) ! temporary
+    real(ESMF_KIND_R8), pointer :: data_dstnormdst ! temporary
+    real(ESMF_KIND_R8), pointer :: data_frac(:)    ! temporary
+    integer                     :: mapindex
+    character(len=64)           :: lstring
+    character(len=CS)           :: mapnorm
+    character(len=CS)           :: fldname
+    integer                     :: i, n
+    character(len=*),parameter  :: subname='(med_phases_FB_Regrid_Norm)'
+    !---------------------------------------
+
+    if (present(string)) then
+      lstring = trim(string)
+    else
+      lstring = " "
+    endif
+
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    !---------------------------------------
+    ! Loop over all fields in the field bundle
+    !---------------------------------------
+    do n = 1,size(fldsSrc)
+
+       fldname  = fldsSrc(n)%shortname
+       mapindex = fldsSrc(n)%mapindex(dstcomp)
+       mapnorm  = fldsSrc(n)%mapnorm(dstcomp)
+
+       ! Error checks
+       if (.not. shr_nuopc_methods_FB_FldChk(FBSrc, fldname, rc=rc)) then
+          if (dbug_flag > 1) then
+             call ESMF_LogWrite(trim(subname)//" field not found in FB: "//trim(fldname), ESMF_LOGMSG_INFO, rc=dbrc)
+          endif
+       else if (.not. ESMF_RouteHandleIsCreated(RouteHandles(mapindex), rc=rc)) then
+          call ESMF_LogWrite(trim(subname)//trim(lstring)//&
+               ": ERROR RH not available for "//mapnames(mapindex)//": fld="//trim(fldname), &
+               ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+          rc = ESMF_FAILURE
+       end if
+
+       ! Do the mapping
+       if (mapindex == mapfcopy) then
+
+          call shr_nuopc_methods_FB_FieldRegrid(FBSrc, fldname), FBDst, fldname, RouteHandles(mapindex), rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       else
+
+          ! Create a new temporary field bundle if needed
+          if (.not. ESMF_FieldBundleIsCreated(FBSrcTmp)) then
+             call shr_nuopc_methods_FB_init(FBSrcTmp, FBgeom=FBSrc, fieldNameList=/trim(fldname)/, rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          end if
+
+          ! Get pointer to source field data in both FBSrc and FBSRcTmp
+          call shr_nuopc_methods_FB_GetFldPtr(FBSrc, fldname, data_src, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call shr_nuopc_methods_FB_GetFldPtr(FBSrcTmp, fldname, data_srctmp, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+          if ( trim(mapnorm) /= 'unset' .and. trim(mapnorm) /= 'one') then
+
+             !-------------------------------------------------
+             ! fractional normalization
+             !-------------------------------------------------
+             ! create a temporary field bundle that will contain the mapped normalization factor
+
+             call shr_nuopc_methods_FB_init(FBout=FBNormSrc, FBgeom=FBSrc, fieldNameList=/trim(mapnorm)/, rc=rc)
+             if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+             call shr_nuopc_methods_FB_init(FBout=FBNormDst, FBgeom=FBDst, fieldNameList=/trim(mapnorm)/, rc=rc)
+             if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+
+             call shr_nuopc_methods_FB_reset(FBNormSrc, value=czero, rc=rc)
+             if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+             call shr_nuopc_methods_FB_reset(FBNormDst, value=czero, rc=rc)
+             if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+
+             call shr_nuopc_methods_FB_GetFldPtr(FBNormSrc, trim(mapnorm), data_srcnorm, rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+             ! error checks
+             if (size(data_normsrc) /= size(data_frac)) then
+                call ESMF_LogWrite(trim(subname)//": ERROR data_normsrc size and data_frac size are inconsistent" //, &
+                     ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+                rc = ESMF_FAILURE
+                return
+             else if (size(data_norm) /= size(data_srctmp)) then
+                call ESMF_LogWrite(trim(subname)//": ERROR data_normsrc size and data_srctmp size are inconsistent" //, &
+                     ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+                rc = ESMF_FAILURE
+                return
+             end if
+
+             ! get a pointer to the FBFrac array based on the mapnorm name
+             call shr_nuopc_methods_FB_GetFldPtr(FBFrac, trim(mapnorm), data_frac, rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+             ! now fill in the values for data_srcnorm and data_srctmp - these are the two arrays needed for normalization
+             ! Note that FBsrcTmp will now have the data_srctmp value
+             do i = 1,size(data_frac)
+                data_srcnorm(i) = data_frac(i)
+                data_srctmp(i)  = data_src(i) * data_frac(i)  ! Multiply initial field by data_frac
+             end if
+
+             ! regrid FBSrcTmp to FBDst
+
+             if (trim(fldname) == trim(flds_scalar_name)) then
+                if (dbug_flag > 1) then
+                   call ESMF_LogWrite(trim(subname)//trim(lstring)//": skip : fld="//trim(fldname), &
+                        ESMF_LOGMSG_INFO, rc=dbrc)
+                endif
+             else
+                call shr_nuopc_methods_FB_FieldRegrid(FBSrcTmp, fldname, FBDst, fldname, RouteHandles(mapindex), rc)
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+             end if
+
+             ! regrid FBNormSrc to from the source to the desination grid (FBNormDst)
+
+             call shr_nuopc_methods_FB_reset(FBNormSrc, value=czero, rc=rc)
+             if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+             call shr_nuopc_methods_FB_FieldRegrid(FBNormSrc, mapnorm, FBNormDst, mapnorm, RouteHandles(mapindex), rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+             ! multiply interpolated field (FBDst) by reciprocal of fraction on destination grid (FBNormDst)
+
+             call shr_nuopc_methods_FB_GetFldPtr(FBNormDst, trim(mapnorm), data_dstnnorm, rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+             call shr_nuopc_methods_FB_GetFldPtr(FBDst, trim(fldname), data_dst, rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+             do i= 1,size(data_dst)
+                if (data_normdst(i) == 0.0_ESMF_KIND_R8) then
+                   data_dst(i) = 0.0_ESMF_KIND_R8
+                else
+                   data_dst(i) = data_dst(i)/data_dstnorm(i)
+                endif
+             end do
+
+          else if (trim(mapnorm) == 'one' .or. trim(mapnorm) == 'none') then
+
+             !-------------------------------------------------
+             ! unity or no normalization
+             !-------------------------------------------------
+
+             ! map source field to destination grid
+             mapindex = fldListSrc%flds(n)%mapindex(dstcomp)
+             call shr_nuopc_methods_FB_FieldRegrid(FBSrc, fldname, FBDst, fldname, RouteHandles(mapindex), rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+             ! obtain unity normalization factor and multiply interpolated field by reciprocal of normalization factor
+             if (trim(mapnorm) == 'one') then
+                call shr_nuopc_methods_FB_GetFldPtr(FBNormOne(mapindex), 'one', data_norm, rc=rc)
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+                call shr_nuopc_methods_FB_GetFldPtr(FBDst, trim(fldname), data_dst, rc=rc)
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                do i= 1,size(data_dst)
+                   if (data_norm(i) == 0.0_ESMF_KIND_R8) then
+                      data_dst(i) = 0.0_ESMF_KIND_R8
+                   else
+                      data_dst(i) = data_dst(i)/data_norm(i)
+                   endif
+                enddo
+             end if ! mapnorm is 'one'
+
+          end if ! mapnorm is 'one' or 'nne'
+       end if ! mapindex is not mapfcopy and field exists
+    end do  ! loop over fields
+
+    ! Clean up temporary field bundle
+    if (ESMF_FieldBundleIsCreated(FBSrcTmp)) then
+       call shr_nuopc_methods_FB_clean(FBSrcTmp, rc=rc)
+       if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+    end if
+
+  end subroutine shr_nuopc_methods_FB_Regrid_Norm
 
 end module med_phases_mod
