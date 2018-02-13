@@ -5,7 +5,7 @@ module med_internalstate_mod
   !-----------------------------------------------------------------------------
 
   use ESMF
-  use shr_nuopc_fldList_mod, only: ncomps, nmappers, med_coupling_active
+  use shr_nuopc_fldList_mod, only: ncomps, nmappers
 
   implicit none
 

@@ -37,6 +37,7 @@ module MED
   use shr_nuopc_fldList_mod , only: ncomps, compmed, compatm, compocn
   use shr_nuopc_fldList_mod , only: compice, complnd, comprof, compwav, compglc, compname
   use shr_nuopc_fldList_mod , only: mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy, mapnames
+  use shr_nuopc_fldList_mod , only: med_coupling_allowed
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Realize
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Advertise
 
@@ -56,7 +57,6 @@ module MED
   use med_infodata_mod      , only: infodata=>med_infodata
 
   use med_internalstate_mod , only: InternalState
-  use med_internalstate_mod , only: med_coupling_allowed
 
   use med_connectors_mod    , only: med_connectors_prep_med2atm
   use med_connectors_mod    , only: med_connectors_prep_med2ocn
