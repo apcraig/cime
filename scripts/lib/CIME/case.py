@@ -540,6 +540,7 @@ class Case(object):
         """
 
         component = self.get_primary_component()
+        logger.info("Primary component is %s"%component)
 
         if pesfile is None:
             self._pesfile = files.get_value("PES_SPEC_FILE", {"component":component})
