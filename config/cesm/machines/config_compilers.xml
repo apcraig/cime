@@ -69,8 +69,9 @@ using a fortran linker.
      compilers -->
 <compiler>
   <CPPDEFS>
-    <append> -D<env>OS</env> </append>
+    <append> -D<env>OS</env> -DCESMCOUPLED </append>
     <append MODEL="pop"> -D_USE_FLOW_CONTROL </append>
+    <append MODEL="mom"> -DMOM6_CAP </append>
   </CPPDEFS>
   <SUPPORTS_CXX>FALSE</SUPPORTS_CXX>
 </compiler>
