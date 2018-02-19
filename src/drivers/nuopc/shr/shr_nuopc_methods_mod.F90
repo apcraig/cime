@@ -1401,7 +1401,7 @@ module shr_nuopc_methods_mod
             rc = ESMF_FAILURE
             return
           endif
-          call shr_nuopc_methods_FB_FieldRegrid(FBin, shortname(n), FBout,shortname(n), bilnrmap,rc)
+          call shr_nuopc_methods_FB_FieldRegrid(FBin, shortnames(n), FBout, shortnames(n), bilnrmap,rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         elseif (mappings(n) == "conservefrac") then
