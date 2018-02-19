@@ -1,6 +1,9 @@
 module shr_nuopc_fldList_mod
 
-  use shr_kind_mod      , only : CX => shr_kind_CX, CXX => shr_kind_CXX, CS=>shr_kind_CS
+  use ESMF
+  use NUOPC
+  use shr_nuopc_fldList_types_mod
+  use shr_kind_mod      , only : CX => shr_kind_CX, CXX => shr_kind_CXX, CS=>shr_kind_CS, CL=>shr_kind_CL
   use shr_sys_mod       , only : shr_sys_abort
   use seq_comm_mct      , only : llogunit => logunit
   use seq_drydep_mod    , only : seq_drydep_init, seq_drydep_readnl, lnd_drydep
@@ -10,36 +13,33 @@ module shr_nuopc_fldList_mod
   use shr_ndep_mod      , only : shr_ndep_readnl
   use shr_flds_mod      , only : shr_flds_dom_coord, shr_flds_dom_other
   use shr_string_mod    , only : shr_string_listGetNum, shr_string_listGetName
+  use glc_elevclass_mod , only : glc_elevclass_init, glc_get_num_elevation_classes, glc_elevclass_as_string
 
   implicit none
   public
-
-  integer, parameter, private :: CSS = 256  ! use longer short character
-  integer, parameter, private :: CLL = 1024
 
   !----------------------------------------------------------------------------
   ! routines
   !----------------------------------------------------------------------------
 
-  public :: shr_nuopc_fldList_Init
   public :: shr_nuopc_fldList_SetDict
-  public :: shr_nuopc_fldList_Advertise
+  public :: shr_nuopc_fldList_Init
+  public :: shr_nuopc_fldList_Concat
   public :: shr_nuopc_fldList_Realize
-  public :: shr_nuopc_fldList_SetScalarField
 
   interface fldList_AddFld ; module procedure &
-    fldList_AddFld_Src, &
-    fldList_AddFld_Dst, &
-  end interface
-
+       fldList_AddFld_Src, &
+       fldList_AddFld_Dst
+  end interface fldList_AddFld
+  private :: fldList_AddFld
   private :: fldList_AddDomain
   private :: fldList_AddMetadata
   private :: fldList_AddMap
-  private :: fldList_AddFld
 
   !----------------------------------------------------------------------------
   ! other field lists - column deliminated string
   !----------------------------------------------------------------------------
+  ! TODO: these must move away from colon delimited fields
 
   character(len=CXX) :: drydep_fields       ! List of dry-deposition fields
   character(len=CXX) :: megan_voc_fields    ! List of MEGAN VOC emission fields
@@ -47,147 +47,15 @@ module shr_nuopc_fldList_mod
   character(len=CX)  :: carma_fields        ! List of CARMA fields from lnd->atm
   character(len=CX)  :: ndep_fields         ! List of nitrogen deposition fields from atm->lnd/ocn
   integer            :: ice_ncat            ! number of sea ice thickness categories
-  logical            :: flds_i2o_per_cat    ! .true. if select per ice thickness category fields are passed from ice to ocean
+  logical            :: flds_i2o_per_cat    ! .true. => select per ice thickness category fields passed from ice to ocn
   logical            :: add_ndep_fields     ! .true. => add ndep fields
-
-  !----------------------------------------------------------------------------
-  ! scalar data
-  !----------------------------------------------------------------------------
-
-  character(len=*) ,parameter :: flds_scalar_name = "cpl_scalars"
-  integer , parameter :: flds_scalar_index_nx                 = 1
-  integer , parameter :: flds_scalar_index_ny                 = 2
-  integer , parameter :: flds_scalar_index_precip_fact        = 3
-  integer , parameter :: flds_scalar_index_nextsw_cday        = 4
-  integer , parameter :: flds_scalar_index_dead_comps         = 5
-  integer , parameter :: flds_scalar_index_rofice_present     = 6  ! does rof have iceberg coupling on
-  integer , parameter :: flds_scalar_index_flood_present      = 7  ! does rof have flooding on
-  integer , parameter :: flds_scalar_index_ocnrof_prognostic  = 8  ! does ocn need rof data
-  integer , parameter :: flds_scalar_index_iceberg_prognostic = 9  ! does ice model support icebergs
-  integer , parameter :: flds_scalar_index_glclnd_present     = 10 ! does glc have land coupling fields on
-  integer , parameter :: flds_scalar_index_glcocn_present     = 11 ! does glc have ocean runoff on
-  integer , parameter :: flds_scalar_index_glcice_present     = 12 ! does glc have iceberg coupling on
-  integer , parameter :: flds_scalar_index_glc_valid_input    = 13 ! does glc have is valid accumulated data being sent to it?
-                                                                   ! (only valid of glc_prognostic is .true.)
-  integer , parameter :: flds_scalar_index_glc_coupled        = 14 ! does glc send fluxes to other components
-                                                                   ! (only relevant if glc_present is .true.)
-  integer , parameter :: flds_scalar_num                      = 14
 
   !----------------------------------------------------------------------------
   ! private data
   !----------------------------------------------------------------------------
 
-  !character(CXX) :: flds_dom_coord
-  !character(CXX) :: flds_dom_other
-
-  ! This defines the components.
-
-  integer, parameter :: ncomps =8
-  integer, parameter :: compmed=1
-  integer, parameter :: compatm=2
-  integer, parameter :: complnd=3
-  integer, parameter :: compocn=4
-  integer, parameter :: compice=5
-  integer, parameter :: comprof=6
-  integer, parameter :: compwav=7
-  integer, parameter :: compglc=8
-
-  character(len=*),parameter :: compname(ncomps) = (/'med','atm','lnd','ocn','ice','rof','wav','glc'/)
-
-  ! This defines the med_mapping_allowed is a starting point for what is
-  ! allowed in this coupled system.  It will be revised further after the system
-  ! starts, but any coupling set to false will never be allowed.  As new connections
-  ! are allowed, just update the table below.
-  ! - the rows are the destination of coupling
-  ! - the columns are the source of coupling
-  ! - So, the second column indicates which models the atm is coupled to.
-  ! - And the second row indicates which models are coupled to the atm.
-  ! The mediator is not connected to any components because the mediator
-  ! doesn't have it's own grid and only acts as a hub.
-
-  ! tcraig, turned off glc2ocn and glc2ice for time being
-  logical, parameter :: med_coupling_allowed(ncomps,ncomps) = &
-   (/ .false., .false., .false., .false., .false., .false., .false., .false., &  ! med
-      .false., .false., .true. , .true. , .true. , .false., .false., .false., &  ! atm
-      .false., .true. , .false., .false., .false., .true. , .false., .true. , &  ! lnd
-      .false., .true. , .false., .false., .true. , .true. , .true. , .false., &  ! ocn
-      .false., .true. , .false., .true. , .false., .true. , .false., .false., &  ! ice
-      .false., .false., .true. , .false., .false., .false., .false., .false., &  ! rof
-      .false., .true. , .false., .true. , .true. , .false., .false., .false., &  ! wav
-      .false., .false., .true. , .false., .false., .false., .false., .false.  /) ! glc
-   !   med      atm      lnd      ocn      ice      rof      wav      glc
-
-  ! mappings used for generating route handle (RH) arrays
-
-  integer, parameter :: nmappers=5
-  integer, parameter :: mapbilnr=1
-  integer, parameter :: mapconsf=2
-  integer, parameter :: mapconsd=3
-  integer, parameter :: mappatch=4
-  integer, parameter :: mapfcopy=5
-  integer, parameter :: mapunset=0
-
-  character(len=*), parameter :: mapnames(nmappers) = (/'bilnr','consf','consd','patch','fcopy'/)
-
-  character(len=*), parameter :: undef     = 'undefined'
-  integer         , parameter :: nmax      = 1000        ! maximum number of entries in metadta_entry
-  integer                     :: n_entries = 0           ! actual number of entries in metadta_entry
-  character(len=CSS)          :: metadta_entry(nmax,4) = undef
-
-  type shr_nuopc_src_entry_type
-     character(CS) :: stdname
-     character(CS) :: shortname
-     character(CS) :: mapindex(ncomps) = mapunset
-     character(CS) :: mapnorm(ncomps) = 'unset'
-     character(CX) :: mapfile(ncomps) = 'unset'
-  end type shr_nuopc_fldList_src_entry_type
-
-  type shr_nuopc_dst_entry_type
-     character(CS) :: stdname
-     character(CS) :: shortname
-     logical       :: merge_with_weight = .false.
-  end type shr_nuopc_fldList_dst_entry_type
-
-  type shr_nuopc_src_fldlist_type
-     type (shr_nuopc_src_entry_type), pointer :: flds(:)
-  end type shr_nuopc_src_fldlist_type
-
-  type shr_nuopc_dst_fldlist_type
-     type (shr_nuopc_dst_entry_type), pointer :: flds(:)
-  end type shr_nuopc_dst_fldlist_type
-
-  ! Instantiations needed to create field bundles
-
-  ! The following is used in the advertise phases of the components and mediator
-  type (shr_nuopc_dst_fldlist_type), pointer :: fldListFr(ncomps)
-  type (shr_nuopc_src_fldlist_type), pointer :: fldListTo(ncomps)
-  type (shr_nuopc_src_fldlist_type)          :: fldListXao_fluxes_a
-  type (shr_nuopc_src_fldlist_type)          :: fldListXao_fluxes_o
-  type (shr_nuopc_src_fldlist_type)          :: fldListXao_ocnalb_a
-  type (shr_nuopc_src_fldlist_type)          :: fldListXao_ocnalb_o
-
-  character(CXX) :: flds_a2x = ''
-  character(CXX) :: flds_x2a = ''
-  character(CXX) :: flds_i2x = ''
-  character(CXX) :: flds_x2i = ''
-  character(CXX) :: flds_l2x = ''
-  character(CXX) :: flds_x2l = ''
-  character(CXX) :: flds_o2x = ''
-  character(CXX) :: flds_x2o = ''
-  character(CXX) :: flds_g2x = ''
-  character(CXX) :: flds_x2g = ''
-  character(CXX) :: flds_w2x = ''
-  character(CXX) :: flds_x2w = ''
-  character(CXX) :: flds_r2x = ''
-  character(CXX) :: flds_x2r = ''
-
-  ! Mediator field bundles are initialized from these colon deliminated strings
-  character(CXX) :: flds_xao_fluxes = ''
-  character(CXX) :: flds_xao_ocnalb = ''
-  character(CXX) :: flds_xao_diurnl = ''
-  character(CXX) :: flds_l2x_to_glc = ''
-  character(CXX) :: flds_x2l_fr_glc = ''
-  character(CXX) :: flds_g2x_to_lnd = ''
+  integer           :: dbrc
+  character(len=CL) :: infostr
 
 !================================================================================
 contains
@@ -197,10 +65,10 @@ contains
     ! ----------------------------------------------
     ! Build NUOPC dictionary from flds data
     ! ----------------------------------------------
-    integer,          intent(inout)  :: rc
+    integer, intent(inout)  :: rc
 
     ! local variables
-    integer       :: n,
+    integer       :: n
     character(CS) :: stdname
     character(CS) :: units
     character(len=*), parameter :: subname='(shr_nuopc_fldList_SetDict)'
@@ -209,8 +77,8 @@ contains
     rc = ESMF_SUCCESS
 
     do n = 1,n_entries
-       stdname = trim(metadta_entry(n,3))
-       units   = trim(metadta_entry(n,4))
+       stdname = trim(metadata_entry(n,3))
+       units   = trim(metadata_entry(n,4))
        if (.not.NUOPC_FieldDictionaryHasEntry(stdname)) then
           call ESMF_LogWrite(subname//': Add:'//trim(stdname), ESMF_LOGMSG_INFO, rc=rc)
           call NUOPC_FieldDictionaryAddEntry(standardName=stdname, canonicalUnits=units, rc=rc)
@@ -222,64 +90,64 @@ contains
 
   !================================================================================
 
-  subroutine shr_nuopc_fldList_Init(gcomp, ID)
-
-    ! uses:
-    use shr_file_mod,      only : shr_file_getUnit, shr_file_freeUnit
-    use shr_mpi_mod,       only : shr_mpi_bcast
-    use glc_elevclass_mod, only : glc_elevclass_init
+  subroutine shr_nuopc_fldList_Init(gcomp, ID, rc)
 
     ! input/output parameters:
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(in)  :: ID        ! seq_comm ID
+    type(ESMF_GridComp)    :: gcomp
+    integer, intent(in)    :: ID        ! seq_comm ID TODO: this needs to be depracated
+    integer, intent(inout) :: rc
 
     ! local variables:
-    type(ESMF_VM)      :: vm
-    integer            :: localPet
-    logical            :: mastertask
-    character(len=CSS) :: attname
-    character(len=CSS) :: units
-    character(len=CSS) :: longname
-    character(len=CSS) :: stdname
-    integer            :: num, i, n
-    integer            :: n1, n2, n3
-    character(len=  2) :: cnum
-    character(len=CSS) :: name
-    character(len=CX)  :: atm2ice_fmapname
-    character(len=CX)  :: atm2ice_smapname
-    character(len=CX)  :: atm2ice_vmapname
-    character(len=CX)  :: atm2lnd_fmapname
-    character(len=CX)  :: atm2lnd_smapname
-    character(len=CX)  :: atm2ocn_fmapname
-    character(len=CX)  :: atm2ocn_smapname
-    character(len=CX)  :: atm2ocn_vmapname
-    character(len=CX)  :: atm2wav_smapname
-    character(len=CX)  :: glc2lnd_fmapname
-    character(len=CX)  :: glc2lnd_smapname
-    character(len=CX)  :: glc2ice_rmapname
-    character(len=CX)  :: glc2ocn_rmapname
-    character(len=CX)  :: ice2atm_fmapname
-    character(len=CX)  :: ice2atm_smapname
-    character(len=CX)  :: ice2wav_smapname
-    character(len=CX)  :: lnd2atm_fmapname
-    character(len=CX)  :: lnd2atm_smapname
-    character(len=CX)  :: lnd2glc_fmapname
-    character(len=CX)  :: lnd2glc_smapname
-    character(len=CX)  :: lnd2rof_fmapname
-    character(len=CX)  :: ocn2atm_fmapname
-    character(len=CX)  :: ocn2atm_smapname
-    character(len=CX)  :: ocn2wav_smapname
-    character(len=CX)  :: rof2lnd_fmapname
-    character(len=CX)  :: rof2ocn_fmapname
-    character(len=CX)  :: rof2ocn_ice_rmapname
-    character(len=CX)  :: rof2ocn_liq_rmapname
-    character(len=CX)  :: wav2ocn_smapname
-    logical            :: flds_co2a  ! use case
-    logical            :: flds_co2b  ! use case
-    logical            :: flds_co2c  ! use case
-    logical            :: flds_wiso
-    logical            :: do_flux_diurnal
-    integer            :: glc_nec
+    type(ESMF_VM)          :: vm
+    integer                :: localPet
+    logical                :: mastertask
+    character(len=CSS)     :: attname
+    character(len=CSS)     :: units
+    character(len=CSS)     :: longname
+    character(len=CSS)     :: stdname
+    integer                :: num, i, n
+    integer                :: n1, n2, n3, n4
+    character(len=  2)     :: cnum
+    character(len=CSS)     :: name
+    character(len=CL)      :: cvalue
+    character(len=CX)      :: atm2ice_fmapname
+    character(len=CX)      :: atm2ice_smapname
+    character(len=CX)      :: atm2ice_vmapname
+    character(len=CX)      :: atm2lnd_fmapname
+    character(len=CX)      :: atm2lnd_smapname
+    character(len=CX)      :: atm2ocn_fmapname
+    character(len=CX)      :: atm2ocn_smapname
+    character(len=CX)      :: atm2ocn_vmapname
+    character(len=CX)      :: atm2wav_smapname
+    character(len=CX)      :: glc2lnd_fmapname
+    character(len=CX)      :: glc2lnd_smapname
+    character(len=CX)      :: glc2ice_rmapname
+    character(len=CX)      :: glc2ocn_rmapname
+    character(len=CX)      :: ice2atm_fmapname
+    character(len=CX)      :: ice2atm_smapname
+    character(len=CX)      :: ice2wav_smapname
+    character(len=CX)      :: lnd2atm_fmapname
+    character(len=CX)      :: lnd2atm_smapname
+    character(len=CX)      :: lnd2glc_fmapname
+    character(len=CX)      :: lnd2glc_smapname
+    character(len=CX)      :: lnd2rof_fmapname
+    character(len=CX)      :: ocn2atm_fmapname
+    character(len=CX)      :: ocn2atm_smapname
+    character(len=CX)      :: ocn2wav_smapname
+    character(len=CX)      :: rof2lnd_fmapname
+    character(len=CX)      :: rof2ocn_fmapname
+    character(len=CX)      :: rof2ocn_ice_rmapname
+    character(len=CX)      :: rof2ocn_liq_rmapname
+    character(len=CX)      :: wav2ocn_smapname
+    character(len=CX)      :: wav2ocn_fmapname
+    logical                :: flds_co2a  ! use case
+    logical                :: flds_co2b  ! use case
+    logical                :: flds_co2c  ! use case
+    logical                :: flds_wiso  ! use case
+    logical                :: do_flux_diurnal
+    integer                :: glc_nec
+    character(CXX)         :: concatFr, concatTo
+    character(len=*), parameter :: subname='(shr_nuopc_fldList_Init)'
     !---------------------------------------------------------------------------
 
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
@@ -316,7 +184,7 @@ contains
     read(cvalue,*) glc_nec
     call glc_elevclass_init(glc_nec)
 
-    call NUOPC_CompAttributeGet(gcomp, name='flux_diurnal', value=do_flux_diurnal, rc=rc)
+    call NUOPC_CompAttributeGet(gcomp, name='flux_diurnal', value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
     read(cvalue,*) do_flux_diurnal
 
@@ -328,131 +196,131 @@ contains
 
     call NUOPC_CompAttributeGet(gcomp, name='ice2atm_fmapname', value=ice2atm_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('ice2atm_fmapname = ',trim(ice2atm_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('ice2atm_fmapname = '// trim(ice2atm_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='ice2atm_smapname', value=ice2atm_smapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('ice2atm_smapname = ',trim(ice2atm_smapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('ice2atm_smapname = '// trim(ice2atm_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='lnd2atm_fmapname', value=lnd2atm_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('lnd2atm_fmapname = ',trim(lnd2atm_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('lnd2atm_fmapname = '// trim(lnd2atm_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='ocn2atm_smapname', value=ocn2atm_smapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('ocn2atm_smapname = ',trim(ocn2atm_smapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('ocn2atm_smapname = '// trim(ocn2atm_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='ocn2atm_fmapname', value=ocn2atm_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('ocn2atm_fmapname = ',trim(ocn2atm_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('ocn2atm_fmapname = '// trim(ocn2atm_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='lnd2atm_smapname', value=lnd2atm_smapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('lnd2atm_smapname = ',trim(lnd2atm_smapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('lnd2atm_smapname = '// trim(lnd2atm_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To lnd
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2lnd_fmapname', value=atm2lnd_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('atm2lnd_fmapname = ',trim(atm2lnd_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('atm2lnd_fmapname = '// trim(atm2lnd_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2lnd_smapname', value=atm2lnd_smapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('atm2lnd_smapname = ',trim(atm2lnd_smapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('atm2lnd_smapname = '// trim(atm2lnd_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='rof2lnd_fmapname', value=rof2lnd_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('rof2lnd_fmapname = ',trim(rof2lnd_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('rof2lnd_fmapname = '// trim(rof2lnd_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='glc2lnd_fmapname', value=glc2lnd_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('glc2lnd_smapname = ',trim(glc2lnd_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('glc2lnd_smapname = '// trim(glc2lnd_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='glc2lnd_smapname', value=glc2lnd_smapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('glc2lnd_smapname = ',trim(glc2lnd_smapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('glc2lnd_smapname = '// trim(glc2lnd_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To ice
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ice_fmapname', value=atm2ice_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('atm2ice_fmapname = ',trim(atm2ice_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('atm2ice_fmapname = '// trim(atm2ice_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ice_smapname', value=atm2ice_smapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('atm2ice_smapname = ',trim(atm2ice_smapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('atm2ice_smapname = '// trim(atm2ice_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ice_vmapname', value=atm2ice_vmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('atm2ice_vmapname = ',trim(atm2ice_vmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('atm2ice_vmapname = '// trim(atm2ice_vmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='glc2ice_rmapname', value=glc2ice_rmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('glc2ice_rmapname = ',trim(glc2ice_rmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('glc2ice_rmapname = '// trim(glc2ice_rmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To ocn
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ocn_fmapname', value=atm2ocn_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('atm2ocn_fmapname = ',trim(atm2ocn_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('atm2ocn_fmapname = '// trim(atm2ocn_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ocn_smapname', value=atm2ocn_smapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('atm2ocn_smapname = ',trim(atm2ocn_smapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('atm2ocn_smapname = '// trim(atm2ocn_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ocn_vmapname', value=atm2ocn_vmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('atm2ocn_vmapname = ',trim(atm2ocn_vmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('atm2ocn_vmapname = '// trim(atm2ocn_vmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='glc2ocn_rmapname', value=glc2ocn_rmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('glc2ocn_rmapname = ',trim(glc2ocn_rmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('glc2ocn_rmapname = '// trim(glc2ocn_rmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='wav2ocn_fmapname', value=wav2ocn_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('wav2ocn_fmapname = ',trim(wav2ocn_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('wav2ocn_fmapname = '// trim(wav2ocn_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='rof2ocn_fmapname', value=rof2ocn_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('rof2ocn_fmapname = ',trim(rof2ocn_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('rof2ocn_fmapname = '// trim(rof2ocn_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='rof2ocn_liq_rmapname', value=rof2ocn_liq_rmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('rof2ocn_liq_rmapname = ',trim(rof2ocn_liq_rmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('rof2ocn_liq_rmapname = '// trim(rof2ocn_liq_rmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='rof2ocn_ice_rmapname', value=rof2ocn_ice_rmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('rof2ocn_ice_rmapname = ',trim(rof2ocn_ice_rmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('rof2ocn_ice_rmapname = '// trim(rof2ocn_ice_rmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To rof
 
     call NUOPC_CompAttributeGet(gcomp, name='lnd2rof_fmapname', value=lnd2rof_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('lnd2rof_fmapname = ',trim(lnd2rof_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('lnd2rof_fmapname = '// trim(lnd2rof_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To glc
 
     call NUOPC_CompAttributeGet(gcomp, name='lnd2glc_fmapname', value=lnd2glc_fmapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('lnd2glc_fmapname = ',trim(lnd2glc_fmapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('lnd2glc_fmapname = '// trim(lnd2glc_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='lnd2glc_smapname', value=lnd2glc_smapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('lnd2glc_smapname = ',trim(lnd2glc_smapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('lnd2glc_smapname = '// trim(lnd2glc_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To wav
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2wav_smapname', value=atm2wav_smapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('atm2wav_smapname = ',trim(atm2wav_smapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('atm2wav_smapname = '// trim(atm2wav_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='ice2wav_smapname', value=ice2wav_smapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('ice2wav_smapname = ',trim(ice2wav_smapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('ice2wav_smapname = '// trim(ice2wav_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='ocn2wav_smapname', value=ocn2wav_smapname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    call ESMF_LogWrite('ocn2wav_smapname = ',trim(ocn2wav_smapname), ESMF_LOGMSG_INFO)
+    call ESMF_LogWrite('ocn2wav_smapname = '// trim(ocn2wav_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     !----------------------------------------------------------
     ! scalar information
@@ -461,11 +329,10 @@ contains
     longname = trim(flds_scalar_name)
     stdname  = trim(flds_scalar_name)
     units    = 'unitless'
-    attname  = trim(flds_scalar_name)
-    call fld_metadata_set(attname, longname, stdname, units=units)
+    call fldList_AddMetadata(fldname=trim(flds_scalar_name), longname=longname, stdname=stdname, units=units)
     do n = 1,ncomps
-       call fldList_AddFld(fldListFr(ncomp), stdname=trim(flds_scalar_name))
-       call fldList_AddFld(fldListTo(ncomp), stdname=trim(flds_scalar_name))
+       call fldList_AddFld(fldListFr(n)%flds, trim(flds_scalar_name))
+       call fldList_AddFld(fldListTo(n)%flds, trim(flds_scalar_name))
     end do
 
     !----------------------------------------------------------
@@ -548,12 +415,12 @@ contains
     stdname  = 'sea_ice_area_fraction'
     units    = '1'
     call fldList_AddMetadata(fldname="Si_ifrac", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Si_ifrac', index=n1)
+    call fldList_AddFld(fldListFr(compice)%flds, 'Si_ifrac', fldindex=n1)
     call fldList_AddFld(fldListTo(compatm)%flds, 'Si_ifrac')
     call fldList_AddFld(fldListTo(compocn)%flds, 'Si_ifrac')
     call fldList_AddFld(fldListTo(compwav)%flds, 'Si_ifrac')
-    call fldlist_AddMap(fldListFr(compice)%flds(n1), compatm,  mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n1), compocn,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compatm,  mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
     !----------------------------------------------------------
     ! Fields from atm
@@ -563,127 +430,122 @@ contains
     stdname  = 'height'
     units    = 'm'
     call fldList_AddMetadata(fldname='Sa_z', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm), 'Sa_z', fldindex=n1)
-    call fldList_AddFld(fldListTo(complnd), 'Sa_z')
-    call fldList_AddFld(fldListTo(compice), 'Sa_z')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapbilnr, 'one', atm2ice_smapfile)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_z', fldindex=n1)
+    call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_z')
+    call fldList_AddFld(fldListTo(compice)%flds, 'Sa_z')
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapbilnr, 'one', atm2ice_smapname)
 
     longname = 'Surface height'
     stdname  = 'height'
     units    = 'm'
     call fldList_AddMetadata(fldname='Sa_topo', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm), 'Sa_topo', fldindex=n1)
-    call fldList_AddFld(fldListTo(complnd), 'Sa_topo')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_topo', fldindex=n1)
+    call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_topo')
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
 
     ! TODO: Sa_u and Sa_v are mapped to the ocean grid in the mediator - BUT are not sent to the ocean -
-    ! They are only used in the atm/ocn flux calculation - so a special ampping will be done in the mediator
+    ! They are only used in the atm/ocn flux calculation - so a special mapping will be done in the mediator
     ! for these fields
 
     longname = 'Zonal wind at the lowest model level'
     stdname  = 'eastward_wind'
     units    = 'm s-1'
     call fldList_AddMetadata(fldname='Sa_u', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm), 'Sa_u', fldindex=n1)
-    call fldList_AddFld(fldListTo(complnd), 'Sa_u')
-    call fldList_AddFld(fldListTo(compice), 'Sa_u')
-    call fldList_AddFld(fldListTo(compwav), 'Sa_u')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mappatch, 'one', atm2ice_pmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compwav, mapbilnr, 'one', atm2wav_smapfile)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_u', fldindex=n1)
+    call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_u')
+    call fldList_AddFld(fldListTo(compice)%flds, 'Sa_u')
+    call fldList_AddFld(fldListTo(compwav)%flds, 'Sa_u')
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mappatch, 'one', atm2ice_vmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compwav, mapbilnr, 'one', atm2wav_smapname)
 
     longname = 'Meridional wind at the lowest model level'
     stdname  = 'northward_wind'
     units    = 'm s-1'
     call fldList_AddMetadata(fldname='Sa_v', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm), 'Sa_v', fldindex=n1)
-    call fldList_AddFld(fldListTo(complnd), 'Sa_v')
-    call fldList_AddFld(fldListTo(compice), 'Sa_v')
-    call fldList_AddFld(fldListTo(compwav), 'Sa_v')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mappatch, 'one', atm2ice_pmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compwav, mapbilnr, 'one', atm2wav_smapfile)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_v', fldindex=n1)
+    call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_v')
+    call fldList_AddFld(fldListTo(compice)%flds, 'Sa_v')
+    call fldList_AddFld(fldListTo(compwav)%flds, 'Sa_v')
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mappatch, 'one', atm2ice_vmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compwav, mapbilnr, 'one', atm2wav_smapname)
 
     longname = 'Temperature at the lowest model level'
     stdname  = 'air_temperature'
     units    = 'K'
-    fldname  = 'Sa_tbot'
     call fldList_AddMetadata(fldname='Sa_tbot', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm), 'Sa_tbot', fldindex=n1)
-    call fldList_AddFld(fldListTo(complnd), 'Sa_tbot')
-    call fldList_AddFld(fldListTo(compice), 'Sa_tbot')
-    call fldList_AddFld(fldListTo(compwav), 'Sa_tbot')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapbilnr, 'one', atm2ice_smapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compwav, mapbilnr, 'one', atm2wav_smapfile)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_tbot', fldindex=n1)
+    call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_tbot')
+    call fldList_AddFld(fldListTo(compice)%flds, 'Sa_tbot')
+    call fldList_AddFld(fldListTo(compwav)%flds, 'Sa_tbot')
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapbilnr, 'one', atm2ice_smapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compwav, mapbilnr, 'one', atm2wav_smapname)
 
     longname = 'Potential temperature at the lowest model level'
     stdname  = 'air_potential_temperature'
     units    = 'K'
-    fldname  = 'Sa_ptem'
     call fldList_AddMetadata(fldname='Sa_ptem', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm), 'Sa_ptem', comp=compatm, fldindex=n)
-    call fldList_AddFld(fldListTo(complnd), 'Sa_ptem', comp=complnd)
-    call fldList_AddFld(fldListTo(compice), 'Sa_ptem', comp=compice)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapbilnr, 'one', atm2ice_smapfile)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_ptem', fldindex=n1)
+    call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_ptem')
+    call fldList_AddFld(fldListTo(compice)%flds, 'Sa_ptem')
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapbilnr, 'one', atm2ice_smapname)
 
     longname = 'Specific humidity at the lowest model level'
     stdname  = 'specific_humidity'
     units    = 'kg kg-1'
-    fldname  = 'Sa_shum'
     call fldList_AddMetadata(fldname='Sa_shum', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm), 'Sa_shum', comp=compatm, fldindex=n)
-    call fldList_AddFld(fldListTo(complnd), 'Sa_shum', comp=complnd)
-    call fldList_AddFld(fldListTo(compice), 'Sa_shum', comp=compice)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapbilnr, 'one', atm2ice_smapfile)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_shum', fldindex=n1)
+    call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_shum')
+    call fldList_AddFld(fldListTo(compice)%flds, 'Sa_shum')
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapbilnr, 'one', atm2ice_smapname)
 
     longname = 'Pressure at the lowest model level'
     stdname  = 'air_pressure'
     units    = 'Pa'
-    fldname  =
     call fldList_AddMetadata(fldname='Sa_pbot', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm), 'Sa_pbot', comp=compatm, fldindex=n1)
-    call fldList_AddFld(fldListTo(complnd), 'Sa_pbot', comp=complnd)
-    call fldList_AddFld(fldListTo(compice), 'Sa_pbot', comp=compice)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapbilnr, 'one', atm2ice_smapfile)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_pbot', fldindex=n1)
+    call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_pbot')
+    call fldList_AddFld(fldListTo(compice)%flds, 'Sa_pbot')
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapbilnr, 'one', atm2ice_smapname)
 
     longname = 'Density at the lowest model level'
     stdname  = 'air_density'
     units    = 'kg m-3'
-    fldname  = 'Sa_dens'
-    call fldList_AddFld(fldListFr(compatm), 'Sa_dens', comp=compatm, fldindex=n1)
-    call fldList_AddFld(fldListTo(compice), 'Sa_dens', comp=compice)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice,  mapbilnr, 'one', atm2ice_smapfile)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_dens', fldindex=n1)
+    call fldList_AddFld(fldListTo(compice)%flds, 'Sa_dens')
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice,  mapbilnr, 'one', atm2ice_smapname)
 
     units    = 'kg m-2 s-1'
     longname = 'Convective precipitation rate'
     stdname  = 'convective_precipitation_flux'
-    fldname  =
+    units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname='Faxa_rainc', longname=longname, stdname=stdname, units=units)
     longname = 'Large-scale (stable) precipitation rate' ! water equivalent
     stdname  = 'large_scale_precipitation_flux'
-    fldname  = 'Faxa_rainl'
+    units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname='Faxa_rainc', longname=longname, stdname=stdname, units=units)
     longname = 'Water flux due to rain'
     stdname  = 'rainfall_flux'
-    fldname  = 'Faxa_rain'
+    units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname='Faxa_rain', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_rainc', index=n)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_rainc', fldindex=n)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_rainc')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_rain' )
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_rain' )
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Convective snow rate'
     stdname  = 'convective_snowfall_flux'
     units    = 'kg m-2 s-1'
-    call fldList_AddMetadata(fldname='Faxa_snowc' longname=longname, stdname=stdname, units=units)
+    call fldList_AddMetadata(fldname='Faxa_snowc', longname=longname, stdname=stdname, units=units)
     longname = 'Large-scale (stable) snow rate'
     stdname  = 'large_scale_snowfall_flux'
     units    = 'kg m-2 s-1'
@@ -691,13 +553,13 @@ contains
     longname = 'Water flux due to snow'
     stdname  = 'surface_snow_melt_flux'
     units    = 'kg m-2 s-1'
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_snowc', index=n)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_snowc', fldindex=n)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_snowc')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_snow' )
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_snow' )
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     ! total precipitation to ocean (derived rain + snow, done AFTER mappings)
     longname = 'Water flux (rain+snow)'
@@ -709,56 +571,55 @@ contains
     longname = 'Downward longwave heat flux'
     stdname  = 'downwelling_longwave_flux'
     units    = 'W m-2'
-    fldname  = 'Faxa_lwdn'
     call fldList_AddMetadata(fldname='Faxa_lwdn', longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname='Foxx_lwdn', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_lwdn', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_lwdn', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_lwdn')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_lwdn')
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_lwdn')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Direct near-infrared incident solar radiation'
     stdname  = 'surface_downward_direct_shortwave_flux_due_to_near_infrared_radiation'
     units    = 'W m-2'
     call fldList_AddMetadata(fldname="Faxa_swndr", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swndr', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swndr', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_swndr')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swndr')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
 
     longname = 'Direct visible incident solar radiation'
     stdname  = 'surface_downward_direct_shortwave_flux_due_to_visible_radiation'
     units    = 'W m-2'
     call fldList_AddMetadata(fldname="Faxa_swvdr", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swvdr', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swvdr', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_swvdr')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swvdr')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
 
     longname = 'Diffuse near-infrared incident solar radiation'
     stdname  = 'surface_downward_diffuse_shortwave_flux_due_to_near_infrared_radiation'
     units    = 'W m-2'
     call fldList_AddMetadata(fldname="Faxa_swndf", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swndf', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swndf', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_swndf')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swndf')
-    call fldlist_AddMap(fldListFr(compatm), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm), compice, mapconsf, 'one', atm2ice_fmapfile)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
 
     longname = 'Diffuse visible incident solar radiation'
     stdname  = 'surface_downward_diffuse_shortwave_flux_due_to_visible_radiation'
     units    = 'W m-2'
     call fldList_AddMetadata(fldname='Faxa_swvdf', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swvdf', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swvdf', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_swvdf')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swvdf')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
 
     longname = 'Net shortwave radiation'
     stdname  = 'surface_net_shortwave_flux'
@@ -766,203 +627,199 @@ contains
     call fldList_AddMetadata(fldname="Faxa_swnet", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Fall_swnet", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Faii_swnet", longname=longname, stdname=stdname, units=units)
-    call fldList_AddMetadata(fldname="Foxx_swnet", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swnet', index=n1)
-    call fldList_AddFld(fldListTo(complnd)%flds, 'Fall_swnet')
-    call fldList_AddFld(fldListTo(compice)%flds, 'Faii_swnet')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_swnet') ! derived using albedos, Faxa_swxxx and swpen
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
-
     longname = 'Net shortwave radiation penetrating into ice and ocean'
     stdname  = 'net_downward_shortwave_flux_in_sea_ice_due_to_penetration'
     units    = 'W m-2'
     call fldList_AddMetadata(fldname='Fioi_swpen', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_swpen', index=n1)
-    call fldlist_AddMap(fldListFr(compatm), complnd, mapfcopy)
+    call fldList_AddMetadata(fldname="Foxx_swnet", longname=longname, stdname=stdname, units=units)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swnet')  ! only diagnostic
+    call fldList_AddFld(fldListTo(complnd)%flds, 'Fall_swnet')  ! only diagnostic
+    call fldList_AddFld(fldListTo(compice)%flds, 'Faii_swnet')  ! only diagnostic
+    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_swpen', fldindex=n1) ! used for Foxx_swnet (see below)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_swnet', merge_with_weights=.true.) ! derived using albedos, Faxa_sw[v,n][dr,df] and swpen
+    call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compocn, mapfcopy, 'unset', 'unset')
 
     longname = 'Hydrophylic black carbon dry deposition flux'
     stdname  = 'dry_deposition_flux_of_hydrophylic_black_carbon'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname='Faxa_bcphidry', longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname='Foxx_bcphidry', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_bcphidry', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_bcphidry', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_bcphidry')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_bcphidry')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_bcphidry')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_bcphidry', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Hydrophobic black carbon dry deposition flux'
     stdname  = 'dry_deposition_flux_of_hydrophobic_black_carbon'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_bcphodry", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_bcphodry", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_bcphodry', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_bcphodry', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_bcphodry')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_bcphodry')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_bcphodry')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_bcphodry', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Hydrophylic black carbon wet deposition flux'
     stdname  = 'wet_deposition_flux_of_hydrophylic_black_carbon'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_bcphiwet", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_bcphiwet", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_bcphiwet', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_bcphiwet', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_bcphiwet')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_bcphiwet')
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_bcphiwet')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Hydrophylic organic carbon dry deposition flux'
     stdname  = 'dry_deposition_flux_of_hydrophylic_organic_carbon'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_bcphidry", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_bcphidry", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_bcphidry', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_bcphidry', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_bcphidry')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_bcphidry')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_bcphidry')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_bcphidry', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Hydrophobic organic carbon dry deposition flux'
     stdname  = 'dry_deposition_flux_of_hydrophobic_organic_carbon'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_ocphodry", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_ocphodry", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_ocphodry', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_ocphodry', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_ocphodry')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_ocphodry')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_ocphodry')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_ocphodry', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Hydrophylic organic carbon wet deposition flux'
     stdname  = 'wet_deposition_flux_of_hydrophylic_organic_carbon'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_ocphiwet", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_ocphiwet", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_ocphiwet', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_ocphiwet', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_ocphiwet')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_ocphiwet')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_ocphiwet')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_ocphiwet', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Dust wet deposition flux (size 1)'
     stdname  = 'wet_deposition_flux_of_dust'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_dstwet1", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_dstwet1", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstwet1', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstwet1', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_dstwet1')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_dstwet1')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstwet1')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstwet1', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Dust wet deposition flux (size 2)'
     stdname  = 'wet_deposition_flux_of_dust'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_dstwet2", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_dstwet2", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstwet2', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstwet2', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_dstwet2')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_dstwet2')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstwet2')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstwet2', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Dust wet deposition flux (size 3)'
     stdname  = 'wet_deposition_flux_of_dust'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_dstwet3", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_dstwet3", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstwet3', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstwet3', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_dstwet3')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_dstwet3')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstwet3')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstwet3', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Dust wet deposition flux (size 4)'
     stdname  = 'wet_deposition_flux_of_dust'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_dstwet4", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_dstwet4", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstwet4', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstwet4', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_dstwet4')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_dstwet4')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstwet4')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstwet4', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Dust dry deposition flux (size 1)'
     stdname  = 'dry_deposition_flux_of_dust'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_dstdry1", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_dstdry1", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstdry1', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstdry1', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_dstdry1')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_dstdry1')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstdry1')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstdry1', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Dust dry deposition flux (size 2)'
     stdname  = 'dry_deposition_flux_of_dust'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_dstdry2", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_dstdry2", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstdry2', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstdry2', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_dstdry2')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_dstdry2')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstdry2')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstdry2', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Dust dry deposition flux (size 3)'
     stdname  = 'dry_deposition_flux_of_dust'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_dstdry3", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_dstdry3", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstdry3', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstdry3', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_dstdry3')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_dstdry3')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstdry3')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstdry3', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Dust dry deposition flux (size 4)'
     stdname  = 'dry_deposition_flux_of_dust'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Faxa_dstdry4", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_dstdry4", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstdry4', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_dstdry4', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_dstdry4')
     call fldList_AddFld(fldListTo(compice)%flds, 'Faxa_dstdry4')
-    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstdry4')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapconsf, 'one', atm2lnd_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compice, mapconsf, 'one', atm2ice_fmapfile)
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapconsf, 'one', atm2ocn_fmapfile)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstdry4', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     !----------------------------------------------------------
     ! states/fluxes to atm (and ocean)
@@ -975,13 +832,13 @@ contains
     call fldList_AddMetadata(fldname="Sl_avsdr", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="So_avsdr", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Sx_avsdr", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_avsdr', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Si_avsdr', index=n2)
-    call fldList_AddFld(fldListXao_ocnalb_o%flds, 'So_avsdr', index=n3)
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_avsdr', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Si_avsdr', fldindex=n2)
+    call fldList_AddFld(fldListMed_ocnalb_o%flds, 'So_avsdr', fldindex=n3)
     call fldList_AddFld(fldListTo(compatm)%flds , 'Sx_avsdr', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_smapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_smapfile)
-    call fldlist_AddMap(fldListXao_ocnalb_o%flds(n3), compatm, mapconsf, 'ofrac', ocn2atm_smapfile)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_smapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_smapname)
+    call fldlist_AddMap(fldListMed_ocnalb_o%flds(n3), compocn, compatm, mapconsf, 'ofrac', ocn2atm_smapname)
 
     longname = 'Direct albedo (near-infrared radiation)'
     stdname  = 'surface_direct_albedo_due_to_near_infrared_radiation'
@@ -990,13 +847,13 @@ contains
     call fldList_AddMetadata(fldname="Sl_anidr", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="So_anidr", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Sx_anidr", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_anidr', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Si_anidr', index=n2)
-    call fldList_AddFld(fldListXao_ocnalb_o%flds, 'So_anidr', index=n3)
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_anidr', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Si_anidr', fldindex=n2)
+    call fldList_AddFld(fldListMed_ocnalb_o%flds, 'So_anidr', fldindex=n3)
     call fldList_AddFld(fldListTo(compatm)%flds , 'Sx_anidr', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_ocnalb_o%flds(n3), compatm, mapconsf, 'ofrac', ocn2atm_smapfile)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_ocnalb_o%flds(n3), compocn, compatm, mapconsf, 'ofrac', ocn2atm_smapname)
 
     longname = 'Diffuse albedo (visible radiation)'
     stdname  = 'surface_diffuse_albedo_due_to_visible_radiation'
@@ -1005,13 +862,13 @@ contains
     call fldList_AddMetadata(fldname="Sl_avsdf", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="So_avsdf", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Sx_avsdf", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_avsdf', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Si_avsdf', index=n2)
-    call fldList_AddFld(fldListXao_ocnalb_o%flds, 'So_avsdf', index=n3)
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_avsdf', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Si_avsdf', fldindex=n2)
+    call fldList_AddFld(fldListMed_ocnalb_o%flds, 'So_avsdf', fldindex=n3)
     call fldList_AddFld(fldListTo(compatm)%flds , 'Sx_avsdf', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_ocnalb_o%flds(n3), compatm, mapconsf, 'ofrac', ocn2atm_smapfile)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_ocnalb_o%flds(n3), compocn, compatm, mapconsf, 'ofrac', ocn2atm_smapname)
 
     longname = 'Diffuse albedo (near-infrared radiation)'
     stdname  = 'surface_diffuse_albedo_due_to_near_infrared_radiation'
@@ -1020,13 +877,13 @@ contains
     call fldList_AddMetadata(fldname="Sl_anidf", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="So_anidf", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Sx_anidf", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_anidf', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Si_anidf', index=n2)
-    call fldList_AddFld(fldListXao_ocnalb_o%flds, 'So_anidf', index=n3)
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_anidf', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Si_anidf', fldindex=n2)
+    call fldList_AddFld(fldListMed_ocnalb_o%flds, 'So_anidf', fldindex=n3)
     call fldList_AddFld(fldListTo(compatm)%flds , 'Sx_anidf', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_ocnalb_o%flds(n3), compatm, mapconsf, 'ofrac', ocn2atm_smapfile)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_ocnalb_o%flds(n3), compocn, compatm, mapconsf, 'ofrac', ocn2atm_smapname)
 
     longname = 'Reference temperature at 2 meters'
     stdname  = 'air_temperature'
@@ -1035,15 +892,15 @@ contains
     call fldList_AddMetadata(fldname="Sl_tref", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="So_tref", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Sx_tref", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Sl_tref', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Si_tref', index=n2)
-    call fldList_AddFld(fldListXao_fluxes_a    , 'So_tref', index=n3)
-    call fldList_AddFld(fldListXao_fluxes_o    , 'So_tref', index=n3)
-    call fldList_AddFld(fldListTo(compatm)%flds, 'Sx_tref', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n3), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n3), compocn, mapbilnr, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_tref', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Si_tref', fldindex=n2)
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'So_tref', fldindex=n3) ! Needed only for merging
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'So_tref', fldindex=n3) ! Needed only for merging
+    call fldList_AddFld(fldListTo(compatm)%flds , 'Sx_tref', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n3), compatm, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n3), compatm, compocn, mapbilnr, 'one'  , atm2ocn_fmapname) ! map atm->ocn
 
     longname = 'Reference specific humidity at 2 meters'
     stdname  = 'specific_humidity'
@@ -1052,15 +909,15 @@ contains
     call fldList_AddMetadata(fldname="Sl_qref", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="So_qref", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Sx_qref", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_qref', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Si_qref', index=n2)
-    call fldList_AddFld(fldListXao_fluxes_a%flds, 'So_qref', index=n3)
-    call fldList_AddFld(fldListXao_fluxes_o%flds, 'So_qref', index=n3)
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_qref', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Si_qref', fldindex=n2)
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'So_qref', fldindex=n3)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'So_qref', fldindex=n3)
     call fldList_AddFld(fldListTo(compatm)%flds , 'Sx_qref', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n3), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n3), compocn, mapbilnr, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n3), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n3), compatm, compocn, mapbilnr, 'one'  , atm2ocn_fmapname) ! map atm->ocn
 
     longname = 'Surface temperature'
     stdname  = 'surface_temperature'
@@ -1069,69 +926,69 @@ contains
     call fldList_AddMetadata(fldname="Sl_t", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="So_t", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Sx_t", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Sl_t', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Si_t', index=n2)
-    call fldList_AddFld(fldListFr(compocn)%flds, 'So_t', index=n3)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Sl_t', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds, 'Si_t', fldindex=n2)
+    call fldList_AddFld(fldListFr(compocn)%flds, 'So_t', fldindex=n3)
     call fldList_AddFld(fldListTo(compatm)%flds, 'Sx_t', merge_with_weights=.true.)
     call fldList_AddFld(fldListTo(compice)%flds, 'So_t')
     call fldList_AddFld(fldListTo(compwav)%flds, 'So_t')
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2), compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compocn)%flds(n3), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compocn)%flds(n3), compice, mapfcopy)
-    call fldlist_AddMap(fldListFr(compocn)%flds(n3), compwav, map_filei, 'one'  , ocn2atm_fmapfile)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf , 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2), compice, compatm, mapconsf , 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compocn)%flds(n3), compocn, compatm, mapconsf , 'ofrac', ocn2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compocn)%flds(n3), compocn, compwav, mapbilnr , 'one'  , ocn2wav_smapname) ! This will be a custom map - need to name it however
+    call fldlist_AddMap(fldListFr(compocn)%flds(n3), compocn, compice, mapfcopy , 'unset', 'unset')
 
     longname = 'Surface fraction velocity in land'
     stdname  = 'fraction_velocity'
     units    = 'm s-1'
     call fldList_AddMetadata(fldname="Sl_fv", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Sl_fv', index=n1)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Sl_fv', fldindex=n1)
     call fldList_AddFld(fldListTo(compatm)%flds, 'Sl_fv')
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
 
     longname = 'Aerodynamic resistance'
     stdname  = 'aerodynamic_resistance'
     units    = 's/m'
     call fldList_AddMetadata(fldname="Sl_ram1", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Sl_ram1', index=n1)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Sl_ram1', fldindex=n1)
     call fldList_AddFld(fldListTo(compatm)%flds, 'Sl_ram1')
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
 
     longname = 'Surface snow water equivalent'
     stdname  = 'surface_snow_water_equivalent'
     units    = 'm'
     call fldList_AddMetadata(fldname="Sl_snowh", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Sl_snowh', index=n1)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Sl_snowh', fldindex=n1)
     call fldList_AddFld(fldListTo(compatm)%flds, 'Sl_snowh')
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
 
     longname = 'Surface snow depth'
     stdname  = 'surface_snow_thickness'
     units    = 'm'
     call fldList_AddMetadata(fldname="Si_snowh", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Si_snowh', index=n1)
+    call fldList_AddFld(fldListFr(compice)%flds, 'Si_snowh', fldindex=n1)
     call fldList_AddFld(fldListTo(compatm)%flds, 'Si_snowh')
-    call fldlist_AddMap(fldListFr(compice)%flds(n1), compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
+    call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
 
     longname = 'Surface saturation specific humidity in ocean'
     stdname  = 'specific_humidity_at_saturation'
     units    = 'kg kg-1'
     call fldList_AddMetadata(fldname="So_ssq", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListXao_fluxes_a%flds, 'So_ssq', index=n1)
-    call fldList_AddFld(fldListXao_fluxes_o%flds, 'So_ssq')
-    call fldList_AddFld(fldListTo(atmcomp)%flds , 'So_ssq')
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n1), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n1), compocn, mapbilnr, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'So_ssq', fldindex=n1)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'So_ssq')
+    call fldList_AddFld(fldListTo(compatm)%flds , 'So_ssq')
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n1), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n1), compatm, compocn, mapbilnr, 'one'  , atm2ocn_fmapname) ! map atm->ocn
 
     longname = 'Square of exch. coeff (tracers)'
     stdname  = 'square_of_exch_coeff'
     units    = '1'
     call fldList_AddMetadata(fldname="So_re", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListXao_fluxes_a%flds, 'So_re', index=n1)
-    call fldList_AddFld(fldListXao_fluxes_o%flds, 'So_re')
-    call fldList_AddFld(fldListTo(atmcomp)%flds , 'So_re')
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n1), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n1), compocn, mapbilnr, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'So_re', fldindex=n1)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'So_re')
+    call fldList_AddFld(fldListTo(compatm)%flds , 'So_re')
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n1), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n1), compatm, compocn, mapbilnr, 'one'  , atm2ocn_fmapname) ! map atm->ocn
 
     longname = '10m wind'
     stdname  = '10m_wind'
@@ -1140,15 +997,15 @@ contains
     call fldList_AddMetadata(fldname="Si_u10", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="So_u10", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Sx_u10", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_u10', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Si_u10', index=n2)
-    call fldList_AddFld(fldListXao_fluxes_a%flds, 'So_u10', index=n3)
-    call fldList_AddFld(fldListXao_fluxes_o%flds, 'So_u10', index=n3)
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Sl_u10', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Si_u10', fldindex=n2)
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'So_u10', fldindex=n3)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'So_u10', fldindex=n3)
     call fldList_AddFld(fldListTo(compatm)%flds , 'Sx_u10', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n3), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n3), compocn, mapbilnr, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n3), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n3), compatm, compocn, mapbilnr, 'one'  , atm2ocn_fmapname) ! map atm->ocn
 
     longname = 'Zonal surface stress'
     stdname  = 'surface_downward_eastward_stress'
@@ -1159,17 +1016,17 @@ contains
     call fldList_AddMetadata(fldname="Faxx_taux", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Fioi_taux", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_taux", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds , 'Fall_taux', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Faii_taux', index=n2)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Fioi_taux', index=n3)
-    call fldList_AddFld(fldListXao_fluxes_a%flds, 'Faox_taux', index=n4)
-    call fldList_AddFld(fldListXao_fluxes_o%flds, 'Faox_taux')
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Fall_taux', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Faii_taux', fldindex=n2)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Fioi_taux', fldindex=n3)
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'Faox_taux', fldindex=n4)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'Faox_taux')
     call fldList_AddFld(fldListTo(compatm)%flds , 'Foxx_taux', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n4), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n4), compocn, mapconsf, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
-    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compocn, mapfcopy)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n4), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n4), compatm, compocn, mapconsf, 'one'  , atm2ocn_fmapname) ! map atm->ocn
+    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compice, compocn, mapfcopy, 'unset', 'unset')
 
     longname = 'Meridional surface stress'
     stdname  = 'surface_downward_northward_stress'
@@ -1180,17 +1037,17 @@ contains
     call fldList_AddMetadata(fldname="Faxx_tauy", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Fioi_tauy", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_tauy", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_tauy', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Faii_tauy', index=n2)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_tauy', index=n3)
-    call fldList_AddFld(fldListXao_fluxes_a    , 'Faox_tauy', index=n4)
-    call fldList_AddFld(fldListXao_fluxes_o    , 'Faox_tauy')
-    call fldList_AddFld(fldListTo(compatm)%flds, 'Foxx_tauy', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n4), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n4), compocn, mapconsf, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
-    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compocn, mapfcopy)
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Fall_tauy', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Faii_tauy', fldindex=n2)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Fioi_tauy', fldindex=n3)
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'Faox_tauy', fldindex=n4)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'Faox_tauy')
+    call fldList_AddFld(fldListTo(compatm)%flds , 'Foxx_tauy', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n4), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n4), compatm, compocn, mapconsf, 'one'  , atm2ocn_fmapname) ! map atm->ocn
+    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compice, compocn, mapfcopy, 'unset', 'unset')
 
     longname = 'Surface latent heat flux'
     stdname  = 'surface_upward_latent_heat_flux'
@@ -1201,17 +1058,17 @@ contains
     call fldList_AddMetadata(fldname="Faxx_lat", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Fioi_lat", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_lat", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds , 'Fall_lat', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Faii_lat', index=n2)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Fioi_lat', index=n3)
-    call fldList_AddFld(fldListXao_fluxes_a%flds, 'Faox_lat', index=n4)
-    call fldList_AddFld(fldListXao_fluxes_o%flds, 'Faox_lat')
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Fall_lat', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Faii_lat', fldindex=n2)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Fioi_lat', fldindex=n3)
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'Faox_lat', fldindex=n4)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'Faox_lat')
     call fldList_AddFld(fldListTo(compatm)%flds , 'Foxx_lat', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n4), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n4), compocn, mapconsf, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
-    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compocn, mapfcopy)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n4), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n4), compatm, compocn, mapconsf, 'one'  , atm2ocn_fmapname) ! map atm->ocn
+    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compice, compocn, mapfcopy, 'unset', 'unset')
 
     longname = 'Sensible heat flux'
     stdname  = 'surface_upward_sensible_heat_flux'
@@ -1222,17 +1079,17 @@ contains
     call fldList_AddMetadata(fldname="Faxx_sen", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Fioi_sen", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_sen", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds , 'Fall_sen', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Faii_sen', index=n2)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Fioi_sen', index=n3)
-    call fldList_AddFld(fldListXao_fluxes_a%flds, 'Faox_sen', index=n4)
-    call fldList_AddFld(fldListXao_fluxes_o%flds, 'Faox_sen')
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Fall_sen', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Faii_sen', fldindex=n2)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Fioi_sen', fldindex=n3)
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'Faox_sen', fldindex=n4)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'Faox_sen')
     call fldList_AddFld(fldListTo(compatm)%flds , 'Foxx_sen', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n4), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n4), compocn, mapconsf, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
-    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compocn, mapfcopy)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n4), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n4), compatm, compocn, mapconsf, 'one'  , atm2ocn_fmapname) ! map atm->ocn
+    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compice, compocn, mapfcopy, 'unset', 'unset')
 
     longname = 'Surface upward longwave heat flux'
     stdname  = 'surface_net_upward_longwave_flux'
@@ -1243,17 +1100,17 @@ contains
     call fldList_AddMetadata(fldname="Faxx_lwup", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Fioi_lwup", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_lwup", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_lwup', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Faii_lwup', index=n2)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_lwup', index=n3)
-    call fldList_AddFld(fldListXao_fluxes_a    , 'Faox_lwup', index=n4)
-    call fldList_AddFld(fldListXao_fluxes_o    , 'Faox_lwup')
-    call fldList_AddFld(fldListTo(compatm)%flds, 'Foxx_lwup', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n4), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n4), compocn, mapconsf, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
-    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compocn, mapfcopy)
+    call fldList_AddFld(fldListFr(complnd)%flds , 'Fall_lwup', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Faii_lwup', fldindex=n2)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Fioi_lwup', fldindex=n3)
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'Faox_lwup', fldindex=n4)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'Faox_lwup')
+    call fldList_AddFld(fldListTo(compatm)%flds , 'Foxx_lwup', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n4), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n4), compatm, compocn, mapconsf, 'one'  , atm2ocn_fmapname) ! map atm->ocn
+    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compice, compocn, mapfcopy, 'unset', 'unset')
 
     longname = 'Evaporation water flux'
     stdname  = 'water_evaporation_flux'
@@ -1264,53 +1121,53 @@ contains
     call fldList_AddMetadata(fldname="Faxx_evap", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Fioi_evap", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_evap", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_evap', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Faii_evap', index=n2)
-    call fldList_AddFld(fldListFr(compice)%flds , 'Fioi_evap', index=n3)
-    call fldList_AddFld(fldListXao_fluxes_a%flds, 'Faox_evap', index=n4)
-    call fldList_AddFld(fldListXao_fluxes_o%flds, 'Faox_evap')
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_evap', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Faii_evap', fldindex=n2)
+    call fldList_AddFld(fldListFr(compice)%flds , 'Fioi_evap', fldindex=n3)
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'Faox_evap', fldindex=n4)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'Faox_evap')
     call fldList_AddFld(fldListTo(compatm)%flds , 'Foxx_evap', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , compatm, mapconsf, 'lfrin', lnd2atm_fmapfile)
-    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compatm, mapconsf, 'ifrac', ice2atm_fmapfile)
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n4), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n4), compocn, mapconsf, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
-    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compocn, mapfcopy)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
+    call fldlist_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_fmapname)
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n4), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n4), compatm, compocn, mapconsf, 'one'  , atm2ocn_fmapname) ! map atm->ocn
+    call fldlist_AddMap(fldListFr(compice)%flds(n3) , compice, compocn, mapfcopy, 'unset', 'unset')
 
     longname = 'Dust flux (particle bin number 1)'
     stdname  = 'dust_flux'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Fall_flxdst1", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Faxx_flxdst1", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_flxdst1', index=n1)
-    call fldList_AddFld(fldListTo(compatm)%flds, 'Faxx_flxdst1', merge_with_weights=.true., rc=rec)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), mapconsf, 'lfrin', lnd2atm_fmapfile)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_flxdst1', fldindex=n1)
+    call fldList_AddFld(fldListTo(compatm)%flds, 'Faxx_flxdst1', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
 
     longname = 'Dust flux (particle bin number 2)'
     stdname  = 'dust_flux'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Fall_flxdst2", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Faxx_flxdst2", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_flxdst2', index=n1)
-    call fldList_AddFld(fldListTo(compatm)%flds, 'Faxx_flxdst2', merge_with_weights=.true., rc=rec)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), mapconsf, 'lfrin', lnd2atm_fmapfile)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_flxdst2', fldindex=n1)
+    call fldList_AddFld(fldListTo(compatm)%flds, 'Faxx_flxdst2', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
 
     longname = 'Dust flux (particle bin number 3)'
     stdname  = 'dust_flux'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Fall_flxdst3", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Faxx_flxdst3", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_flxdst3', index=n1)
-    call fldList_AddFld(fldListTo(compatm)%flds, 'Faxx_flxdst3', merge_with_weights=.true., rc=rec)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), mapconsf, 'lfrin', lnd2atm_fmapfile)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_flxdst3', fldindex=n1)
+    call fldList_AddFld(fldListTo(compatm)%flds, 'Faxx_flxdst3', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
 
     longname = 'Dust flux (particle bin number 4)'
     stdname  = 'dust_flux'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Fall_flxdst4", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Faxx_flxdst4", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_flxdst4', index=n1)
-    call fldList_AddFld(fldListTo(compatm)%flds, 'Faxx_flxdst4', merge_with_weights=.true., rc=rec)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), mapconsf, 'lfrin', lnd2atm_fmapfile)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_flxdst4', fldindex=n1)
+    call fldList_AddFld(fldListTo(compatm)%flds, 'Faxx_flxdst4', merge_with_weights=.true.)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'lfrin', lnd2atm_fmapname)
 
     !-----------------------------
     ! atm<->ocn only exchange
@@ -1320,28 +1177,28 @@ contains
     stdname  = 'air_pressure_at_sea_level'
     units    = 'Pa'
     call fldList_AddMetadata(fldname="Sa_pslv", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_pslv', index=n1)
+    call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_pslv', fldindex=n1)
     call fldList_AddFld(fldListTo(compocn)%flds, 'Sa_pslv')
-    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapbilnr, 'one', atm2ocn_smapfile)
+    call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)
 
     longname = 'Wind speed squared at 10 meters'
     stdname  = 'square_of_wind_speed'
     units    = 'm2 s-2'
     call fldList_AddMetadata(fldname="So_duu10n", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListXao_fluxes_a%flds, 'So_duu10n', index=n1)
-    call fldList_AddFld(fldListXao_fluxes_o%flds, 'So_duu10n')
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'So_duu10n', fldindex=n1)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'So_duu10n')
     call fldList_AddFld(fldListTo(compocn)%flds , 'So_duu10n')
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n1), compocn, mapbilnr, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n1), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n1), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n1), compatm, compocn, mapbilnr, 'one'  , atm2ocn_fmapname) ! map atm->ocn
 
     longname = 'Surface fraction velocity in ocean'
     stdname  = 'fraction_velocity'
     units    = 'm s-1'
-    call fldList_AddFld(fldListXao_fluxes_a%flds, 'So_ustar', index=n1)
-    call fldList_AddFld(fldListXao_fluxes_o%flds, 'So_ustar')
+    call fldList_AddFld(fldListMed_aoflux_a%flds, 'So_ustar', fldindex=n1)
+    call fldList_AddFld(fldListMed_aoflux_o%flds, 'So_ustar')
     call fldList_AddFld(fldListTo(compocn)%flds , 'So_ustar')
-    call fldlist_AddMap(fldListXao_fluxes_a%flds(n1), compocn, mapbilnr, 'one'  , atm2ocn_fmapfile) ! map atm->ocn
-    call fldlist_AddMap(fldListXao_fluxes_o%flds(n1), compatm, mapconsf, 'ofrac', ocn2atm_fmapfile) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_o%flds(n1), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
+    call fldlist_AddMap(fldListMed_aoflux_a%flds(n1), compatm, compocn, mapbilnr, 'one'  , atm2ocn_fmapname) ! map atm->ocn
 
     !-----------------------------
     ! ice->ocn exchange
@@ -1352,54 +1209,54 @@ contains
     units    = 'W m-2'
     call fldList_AddMetadata(fldname="Fioi_melth", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_melth", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_melth', index=n1)
+    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_melth', fldindex=n1)
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_melth')
-    call fldlist_AddMap(fldListFr(compice)%flds(n1), compocn,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
     longname = 'Water flux due to melting'
     stdname  = 'surface_snow_melt_flux'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Fioi_meltw", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_meltw", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_meltw', index=n1)
+    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_meltw', fldindex=n1)
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_meltw')
-    call fldlist_AddMap(fldListFr(compice)%flds(n1), compocn,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
     longname = 'Salt flux'
     stdname  = 'virtual_salt_flux_into_sea_water'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Fioi_salt", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_salt", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_salt', index=n1)
+    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_salt', fldindex=n1)
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_salt')
-    call fldlist_AddMap(fldListFr(compice)%flds(n1), compocn,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
     longname = 'Hydrophylic black carbon deposition flux'
     stdname  = 'deposition_flux_of_hydrophylic_black_carbon'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Fioi_bcphi", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_bcphi", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_bcphi', index=n1)
+    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_bcphi', fldindex=n1)
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_bcphi')
-    call fldlist_AddMap(fldListFr(compice)%flds(n1), compocn,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
     longname = 'Hydrophobic black carbon deposition flux'
     stdname  = 'deposition_flux_of_hydrophobic_black_carbon'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Fioi_bcpho", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_bcpho", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_bcpho', index=n1)
+    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_bcpho', fldindex=n1)
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_bcpho')
-    call fldlist_AddMap(fldListFr(compice)%flds(n1), compocn,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
     longname = 'Dust flux'
     stdname  = 'dust_flux'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Fioi_flxdst", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_flxdst", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_flxdst', index=n1)
+    call fldList_AddFld(fldListFr(compice)%flds, 'Fioi_flxdst', fldindex=n1)
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_flxdst')
-    call fldlist_AddMap(fldListFr(compice)%flds(n1), compocn,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
     !-----------------------------
     ! ocn -> ice exchange
@@ -1409,65 +1266,65 @@ contains
     stdname  = 'sea_surface_salinity'
     units    = 'g kg-1'
     call fldList_AddMetadata(fldname="So_s", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compocn)%flds, 'So_s', index=n1)
-    call fldList_AddFld(fldListFr(compice)%flds, 'So_s', index=n1)
-    call fldlist_AddMap(fldListFr(compice)%flds(n1), compocn,  mapfcopy)
+    call fldList_AddFld(fldListFr(compocn)%flds, 'So_s', fldindex=n1)
+    call fldList_AddFld(fldListFr(compice)%flds, 'So_s', fldindex=n1)
+    call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
     longname = 'Ocean melt and freeze potential'
     stdname  = 'surface_snow_and_ice_melt_heat_flux'
     units    = 'W m-2'
     call fldList_AddMetadata(fldname="Fioo_q", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compocn)%flds, 'Fioo_q', index=n1)
+    call fldList_AddFld(fldListFr(compocn)%flds, 'Fioo_q', fldindex=n1)
     call fldList_AddFld(fldListTo(compice)%flds, 'Fioo_q')
-    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compice,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
 
     longname = 'Zonal sea water velocity'
     stdname  = 'eastward_sea_water_velocity'
     units    = 'm s-1'
     call fldList_AddMetadata(fldname="So_u", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compocn)%flds, 'So_u', index=n1)
+    call fldList_AddFld(fldListFr(compocn)%flds, 'So_u', fldindex=n1)
     call fldList_AddFld(fldListTo(compice)%flds, 'So_u')
-    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compice,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
 
     longname = 'Meridional sea water velocity'
     stdname  = 'northward_sea_water_velocity'
     units    = 'm s-1'
     call fldList_AddMetadata(fldname="So_v", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compocn)%flds, 'So_v', index=n1)
+    call fldList_AddFld(fldListFr(compocn)%flds, 'So_v', fldindex=n1)
     call fldList_AddFld(fldListTo(compice)%flds, 'So_v')
-    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compice,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
 
     longname = 'Zonal sea surface slope'
     stdname  = 'sea_surface_eastward_slope'
     units    = 'm m-1'
     call fldList_AddMetadata(fldname="So_dhdx", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compocn)%flds, 'So_dhdx', index=n1)
+    call fldList_AddFld(fldListFr(compocn)%flds, 'So_dhdx', fldindex=n1)
     call fldList_AddFld(fldListTo(compice)%flds, 'So_dhdx')
-    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compice,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
 
     longname = 'Meridional sea surface slope'
     stdname  = 'sea_surface_northward_slope'
     units    = 'm m-1'
     call fldList_AddMetadata(fldname="So_dhdy", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compocn)%flds, 'So_dhdy', index=n1)
+    call fldList_AddFld(fldListFr(compocn)%flds, 'So_dhdy', fldindex=n1)
     call fldList_AddFld(fldListTo(compice)%flds, 'So_dhdy')
-    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compice,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
 
     longname = 'Ocean Boundary Layer Depth'
     stdname  = 'ocean_boundary_layer_depth'
     units    = 'm'
     call fldList_AddMetadata(fldname="So_bldepth", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compocn)%flds, 'So_bldepth', index=n1)
+    call fldList_AddFld(fldListFr(compocn)%flds, 'So_bldepth', fldindex=n1)
     call fldList_AddFld(fldListTo(compice)%flds, 'So_bldepth')
-    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compice,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
 
     longname = 'Fraction of sw penetrating surface layer for diurnal cycle'
     stdname  = 'Fraction_of_sw_penetrating_surface_layer'
     units    = '1'
     call fldList_AddMetadata(fldname="So_fswpen", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compocn)%flds, 'So_fswpen', index=n1)
+    call fldList_AddFld(fldListFr(compocn)%flds, 'So_fswpen', fldindex=n1)
     call fldList_AddFld(fldListTo(compice)%flds, 'So_fswpen')
-    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compice,  mapfcopy)
+    call fldlist_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
 
     !-----------------------------
     ! lnd->rof exchange
@@ -1478,45 +1335,45 @@ contains
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Flrl_rofsur", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Frxx_rofsur", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_rofsur', index=n1)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_rofsur', fldindex=n1)
     call fldList_AddFld(fldListTo(comprof)%flds, 'Frxx_rofsur', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
 
     longname = 'Water flux from land (liquid glacier, wetland, and lake)'
     stdname  = 'water_flux_into_runoff_from_gwl'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Flrl_rofgwl", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Frxx_rofgwl", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_rofgwl', index=n1)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_rofgwl', fldindex=n1)
     call fldList_AddFld(fldListTo(comprof)%flds, 'Frxx_rofgwl', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
 
     longname = 'Water flux from land (liquid subsurface)'
     stdname  = 'water_flux_into_runoff_subsurface'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Flrl_rofsub", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Frxx_rofsub", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_rofsub', index=n1)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_rofsub', fldindex=n1)
     call fldList_AddFld(fldListTo(comprof)%flds, 'Frxx_rofsub', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
 
     longname = 'Water flux from land direct to ocean'
     stdname  = 'water_flux_direct_to_ocean'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Flrl_rofdto", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Frxx_rofdto", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_rofdto', index=n1)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_rofdto', fldindex=n1)
     call fldList_AddFld(fldListTo(comprof)%flds, 'Frxx_rofdto', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
 
     longname = 'Water flux from land (frozen)'
     stdname  = 'frozen_water_flux_into_runoff'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Flrl_rofi", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Frxx_rofi", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_rofi', index=n1)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_rofi', fldindex=n1)
     call fldList_AddFld(fldListTo(comprof)%flds, 'Frxx_rofi', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
 
     ! Irrigation flux (land/rof only)
     longname = 'Irrigation flux (withdrawal from rivers)'
@@ -1524,9 +1381,9 @@ contains
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Flrl_irrig", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Frxx_irrig", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_irrig', index=n1)
+    call fldList_AddFld(fldListFr(complnd)%flds, 'Flrl_irrig', fldindex=n1)
     call fldList_AddFld(fldListTo(comprof)%flds, 'Frxx_irrig', merge_with_weights=.true.)
-    call fldlist_AddMap(fldListFr(complnd)%flds(n1), comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
+    call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, comprof, mapconsf, 'lfrin', lnd2rof_fmapname)
 
     !-----------------------------
     ! rof->lnd
@@ -1536,27 +1393,27 @@ contains
     stdname  = 'flooding_water_flux'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Flrr_flood", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(comprof)%flds, 'Flrr_flood', index=n1)
+    call fldList_AddFld(fldListFr(comprof)%flds, 'Flrr_flood', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Flrr_flood')
     call fldList_AddFld(fldListTo(compocn)%flds, 'Flrr_flood')
-    call fldlist_AddMap(fldListFr(comprof)%flds(n1), complnd, mapconsf, 'one', rof2lnd_fmapname)
-    call fldlist_AddMap(fldListFr(comprof)%flds(n1), complnd, mapconsf, 'one', rof2ocn_fmapname)
+    call fldlist_AddMap(fldListFr(comprof)%flds(n1), comprof, complnd, mapconsf, 'one', rof2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(comprof)%flds(n1), comprof, complnd, mapconsf, 'one', rof2ocn_fmapname)
 
     longname = 'River channel total water volume'
     stdname  = 'rtm_volr'
     units    = 'm'
     call fldList_AddMetadata(fldname="Flrr_volr", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(comprof)%flds, 'Flrr_volr', index=n1)
+    call fldList_AddFld(fldListFr(comprof)%flds, 'Flrr_volr', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Flrr_volr')
-    call fldlist_AddMap(fldListFr(comprof)%flds(n1), complnd, mapconsf, 'one', rof2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(comprof)%flds(n1), comprof, complnd, mapconsf, 'one', rof2lnd_fmapname)
 
     longname = 'River channel main channel water volume'
     stdname  = 'rtm_volrmch'
     units    = 'm'
     call fldList_AddMetadata(fldname="Flrr_volrmch", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(comprof)%flds, 'Flrr_volrmch', index=n1)
+    call fldList_AddFld(fldListFr(comprof)%flds, 'Flrr_volrmch', fldindex=n1)
     call fldList_AddFld(fldListTo(complnd)%flds, 'Flrr_volrmch')
-    call fldlist_AddMap(fldListFr(comprof)%flds(n1), complnd, mapconsf, 'one', rof2lnd_fmapname)
+    call fldlist_AddMap(fldListFr(comprof)%flds(n1), comprof, complnd, mapconsf, 'one', rof2lnd_fmapname)
 
     !-----------------------------
     ! rof->ocn (liquid and frozen)
@@ -1566,18 +1423,18 @@ contains
     stdname  = 'water_flux_into_sea_water'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Foxx_rofl", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(comprof)%flds, 'Forr_rofl', index=n1)
+    call fldList_AddFld(fldListFr(comprof)%flds, 'Forr_rofl', fldindex=n1)
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_rofl')
-    call fldlist_AddMap(fldListFr(comprof)%flds(n1), compocn, mapunset, 'none', rof2ocn_liq_rmapname)
+    call fldlist_AddMap(fldListFr(comprof)%flds(n1), comprof, compocn, mapunset, 'none', rof2ocn_liq_rmapname)
 
     longname = 'Water flux into sea water due to runoff (frozen)'
     stdname  = 'frozen_water_flux_into_sea_water'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Forr_rofl", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Foxx_rofl", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(comprof)%flds, 'Forr_rofi', index=n1)
+    call fldList_AddFld(fldListFr(comprof)%flds, 'Forr_rofi', fldindex=n1)
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_rofi')
-    call fldlist_AddMap(fldListFr(comprof)%flds(n1), compocn, mapunset, 'none', rof2ocn_ice_rmapname)
+    call fldlist_AddMap(fldListFr(comprof)%flds(n1), comprof, compocn, mapunset, 'none', rof2ocn_ice_rmapname)
 
     !-----------------------------
     ! rof->ice (frozen)
@@ -1588,9 +1445,9 @@ contains
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname="Firr_rofl", longname=longname, stdname=stdname, units=units)
     call fldList_AddMetadata(fldname="Fixx_rofl", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(comprof)%flds, 'Forr_rofi', index=n1)
+    call fldList_AddFld(fldListFr(comprof)%flds, 'Forr_rofi', fldindex=n1)
     call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_rofi')
-    call fldlist_AddMap(fldListFr(comprof)%flds(n1), compocn, mapunset, 'none', rof2ocn_ice_rmapname)
+    call fldlist_AddMap(fldListFr(comprof)%flds(n1), comprof, compocn, mapunset, 'none', rof2ocn_ice_rmapname)
 
     !-----------------------------
     ! wav->ocn
@@ -1600,37 +1457,33 @@ contains
     stdname  = 'wave_model_langmuir_multiplier'
     units    = '1'
     call fldList_AddMetadata(fldname='Sw_lamult', longname=longname, stdname=stdname, units=units)
-    call fldList_AddMetadata(fldname='Sw_lamult')
-    call fldList_AddFld(fldListFr(compwav), 'Sw_lamult', fldindex=n1)
-    call fldList_AddFld(fldListTo(compocn), 'Sw_lamult')
-    call fldlist_AddMap(fldListFr(compwav), compocn,  fldindex=n1, mapbilnr, 'one', wav2ocn_smapfile)
+    call fldList_AddFld(fldListFr(compwav)%flds, 'Sw_lamult', fldindex=n1)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Sw_lamult')
+    call fldlist_AddMap(fldListFr(compwav)%flds(n1), compwav, compocn,  mapbilnr, 'one', wav2ocn_smapname)
 
     longname = 'Stokes drift u component'
     stdname  = 'wave_model_stokes_drift_eastward_velocity'
     units    = 'm/s'
     call fldList_AddMetadata(fldname='Sw_ustokes', longname=longname, stdname=stdname, units=units)
-    call fldList_AddMetadata(fldname='Sw_ustokes')
-    call fldList_AddFld(fldListFr(compwav), 'Sw_ustokes', fldindex=n1)
-    call fldList_AddFld(fldListTo(compocn), 'Sw_ustokes')
-    call fldlist_AddMap(fldListFr(compwav), compocn,  fldindex=n1, mapbilnr, 'one', wav2ocn_smapfile)
+    call fldList_AddFld(fldListFr(compwav)%flds, 'Sw_ustokes', fldindex=n1)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Sw_ustokes')
+    call fldlist_AddMap(fldListFr(compwav)%flds(n1), compwav, compocn,  mapbilnr, 'one', wav2ocn_smapname)
 
     longname = 'Stokes drift v component'
     stdname  = 'wave_model_stokes_drift_northward_velocity'
     units    = 'm/s'
     call fldList_AddMetadata(fldname='Sw_vstokes', longname=longname, stdname=stdname, units=units)
-    call fldList_AddMetadata(fldname='Sw_vstokes')
-    call fldList_AddFld(fldListFr(compwav), 'Sw_vstokes', fldindex=n1)
-    call fldList_AddFld(fldListTo(compocn), 'Sw_vstokes')
-    call fldlist_AddMap(fldListFr(compwav), compocn,  fldindex=n1, mapbilnr, 'one', wav2ocn_smapfile)
+    call fldList_AddFld(fldListFr(compwav)%flds, 'Sw_vstokes', fldindex=n1)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Sw_vstokes')
+    call fldlist_AddMap(fldListFr(compwav)%flds(n1), compwav, compocn, mapbilnr, 'one', wav2ocn_smapname)
 
     longname = 'Stokes drift depth'
     stdname  = 'wave_model_stokes_drift_depth'
     units    = 'm'
     call fldList_AddMetadata(fldname='Sw_hstokes', longname=longname, stdname=stdname, units=units)
-    call fldList_AddMetadata(fldname='Sw_hstokes')
-    call fldList_AddFld(fldListFr(compwav), 'Sw_hstokes', fldindex=n1)
-    call fldList_AddFld(fldListTo(compocn), 'Sw_hstokes')
-    call fldlist_AddMap(fldListFr(compwav), compocn,  fldindex=n1, mapbilnr, 'one', wav2ocn_smapfile)
+    call fldList_AddFld(fldListFr(compwav)%flds, 'Sw_hstokes', fldindex=n1)
+    call fldList_AddFld(fldListTo(compocn)%flds, 'Sw_hstokes')
+    call fldlist_AddMap(fldListFr(compwav)%flds(n1), compwav, compocn, mapbilnr, 'one', wav2ocn_smapname)
 
     !-----------------------------
     ! fields for history output only
@@ -1641,127 +1494,127 @@ contains
        stdname  = 'surface_downward_shortwave_flux'
        units    = 'W m-2'
        call fldList_AddMetadata(fldname="Faox_swdn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('Faox_swdn', flds_xao_diurnl) ! Needed for FB initialization
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'Faox_swdn') ! Needed for FB initialization
 
        longname = 'Upward solar radiation'
        stdname  = 'surface_upward_shortwave_flux'
        units    = 'W m-2'
        call fldList_AddMetadata(fldname="Faox_swup", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('Faox_swup', flds_xao_diurnl) ! Needed for FB initialization
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'Faox_swup') ! Needed for FB initialization
 
        longname = 'atm/ocn flux temperature bulk'
        stdname  = 'aoflux_tbulk'
        units    = 'K'
        call fldList_AddMetadata(fldname="So_tbulk_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_tbulk_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_tbulk_diurn')
 
        longname = 'atm/ocn flux temperature skin'
        stdname  = 'aoflux_tskin'
        units    = 'K'
        call fldList_AddMetadata(fldname="So_tskin_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString( 'So_tskin_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds,  'So_tskin_diurn')
 
        longname = 'atm/ocn flux temperature skin at night'
        stdname  = 'aoflux_tskin_night'
        units    = 'K'
        call fldList_AddMetadata(fldname="So_tskin_night_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_tskin_night_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_tskin_night_diurn')
 
        longname = 'atm/ocn flux temperature skin at day'
        stdname  = 'aoflux_tskin_day'
        units    = 'K'
        call fldList_AddMetadata(fldname="So_tskin_day_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_tskin_day_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_tskin_day_diurn')
 
        longname = 'atm/ocn flux cool skin'
        stdname  = 'aoflux_cskin'
        units    = 'K'
        call fldList_AddMetadata(fldname="So_cskin_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_cskin_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_cskin_diurn')
 
        longname = 'atm/ocn flux cool skin at night'
        stdname  = 'aoflux_cskin_night'
        units    = 'K'
        call fldList_AddMetadata(fldname="So_cskin_night_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_cskin_night_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_cskin_night_diurn')
 
        longname = 'atm/ocn flux warming'
        stdname  = 'aoflux_warm'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_warm_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_warm_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_warm_diurn')
 
        longname = 'atm/ocn flux salting'
        stdname  = 'aoflux_salt'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_salt_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_salt_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_salt_diurn')
 
        longname = 'atm/ocn flux speed'
        stdname  = 'aoflux_speed'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_speed_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_speed_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_speed_diurn')
 
        longname = 'atm/ocn flux regime'
        stdname  = 'aoflux_regime'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_regime_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_regime_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_regime_diurn')
 
        longname = 'atm/ocn flux warming dialy max'
        stdname  = 'aoflux_warmmax'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_warmmax_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_warmmax_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_warmmax_diurn')
 
        longname = 'atm/ocn flux wind daily max'
        stdname  = 'aoflux_windmax'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_windmax_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_windmax_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_windmax_diurn')
 
        longname = 'atm/ocn flux q-solar daily avg'
        stdname  = 'aoflux_qsolavg'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_qsolvavg_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_qsolvavg_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_qsolvavg_diurn')
 
        longname = 'atm/ocn flux wind daily avg'
        stdname  = 'aoflux_windavg'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_windavg_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_windavg_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_windavg_diurn')
 
        longname = 'atm/ocn flux daily max increment'
        stdname  = 'aoflux_warmmaxinc'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_warmmaxinc_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_warmmaxinc_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_warmmaxinc_diurn')
 
        longname = 'atm/ocn flux wind daily max increment'
        stdname  = 'aoflux_windmaxinc'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_windmaxinc_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_windmaxinc_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_windmaxinc_diurn')
 
        longname = 'atm/ocn flux q-solar increment'
        stdname  = 'aoflux_qsolinc'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_qsolinc_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_qsolinc_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_qsolinc_diurn')
 
        longname = 'atm/ocn flux wind increment'
        stdname  = 'aoflux_windinc'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_windinc_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_windinc_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_windinc_diurn')
 
        longname = 'atm/ocn flux increment counter'
        stdname  = 'aoflux_ninc'
        units    = 'unitless'
        call fldList_AddMetadata(fldname="So_ninc_diurn", longname=longname, stdname=stdname, units=units)
-       call fldList_ConcatString('So_ninc_diurn', flds_xao_diurnl)
+       call fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'So_ninc_diurn')
     end if
 
     !-----------------------------
@@ -1772,15 +1625,15 @@ contains
     stdname  = 'glacier_liquid_runoff_flux_to_ocean'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname='Fogg_rofl', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compglc), 'Flgg_rofl', fldindex=n1)
-    call fldlist_AddMap(fldListFr(compglc)%flds(n1), compocn,  mapunset, 'one', glc2ocn_rmapname)
+    call fldList_AddFld(fldListFr(compglc)%flds, 'Flgg_rofl', fldindex=n1)
+    call fldlist_AddMap(fldListFr(compglc)%flds(n1), compglc, compocn,  mapunset, 'one', glc2ocn_rmapname)
 
     longname = 'glc frozen runoff flux to ocean'
     stdname  = 'glacier_frozen_runoff_flux_to_ocean'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname='Fogg_rofi', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compglc), 'Flgg_rofi', fldindex=n1)
-    call fldlist_AddMap(fldListFr(compglc)%flds(n1), compocn,  mapunset, 'one', glc2ocn_rmapname)
+    call fldList_AddFld(fldListFr(compglc)%flds, 'Flgg_rofi', fldindex=n1)
+    call fldlist_AddMap(fldListFr(compglc)%flds(n1), compglc, compocn,  mapunset, 'one', glc2ocn_rmapname)
 
     !-----------------------------
     ! glc -> ice
@@ -1790,8 +1643,8 @@ contains
     stdname  = 'glacier_frozen_runoff_flux_to_seaice'
     units    = 'kg m-2 s-1'
     call fldList_AddMetadata(fldname='Figg_rofi', longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compglc), 'Figg_rofi', fldindex=n1)
-    call fldlist_AddMap(fldListFr(compglc)%flds(n1), compice,  mapunset, 'one', glc2ice_rmapname)
+    call fldList_AddFld(fldListFr(compglc)%flds, 'Figg_rofi', fldindex=n1)
+    call fldlist_AddMap(fldListFr(compglc)%flds(n1), compglc, compice,  mapunset, 'one', glc2ice_rmapname)
 
     !-----------------------------
     ! glc -> lnd
@@ -1805,34 +1658,34 @@ contains
     stdname  = 'ice_sheet_grid_mask'
     units    = '1'
     call fldList_AddMetadata(fldname="Sg_icemask", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compglc)%flds, 'Sg_icemask', index=n1)
-    call fldList_AddFld(fldListTo(complnd)%flds, 'Sg_icemask')
-    call fldlist_AddMap(fldListFr(compglc)%flds(n1), complnd,  mapconsf, 'one', glc2lnd_smapname)
-    call fldList_ConcatString('Sg_icemask', flds_x2l_fr_glc) ! Needed for FB initialization
+    call fldList_AddFld(fldListFr(compglc)%flds   , 'Sg_icemask', fldindex=n1)
+    call fldList_AddFld(fldListTo(complnd)%flds   , 'Sg_icemask')
+    call fldList_AddFld(fldListMed_x2l_fr_glc%flds, 'Sg_icemask') ! Needed for FB initialization
+    call fldlist_AddMap(fldListFr(compglc)%flds(n1), compglc, complnd,  mapconsf, 'one', glc2lnd_smapname)
 
     longname = 'Ice sheet mask where we are potentially sending non-zero fluxes'
     stdname  = 'icemask_coupled'
     units    = '1'
     call fldList_AddMetadata(fldname="Sg_icemask_coupled_fluxes", longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compglc)%flds, 'Sg_icemask_coupled_fluxes', index=n1)
-    call fldList_AddFld(fldListTo(complnd)%flds, 'Sg_icemask_coupled_fluxes')
-    call fldlist_AddMap(fldListFr(compglc)%flds(n1), complnd,  mapconsf, 'one', glc2lnd_smapname)
-    call fldList_ConcatString('Sg_icemask_coupled_fluxes', flds_x2l_fr_glc) ! Needed for FB initialization
+    call fldList_AddFld(fldListFr(compglc)%flds   , 'Sg_icemask_coupled_fluxes', fldindex=n1)
+    call fldList_AddFld(fldListTo(complnd)%flds   , 'Sg_icemask_coupled_fluxes')
+    call fldList_AddFld(fldListMed_x2l_fr_glc%flds, 'Sg_icemask_coupled_fluxes') 
+    call fldlist_AddMap(fldListFr(compglc)%flds(n1), compglc, complnd,  mapconsf, 'one', glc2lnd_smapname)
 
     name = 'Sg_ice_covered'
     longname = 'Fraction of glacier area'
     stdname  = 'glacier_area_fraction'
     units    = '1'
     call fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compglc), trim(name), fldindex=n1)
-    call fldList_AddMap(FldListFr(compglc)%flds(n1), complnd, mapconsf, 'unset', glc2lnd_fmapname) ! TODO: normalization?
+    call fldList_AddFld(fldListFr(compglc)%flds, trim(name), fldindex=n1)
+    call fldList_AddMap(FldListFr(compglc)%flds(n1), compglc, complnd, mapconsf, 'unset', glc2lnd_fmapname) ! TODO: normalization?
     if (glc_get_num_elevation_classes() > 0) then
        do num = 0, glc_get_num_elevation_classes()
           cnum = glc_elevclass_as_string(num)
           call fldList_AddMetadata(fldname= trim(name)//trim(cnum), &
-               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, unit=units)
-          call fldList_AddFld(fldListTo(complnd)   , trim(name)//trim(cnum))
-          call fldList_ConcatString(trim(name)//trim(cnum), flds_x2l_fr_glc) ! Needed for FB initialization
+               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, units=units)
+          call fldList_AddFld(fldListTo(complnd)%flds   , trim(name)//trim(cnum))
+          call fldList_AddFld(fldListMed_x2l_fr_glc%flds, trim(name)//trim(cnum))
        end do
     end if
 
@@ -1841,15 +1694,15 @@ contains
     stdname  = 'height'
     units    = 'm'
     call fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compglc), trim(name), fldindex=n1)
-    call fldList_AddMap(FldListFr(compglc)%flds(n1), compglc, mapconsf, 'custom', glc2lnd_fmapname)
+    call fldList_AddFld(fldListFr(compglc)%flds, trim(name), fldindex=n1)
+    call fldList_AddMap(FldListFr(compglc)%flds(n1), compglc, compglc, mapconsf, 'custom', glc2lnd_fmapname)
     if (glc_get_num_elevation_classes() > 0) then
        do num = 0, glc_get_num_elevation_classes()
           cnum = glc_elevclass_as_string(num)
           call fldList_AddMetadata(fldname= trim(name)//trim(cnum), &
-               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, unit=units)
-          call fldList_AddFld(fldListTo(complnd)   , trim(name)//trim(cnum))
-          call fldList_ConcatString(trim(name)//trim(cnum), flds_x2l_fr_glc) ! Needed for FB initialization
+               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, units=units)
+          call fldList_AddFld(fldListTo(complnd)%flds   , trim(name)//trim(cnum))
+          call fldList_AddFld(fldListMed_x2l_fr_glc%flds, trim(name)//trim(cnum))
        end do
     end if
 
@@ -1859,15 +1712,15 @@ contains
     stdname  = 'downward_heat_flux_in_glacier'
     units    = 'W m-2'
     call fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListFr(compglc), trim(name), fldindex=n1)
-    call fldList_AddMap(FldListFr(compglc)%flds(n1), compglc, mapconsf, 'custom', glc2lnd_fmapname)
+    call fldList_AddFld(fldListFr(compglc)%flds, trim(name), fldindex=n1)
+    call fldList_AddMap(FldListFr(compglc)%flds(n1), compglc, compglc, mapconsf, 'custom', glc2lnd_fmapname)
     if (glc_get_num_elevation_classes() > 0) then
        do num = 0, glc_get_num_elevation_classes()
           cnum = glc_elevclass_as_string(num)
           call fldList_AddMetadata(fldname= trim(name)//trim(cnum), &
-               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, unit=units)
-          call fldList_AddFld(fldListTo(complnd)   , trim(name)//trim(cnum))
-          call fldList_ConcatString(trim(name)//trim(cnum), flds_x2l_fr_glc) ! Needed for FB initialization
+               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, units=units)
+          call fldList_AddFld(fldListTo(complnd)%flds   , trim(name)//trim(cnum))
+          call fldList_AddFld(fldListMed_x2l_fr_glc%flds, trim(name)//trim(cnum))
        end do
     end if
 
@@ -1883,28 +1736,26 @@ contains
     !   additional fields holding accumulated quantities of just these fields.
 
     ! Sets a coupling field for all glc elevation classes (1:glc_nec) plus bare land (index 0).
-    ! Note that, if glc_nec = 0, then we don't create any coupling fields (not even the bare land (0) index)
+    ! Note that, if glc_nec = 0, then we don't create any coupling fields (not even the bare land (0) fldindex)
 
     name = 'Flgl_qice'
-    attname = name
     longname = 'New glacier ice flux'
     stdname  = 'ice_flux_out_of_glacier'
     units    = 'kg m-2 s-1'
     if (glc_get_num_elevation_classes() > 0) then
        do num = 0, glc_get_num_elevation_classes()
           cnum = glc_elevclass_as_string(num)
-          call fldList_AddMetadata(fldname  = trim(name)//trim(cnum), &
-               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, unit=units)
-          call fldList_AddFld(fldListFr(complnd), trim(name)//trim(cnum)), fldindex=n1)
-          call fldList_AddFld(fldListMed_lnd_to_glc, trim(name)//trim(cnum))
+          call fldList_AddMetadata(fldname = trim(name)//trim(cnum), &
+               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, units=units)
+          call fldList_AddFld(fldListFr(complnd)%flds   , trim(name)//trim(cnum), fldindex=n1)
+          call fldList_AddFld(fldListMed_l2x_to_glc%flds, trim(name)//trim(cnum))
        end do
     end if
     call fldList_AddMetadata(fldname= trim(name), longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListTo(compglc), trim(name))
-    call fldList_AddMap(FldListFr(complnd)%flds(n1), compglc, mapconsf, 'none', lnd2glc_fmapname)
+    call fldList_AddFld(fldListTo(compglc)%flds, trim(name))
+    call fldList_AddMap(FldListFr(complnd)%flds(n1), complnd, compglc, mapconsf, 'none', lnd2glc_fmapname)
 
     name = 'Sl_tsrf'
-    attname = name
     longname = 'Surface temperature of glacier'
     stdname  = 'surface_temperature'
     units    = 'deg C'
@@ -1912,19 +1763,18 @@ contains
        do num = 0, glc_get_num_elevation_classes()
           cnum = glc_elevclass_as_string(num)
           call fldList_AddMetadata(fldname  = trim(name)//trim(cnum), &
-               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, unit=units)
-          call fldList_AddFld(fldListFr(complnd), trim(name)//trim(cnum)), fldindex=n1)
-          call fldList_AddFld(fldListMed_l2x_to_glc, trim(name)//trim(cnum))
+               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, units=units)
+          call fldList_AddFld(fldListFr(complnd)%flds   , trim(name)//trim(cnum), fldindex=n1)
+          call fldList_AddFld(fldListMed_l2x_to_glc%flds, trim(name)//trim(cnum))
        end do
     end if
     call fldList_AddMetadata(fldname= trim(name), longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListTo(compglc), trim(name))
-    call fldList_AddMap(FldListFr(complnd)%flds(n1), compglc, mapconsf, 'none', lnd2glc_fmapname)
+    call fldList_AddFld(fldListTo(compglc)%flds, trim(name))
+    call fldList_AddMap(FldListFr(complnd)%flds(n1), complnd, compglc, mapconsf, 'none', lnd2glc_fmapname)
 
     ! Sl_topo is sent from lnd -> med, but is NOT sent to glc (it is only used for the
     ! remapping in the mediator)
     name = 'Sl_topo'
-    attname = name
     longname = 'Surface height'
     stdname  = 'height'
     units    = 'm'
@@ -1932,14 +1782,14 @@ contains
        do num = 0, glc_get_num_elevation_classes()
           cnum = glc_elevclass_as_string(num)
           call fldList_AddMetadata(fldname  = trim(name)//trim(cnum), &
-               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, unit=units)
-          call fldList_AddFld(fldListFr(complnd), trim(name)//trim(cnum)), fldindex=n1)
-          call fldList_AddFld(fldListMed_l2x_to_glc, trim(name)//trim(cnum))
+               longname = trim(longname)//' of elevation class '//trim(cnum), stdname =stdname, units=units)
+          call fldList_AddFld(fldListFr(complnd)%flds   , trim(name)//trim(cnum), fldindex=n1)
+          call fldList_AddFld(fldListMed_l2x_to_glc%flds, trim(name)//trim(cnum))
        end do
     end if
     call fldList_AddMetadata(fldname= trim(name), longname=longname, stdname=stdname, units=units)
-    call fldList_AddFld(fldListTo(compglc), trim(name))
-    call fldList_AddMap(FldListFr(complnd)%flds(n1), compglc, mapconsf, 'none', lnd2glc_fmapname)
+    call fldList_AddFld(fldListTo(compglc)%flds, trim(name))
+    call fldList_AddMap(FldListFr(complnd)%flds(n1), complnd, compglc, mapconsf, 'none', lnd2glc_fmapname)
 
     !-----------------------------
     ! co2 fields
@@ -1951,21 +1801,21 @@ contains
        stdname  = 'prognostic_CO2_lowest_level'
        units    = '1e-6 mol/mol'
        call fldList_AddMetadata(fldname='Sa_co2prog', longname=longname, stdname=stdname, units=units)
-       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2prog', index=n1)
+       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2prog', fldindex=n1)
        call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_co2prog')
        call fldList_AddFld(fldListTo(compocn)%flds, 'Sa_co2prog')
-       call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
-       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapbilnr, 'one', atm2ocn_smapfile)
+       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)
 
        longname = 'Diagnostic CO2 at the lowest model level'
        stdname  = 'diagnostic_CO2_lowest_level'
        units    = '1e-6 mol/mol'
        call fldList_AddMetadata(fldname='Sa_co2diag', longname=longname, stdname=stdname, units=units)
-       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2diag', index=n1)
+       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2diag', fldindex=n1)
        call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_co2diag')
        call fldList_AddFld(fldListTo(compocn)%flds, 'Sa_co2diag')
-       call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
-       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapbilnr, 'one', atm2ocn_smapfile)
+       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)
 
     else if (flds_co2b) then
 
@@ -1973,26 +1823,26 @@ contains
        stdname  = 'prognostic_CO2_lowest_level'
        units    = '1e-6 mol/mol'
        call fldList_AddMetadata(fldname='Sa_co2prog', longname=longname, stdname=stdname, units=units)
-       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2prog', index=n1)
+       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2prog', fldindex=n1)
        call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_co2prog')
-       call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
+       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
 
        longname = 'Diagnostic CO2 at the lowest model level'
        stdname  = 'diagnostic_CO2_lowest_level'
        units    = '1e-6 mol/mol'
        call fldList_AddMetadata(fldname='Sa_co2diag', longname=longname, stdname=stdname, units=units)
-       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2diag', index=n1)
+       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2diag', fldindex=n1)
        call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_co2diag')
-       call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
+       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
 
        longname = 'Surface flux of CO2 from land'
        stdname  = 'surface_upward_flux_of_carbon_dioxide_where_land'
        units    = 'moles m-2 s-1'
        call fldList_AddMetadata(fldname='Fall_fco2_lnd', longname=longname, stdname=stdname, units=units)
        call fldList_AddMetadata(fldname='Faxx_fco2_lnd', longname=longname, stdname=stdname, units=units)
-       call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_fco2_lnd', index=n1)
+       call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_fco2_lnd', fldindex=n1)
        call fldList_AddFld(fldListTo(compatm)%flds, 'Faxx_fco2_lnd', merge_with_weights=.true.)
-       call fldlist_AddMap(fldListFr(complnd)%flds(n1), compatm, mapconsf, 'one', atm2lnd_smapfile)
+       call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'one', atm2lnd_smapname)
 
     else if (flds_co2c) then
 
@@ -2000,39 +1850,39 @@ contains
        stdname  = 'prognostic_CO2_lowest_level'
        units    = '1e-6 mol/mol'
        call fldList_AddMetadata(fldname='Sa_co2prog', longname=longname, stdname=stdname, units=units)
-       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2prog', index=n1)
+       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2prog', fldindex=n1)
        call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_co2prog')
        call fldList_AddFld(fldListTo(compocn)%flds, 'Sa_co2prog')
-       call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
-       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapbilnr, 'one', atm2ocn_smapfile)
+       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)
 
        longname = 'Diagnostic CO2 at the lowest model level'
        stdname  = 'diagnostic_CO2_lowest_level'
        units    = '1e-6 mol/mol'
        call fldList_AddMetadata(fldname='Sa_co2diag', longname=longname, stdname=stdname, units=units)
-       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2diag', index=n1)
+       call fldList_AddFld(fldListFr(compatm)%flds, 'Sa_co2diag', fldindex=n1)
        call fldList_AddFld(fldListTo(complnd)%flds, 'Sa_co2diag')
        call fldList_AddFld(fldListTo(compocn)%flds, 'Sa_co2diag')
-       call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd, mapbilnr, 'one', atm2lnd_smapfile)
-       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn, mapbilnr, 'one', atm2ocn_smapfile)
+       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+       call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)
 
        longname = 'Surface flux of CO2 from land'
        stdname  = 'surface_upward_flux_of_carbon_dioxide_where_land'
        units    = 'moles m-2 s-1'
        call fldList_AddMetadata(fldname='Fall_fco2_lnd', longname=longname, stdname=stdname, units=units)
        call fldList_AddMetadata(fldname='Faxx_fco2_lnd', longname=longname, stdname=stdname, units=units)
-       call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_fco2_lnd', index=n1)
+       call fldList_AddFld(fldListFr(complnd)%flds, 'Fall_fco2_lnd', fldindex=n1)
        call fldList_AddFld(fldListTo(compatm)%flds, 'Faxx_fco2_lnd', merge_with_weights=.true.)
-       call fldlist_AddMap(fldListFr(complnd)%flds(n1), compatm, mapconsf, 'one', atm2lnd_smapfile)
+       call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'one', atm2lnd_smapname)
 
        longname = 'Surface flux of CO2 from ocean'
        stdname  = 'surface_upward_flux_of_carbon_dioxide_where_open_sea'
        units    = 'moles m-2 s-1'
        call fldList_AddMetadata(fldname='Fall_fco2_lnd', longname=longname, stdname=stdname, units=units)
        call fldList_AddMetadata(fldname='Faxx_fco2_lnd', longname=longname, stdname=stdname, units=units)
-       call fldList_AddFld(fldListFr(complcn)%flds, 'Faoo_fco2_ocn', index=n1)
+       call fldList_AddFld(fldListFr(complnd)%flds, 'Faoo_fco2_ocn', fldindex=n1)
        call fldList_AddFld(fldListTo(compatm)%flds, 'Faxx_fco2_ocn', merge_with_weights=.true.)
-       call fldlist_AddMap(fldListFr(compocn)%flds(n1), compatm, mapconsf, 'one', ocn2atm_smapfile)
+       call fldlist_AddMap(fldListFr(compocn)%flds(n1), compocn, compatm, mapconsf, 'one', ocn2atm_smapname)
 
     endif
 
@@ -2419,9 +2269,9 @@ contains
           stdname  = 'sea_ice_area_fraction'
           units    = '1'
           call fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
-          call fldList_AddFld(fldListFr(compice)%flds, trim(name), index=n1)
+          call fldList_AddFld(fldListFr(compice)%flds, trim(name), fldindex=n1)
           call fldList_AddFld(fldListTo(compocn)%flds, trim(name))
-          call fldlist_AddMap(fldListFr(compice)%flds(n1), compocn,  mapfcopy)
+          call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
           ! Net shortwave radiation
           name = 'PFioi_swpen_ifrac_' // cnum
@@ -2429,9 +2279,9 @@ contains
           stdname  = 'product_of_net_downward_shortwave_flux_at_sea_water_surface_and_sea_ice_area_fraction'
           units    = 'W m-2'
           call fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
-          call fldList_AddFld(fldListFr(compice)%flds, trim(name), index=n1)
+          call fldList_AddFld(fldListFr(compice)%flds, trim(name), fldindex=n1)
           call fldList_AddFld(fldListTo(compocn)%flds, trim(name))
-          call fldlist_AddMap(fldListFr(compice)%flds(n1), compocn,  mapfcopy)
+          call fldlist_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
        end do
 
        ! Fractional atmosphere coverage wrt ocean
@@ -2458,7 +2308,7 @@ contains
        units = 'W m-2'
        call fldList_AddMetadata(fldname='Foxx_swnet_afracr', longname=longname, stdname=stdname, units=units)
        call fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_swnet_afracr')
-       ! ???? add mapping
+       ! TODO: add mapping
 
     endif
 
@@ -2474,11 +2324,11 @@ contains
        units    = 'm3/m3'
        num = shr_string_listGetNum(carma_fields)
        do n = 1,num
-          call shr_string_listGetName(carm_fields, n, name)
+          call shr_string_listGetName(carma_fields, n, name)
           call fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
-          call fldList_AddFld(fldListFr(complnd)%flds, trim(name), index=n1)
+          call fldList_AddFld(fldListFr(complnd)%flds, trim(name), fldindex=n1)
           call fldList_AddFld(fldListTo(compatm)%flds, trim(name))
-          call fldlist_AddMap(fldListFr(complnd)%flds(n1), compatm, mapconsf, 'one', lnd2atm_smapfile)
+          call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'one', lnd2atm_smapname)
        enddo
     endif
 
@@ -2495,9 +2345,9 @@ contains
        do n = 1,num
           call shr_string_listGetName(megan_voc_fields, n, name)
           call fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
-          call fldList_AddFld(fldListFr(complnd)%flds, trim(name), index=n1)
+          call fldList_AddFld(fldListFr(complnd)%flds, trim(name), fldindex=n1)
           call fldList_AddFld(fldListTo(compatm)%flds, trim(name))
-          call fldlist_AddMap(fldListFr(complnd)%flds(n1), compatm, mapconsf, 'one', atm2lnd_smapfile)
+          call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'one', atm2lnd_smapname)
        enddo
     endif
 
@@ -2515,9 +2365,9 @@ contains
        do n = 1,num
           call shr_string_listGetName(fire_emis_fields, n, name)
           call fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
-          call fldList_AddFld(fldListFr(complnd)%flds, trim(name), index=n1)
+          call fldList_AddFld(fldListFr(complnd)%flds, trim(name), fldindex=n1)
           call fldList_AddFld(fldListTo(compatm)%flds, trim(name))
-          call fldlist_AddMap(fldListFr(complnd)%flds(n1), compatm, mapconsf, 'one', lnd2atm_smapfile)
+          call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'one', lnd2atm_smapname)
        enddo
 
        name = trim(shr_fire_emis_ztop_token)
@@ -2525,9 +2375,9 @@ contains
        stdname  = 'fire_plume_top'
        units    = 'm'
        call fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
-       call fldList_AddFld(fldListFr(complnd)%flds, trim(name), index=n1)
+       call fldList_AddFld(fldListFr(complnd)%flds, trim(name), fldindex=n1)
        call fldList_AddFld(fldListTo(compatm)%flds, trim(name))
-       call fldlist_AddMap(fldListFr(complnd)%flds(n1), compatm, mapconsf, 'one', lnd2atm_smapfile)
+       call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'one', lnd2atm_smapname)
     endif
 
     !-----------------------------------------------------------------------------
@@ -2545,11 +2395,11 @@ contains
        stdname  = 'drydep_vel'
        units    = 'cm/sec'
        do n = 1,num
-          call shr_string_listGetName(drydepfields, n, name)
+          call shr_string_listGetName(drydep_fields, n, name)
           call fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
-          call fldList_AddFld(fldListFr(complnd)%flds, trim(name), index=n1)
+          call fldList_AddFld(fldListFr(complnd)%flds, trim(name), fldindex=n1)
           call fldList_AddFld(fldListTo(compatm)%flds, trim(name))
-          call fldlist_AddMap(fldListFr(complnd)%flds(n1), compatm, mapconsf, 'one', lnd2atm_smapfile)
+          call fldlist_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf, 'one', lnd2atm_smapname)
        enddo
     endif
     call seq_drydep_init( )
@@ -2569,106 +2419,94 @@ contains
        do n = 1,num
           call shr_string_listGetName(ndep_fields, n, name)
           call fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
-          call fldList_AddFld(fldListFr(compatm)%flds, trim(name), index=n1)
+          call fldList_AddFld(fldListFr(compatm)%flds, trim(name), fldindex=n1)
           call fldList_AddFld(fldListTo(compatm)%flds, trim(name))
           call fldList_AddFld(fldListTo(compocn)%flds, trim(name))
-          call fldlist_AddMap(fldListFr(compatm)%flds(n1), complnd mapbilnr, 'one', atm2lnd_smapfile)
-          call fldlist_AddMap(fldListFr(compatm)%flds(n1), compocn mapbilnr, 'one', atm2ocn_smapfile)
+          call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
+          call fldlist_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)
        enddo
     end if
 
     !----------------------------------------------------------------------------
-    ! state + flux fields
+    ! creation of colon delimited field list
     !----------------------------------------------------------------------------
 
     ! Determine character list of fields
-    call fldList_concat(fldListFr(compatm), fldListTo(compatm), flds_a2x, flds_x2a)
-    call fldList_concat(fldListFr(complnd), fldListTo(complnd), flds_l2x, flds_x2l)
-    call fldList_concat(fldListFr(compice), fldListTo(compice), flds_i2x, flds_x2i)
-    call fldList_concat(fldListFr(compocn), fldListTo(compocn), flds_o2x, flds_x2o)
-    call fldList_concat(fldListFr(compglc), fldListTo(compglc), flds_g2x, flds_x2g)
-    call fldList_concat(fldListFr(comprof), fldListTo(comprof), flds_r2x, flds_x2r)
-    call fldList_concat(fldListFr(compwav), fldListTo(compwav), flds_w2x, flds_x2w)
-
-    do n = 1,size(FldListXao_ocnalb_o)
-       if (trim(flds_xao_ocnalb) == '') then
-          flds_xao_ocnalb = trim(FldListXao_ocnalb_o(n)%shortname)
-       else
-          flds_xao_ocnalb = trim(flds_xao_ocnalb//':'//trim(FldListXao_ocnalb_o(n)%shortname)
-       end if
-    end do
-    if (len_trim(flds_xao_ocnalb) >= CXX) then
-       write(llogunit,*)'fields are = ',trim(flds_xao_ocnalb)
-       write(llogunit,*)'fields length = ',len_trim(flds_xao_ocnalb)
-       call shr_sys_abort(subname//'ERROR: maximum length of xxx or xxx has been exceeded')
-    end if
-
-    do n = 1,size(FldListXao_fluxes_o)
-       if (trim(flds_xao_fluxes) == '') then
-          flds_xao_fluxes = trim(FldListXao_fluxes_o(n)%shortname)
-       else
-          flds_xao_fluxes = trim(flds_xao_fluxes//':'//trim(FldListXao_fluxes_o(n)%shortname)
-       end if
-    end do
-    if (len_trim(flds_xao_fluxes) >= CXX) then
-       write(llogunit,*)'fields are = ',trim(flds_xao_fluxes)
-       write(llogunit,*)'fields length = ',len_trim(flds_xao_fluxes)
-       call shr_sys_abort(subname//'ERROR: maximum length of xxx or xxx has been exceeded')
-    end if
-
+    concatFr = ''; concatTo = ''
+    call shr_nuopc_fldList_Concat(fldListFr(compatm), fldListTo(compatm), concatFr, concatTo)
     if (mastertask) then
-       write(llogunit, "(A)") subname//': flds_a2x        = ',trim(flds_a2x)
+       write(llogunit, "(A)") subname//': flds_a2x        = ',trim(concatFr)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2a        = ',trim(flds_x2a)
+       write(llogunit, "(A)") subname//': flds_x2a        = ',trim(concatTo)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_l2x        = ',trim(flds_l2x)
+    end if
+    concatFr = ''; concatTo = ''
+    call shr_nuopc_fldList_Concat(fldListFr(complnd), fldListTo(complnd), concatFr, concatTo)
+    if (mastertask) then
+       write(llogunit, "(A)") subname//': flds_l2x        = ',trim(concatFr)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2l        = ',trim(flds_x2l)
+       write(llogunit, "(A)") subname//': flds_x2l        = ',trim(concatTo)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_i2x        = ',trim(flds_i2x)
+    end if
+    concatFr = ''; concatTo = ''
+    call shr_nuopc_fldList_Concat(fldListFr(compice), fldListTo(compice), concatFr, concatTo)
+    if (mastertask) then
+       write(llogunit, "(A)") subname//': flds_i2x        = ',trim(concatFr)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2i        = ',trim(flds_x2i)
+       write(llogunit, "(A)") subname//': flds_x2i        = ',trim(concatTo)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_o2x        = ',trim(flds_o2x)
+    end if
+    concatFr = ''; concatTo = ''
+    call shr_nuopc_fldList_Concat(fldListFr(compocn), fldListTo(compocn), concatFr, concatTo)
+    if (mastertask) then
+       write(llogunit, "(A)") subname//': concatFr        = ',trim(concatFr)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2o        = ',trim(flds_x2o)
+       write(llogunit, "(A)") subname//': concatTo        = ',trim(concatTo)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_g2x        = ',trim(flds_g2x)
+    end if
+    concatFr = ''; concatTo = ''
+    call shr_nuopc_fldList_Concat(fldListFr(compglc), fldListTo(compglc), concatFr, concatTo)
+    if (mastertask) then
+       write(llogunit, "(A)") subname//': concatFr        = ',trim(concatFr)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2g        = ',trim(flds_x2g)
+       write(llogunit, "(A)") subname//': concatTo        = ',trim(concatTo)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_r2x        = ',trim(flds_r2x)
+    end if
+    concatFr = ''; concatTo = ''
+    call shr_nuopc_fldList_Concat(fldListFr(comprof), fldListTo(comprof), concatFr, concatTo)
+    if (mastertask) then
+       write(llogunit, "(A)") subname//': concatFr        = ',trim(concatFr)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2r        = ',trim(flds_x2r)
+       write(llogunit, "(A)") subname//': concatTo        = ',trim(concatTo)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_w2x        = ',trim(flds_w2x)
+    end if
+    concatFr = ''; concatTo = ''
+    call shr_nuopc_fldList_Concat(fldListFr(compwav), fldListTo(compwav), concatFr, concatTo)
+    if (mastertask) then
+       write(llogunit, "(A)") subname//': concatFr        = ',trim(concatFr)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2w        = ',trim(flds_x2w)
+       write(llogunit, "(A)") subname//': concatTo        = ',trim(concatTo)
        write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_xao_fluxes = ',trim(flds_xao_fluxes)
-       write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_xao_ocnalb = ',trim(flds_xao_ocnalb)
-       write(llogunit, "(A)") '-------------------------------------------------'
-      !write(llogunit, "(A)") subname//': flds_xao_diurnl = ',trim(flds_xao_diurnl)
     end if
 
   end subroutine shr_nuopc_fldList_Init
 
   !===============================================================================
 
-  subroutine fldList_concat_entry(fldsFr, fldsTo, concat_src, concat_dst)
+  subroutine shr_nuopc_fldList_Concat(fldsFr, fldsTo, concat_src, concat_dst)
     ! Returns new concatentated colon delimited field lists
-
+    
     ! input/output parameters:
-    type(src_fldlist_type), intent(in) :: fldsFr
-    type(dst_fldlist_type), intent(in) :: fldsTo
-    character(len=*) , intent(inout) :: concat_src
-    character(len=*) , intent(inout) :: concat_dst
-
+    type(shr_nuopc_fldList_src_type) , intent(in)    :: fldsFr
+    type(shr_nuopc_fldList_dst_type) , intent(in)    :: fldsTo
+    character(len=*)                 , intent(inout) :: concat_src
+    character(len=*)                 , intent(inout) :: concat_dst
+    
     ! local variables
-    character(len=*),parameter :: subname = '(fldList_concat) '
+    integer :: n
+    character(len=*),parameter :: subname = '(shr_nuopc_fldList_concat) '
     !-------------------------------------------------------------------------------
-
+    
     do n = 1,size(FldsFr%flds)
        if (trim(concat_src) == '') then
           concat_src = trim(FldsFr%flds(n)%shortname)
@@ -2676,13 +2514,12 @@ contains
           concat_src = trim(concat_dst)//':'//trim(FldsFr%flds(n)%shortname)
        end if
     end do
-
     if (len_trim(concat_src) >= CXX) then
        write(llogunit,*)'fields are = ',trim(concat_src)
        write(llogunit,*)'fields length = ',len_trim(concat_src)
        call shr_sys_abort(subname//'ERROR: maximum length of xxx or xxx has been exceeded')
     end if
-
+    
     do n = 1,size(FldsTo%flds)
        if (trim(concat_dst) == '') then
           concat_dst = trim(FldsTo%flds(n)%shortname)
@@ -2690,39 +2527,36 @@ contains
           concat_dst = trim(concat_dst)//':'//trim(FldsFr%flds(n)%shortname)
        end if
     end do
-
     if (len_trim(concat_src) >= CXX) then
        write(llogunit,*)'fields are = ',trim(concat_src)
        write(llogunit,*)'fields length = ',len_trim(concat_src)
        call shr_sys_abort(subname//'ERROR: maximum length of xxx or xxx has been exceeded')
     end if
+    
+  contains  !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  end subroutine fldList_concat_entry
+    subroutine fldList_concat_string(fldname, fldlist_string)
+      character(len=*), intent(in)    :: fldname
+      character(len=*), intent(inout) :: fldlist_string
+      
+      ! local variables
+      character(len=*),parameter :: subname = '(fldList_concat_string) '
+      !-------------------------------------------------------------------------------
+      
+      ! Returns new concatentated colon delimited field lists
+      if (trim(fldlist_string) == '') then
+         fldlist_string = trim(fldname)
+      else
+         fldlist_string = trim(fldlist_string)//':'//trim(fldname)
+      end if
+      if (len_trim(fldlist_string) >= CXX) then
+         write(llogunit,*)'fields are = ',trim(fldlist_string)
+         write(llogunit,*)'fields length = ',len_trim(fldlist_string)
+         call shr_sys_abort(subname//'ERROR: maximum length of xxx or xxx has been exceeded')
+      end if
+    end subroutine fldList_concat_string
 
-  subroutine fldList_concat_string(fldname, fldlist_string
-    ! Returns new concatentated colon delimited field lists
-
-    ! input/output parameters:
-    character(len=*), intent(in) :: fldname
-    character(len=*), intent(inout) :: fldlist_string
-
-    ! local variables
-    character(len=*),parameter :: subname = '(fldList_concat) '
-    !-------------------------------------------------------------------------------
-
-    if (trim(fldlist) == '') then
-       fldlist_string = trim(fldname)
-    else
-       fldlist_string = trim(fldlist_string)//':'//trim(fldname)
-    end if
-
-    if (len_trim(fldlist_string) >= CXX) then
-       write(llogunit,*)'fields are = ',trim(fldlist_string)
-       write(llogunit,*)'fields length = ',len_trim(fldlist_string)
-       call shr_sys_abort(subname//'ERROR: maximum length of xxx or xxx has been exceeded')
-    end if
-
-  end subroutine fldList_concat_string
+  end subroutine shr_nuopc_fldList_Concat
 
   !===============================================================================
 
@@ -2760,11 +2594,11 @@ contains
   end subroutine fldList_AddDomain
 
   !===============================================================================
-
-  subroutine fldList_AddMetadata(attname , longname, stdname, units)
+  
+  subroutine fldList_AddMetadata(fldname , longname, stdname, units)
 
     ! input/output parameters:
-    character(len=*), intent(in) :: attname
+    character(len=*), intent(in) :: fldname
     character(len=*), intent(in) :: longname
     character(len=*), intent(in) :: stdname
     character(len=*), intent(in) :: units
@@ -2774,124 +2608,103 @@ contains
     character(len=*),parameter :: subname = '(fldList_AddMetadata) '
     !-------------------------------------------------------------------------------
 
-    ! If the attname passed in contains colons it is assumed to be a list of fields
+    ! If the fldname passed in contains colons it is assumed to be a list of fields
     ! all of which have the same names and units
 
-    i = index(attname,':')
+    i = index(fldname,':')
     j=1
 
-    do while(i>j .and. i<=len_trim(attname))
-       if (fld_metadata_entry(attname(j:i-1)) <= 0) then
+    do while(i>j .and. i<=len_trim(fldname))
+       if (metadata_entry(fldname(j:i-1)) <= 0) then
           n_entries = n_entries + 1
-          metadta_entry(n_entries,1) = attname(j:i-1)
-          metadta_entry(n_entries,2) = trim(longname)
-          metadta_entry(n_entries,3) = trim(stdname )
-          metadta_entry(n_entries,4) = trim(units   )
+          metadata_entry(n_entries,1) = fldname(j:i-1)
+          metadata_entry(n_entries,2) = trim(longname)
+          metadata_entry(n_entries,3) = trim(stdname )
+          metadata_entry(n_entries,4) = trim(units   )
           j=i+1
-          i =  index(attname(j:),':') + j - 1
+          i =  index(fldname(j:),':') + j - 1
        endif
     enddo
-    if (fld_metadata_entry(attname(j:i)) <= 0) then
+    if (metadata_entry(fldname(j:i)) <= 0) then
        n_entries = n_entries + 1
-       i = len_trim(attname)
-       metadta_entry(n_entries,1) = attname(j:i)
-       metadta_entry(n_entries,2) = trim(longname)
-       metadta_entry(n_entries,3) = trim(stdname )
-       metadta_entry(n_entries,4) = trim(units   )
+       i = len_trim(fldname)
+       metadata_entry(n_entries,1) = fldname(j:i)
+       metadata_entry(n_entries,2) = trim(longname)
+       metadata_entry(n_entries,3) = trim(stdname )
+       metadata_entry(n_entries,4) = trim(units   )
     endif
 
     if (n_entries .ge. nmax) then
-       write(llogunit,*)'n_entries= ',n_entries,' nmax = ',nmax,' attname= ',trim(attname)
-       call shr_sys_abort(subname//'ERROR: nmax fields in metadta_entry table exceeded')
+       write(llogunit,*)'n_entries= ',n_entries,' nmax = ',nmax,' fldname= ',trim(fldname)
+       call shr_sys_abort(subname//'ERROR: nmax fields in metadata_entry table exceeded')
     end if
 
   end subroutine fldList_AddMetadata
 
   !================================================================================
 
-  subroutine fldList_AddFld_Src(fldlist, stdname, transferOffer, tag, shortname, index, rc)
+  subroutine fldList_AddFld_Src(flds, stdname, shortname, fldindex)
     ! ----------------------------------------------
-    ! Set up a list of field information
+    ! Add an entry to to the flds array
     ! Use pointers to create an extensible allocatable array.
-    ! o allow the size of fldlist to grow, the process for
+    ! to allow the size of flds to grow, the process for
     ! adding a new field is:
-    !
-    ! 1) allocate new_fldlist to be N (one element larger than fldlist)
-    ! 2) copy fldlist into first N-1 elements of new_fldlist
-    ! 3) newest fldlist entry is Nth element of new_fldlist
-    ! 4) deallocate / nullify fldlist
-    ! 5) point fldlist => new_sfo
+    ! 1) allocate newflds to be N (one element larger than flds)
+    ! 2) copy flds into first N-1 elements of newflds
+    ! 3) newest flds entry is Nth element of newflds
+    ! 4) deallocate / nullify flds
+    ! 5) point flds => newflds
     ! ----------------------------------------------
 
-    type(shr_nuopc_src_fldList_type) , intent(inout)              :: fldlist(:)
-    character(len=*)                 , intent(in)                 :: stdname
-    character(len=*)                 , intent(in)    , optional   :: tag
-    character(len=*)                 , intent(in)    , optional   :: shortname
-    integer                          , intent(out)   , optional   :: index
-    integer                          , intent(inout)              :: rc
+    type(shr_nuopc_fldList_src_entry_type) , pointer                    :: flds(:)
+    character(len=*)                       , intent(in)                 :: stdname
+    character(len=*)                       , intent(in)    , optional   :: shortname
+    integer                                , intent(out)   , optional   :: fldindex
 
     ! local variables
     integer :: n,oldsize,id
-    type(shr_nuopc_src_entry_type), pointer :: new_fldList(:)
+    type(shr_nuopc_fldList_src_entry_type), pointer :: newflds(:)
     character(len=*), parameter :: subname='(fldList_AddFld_Src)'
     ! ----------------------------------------------
 
-    rc = ESMF_SUCCESS
-
-    if (.not.associated(fldlist)) then
-       call ESMF_LogWrite(trim(subname)//":"//trim(tag)//&
-            " ERROR in fldlist, call fldList_Zero first "//trim(stdname), &
-            ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
-       rc = ESMF_FAILURE
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (.not.associated(flds)) then
+       call shr_sys_abort(trim(subname) // "flds is not associated")
     end if
 
-    oldsize = size(fldlist%flds)
+    oldsize = size(flds)
     id = oldsize + 1
 
-    if (associated(fldlist%flds)) then
-       oldsize = size(fldlist%flds)
+    if (associated(flds)) then
+       oldsize = size(flds)
     else
        oldsize = 0
     end if
     id = oldsize + 1
 
-    ! 1) allocate new_fldList to be size (one element larger than this%state)
-    allocate(new_fldList%flds(id))
+    ! 1) allocate newfld to be size (one element larger than input flds)
+    allocate(newflds(id))
 
-    ! 2) copy fldList into first N-1 elements of new_state
+    ! 2) copy flds into first N-1 elements of newflds
     do n = 1,oldsize
-       new_fldlist%flds(n)%stdname           = fldlist(n)%stdname
-       new_fldlist(n)%flds(n)%shortname      = fldlist(n)%shortname
-       new_fldlist%flds(n)(n)%transfer_offer = fldlist(n)%transfer_offer
-       new_fldlist%flds(n)(n)%tag            = fldlist(n)%tag
-       new_fldlist%flds(n)(n)%mapname        = fldlist(n)%mapname
-       new_fldlist%flds(n)(n)%mapnorm        = fldlist(n)%mapnorm
+       newflds(n)%stdname   = flds(n)%stdname
+       newflds(n)%shortname = flds(n)%shortname
+       newflds(n)%mapindex  = flds(n)%mapindex
+       newflds(n)%mapnorm   = flds(n)%mapnorm
     end do
 
-    ! 3) deallocate / nullify fldlist
+    ! 3) deallocate / nullify flds
     if (oldsize >  0) then
-       deallocate(fldlist%flds)
-       nullify(fldlist%flds)
+       deallocate(flds)
+       nullify(flds)
     end if
 
-    ! 4) point fldlist => new_fldlist
-    fldlist%flds => new_fldlist%flds
+    ! 4) point flds => new_flds
+    flds => newflds
 
-    ! 5) now update fldlist information for new entry
-    if (.not. present(transfer_offer)) then
-       transfer_offer= 'unset'
-    end if
-    if (.not. present(tag)) then
-       tag = 'unset'
-    end if
-    if (.not. present(shortname)) then
-       shortname = trim(stdname)
-    end if
-    fldlist%flds(id)%stdname            = trim(stdname)
-    fldlist%flds(id)%shortname          = trim(shortname)
-    fldlist%flds(id)%transferOffer(num) = trim(transferOffer)
-    fldlist%flds(id)%tag(num)           = trim(tag)
+    ! 5) now update flds information for new entry
+    if (.not. present(shortname)) shortname = trim(stdname)
+    flds(id)%stdname   = trim(stdname)
+    flds(id)%shortname = trim(shortname)
 
     if (present(fldindex)) then
        fldindex = id
@@ -2901,184 +2714,120 @@ contains
 
   !================================================================================
 
-  subroutine fldList_AddFld_Dst(fldlist, stdname, transferOffer, tag, shortname,  merge_with_weights, rc)
+  subroutine fldList_AddFld_Dst(flds, stdname, shortname,  merge_with_weights)
 
     ! ----------------------------------------------
-    ! Set up a list of field information
+    ! Add an entry to to the flds array
     ! Use pointers to create an extensible allocatable array.
-    ! o allow the size of fldlist to grow, the process for
+    ! to allow the size of flds to grow, the process for
     ! adding a new field is:
-    !
-    ! 1) allocate new_fldlist to be N (one element larger than fldlist)
-    ! 2) copy fldlist into first N-1 elements of new_fldlist
-    ! 3) newest fldlist entry is Nth element of new_fldlist
-    ! 4) deallocate / nullify fldlist
-    ! 5) point fldlist => new_sfo
+    ! 1) allocate newflds to be N (one element larger than flds)
+    ! 2) copy flds into first N-1 elements of newflds
+    ! 3) newest flds entry is Nth element of newflds
+    ! 4) deallocate / nullify flds
+    ! 5) point flds => newflds
     ! ----------------------------------------------
 
-    type (shr_nuopc_dst_fldlist_type) , intent(inout)         :: fldlist(:)
-    logical                           , intent(in) , optional :: merge_with_weights
-    character(len=*)                  , intent(in)            :: stdname
-    character(len=*)                  , intent(in) , optional :: transferOffer
-    character(len=*)                  , intent(in) , optional :: tag
-    character(len=*)                  , intent(in) , optional :: shortname
-    integer                           , intent(inout)         :: rc
+    type (shr_nuopc_fldList_dst_entry_type) , pointer               :: flds(:)
+    character(len=*)                        , intent(in)            :: stdname
+    character(len=*)                        , intent(in) , optional :: shortname
+    logical                                 , intent(in) , optional :: merge_with_weights
 
     ! local variables
     integer :: n,oldsize,id
-    type(shr_nuopc_dst_entry_type), pointer :: new_fldList(:)
+    type(shr_nuopc_fldList_dst_entry_type), pointer :: newflds(:)
     character(len=*), parameter :: subname='(fldList_AddFld_Dst)'
     ! ----------------------------------------------
 
-    rc = ESMF_SUCCESS
-
-    if (.not.associated(fldlist)) then
-       call ESMF_LogWrite(trim(subname)//":"//trim(tag)//&
-            " ERROR in fldlist, call fldList_Zero first "//trim(stdname), &
-            ESMF_LOGMSG_ERROR, line=__LINE__, file=__FILE__, rc=dbrc)
-       rc = ESMF_FAILURE
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (.not.associated(flds)) then
+       call shr_sys_abort(trim(subname) // "flds is not associated in ")
     end if
 
-    oldsize = size(fldlist%flds)
+    oldsize = size(flds)
     id = oldsize + 1
 
-    if (associated(fldlist%flds)) then
-       oldsize = size(fldlist%flds)
+    if (associated(flds)) then
+       oldsize = size(flds)
     else
        oldsize = 0
     end if
     id = oldsize + 1
 
-    ! 1) allocate new_fldList to be size (one element larger than this%state)
-    allocate(new_fldList%flds(id))
+    ! 1) allocate newflds to be one element larger than flds
+    allocate(newflds(id))
 
-    ! 2) copy fldList into first N-1 elements of new_state
+    ! 2) copy flds into first N-1 elements of newflds
     do n = 1,oldsize
-       new_fldlist%flds(n)%stdname           = fldlist(n)%stdname
-       new_fldlist(n)%flds(n)%shortname      = fldlist(n)%shortname
-       new_fldlist%flds(n)(n)%transfer_offer = fldlist(n)%transfer_offer
-       new_fldlist%flds(n)(n)%tag            = fldlist(n)%tag
-       new_fldlist%flds(n)(n)%merge_with_weights = fldlist(n)%merge_with_weights
+       newflds(n)%stdname           = flds(n)%stdname
+       newflds(n)%shortname         = flds(n)%shortname
+       newflds(n)%merge_with_weight = flds(n)%merge_with_weight
     end do
 
-    ! 3) deallocate / nullify fldlist
+    ! 3) deallocate / nullify flds
     if (oldsize >  0) then
-       deallocate(fldlist%flds)
-       nullify(fldlist%flds)
+       deallocate(flds)
+       nullify(flds)
     end if
 
-    ! 4) point fldlist => new_fldlist
-    fldlist%flds => new_fldlist%flds
+    ! 4) point flds => newflds
+    flds => newflds
 
-    ! 5) now update fldlist information for new entry
-    if (.not. present(transfer_offer)) then
-       transfer_offer= 'unset'
-    end if
-    if (.not. present(tag)) then
-       tag = 'unset'
-    end if
-    if (.not. present(shortname)) then
-       shortname = trim(stdname)
-    end if
-    fldlist%flds(id)%stdname            = trim(stdname)
-    fldlist%flds(id)%shortname          = trim(shortname)
-    fldlist%flds(id)%transferOffer(num) = trim(transferOffer)
-    fldlist%flds(id)%tag(num)           = trim(tag)
+    ! 5) now update flds information for new entry
+    if (.not. present(shortname)) shortname = trim(stdname)
+    flds(id)%shortname          = trim(shortname)
+    flds(id)%stdname            = trim(stdname)
 
     if (present(merge_with_weights)) then
-       fldlist%flds(id)%merge_with_weights = merge_with_weights
+       flds(id)%merge_with_weights = merge_with_weights
     end if
 
   end subroutine fldList_AddFld_Dst
 
   !================================================================================
 
-  subroutine fldListAddMap(fld, destcomp, mapindex, mapnorm, mapfile)
-    type(shr_nuopc_src_entry_type) , intent(inout) :: fld
-    integer                        , intent(in)    :: destcomp
-    integer                        , intent(in)    :: mapindex
-    character(len=*)               , intent(in)    :: mapnorm
-    character(len=*)               , intent(in)    :: mapfile
-
-    if (mapfile == 'idmap') then
-       fld%mapfile(destcomp) = 'unset'
-       fld%mapindex(destcomp) = mapfcopy
-    else
-       fld%mapfile(destcomp) = mapfile
-       fld%mapindex(destcomp) = mapindex
-    end if
-    fld%mapnorm(destcomp) = mapnorm
-
-  end subroutine fldListAddMap
-
-  !================================================================================
-
-  subroutine shr_nuopc_fldList_Advertise(state, frFldList, toFldList, transferOffer, tag, rc)
-
-    type(ESMF_State)               , intent(inout)     :: state
-    type(shr_nuopc_src_entry_type) , pointer, optional :: frFldList(:)
-    type(shr_nuopc_dst_entry_type) , pointer, optional :: toFldList(:)
-    character(len=*)               , intent(in)        :: transferOffer
-    character(len=*)               , intent(in)        :: tag
-    integer                        , intent(inout)     :: rc
-
+  subroutine fldList_AddMap(fld, srccomp, destcomp, mapindex, mapnorm, mapfile)
+    type(shr_nuopc_fldList_src_entry_type) , intent(inout) :: fld
+    integer                                , intent(in)    :: srccomp
+    integer                                , intent(in)    :: destcomp
+    integer                                , intent(in)    :: mapindex
+    character(len=*)                       , intent(in)    :: mapnorm
+    character(len=*)                       , intent(in)    :: mapfile
+    
     ! local variables
-    integer       :: n, nflds
-    character(CS) :: units
-    character(ESMF_MAXSTR), pointer :: StandardNameList(:)
-    character(ESMF_MAXSTR), pointer :: ConnectedList(:)
-    character(ESMF_MAXSTR), pointer :: NameSpaceList(:)
-    character(ESMF_MAXSTR), pointer :: itemNameList(:)
-    character(len=*),parameter  :: subname='(shr_nuopc_fldList_Advertise)'
+    logical :: mapset 
+    character(len=*),parameter  :: subname='(fldList_AddMap)'
     ! ----------------------------------------------
 
-    rc = ESMF_SUCCESS
+    ! Note - default values are already set for the fld entries - so only non-default
+    ! values need to be set below
+    ! If mapindex is mapfcopy - create a redistribution route handle
+    ! If mapfile is idmap - create a redistribution route nhandle
+    ! If mapfile is unset then create the mapping route handle at run time
 
-    if (.not. present(frFlds) .and. .not. present(toFlds)) then
-       call ESMF_LogWrite(trim(subname)//trim(tag)//": ERROR either frFlds or toFlds argument must be provided", &
-            ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
-      rc = ESMF_FAILURE
-      return
-    endif
+    fld%mapindex(destcomp) = mapindex
+    fld%mapfile(destcomp)  = trim(mapfile)
+    fld%mapnorm(destcomp)  = trim(mapnorm)
 
-    if (present(frFldList)) then
-       nflds = size(frFldList%flds)
-    else
-       nflds = size(ToFldList%flds)
+    ! overwrite values if appropriate
+    if (fld%mapindex(destcomp) == mapfcopy) then
+       fld%mapfile(destcomp) = 'unset'
+       fld%mapnorm(destcomp) = 'unset'
+    else if (trim(fld%mapfile(destcomp)) == 'idmap') then
+       fld%mapindex(destcomp) = fmapcopy
+       fld%mapnorm(destcomp) = 'unset'
     end if
-
-    do n = 1, nflds
-       if (present(frFldList)) then
-          shortname = frFldList%flds(n)%shortname
-          stdname = frFldList%flds(n)%stdname
-       else
-          shortname = toFldList%flds(n)%shortname
-          shortname = toFldList%flds(n)%stdname
-       end if
-
-       call ESMF_LogWrite(subname//':'//trim(tag)//':'//trim(stdname), ESMF_LOGMSG_INFO)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-
-       call NUOPC_Advertise(state, &
-            standardName=trim(stdname), shortname=trim(shortname), name=trim(shortname), &
-            TransferOfferGeomObject=transferOffer)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    enddo
-
-  end subroutine shr_nuopc_fldList_Advertise
+  end subroutine fldList_AddMap
 
   !================================================================================
 
-  subroutine shr_nuopc_fldList_Realize(state, grid, mesh, fldListFr, fldListTo, tag, rc)
-
-    type(ESMF_State)                  , intent(inout)         :: state
-    type(ESMF_Grid)                   , intent(in) , optional :: grid
-    type(ESMF_Mesh)                   , intent(in) , optional :: mesh
-    type(shr_nuopc_fldlist_entry_src) , pointer    , optional :: fldListFr(:)
-    type(shr_nuopc_fldlist_entry_dst) , pointer    , optional :: fldListTo(:)
-    character(len=*)                  , intent(in)            :: tag
-    integer                           , intent(inout)         :: rc
+  subroutine shr_nuopc_fldList_Realize(state, grid, mesh, fldsFr, fldsTo, tag, rc)
+    type(ESMF_State)                      , intent(inout)         :: state
+    type(ESMF_Grid)                       , intent(in) , optional :: grid
+    type(ESMF_Mesh)                       , intent(in) , optional :: mesh
+    type(shr_nuopc_fldlist_src_entry_type), pointer    , optional :: fldsfr(:)
+    type(shr_nuopc_fldlist_dst_entry_type), pointer    , optional :: fldsTo(:)
+    character(len=*)                      , intent(in)            :: tag
+    integer                               , intent(inout)         :: rc
 
     ! local variables
     integer                         :: n, nflds
@@ -3096,13 +2845,13 @@ contains
 
     rc = ESMF_SUCCESS
 
-    if (.not. present(fldListFr) .and. .not. present(fldListTo)) then
-       call ESMF_LogWrite(trim(subname)//trim(tag)//": ERROR either fldListFr or fldListTo argument must be provided as input", &
+    if (.not. present(fldsFr) .and. .not. present(fldsTo)) then
+       call ESMF_LogWrite(trim(subname)//trim(tag)//": ERROR either fldsFr or fldsTo argument must be provided as input", &
             ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
        rc = ESMF_FAILURE
        return
-    else if (present(fldListFr) .and. present(fldListTo) then
-       call ESMF_LogWrite(trim(subname)//trim(tag)//": ERROR FldListFr and fldListTo cannot both be provided as input", &
+    else if (present(fldsFr) .and. present(fldsTo)) then
+       call ESMF_LogWrite(trim(subname)//trim(tag)//": ERROR FldsFr and fldsTo cannot both be provided as input", &
             ESMF_LOGMSG_INFO, line=__LINE__, file=__FILE__, rc=dbrc)
        rc = ESMF_FAILURE
        return
@@ -3122,8 +2871,8 @@ contains
 
     call ESMF_StateGet(state, itemCount=itemCount, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    write(infostr,'(i6)') itemCount
 
+    write(infostr,'(i6)') itemCount
     call ESMF_LogWrite(trim(subname)//trim(tag)//" count = "//trim(infostr), ESMF_LOGMSG_INFO, rc=dbrc)
     if (itemCount > 0) then
        allocate(itemNameList(itemCount))
@@ -3160,18 +2909,17 @@ contains
     enddo
 #endif
 
-    if (present(fldListFr)) then
-       nflds = size(fldListFr%flds)
+    if (present(fldsFr)) then
+       nflds = size(fldsFr)
     else
-       nflds = size(fldListTo%flds)
+       nflds = size(fldsTo)
     end if
 
     do n = 1, nflds
-
-       if (present(fldListFr)) then
-          shortname = fldListFr%flds(n)%shortname
+       if (present(fldstFr)) then
+          shortname = fldsFr(n)%shortname
        else
-          shortname = fldListTo%flds(n)%shortname
+          shortname = fldsTo(n)%shortname
        end if
        ! call ESMF_LogWrite(subname//' fld = '//trim(shortname), ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -3192,7 +2940,7 @@ contains
              if (shortname == trim(flds_scalar_name)) then
                 call ESMF_LogWrite(trim(subname)//trim(tag)//" Field = "//trim(shortname)//" is connected on root pe", &
                      ESMF_LOGMSG_INFO, rc=dbrc)
-                call shr_nuopc_fldList_SetScalarField(field, rc=rc)
+                call SetScalarField(field, rc=rc)
                 if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
              elseif (present(grid)) then
                 call ESMF_LogWrite(trim(subname)//trim(tag)//" Field = "//trim(shortname)//" is connected using grid", &
@@ -3230,6 +2978,40 @@ contains
     end do
 
     call ESMF_LogWrite(subname//' done ', ESMF_LOGMSG_INFO, rc=dbrc)
+
+  contains  !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    subroutine SetScalarField(field, rc)
+      ! ----------------------------------------------
+      ! create a field with scalar data on the root pe
+      ! ----------------------------------------------
+      type(ESMF_Field), intent(inout)  :: field
+      integer,          intent(inout)  :: rc
+
+      ! local variables
+      type(ESMF_Distgrid) :: distgrid
+      type(ESMF_Grid)     :: grid
+      character(len=*), parameter :: subname='(SetScalarField)'
+      ! ----------------------------------------------
+
+      rc = ESMF_SUCCESS
+
+      ! create a DistGrid with a single index space element, which gets mapped onto DE 0.
+      distgrid = ESMF_DistGridCreate(minIndex=(/1/), maxIndex=(/1/), rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+      grid = ESMF_GridCreate(distgrid, rc=rc)
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+      field = ESMF_FieldCreate(name=trim(flds_scalar_name), &
+           grid=grid, &
+           typekind=ESMF_TYPEKIND_R8, &
+           ungriddedLBound=(/1/), &
+           ungriddedUBound=(/flds_scalar_num/), rc=rc)  ! num of scalar values
+      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+    end subroutine SetScalarField
+
   end subroutine shr_nuopc_fldList_Realize
 
 end module shr_nuopc_fldList_mod

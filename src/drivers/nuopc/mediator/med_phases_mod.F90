@@ -1555,7 +1555,7 @@ module med_phases_mod
        rc = ESMF_FAILURE
     end if
 
-    ! Calculate ocean albedoes on the ocean grid
+    ! Calculate ocean albedos on the ocean grid
     call med_ocnalb_run(gcomp, FBfrac_o=is_local%wrap%FBfrac(compocn), nextsw_cday=nextsw_cday, rc=rc)
 
     if (dbug_flag > 1) then
