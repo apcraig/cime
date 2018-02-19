@@ -12,7 +12,7 @@ module shr_nuopc_fldList_mod
   use shr_carma_mod     , only : shr_carma_readnl
   use shr_ndep_mod      , only : shr_ndep_readnl
   use shr_flds_mod      , only : shr_flds_dom_coord, shr_flds_dom_other
-  use shr_string_mod    , only : shr_string_listGetNum, shr_string_listGetName
+  use shr_string_mod    , only : shr_string_listGetNum, shr_string_listGetName, shr_string_lastindex
   use glc_elevclass_mod , only : glc_elevclass_init, glc_get_num_elevation_classes, glc_elevclass_as_string
 
   implicit none
@@ -2615,7 +2615,7 @@ contains
     j=1
 
     do while(i>j .and. i<=len_trim(fldname))
-       if (metadata_entry(fldname(j:i-1)) <= 0) then
+       if (get_metadata_entry(fldname(j:i-1)) <= 0) then
           n_entries = n_entries + 1
           metadata_entry(n_entries,1) = fldname(j:i-1)
           metadata_entry(n_entries,2) = trim(longname)
@@ -2625,7 +2625,7 @@ contains
           i =  index(fldname(j:),':') + j - 1
        endif
     enddo
-    if (metadata_entry(fldname(j:i)) <= 0) then
+    if (get_metadata_entry(fldname(j:i)) <= 0) then
        n_entries = n_entries + 1
        i = len_trim(fldname)
        metadata_entry(n_entries,1) = fldname(j:i)
@@ -2634,10 +2634,49 @@ contains
        metadata_entry(n_entries,4) = trim(units   )
     endif
 
-    if (n_entries .ge. nmax) then
+    if (n_entries >= nmax) then
        write(llogunit,*)'n_entries= ',n_entries,' nmax = ',nmax,' fldname= ',trim(fldname)
        call shr_sys_abort(subname//'ERROR: nmax fields in metadata_entry table exceeded')
     end if
+
+  contains  !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    integer function get_metadata_entry(shortname)
+      character(len=*), intent(in)  :: shortname
+
+      integer :: i,n,lnentry
+      logical :: found
+      character(len=CSS) :: lshortname  ! local copies
+      character(len=*),parameter :: subname = '(get_metadata_entry) '
+      !-------------------------------------------------------------------------------
+
+      found = .false.
+      lnentry = 0
+      if (.not.found) then
+         i = 1
+         do while (i <= n_entries .and. .not.found)
+            if (trim(shortname) == trim(metadata_entry(i,1))) then
+               found     =.true.
+               lnentry   = i
+            end if
+            i = i + 1
+         end do
+      endif
+      if (.not.found) then
+         i = 1
+         do while (i <= n_entries .and. .not.found)
+            n = shr_string_lastIndex(shortname, "_")
+            lshortname = ""
+            if (n < len_trim(shortname)) lshortname = shortname(n+1:len_trim(shortname))
+            if (trim(lshortname) == trim(metadata_entry(i,1))) then
+               found   = .true.
+               lnentry = i
+            end if
+            i = i + 1
+         end do
+      endif
+      get_metadata_entry = lnentry
+    end function get_metadata_entry
 
   end subroutine fldList_AddMetadata
 
@@ -2702,9 +2741,12 @@ contains
     flds => newflds
 
     ! 5) now update flds information for new entry
-    if (.not. present(shortname)) shortname = trim(stdname)
     flds(id)%stdname   = trim(stdname)
-    flds(id)%shortname = trim(shortname)
+    if (present(shortname)) then
+       flds(id)%shortname = trim(shortname)
+    else
+       flds(id)%shortname = trim(stdname)
+    end if
 
     if (present(fldindex)) then
        fldindex = id
@@ -2714,7 +2756,7 @@ contains
 
   !================================================================================
 
-  subroutine fldList_AddFld_Dst(flds, stdname, shortname,  merge_with_weights)
+  subroutine fldList_AddFld_Dst(flds, stdname, shortname, merge_with_weights)
 
     ! ----------------------------------------------
     ! Add an entry to to the flds array
@@ -2760,7 +2802,7 @@ contains
     do n = 1,oldsize
        newflds(n)%stdname           = flds(n)%stdname
        newflds(n)%shortname         = flds(n)%shortname
-       newflds(n)%merge_with_weight = flds(n)%merge_with_weight
+       newflds(n)%merge_with_weights = flds(n)%merge_with_weights
     end do
 
     ! 3) deallocate / nullify flds
@@ -2773,9 +2815,11 @@ contains
     flds => newflds
 
     ! 5) now update flds information for new entry
-    if (.not. present(shortname)) shortname = trim(stdname)
-    flds(id)%shortname          = trim(shortname)
-    flds(id)%stdname            = trim(stdname)
+    if (present(shortname)) then
+       flds(id)%shortname = trim(shortname)
+    else
+       flds(id)%shortname = trim(stdname)
+    end if
 
     if (present(merge_with_weights)) then
        flds(id)%merge_with_weights = merge_with_weights
@@ -2813,7 +2857,7 @@ contains
        fld%mapfile(destcomp) = 'unset'
        fld%mapnorm(destcomp) = 'unset'
     else if (trim(fld%mapfile(destcomp)) == 'idmap') then
-       fld%mapindex(destcomp) = fmapcopy
+       fld%mapindex(destcomp) = mapfcopy
        fld%mapnorm(destcomp) = 'unset'
     end if
   end subroutine fldList_AddMap
@@ -2824,7 +2868,7 @@ contains
     type(ESMF_State)                      , intent(inout)         :: state
     type(ESMF_Grid)                       , intent(in) , optional :: grid
     type(ESMF_Mesh)                       , intent(in) , optional :: mesh
-    type(shr_nuopc_fldlist_src_entry_type), pointer    , optional :: fldsfr(:)
+    type(shr_nuopc_fldlist_src_entry_type), pointer    , optional :: fldsFr(:)
     type(shr_nuopc_fldlist_dst_entry_type), pointer    , optional :: fldsTo(:)
     character(len=*)                      , intent(in)            :: tag
     integer                               , intent(inout)         :: rc
@@ -2916,7 +2960,7 @@ contains
     end if
 
     do n = 1, nflds
-       if (present(fldstFr)) then
+       if (present(fldsFr)) then
           shortname = fldsFr(n)%shortname
        else
           shortname = fldsTo(n)%shortname

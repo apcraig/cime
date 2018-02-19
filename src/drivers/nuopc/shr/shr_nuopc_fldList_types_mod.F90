@@ -77,7 +77,7 @@ module shr_nuopc_fldList_types_mod
   type shr_nuopc_fldList_dst_entry_type
      character(CS) :: stdname
      character(CS) :: shortname
-     logical       :: merge_with_weight = .false.
+     logical       :: merge_with_weights = .false.
   end type shr_nuopc_fldList_dst_entry_type
 
   type shr_nuopc_fldList_src_type
