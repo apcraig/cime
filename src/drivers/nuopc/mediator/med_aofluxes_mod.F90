@@ -1,18 +1,18 @@
-module med_ocnatm_fluxes_mod
+module med_aofluxes_mod
 
+  use ESMF
+  use NUOPC
   use shr_kind_mod          , only: r8=>shr_kind_r8, in=>shr_kind_in
   use shr_kind_mod          , only: cs=>shr_kind_cs, cl=>shr_kind_cl
   use shr_sys_mod           , only: shr_sys_abort
   use shr_flux_mod          , only: shr_flux_atmocn, shr_flux_atmocn_diurnal
   use shr_orb_mod           , only: shr_orb_params, shr_orb_cosz, shr_orb_decl
-  use shr_const_mod         , only: SHR_CONST_PI, shr_const_spval
+  use shr_const_mod         , only: shr_const_pi, shr_const_spval
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_getFieldN
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_GetFldPtr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
   use seq_timemgr_mod       , only: seq_timemgr_EclockGetData
   use med_constants_mod     , only: med_constants_dbug_flag
-  use ESMF
-  use NUOPC
 
   implicit none
   private
@@ -21,8 +21,8 @@ module med_ocnatm_fluxes_mod
   ! Public interfaces
   !--------------------------------------------------------------------------
 
-  public med_atmocn_init
-  public med_atmocn_flux
+  public med_aofluxes_init
+  public med_aofluxes
 
   !--------------------------------------------------------------------------
   ! Private data
@@ -97,14 +97,16 @@ module med_ocnatm_fluxes_mod
   real(r8) , pointer :: prec        (:) ! precip
   real(r8) , pointer :: prec_gust   (:) ! atm precip for convective gustiness (kg/m^3)
 
-  ! TODO: put flds_wiso in config and query it - for now just hard-wire it to false
-  logical :: flds_wiso = .false.
+  ! The following three variables are obtained as attributes from gcomp
+  logical       :: flds_wiso  ! use case
+  logical       :: do_flux_diurnal
+  character(CL) :: aoflux_grid
 
   ! Conversion from degrees to radians
   integer                :: dbug_flag = med_constants_dbug_flag
   integer                :: dbrc
   character(len=1024)    :: tmpstr
-  real(r8)    ,parameter :: const_pi      = SHR_CONST_PI       ! pi
+  real(r8)    ,parameter :: const_pi      = shr_const_pi       ! pi
   real(r8)    ,parameter :: const_deg2rad = const_pi/180.0_r8  ! deg to rads
   character(*),parameter :: u_FILE_u = __FILE__
 
@@ -112,24 +114,26 @@ module med_ocnatm_fluxes_mod
 contains
 !===============================================================================
 
-  subroutine med_ocnatm_flux_init(gcomp, aoflux_grid, FBAtmOcn, FBAtm, FBOcn, FBFrac, rc)
+  subroutine med_aofluxes_init(gcomp, FBAtm, FBOcn, FBFrac, &
+       FBMed_ocnalb, FBMed_aoflux, FBMed_aoflux_diurnl, rc)
+
     !-----------------------------------------------------------------------
-    ! Initialize pointers to the module variables and then use the module
-    ! variables in the med_atmocn_ocnalb and med_atmocn_flux routine
+    ! Initialize pointers to the module variables 
     !-----------------------------------------------------------------------
 
     ! Arguments
-    type(ESMF_GridComp)            :: gcomp
-    character(len=*) , intent(in)  :: aoflux_grid ! FBAtmOcn grid - 'atm' or 'ocn'
-    type(ESMF_FieldBundle)         :: FBAtmOcn    ! Atm/Ocn flux fields
-    type(ESMF_FieldBundle)         :: FBAtm       ! Atm Import fields on atmocn flux grid
-    type(ESMF_FieldBundle)         :: FBOcn       ! Ocn Import fields on atmocn flux grid
-    type(ESMF_FieldBundle)         :: FBfrac      ! Fraction data for various components, on their grid
-    integer          , intent(out) :: rc
+    type(ESMF_GridComp)    :: gcomp
+    type(ESMF_FieldBundle) :: FBAtm               ! Atm Import fields on aoflux grid
+    type(ESMF_FieldBundle) :: FBOcn               ! Ocn Import fields on aoflux grid
+    type(ESMF_FieldBundle) :: FBfrac              ! Fraction data for various components, on their grid
+    type(ESMF_FieldBundle) :: FBMed_ocnalb        ! Ocn albedos computed in mediator 
+    type(ESMF_FieldBundle) :: FBMed_aoflux        ! Ocn/Atm flux fields
+    type(ESMF_FieldBundle) :: FBMed_aoflux_diurnl ! Ocn/Atm flux fields needed only for history output
+    integer, intent(out)   :: rc
     !
     ! Local variables
     type(ESMF_VM)            :: vm
-    integer(in)              :: iam
+    integer                  :: iam
     type(ESMF_Field)         :: lfield
     type(ESMF_Grid)          :: lgrid
     type(ESMF_Mesh)          :: lmesh
@@ -142,8 +146,9 @@ contains
     integer                  :: dimCount
     integer                  :: spatialDim
     integer                  :: numOwnedElements
+    character(CL)   :: cvalue
     real(ESMF_KIND_R8), pointer :: ownedElemCoords(:)
-    character(*),parameter   :: subName =   '(med_atmocn_init) '
+    character(*),parameter   :: subName =   '(med_ocnatm_init) '
     !-----------------------------------------------------------------------
 
     if (dbug_flag > 5) then
@@ -158,42 +163,67 @@ contains
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !----------------------------------
+    ! get attributes that are set as module variables
+    !----------------------------------
+
+    call NUOPC_CompAttributeGet(gcomp, name='flds_wiso', value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    read(cvalue,*) flds_wiso
+
+    call NUOPC_CompAttributeGet(gcomp, name='flux_diurnal', value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    read(cvalue,*) do_flux_diurnal
+
+    call NUOPC_CompAttributeGet(gcomp, name='aoflux_grid', value=cvalue, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    read(cvalue,*) aoflux_grid
+
+    !----------------------------------
+    ! fields calculated in flux_ocnalb
+    !----------------------------------
+
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_ocnalb, fldname='Faox_swdn', fldptr1=swdn, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_ocnalb, fldname='Faox_swup', fldptr1=swup, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !----------------------------------
     ! atm/ocn fields
     !----------------------------------
 
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_tref', fldptr1=tref, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='So_tref', fldptr1=tref, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_qref', fldptr1=qref, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='So_qref', fldptr1=qref, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_ustar', fldptr1=ustar, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='So_ustar', fldptr1=ustar, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_re', fldptr1=re, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='So_re', fldptr1=re, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_ssq', fldptr1=ssq, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='So_ssq', fldptr1=ssq, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_u10', fldptr1=u10, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='So_u10', fldptr1=u10, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_duu10n', fldptr1=duu10n, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='So_duu10n', fldptr1=duu10n, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='Faox_taux', fldptr1=taux, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='Faox_taux', fldptr1=taux, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='Faox_tauy', fldptr1=tauy, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='Faox_tauy', fldptr1=tauy, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='Faox_lat', fldptr1=lat, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='Faox_lat', fldptr1=lat, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='Faox_sen', fldptr1=sen, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='Faox_sen', fldptr1=sen, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='Faox_evap', fldptr1=evap, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='Faox_evap', fldptr1=evap, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     lsize = size(evap)
     if (flds_wiso) then
-       call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='Faox_evap_16O', fldptr1=evap_16O, rc=rc)
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='Faox_evap_16O', fldptr1=evap_16O, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='Faox_evap_18O', fldptr1=evap_18O, rc=rc)
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='Faox_evap_18O', fldptr1=evap_18O, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='Faox_evap_HDO', fldptr1=evap_HDO, rc=rc)
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='Faox_evap_HDO', fldptr1=evap_HDO, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
        allocate(evap_16O(lsize)); evap_16O(:) = 0._r8
@@ -201,54 +231,51 @@ contains
        allocate(evap_HDO(lsize)); evap_HDO(:) = 0._r8
     end if
 
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='Faox_swdn', fldptr1=swdn, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='Faox_lwup', fldptr1=lwup, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='Faox_swup', fldptr1=swup, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='Faox_lwup', fldptr1=lwup, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_fswpen', fldptr1=fswpen, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux, fldname='So_fswpen', fldptr1=fswpen, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    ! fields for history output only
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_warm_diurn', fldptr1=warm, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_salt_diurn', fldptr1=salt, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_speed_diurn', fldptr1=speed, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_regime_diurn', fldptr1=regime, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_warmmax_diurn', fldptr1=warmMax, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_windmax_diurn', fldptr1=windMax, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_warmmaxinc_diurn', fldptr1=warmMaxInc, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_qsolinc_diurn', fldptr1=qSolInc, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_windinc_diurn', fldptr1=windInc, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_ninc_diurn', fldptr1=nInc, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_tbulk_diurn', fldptr1=tbulk, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_tskin_diurn', fldptr1=tskin, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_tskin_day_diurn', fldptr1=tskin_day, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_tskin_night_diurn', fldptr1=tskin_night, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_cskin_diurn', fldptr1=cskin, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_cskin_night_diurn', fldptr1=cskin_night, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_windavg_diurn', fldptr1=windAvg, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_qsolavg_diurn', fldptr1=qSolAvg, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtmOcn, fldname='So_windmaxinc_diurn', fldptr1=windmaxinc, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (do_flux_diurnal) then
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_warm_diurn', fldptr1=warm, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_salt_diurn', fldptr1=salt, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_speed_diurn', fldptr1=speed, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_regime_diurn', fldptr1=regime, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_warmmax_diurn', fldptr1=warmMax, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_windmax_diurn', fldptr1=windMax, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_warmmaxinc_diurn', fldptr1=warmMaxInc, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_qsolinc_diurn', fldptr1=qSolInc, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_windinc_diurn', fldptr1=windInc, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_ninc_diurn', fldptr1=nInc, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_tbulk_diurn', fldptr1=tbulk, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_tskin_diurn', fldptr1=tskin, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_tskin_day_diurn', fldptr1=tskin_day, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_tskin_night_diurn', fldptr1=tskin_night, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_cskin_diurn', fldptr1=cskin, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_cskin_night_diurn', fldptr1=cskin_night, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_windavg_diurn', fldptr1=windAvg, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_qsolavg_diurn', fldptr1=qSolAvg, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call shr_nuopc_methods_FB_GetFldPtr(FBMed_aoflux_diurnl, fldname='So_windmaxinc_diurn', fldptr1=windmaxinc, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
 
     !----------------------------------
     ! Ocn import fields
@@ -325,9 +352,9 @@ contains
     ! ! Get lat, lon, which are time-invariant
     ! !----------------------------------
 
-    ! The following assumes that all fields in FBAtmOcn have the same grid - so
-    ! only need to query field 1
-    call shr_nuopc_methods_FB_getFieldN(FBAtmOcn, fieldnum=1, field=lfield, rc=rc)
+    ! Get the first field from the field bundle - assumes that all fields
+    ! in FBMed_aoflux have the same grid - so only need to query field 1
+    call shr_nuopc_methods_FB_getFieldN(FBMed_aoflux, fieldnum=1, field=lfield, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! Determine if first field is on a grid or a mesh - default will be mesh
@@ -335,7 +362,7 @@ contains
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (geomtype == ESMF_GEOMTYPE_MESH) then
-       call ESMF_LogWrite(trim(subname)//" : FBATM is on a mesh ", ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(trim(subname)//" : FBAtm is on a mesh ", ESMF_LOGMSG_INFO, rc=rc)
        call ESMF_FieldGet(lfield, mesh=lmesh, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_MeshGet(lmesh, spatialDim=spatialDim, numOwnedElements=numOwnedElements)
@@ -417,16 +444,16 @@ contains
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
-  end subroutine med_ocnatm_flux_init
+  end subroutine med_aofluxes_init
 
   !===============================================================================
 
-  subroutine med_ocnatm_flux_run(gcomp, clock, ocn_prognostic, dead_comps, rc)
+  subroutine med_aofluxes(gcomp, clock, ocn_prognostic, dead_comps, rc)
 
     !-----------------------------------------------------------------------
     ! Determine atm/ocn fluxes eother on atm or on ocean grid
     ! The module arrays are set via pointers the the mediator internal states
-    ! in med_atmocn_init and are used below.
+    ! in med_ocnatm_init and are used below.
     ! gcomp (the mediator gridded component) is only needed to retreive the
     ! attributes
     !-----------------------------------------------------------------------
@@ -440,9 +467,9 @@ contains
     !
     ! Local variables
     character(CL) :: cvalue
-    integer(in)   :: tod, dt
-    integer(in)   :: n,i                     ! indices
-    integer(in)   :: lsize                   ! local size
+    integer       :: tod, dt
+    integer       :: n,i                     ! indices
+    integer       :: lsize                   ! local size
     real(r8)      :: gust_fac = huge(1.0_r8) ! wind gust factor
     logical       :: cold_start              ! .true. to initialize internal fields in shr_flux diurnal
     logical       :: read_restart            ! .true. => continue run
@@ -450,7 +477,7 @@ contains
     logical,save  :: first_call = .true.
     real(r8),parameter :: albdif = 0.06_r8 ! 60 deg reference albedo, diffuse
     real(r8),parameter :: albdir = 0.07_r8 ! 60 deg reference albedo, direct
-    character(*),parameter :: subName =   '(med_atmocn_flux) '
+    character(*),parameter :: subName =   '(med_fluxes) '
     !-----------------------------------------------------------------------
 
     call seq_timemgr_EClockGetData( clock, curr_tod=tod, dtime=dt )
@@ -594,6 +621,6 @@ contains
        end if
     enddo
 
-  end subroutine med_ocnatm_flux_run
+  end subroutine med_aofluxes
 
-end module med_ocnatm_fluxes_mod
+end module med_aofluxes_mod

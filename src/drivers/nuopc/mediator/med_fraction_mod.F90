@@ -6,11 +6,13 @@ module med_fraction_mod
   !-----------------------------------------------------------------------------
 
   use ESMF
-  use shr_nuopc_methods_mod, only : shr_nuopc_methods_ChkErr
-  use shr_nuopc_methods_mod, only : shr_nuopc_methods_FB_reset
-  use shr_nuopc_methods_mod, only : shr_nuopc_methods_FB_getFldPtr
-  use shr_nuopc_methods_mod, only : shr_nuopc_methods_FB_FieldRegrid
-  use shr_nuopc_methods_mod, only : shr_nuopc_methods_FB_diagnose
+  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_reset
+  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_getFldPtr
+  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_FieldRegrid
+  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_diagnose
+  use shr_nuopc_fldList_types_mod , only : compatm, compocn, compice, complnd
+  use shr_nuopc_fldList_types_mod , only : comprof, compglc, compwav, compname, mapconsf
   use med_internalstate_mod
   use med_constants_mod
 
@@ -24,8 +26,7 @@ module med_fraction_mod
   real(ESMF_KIND_R8), parameter :: spval_init  = med_constants_spval_init
   real(ESMF_KIND_R8), parameter :: spval       = med_constants_spval
   real(ESMF_KIND_R8), parameter :: czero       = med_constants_czero
-  character(*),parameter :: u_FILE_u = &
-    __FILE__
+  character(*)      , parameter :: u_FILE_u =  __FILE__
 
   public med_fraction_setupflds
   public med_fraction_init

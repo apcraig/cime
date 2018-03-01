@@ -2260,6 +2260,7 @@ contains
     !-----------------------------------------------------------------------------
 
     if (flds_i2o_per_cat) then
+
        do num = 1, ice_ncat
           write(cnum,'(i2.2)') num
 
@@ -2493,7 +2494,7 @@ contains
 
   !===============================================================================
 
-  subroutine shr_nuopc_fldList_Concat(fldsFr, fldsTo, concat_src, concat_dst)
+  subroutine shr_nuopc_fldList_Concat(fldsFr, fldsTo, concat_src, concat_dst, rc)
     ! Returns new concatentated colon delimited field lists
     
     ! input/output parameters:
@@ -2501,6 +2502,7 @@ contains
     type(shr_nuopc_fldList_dst_type) , intent(in)    :: fldsTo
     character(len=*)                 , intent(inout) :: concat_src
     character(len=*)                 , intent(inout) :: concat_dst
+    integer, optional                , intent(out)   :: rc
     
     ! local variables
     integer :: n
@@ -2508,10 +2510,12 @@ contains
     !-------------------------------------------------------------------------------
     
     do n = 1,size(FldsFr%flds)
-       if (trim(concat_src) == '') then
-          concat_src = trim(FldsFr%flds(n)%shortname)
-       else
-          concat_src = trim(concat_dst)//':'//trim(FldsFr%flds(n)%shortname)
+       if (trim(FldsFr%flds(n)%shortname) /= flds_scalar_name) then
+          if (trim(concat_src) == '') then
+             concat_src = trim(FldsFr%flds(n)%shortname)
+          else
+             concat_src = trim(concat_dst)//':'//trim(FldsFr%flds(n)%shortname)
+          end if
        end if
     end do
     if (len_trim(concat_src) >= CXX) then
@@ -2521,10 +2525,12 @@ contains
     end if
     
     do n = 1,size(FldsTo%flds)
-       if (trim(concat_dst) == '') then
-          concat_dst = trim(FldsTo%flds(n)%shortname)
-       else
-          concat_dst = trim(concat_dst)//':'//trim(FldsFr%flds(n)%shortname)
+       if (trim(FldsTo%flds(n)%shortname) /= flds_scalar_name) then
+          if (trim(concat_dst) == '') then
+             concat_dst = trim(FldsTo%flds(n)%shortname)
+          else
+             concat_dst = trim(concat_dst)//':'//trim(FldsFr%flds(n)%shortname)
+          end if
        end if
     end do
     if (len_trim(concat_src) >= CXX) then
@@ -2541,7 +2547,6 @@ contains
       
       ! local variables
       character(len=*),parameter :: subname = '(fldList_concat_string) '
-      !-------------------------------------------------------------------------------
       
       ! Returns new concatentated colon delimited field lists
       if (trim(fldlist_string) == '') then

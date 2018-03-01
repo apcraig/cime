@@ -8,17 +8,19 @@ module med_connectors_mod
 
   use ESMF
   use NUOPC
-  use shr_kind_mod          , only: SHR_KIND_CL
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_diagnose
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_reset
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_reset
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_copy
+  use shr_kind_mod                , only: SHR_KIND_CL
+  use shr_nuopc_fldList_types_mod , only: compatm, compocn, compice
+  use shr_nuopc_fldList_types_mod , only: complnd, comprof, compwav, compglc
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_State_diagnose
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_State_reset
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_reset
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_copy
+  use med_infodata_mod            , only: med_infodata_CopyStateToInfodata
+  use med_infodata_mod            , only: med_infodata_CopyInfodataToState
+  use med_infodata_mod            , only: infodata=>med_infodata
   use med_internalstate_mod
   use med_constants_mod
-  use med_infodata_mod      , only: med_infodata_CopyStateToInfodata
-  use med_infodata_mod      , only: med_infodata_CopyInfodataToState
-  use med_infodata_mod      , only: infodata=>med_infodata
 
   implicit none
 

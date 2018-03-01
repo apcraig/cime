@@ -5,28 +5,28 @@ module drof_comp_nuopc
 !----------------------------------------------------------------------------
 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
-  use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
+  use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, CXX => shr_kind_CXX
   use shr_sys_mod   ! shared system calls
 
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
 
-  use shr_nuopc_fldList_mod
-  use shr_nuopc_flds_mod    , only: flds_r2x, flds_r2x_map, flds_x2r, flds_x2r_map
-  use shr_nuopc_flds_mod    , only: flds_scalar_name
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_rofice_present
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_flood_present
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
-  use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
-  use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
-  use shr_file_mod          , only: shr_file_setIO, shr_file_getUnit
-  use shr_strdata_mod       , only: shr_strdata_type
+  use shr_nuopc_fldList_types_mod , only: fldListFr, fldListTo, comprof
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_name
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_nx, flds_scalar_index_ny
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_dead_comps
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_rofice_present
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_flood_present
+  use shr_nuopc_fldList_mod       , only: shr_nuopc_fldList_Realize, shr_nuopc_fldList_Concat
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_Clock_TimePrint
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_ChkErr
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_Meshinit
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_ArrayToState
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_StateToArray
+  use shr_file_mod                , only: shr_file_getlogunit, shr_file_setlogunit
+  use shr_file_mod                , only: shr_file_getloglevel, shr_file_setloglevel
+  use shr_file_mod                , only: shr_file_setIO, shr_file_getUnit
+  use shr_strdata_mod             , only: shr_strdata_type
 
   use ESMF
   use NUOPC
@@ -83,14 +83,12 @@ module drof_comp_nuopc
   integer                    :: dbrc
   integer, parameter         :: dbug = 10
   character(len=*),parameter :: grid_option = "mesh"      ! grid_de, grid_arb, grid_reg, mesh
-
-  type (shr_nuopc_fldList_Type) :: fldsToRof
-  type (shr_nuopc_fldList_Type) :: fldsFrRof
+  character(CXX)             :: flds_r2x = ''
+  character(CXX)             :: flds_x2r = ''
 
   !----- formats -----
   character(*),parameter :: modName =  "(drof_comp_nuopc)"
-  character(*),parameter :: u_FILE_u = &
-    __FILE__
+  character(*),parameter :: u_FILE_u = __FILE__
 
   !===============================================================================
   contains
@@ -173,6 +171,7 @@ module drof_comp_nuopc
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
     logical       :: exists
+    integer(IN)   :: n       
     integer(IN)   :: ierr       ! error code
     integer(IN)   :: shrlogunit ! original log unit
     integer(IN)   :: shrloglev  ! original log level
@@ -240,42 +239,35 @@ module drof_comp_nuopc
          logunit, shrlogunit, SDROF, rof_present, rof_prognostic, rofice_present, flood_present)
 
     !--------------------------------
-    ! create import fields list
+    ! create import and export field list needed by data models
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsToRof, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    if (rof_prognostic) then
-       call shr_nuopc_fldList_fromflds(fldsToRof, flds_x2r, flds_x2r_map, "will provide", subname//":flds_x2r", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    end if
-
-    call shr_nuopc_fldList_Add(fldsToRof, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    !--------------------------------
-    ! create export fields list
-    !--------------------------------
-
-    call shr_nuopc_fldList_Zero(fldsFrRof, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_fromflds(fldsFrRof, flds_r2x, flds_r2x_map, "will provide", subname//":flds_r2x", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFrRof, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    call shr_nuopc_fldList_Concat(fldListFr(comprof), fldListTo(comprof), flds_r2x, flds_x2r)
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    call shr_nuopc_fldList_Advertise(importState, fldsToRof, subname//':drofImport', rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    do n = 1,size(fldListFr(comprof)%flds)
+       if ( (trim(fldListFr(comprof)%flds(n)%shortname) /= flds_scalar_name .and. rof_prognostic) .or. &
+            (trim(fldListFr(comprof)%flds(n)%shortname) == flds_scalar_name)) then
+             call NUOPC_Advertise(importState, &
+                  standardName=trim(fldListFr(comprof)%flds(n)%stdname), &
+                  shortname=trim(fldListFr(comprof)%flds(n)%shortname), &
+                  name=trim(fldListFr(comprof)%flds(n)%shortname), &
+                  TransferOfferGeomObject='will provide')
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          end if
+    end do
 
-    call shr_nuopc_fldList_Advertise(exportState, fldsFrRof, subname//':drofExport', rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    do n = 1,size(fldListTo(comprof)%flds)
+       call NUOPC_Advertise(exportState, &
+            standardName=trim(fldListTo(comprof)%flds(n)%stdname), &
+            shortname=trim(fldListTo(comprof)%flds(n)%shortname), &
+            name=trim(fldListTo(comprof)%flds(n)%shortname), &
+            TransferOfferGeomObject='will provide')
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -381,10 +373,10 @@ module drof_comp_nuopc
     !  by replacing the advertised fields with the fields in fldsToRof of the same name.
     !--------------------------------
 
-    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToRof, tag=subname//':drofImport', rc=rc)
+    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldsTo=fldListTo(comprof)%flds, tag=subname//':drofImport', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrRof, tag=subname//':drofExport', rc=rc)
+    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldsFr=fldListFr(comprof)%flds, tag=subname//':drofExport', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------

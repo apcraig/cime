@@ -5,28 +5,27 @@ module dice_comp_nuopc
 !----------------------------------------------------------------------------
 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
-  use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
+  use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, CXX => shr_kind_CXX
   use shr_sys_mod   ! shared system calls
 
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
 
-  use shr_nuopc_fldList_mod
-  use shr_nuopc_flds_mod    , only: flds_i2x, flds_i2x_map, flds_x2i, flds_x2i_map
-  use shr_nuopc_flds_mod    , only: flds_i2o_per_cat
-  use shr_nuopc_flds_mod    , only: flds_scalar_name, flds_scalar_index_nextsw_cday
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_iceberg_prognostic
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
-  use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
-  use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
-  use shr_file_mod          , only: shr_file_setIO, shr_file_getUnit
-  use shr_strdata_mod       , only: shr_strdata_type
+  use shr_nuopc_fldList_types_mod , only: fldListFr, fldListTo, compice
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_name, flds_scalar_index_nextsw_cday
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_nx, flds_scalar_index_ny
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_dead_comps
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_iceberg_prognostic
+  use shr_nuopc_fldList_mod       , only: shr_nuopc_fldList_Realize, shr_nuopc_fldList_Concat
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_Clock_TimePrint
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_ChkErr
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_Meshinit
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_ArrayToState
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_StateToArray
+  use shr_file_mod                , only: shr_file_getlogunit, shr_file_setlogunit
+  use shr_file_mod                , only: shr_file_getloglevel, shr_file_setloglevel
+  use shr_file_mod                , only: shr_file_setIO, shr_file_getUnit
+  use shr_strdata_mod             , only: shr_strdata_type
 
   use ESMF
   use NUOPC
@@ -83,9 +82,10 @@ module dice_comp_nuopc
   integer, parameter         :: dbug = 10
   character(len=*),parameter :: grid_option = "mesh"      ! grid_de, grid_arb, grid_reg, mesh
   logical                    :: iceberg_prognostic = .false.
-
-  type (shr_nuopc_fldList_Type) :: fldsToIce
-  type (shr_nuopc_fldList_Type) :: fldsFrIce
+  logical                    :: flds_i2o_per_cat          ! .true. if select per ice thickness 
+                                                          ! category fields are passed from ice to ocean
+  character(CXX)             :: flds_i2x = ''
+  character(CXX)             :: flds_x2i = ''
 
   !----- formats -----
   character(*),parameter :: modName =  "(dice_comp_nuopc)"
@@ -173,6 +173,7 @@ module dice_comp_nuopc
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
     logical       :: exists
+    integer(IN)   :: n       
     integer(IN)   :: ierr       ! error code
     integer(IN)   :: shrlogunit ! original log unit
     integer(IN)   :: shrloglev  ! original log level
@@ -250,42 +251,36 @@ module dice_comp_nuopc
     end if
 
     !--------------------------------
-    ! create import fields list
+    ! create import and export field list needed by data models
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsToIce, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    call shr_nuopc_fldList_Concat(fldListFr(compice), fldListTo(compice), flds_i2x, flds_x2i)
 
-    if (ice_prognostic) then
-       call shr_nuopc_fldList_fromflds(fldsToIce, flds_x2i, flds_x2i_map, "will provide", subname//":flds_x2i", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    end if
-
-    call shr_nuopc_fldList_Add(fldsToIce, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    !--------------------------------
-    ! create export fields list
-    !--------------------------------
-
-    call shr_nuopc_fldList_Zero(fldsFrIce, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_fromflds(fldsFrIce, flds_i2x, flds_i2x_map, "will provide", subname//":flds_i2x", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFrIce, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    call shr_nuopc_fldList_Advertise(importState, fldsToIce, subname//':diceImport', rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    do n = 1,size(fldListFr(compice)%flds)
+       if ( (trim(fldListFr(compice)%flds(n)%shortname) /= flds_scalar_name .and. ice_prognostic) .or. &
+            (trim(fldListFr(compice)%flds(n)%shortname) == flds_scalar_name)) then
+             call NUOPC_Advertise(importState, &
+                  standardName=trim(fldListFr(compice)%flds(n)%stdname), &
+                  shortname=trim(fldListFr(compice)%flds(n)%shortname), &
+                  name=trim(fldListFr(compice)%flds(n)%shortname), &
+                  TransferOfferGeomObject='will provide')
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          end if
+    end do
 
-    call shr_nuopc_fldList_Advertise(exportState, fldsFrIce, subname//':diceExport', rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    do n = 1,size(fldListTo(compice)%flds)
+       call NUOPC_Advertise(exportState, &
+            standardName=trim(fldListTo(compice)%flds(n)%stdname), &
+            shortname=trim(fldListTo(compice)%flds(n)%shortname), &
+            name=trim(fldListTo(compice)%flds(n)%shortname), &
+            TransferOfferGeomObject='will provide')
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -360,6 +355,10 @@ module dice_comp_nuopc
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
     read(cvalue,*) read_restart
 
+    call NUOPC_CompAttributeGet(gcomp, name='flds_i2o_per_cat', value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    read(cvalue,*) flds_i2o_per_cat  ! module variable
+
     call dice_comp_init(clock, x2d, d2x, &
          flds_x2i, flds_i2x, flds_i2o_per_cat, &
          SDICE, gsmap, ggrid, mpicom, compid, my_task, master_task, &
@@ -404,10 +403,10 @@ module dice_comp_nuopc
     !  by replacing the advertised fields with the fields in fldsToIce of the same name.
     !--------------------------------
 
-    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToIce, tag=subname//':diceImport', rc=rc)
+    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldsTo=fldListTo(compice)%flds, tag=subname//':diceImport', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrIce, tag=subname//':diceExport', rc=rc)
+    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldsFr=fldListFr(compice)%flds, tag=subname//':diceExport', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------

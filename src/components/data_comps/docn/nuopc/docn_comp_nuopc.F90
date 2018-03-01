@@ -5,27 +5,27 @@ module docn_comp_nuopc
   !----------------------------------------------------------------------------
 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
-  use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
+  use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, CXX => shr_kind_CXX
   use shr_sys_mod   ! shared system calls
 
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
 
-  use shr_nuopc_fldList_mod
-  use shr_nuopc_flds_mod    , only: flds_o2x, flds_o2x_map, flds_x2o, flds_x2o_map
-  use shr_nuopc_flds_mod    , only: flds_scalar_name
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
-  use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
-  use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
-  use shr_file_mod          , only: shr_file_setIO, shr_file_getUnit
-  use shr_strdata_mod       , only: shr_strdata_type
+  use shr_nuopc_fldList_types_mod , only: fldListFr, fldListTo, compocn
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_name
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_nx, flds_scalar_index_ny
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_dead_comps
+  use shr_nuopc_fldList_mod       , only: shr_nuopc_fldList_Realize, shr_nuopc_fldList_Concat
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_Clock_TimePrint
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_Meshinit
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_ArrayToState
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_StateToArray
+  use shr_file_mod                , only: shr_file_getlogunit, shr_file_setlogunit
+  use shr_file_mod                , only: shr_file_getloglevel, shr_file_setloglevel
+  use shr_file_mod                , only: shr_file_setIO, shr_file_getUnit
+  use shr_strdata_mod             , only: shr_strdata_type
 
   use ESMF
   use NUOPC
@@ -82,9 +82,8 @@ module docn_comp_nuopc
   integer                    :: dbrc
   integer, parameter         :: dbug = 10
   character(len=*),parameter :: grid_option = "mesh"      ! grid_de, grid_arb, grid_reg, mesh
-
-  type (shr_nuopc_fldList_Type) :: fldsToOcn
-  type (shr_nuopc_fldList_Type) :: fldsFrOcn
+  character(CXX)             :: flds_o2x = ''
+  character(CXX)             :: flds_x2o = ''
 
   !----- formats -----
   character(*),parameter :: modName =  "(docn_comp_nuopc)"
@@ -176,6 +175,7 @@ module docn_comp_nuopc
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
     logical       :: exists
+    integer(IN)   :: n       
     integer(IN)   :: ierr       ! error code
     integer(IN)   :: shrlogunit ! original log unit
     integer(IN)   :: shrloglev  ! original log level
@@ -256,42 +256,35 @@ module docn_comp_nuopc
     end if
 
     !--------------------------------
-    ! create import fields list
+    ! create import and export field list needed by data models
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsToOcn, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    if (ocn_prognostic) then
-       call shr_nuopc_fldList_fromflds(fldsToOcn, flds_x2o, flds_x2o_map, "will provide", subname//":flds_x2o", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    end if
-
-    call shr_nuopc_fldList_Add(fldsToOcn, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    !--------------------------------
-    ! create export fields list
-    !--------------------------------
-
-    call shr_nuopc_fldList_Zero(fldsFrOcn, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_fromflds(fldsFrOcn, flds_o2x, flds_o2x_map, "will provide", subname//":flds_o2x", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFrOcn, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    call shr_nuopc_fldList_Concat(fldListFr(compocn), fldListTo(compocn), flds_o2x, flds_x2o)
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    call shr_nuopc_fldList_Advertise(importState, fldsToOcn, subname//':docnImport', rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    do n = 1,size(fldListFr(compocn)%flds)
+       if ( (trim(fldListFr(compocn)%flds(n)%shortname) /= flds_scalar_name .and. ocn_prognostic) .or. &
+            (trim(fldListFr(compocn)%flds(n)%shortname) == flds_scalar_name)) then
+             call NUOPC_Advertise(importState, &
+                  standardName=trim(fldListFr(compocn)%flds(n)%stdname), &
+                  shortname=trim(fldListFr(compocn)%flds(n)%shortname), &
+                  name=trim(fldListFr(compocn)%flds(n)%shortname), &
+                  TransferOfferGeomObject='will provide')
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          end if
+    end do
 
-    call shr_nuopc_fldList_Advertise(exportState, fldsFrOcn, subname//':docnExport', rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    do n = 1,size(fldListTo(compocn)%flds)
+       call NUOPC_Advertise(exportState, &
+            standardName=trim(fldListTo(compocn)%flds(n)%stdname), &
+            shortname=trim(fldListTo(compocn)%flds(n)%shortname), &
+            name=trim(fldListTo(compocn)%flds(n)%shortname), &
+            TransferOfferGeomObject='will provide')
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -410,10 +403,10 @@ module docn_comp_nuopc
     !  by replacing the advertised fields with the fields in fldsToOcn of the same name.
     !--------------------------------
 
-    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToOcn, tag=subname//':docnImport', rc=rc)
+    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldsTo=fldListTo(compocn)%flds, tag=subname//':docnImport', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrOcn, tag=subname//':docnExport', rc=rc)
+    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldsFr=fldListFr(compocn)%flds, tag=subname//':docnExport', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------

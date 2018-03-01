@@ -5,28 +5,28 @@ module datm_comp_nuopc
 !----------------------------------------------------------------------------
 
   use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
-  use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
+  use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, CXX => shr_kind_CXX
   use shr_sys_mod   ! shared system calls
 
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
 
-  use shr_nuopc_fldList_mod
-  use shr_nuopc_flds_mod    , only: flds_a2x, flds_a2x_map, flds_x2a, flds_x2a_map
-  use shr_nuopc_flds_mod    , only: flds_scalar_name, flds_scalar_index_nextsw_cday
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_Diagnose
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
-  use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
-  use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
-  use shr_file_mod          , only: shr_file_setIO, shr_file_getUnit
-  use shr_strdata_mod       , only: shr_strdata_type
+  use shr_nuopc_fldList_types_mod , only: fldListFr, fldListTo, compatm
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_name, flds_scalar_index_nextsw_cday
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_nx, flds_scalar_index_ny
+  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_dead_comps
+  use shr_nuopc_fldList_mod       , only: shr_nuopc_fldList_Realize, shr_nuopc_fldList_Concat
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_Clock_TimePrint
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_State_SetScalar
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_State_Diagnose
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_Meshinit
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_ArrayToState
+  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_StateToArray
+  use shr_file_mod                , only: shr_file_getlogunit, shr_file_setlogunit
+  use shr_file_mod                , only: shr_file_getloglevel, shr_file_setloglevel
+  use shr_file_mod                , only: shr_file_setIO, shr_file_getUnit
+  use shr_strdata_mod             , only: shr_strdata_type
 
   use ESMF
   use NUOPC
@@ -82,14 +82,12 @@ module datm_comp_nuopc
   integer                    :: dbrc
   integer, parameter         :: dbug = 10
   character(len=*),parameter :: grid_option = "mesh"      ! grid_de, grid_arb, grid_reg, mesh
-
-  type (shr_nuopc_fldList_Type) :: fldsToAtm
-  type (shr_nuopc_fldList_Type) :: fldsFrAtm
+  character(CXX)             :: flds_a2x = ''
+  character(CXX)             :: flds_x2a = ''
 
   !----- formats -----
   character(*),parameter :: modName =  "(datm_comp_nuopc)"
-  character(*),parameter :: u_FILE_u = &
-    __FILE__
+  character(*),parameter :: u_FILE_u = __FILE__
 
   !===============================================================================
   contains
@@ -181,6 +179,7 @@ module datm_comp_nuopc
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
     logical       :: exists
+    integer(IN)   :: n       
     integer(IN)   :: ierr       ! error code
     integer(IN)   :: shrlogunit ! original log unit
     integer(IN)   :: shrloglev  ! original log level
@@ -247,9 +246,10 @@ module datm_comp_nuopc
          inst_index, inst_suffix, inst_name, &
          logunit, shrlogunit, SDATM, atm_present, atm_prognostic)
 
-    ! NOTE: atm_present flag is not needed - since the run sequence will have no call to this routine
-    ! for the atm_present flag being set to false (i.e. null mode)
-    ! NOTE: only the atm_prognostic flag is needed below
+    ! NOTE: atm_present flag is not needed - since the run sequence
+    ! will have no call to this routine for the atm_present flag being
+    ! set to false (i.e. null mode) - only the atm_prognostic flag is
+    ! needed below
 
     if (atm_prognostic) then
        unpack_import = .true.
@@ -258,42 +258,35 @@ module datm_comp_nuopc
     end if
 
     !--------------------------------
-    ! create import fields list
+    ! create import and export field list needed by data models
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsToAtm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    if (atm_prognostic) then
-       call shr_nuopc_fldList_fromflds(fldsToAtm, flds_x2a, flds_x2a_map, "will provide", subname//":flds_x2a", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    end if
-
-    call shr_nuopc_fldList_Add(fldsToAtm, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    !--------------------------------
-    ! create export fields list
-    !--------------------------------
-
-    call shr_nuopc_fldList_Zero(fldsFrAtm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_fromflds(fldsFrAtm, flds_a2x, flds_a2x_map, "will provide", subname//":flds_a2x", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFrAtm, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    call shr_nuopc_fldList_Concat(fldListFr(compatm), fldListTo(compatm), flds_a2x, flds_x2a)
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    call shr_nuopc_fldList_Advertise(importState, fldsToAtm, subname//':datmImport', rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    do n = 1,size(fldListFr(compatm)%flds)
+       if ( (trim(fldListFr(compatm)%flds(n)%shortname) /= flds_scalar_name .and. atm_prognostic) .or. &
+            (trim(fldListFr(compatm)%flds(n)%shortname) == flds_scalar_name)) then            
+             call NUOPC_Advertise(importState, &
+                  standardName=trim(fldListFr(compatm)%flds(n)%stdname), &
+                  shortname=trim(fldListFr(compatm)%flds(n)%shortname), &
+                  name=trim(fldListFr(compatm)%flds(n)%shortname), &
+                  TransferOfferGeomObject='will provide')
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          end if
+    end do
 
-    call shr_nuopc_fldList_Advertise(exportState, fldsFrAtm, subname//':datmExport', rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    do n = 1,size(fldListTo(compatm)%flds)
+       call NUOPC_Advertise(exportState, &
+            standardName=trim(fldListTo(compatm)%flds(n)%stdname), &
+            shortname=trim(fldListTo(compatm)%flds(n)%shortname), &
+            name=trim(fldListTo(compatm)%flds(n)%shortname), &
+            TransferOfferGeomObject='will provide')
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end do
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -446,10 +439,10 @@ module datm_comp_nuopc
     !  by replacing the advertised fields with the fields in fldsToAtm of the same name.
     !--------------------------------
 
-    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToAtm, tag=subname//':datmImport', rc=rc)
+    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldsTo=fldListTo(compatm)%flds, tag=subname//':datmImport', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
-    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrAtm, tag=subname//':datmExport', rc=rc)
+    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldsFr=fldListFr(compatm)%flds, tag=subname//':datmExport', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
     !--------------------------------

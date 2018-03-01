@@ -1,6 +1,10 @@
 module shr_nuopc_fldList_types_mod
 
   use shr_kind_mod, only : CX => shr_kind_CX, CXX => shr_kind_CXX, CS=>shr_kind_CS, CL=>shr_kind_CL
+
+  implicit none
+  public
+
   integer, parameter :: CSS = 256  ! use longer short character
   integer, parameter :: CLL = 1024
 

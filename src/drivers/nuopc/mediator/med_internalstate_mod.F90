@@ -48,6 +48,7 @@ module med_internalstate_mod
     logical               :: comp_present(ncomps)               ! comp present flag
     logical               :: med_coupling_active(ncomps,ncomps) ! computes the active coupling
     type(ESMF_RouteHandle):: RH(ncomps,ncomps,nmappers)         ! Routehandles for pairs of components and different mappers
+    type(ESMF_FieldBundle):: FBfrac(ncomps)                     ! Fraction data for various components, on their grid
     type(ESMF_FieldBundle):: FBNormOne(ncomps,ncomps,nmappers)  ! Unity static normalization
     type(ESMF_State)      :: NStateImp(ncomps)                  ! Import data from various component, on their grid
     type(ESMF_State)      :: NStateExp(ncomps)                  ! Export data to various component, on their grid
@@ -57,14 +58,15 @@ module med_internalstate_mod
     type(ESMF_FieldBundle):: FBExp(ncomps)                      ! Export data for various components, on their grid
     type(ESMF_FieldBundle):: FBExpAccum(ncomps)                 ! Accumulator for various components export on their grid
     integer               :: FBExpAccumcnt(ncomps)              ! Accumulator counter for each FBExpAccum
-    type(ESMF_FieldBundle):: FBfrac(ncomps)                     ! Fraction data for various components, on their grid
     type(ESMF_FieldBundle):: FBMed_ocnalb_o                     ! FB only in mediator- Ocn albedo on ocn grid
     type(ESMF_FieldBundle):: FBMed_ocnalb_a                     ! FB only in mediator- Ocn albedo on atm grid
-    type(ESMF_FieldBundle):: FBMed_aoflux_a                     ! FB only in mediator- Ocn/Atm flux fields on atm grid
     type(ESMF_FieldBundle):: FBMed_aoflux_o                     ! FB only in mediator- Ocn/Atm flux fields on ocn grid
-    type(ESMF_FieldBundle):: FBMed_aoflux_o_accum               ! FB only in mediator- Ocn/Atm flux accumulator on ocn grid
+    type(ESMF_FieldBundle):: FBMed_aoflux_a                     ! FB only in mediator- Ocn/Atm flux fields on atm grid
+    type(ESMF_FieldBundle):: FBMed_aoflux_diurnl_o              ! FB only in mediator- Ocn/Atm flux fields only needed for history
+    type(ESMF_FieldBundle):: FBMed_aoflux_diurnl_a              ! FB only in mediator- Ocn/Atm flux fields only needed for history
+    type(ESMF_FieldBundle):: FBMed_aoflux_accum_o               ! FB only in mediator- Ocn/Atm flux accumulator on ocn grid
     type(ESMF_FieldBundle):: FBMed_l2x_to_glc_l                 ! FB only in mediator- Land->glc on lnd grid
-    type(ESMF_FieldBundle):: FBMed_l2x_to_glc_l_accum           ! FB only in mediator- Land->glc accumulator on lnd grid
+    type(ESMF_FieldBundle):: FBMed_l2x_to_glc_accum_l           ! FB only in mediator- Land->glc accumulator on lnd grid
     integer               :: conn_prep_cnt(ncomps)              ! Connector prep count
     integer               :: conn_post_cnt(ncomps)              ! Connector post count
     integer               :: mpicom

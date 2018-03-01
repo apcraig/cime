@@ -1,15 +1,15 @@
 module med_ocnalb_mod
 
-  use shr_kind_mod          , only: r8=>shr_kind_r8, in=>shr_kind_in
-  use shr_kind_mod          , only: cs=>shr_kind_cs, cl=>shr_kind_cl
-  use shr_sys_mod           , only: shr_sys_abort
-  use shr_orb_mod           , only: shr_orb_cosz, shr_orb_decl
-  use shr_const_mod         , only: SHR_CONST_PI, shr_const_spval
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_getFieldN
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_GetFldPtr
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
-  use seq_timemgr_mod       , only: seq_timemgr_EclockGetData
-  use med_constants_mod     , only: med_constants_dbug_flag
+  use shr_kind_mod                , only: r8=>shr_kind_r8, in=>shr_kind_in
+  use shr_kind_mod                , only: cs=>shr_kind_cs, cl=>shr_kind_cl
+  use shr_sys_mod                 , only: shr_sys_abort
+  use shr_orb_mod                 , only: shr_orb_cosz, shr_orb_decl
+  use shr_const_mod               , only: SHR_CONST_PI, shr_const_spval
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_getFieldN
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_GetFldPtr
+  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_ChkErr
+  use seq_timemgr_mod             , only: seq_timemgr_EclockGetData
+  use med_constants_mod           , only: med_constants_dbug_flag
   use ESMF
   use NUOPC
 
@@ -38,6 +38,8 @@ module med_ocnalb_mod
   real(r8) , pointer :: swndf (:) ! diffuse near-infrared incident solar radiation
   real(r8) , pointer :: swvdr (:) ! direct visible  incident solar radiation
   real(r8) , pointer :: swvdf (:) ! diffuse visible incident solar radiation
+  real(r8) , pointer :: swdn  (:) ! short wave, downward
+  real(r8) , pointer :: swup  (:) ! short wave, upward
 
   ! Conversion from degrees to radians
   integer                :: dbug_flag = med_constants_dbug_flag
@@ -51,16 +53,18 @@ module med_ocnalb_mod
 contains
 !===============================================================================
 
-  subroutine med_ocnalb_init(gcomp, FBAtm_o, FBXao_ocnalb_o, rc)
+  subroutine med_ocnalb_init(gcomp, FBAtm, FBMedOcnalb, rc)
+
     !-----------------------------------------------------------------------
     ! Initialize pointers to the module variables and then use the module
-    ! variables in the med_ocnalb_run phase
+    ! variables in the med_ocnalb phase
+    ! All input field bundles are ASSUMED to be on the ocean grid
     !-----------------------------------------------------------------------
 
     ! Arguments
     type(ESMF_GridComp)    :: gcomp
-    type(ESMF_FieldBundle) :: FBAtm_o        ! Atm Import fields on atmocn flux grid
-    type(ESMF_FieldBundle) :: FBXao_ocnalb_o ! Ocean albedos computed in mediator on ocean grid
+    type(ESMF_FieldBundle) :: FBMedOcnalb ! Ocean albedos computed in mediator on ocean grid
+    type(ESMF_FieldBundle) :: FBAtm       ! Atm Import fields ocn grid
     integer, intent(out)   :: rc
     !
     ! Local variables
@@ -73,8 +77,6 @@ contains
     integer                     :: n
     integer                     :: lsize
     real(r8), pointer           :: rmask(:)  ! ocn domain mask
-    real(r8), pointer           :: ofrac(:)
-    real(r8), pointer           :: ifrac(:)
     integer                     :: dimCount
     integer                     :: spatialDim
     integer                     :: numOwnedElements
@@ -98,31 +100,35 @@ contains
     ! fields needed for albedo calculations - must be on the ocean grid
     !----------------------------------
 
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtm_o, fldname='Faxa_swndr', fldptr1=swndr, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBAtm, fldname='Faxa_swndr', fldptr1=swndr, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtm_o, fldname='Faxa_swndf', fldptr1=swndf, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBAtm, fldname='Faxa_swndf', fldptr1=swndf, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtm_o, fldname='Faxa_swvdr', fldptr1=swvdr, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBAtm, fldname='Faxa_swvdr', fldptr1=swvdr, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAtm_o, fldname='Faxa_swvdf', fldptr1=swvdf, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBAtm, fldname='Faxa_swvdf', fldptr1=swvdf, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_methods_FB_GetFldPtr(FBXao_ocnalb_o, fldname='So_avsdr', fldptr1=avsdr, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMedOcnalb, fldname='Faox_swdn', fldptr1=swdn, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBXao_ocnalb_o, fldname='So_avsdf', fldptr1=avsdf, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMedOcnalb, fldname='Faox_swup', fldptr1=swup, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBXao_ocnalb_o, fldname='So_anidr', fldptr1=anidr, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMedOcnalb, fldname='So_avsdr', fldptr1=avsdr, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_nuopc_methods_FB_GetFldPtr(FBAXao_ocnalb_o, fldname='So_anidf', fldptr1=anidf, rc=rc)
+    call shr_nuopc_methods_FB_GetFldPtr(FBMedOcnalb, fldname='So_avsdf', fldptr1=avsdf, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(FBMedOcnalb, fldname='So_anidr', fldptr1=anidr, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(FBMedOcnalb, fldname='So_anidf', fldptr1=anidf, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !----------------------------------
     ! Get lat, lon, which are time-invariant
     !----------------------------------
 
-    ! The following assumes that all fields in FBXao_ocnalb_o have the same grid - so
+    ! The following assumes that all fields in FBMedOcnalb have the same grid - so
     ! only need to query field 1
-    call shr_nuopc_methods_FB_getFieldN(FBXao_ocnalb_o, fieldnum=1, field=lfield, rc=rc)
+    call shr_nuopc_methods_FB_getFieldN(FBMedOcnalb, fieldnum=1, field=lfield, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! Determine if first field is on a grid or a mesh - default will be mesh
@@ -130,7 +136,7 @@ contains
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (geomtype == ESMF_GEOMTYPE_MESH) then
-       call ESMF_LogWrite(trim(subname)//" : FBATM_o is on a mesh ", ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(trim(subname)//" : FBAtm is on a mesh ", ESMF_LOGMSG_INFO, rc=rc)
        call ESMF_FieldGet(lfield, mesh=lmesh, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_MeshGet(lmesh, spatialDim=spatialDim, numOwnedElements=numOwnedElements)
@@ -151,7 +157,7 @@ contains
           lats(n) = ownedElemCoords(2*n)
        end do
     else if (geomtype == ESMF_GEOMTYPE_GRID) then
-       call ESMF_LogWrite(trim(subname)//" : FBATM_o is on a grid ", ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(trim(subname)//" : FBAtm is on a grid ", ESMF_LOGMSG_INFO, rc=rc)
        call ESMF_FieldGet(lfield, grid=lgrid, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_GridGet(lgrid, dimCount=dimCount, rc=rc)
@@ -161,7 +167,7 @@ contains
        call ESMF_GridGetCoord(lgrid, coordDim=2, farrayPtr=lats, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
-       call ESMF_LogWrite(trim(subname)//": ERROR FBATM must be either on a grid or a mesh", &
+       call ESMF_LogWrite(trim(subname)//": ERROR FBAtm must be either on a grid or a mesh", &
             ESMF_LOGMSG_INFO, rc=rc)
       rc = ESMF_FAILURE
       return
@@ -175,7 +181,7 @@ contains
 
   !===============================================================================
 
-  subroutine med_ocnalb_run(gcomp, FBFrac_o, nextsw_cday, rc)
+  subroutine med_ocnalb(gcomp, nextsw_cday, update_alb, rc)
 
     !-----------------------------------------------------------------------
     ! Update albedoes on ocean grid
@@ -183,21 +189,14 @@ contains
     !
     ! Arguments
     type(ESMF_GridComp)    :: gcomp
-    type(ESMF_FieldBundle) :: FBFrac_o     ! Fraction data on ocean grid
     real(r8), intent(in)   :: nextsw_cday  ! calendar day of next atm shortwave
+    logical , intent(out)  :: update_alb   ! was albedo updated
     integer , intent(out)  :: rc
     !
     ! Local variables
-    type(ESMF_VM)     :: vm
-    integer(in)       :: iam
     character(CL)     :: cvalue
-    real(r8), pointer :: ofrac_o(:)
-    real(r8), pointer :: ofrad_o(:)
-    real(r8), pointer :: ifrac_o(:)
-    real(r8), pointer :: ifrad_o(:)
     integer(in)       :: lsize      ! local size
     logical	      :: flux_albav ! flux avg option
-    logical	      :: update_alb ! was albedo updated
     integer(in)	      :: n,i	    ! indices
     real(r8)	      :: rlat	    ! gridcell latitude in radians
     real(r8)	      :: rlon	    ! gridcell longitude in radians
@@ -232,13 +231,6 @@ contains
     call NUOPC_CompAttributeGet(gcomp, name='orb_mvelpp', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) mvelpp
-
-    ! The following is for debugging
-    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call ESMF_VMGet(vm, localPet=iam, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! Determine indices
 
@@ -309,21 +301,6 @@ contains
 
     end if   ! flux_albav
 
-    !--- update current ifrad/ofrad values if albedo was updated
-    if (update_alb) then
-       call shr_nuopc_methods_FB_getFldPtr(FBFrac_o, 'ifrac', fldptr1=ifrac_o, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call shr_nuopc_methods_FB_getFldPtr(FBFrac_o, 'ifrad', fldptr1=ifrad_o, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       ifrad_o(:) = ifrac_o(:)
-
-       call shr_nuopc_methods_FB_getFldPtr(FBFrac_o, fldname='ofrac', fldptr1=ofrac_o, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call shr_nuopc_methods_FB_getFldPtr(FBFrac_o, fldname='ofrad', fldptr1=ofrad_o, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       ofrad_o(:) = ofrac_o(:)
-    endif
-
-  end subroutine med_ocnalb_run
+  end subroutine med_ocnalb
 
 end module med_ocnalb_mod

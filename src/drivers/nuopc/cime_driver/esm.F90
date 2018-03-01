@@ -43,8 +43,8 @@ module ESM
   use seq_comm_mct          , only : seq_comm_iamin, seq_comm_name, seq_comm_namelen, seq_comm_iamroot
   use seq_timemgr_mod       , only : seq_timemgr_clockInit, seq_timemgr_EClockGetData
 
-  use shr_nuopc_flds_mod    , only : shr_nuopc_flds_set
-  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_setDict_fromflds
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Init
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_setDict
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
 
@@ -340,7 +340,7 @@ module ESM
          Eclock_d, Eclock_a, Eclock_l, Eclock_o, &
          Eclock_i, Eclock_g, Eclock_r, Eclock_w, Eclock_e)
 
-    call shr_nuopc_fldList_setDict_fromflds(rc)
+    call shr_nuopc_fldList_setDict(rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--------
