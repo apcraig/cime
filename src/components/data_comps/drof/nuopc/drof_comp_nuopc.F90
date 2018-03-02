@@ -11,22 +11,22 @@ module drof_comp_nuopc
   use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
 
-  use shr_nuopc_fldList_types_mod , only: fldListFr, fldListTo, comprof
-  use shr_nuopc_fldList_types_mod , only: flds_scalar_name
-  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_nx, flds_scalar_index_ny
-  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_dead_comps
-  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_rofice_present
-  use shr_nuopc_fldList_types_mod , only: flds_scalar_index_flood_present
-  use shr_nuopc_fldList_mod       , only: shr_nuopc_fldList_Realize, shr_nuopc_fldList_Concat
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_Clock_TimePrint
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_ChkErr
-  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_Meshinit
-  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_ArrayToState
-  use shr_nuopc_grid_mod          , only: shr_nuopc_grid_StateToArray
-  use shr_file_mod                , only: shr_file_getlogunit, shr_file_setlogunit
-  use shr_file_mod                , only: shr_file_getloglevel, shr_file_setloglevel
-  use shr_file_mod                , only: shr_file_setIO, shr_file_getUnit
-  use shr_strdata_mod             , only: shr_strdata_type
+  use shr_nuopc_fldList_mod , only: fldListFr, fldListTo, comprof
+  use shr_nuopc_fldList_mod , only: flds_scalar_name
+  use shr_nuopc_fldList_mod , only: flds_scalar_index_nx, flds_scalar_index_ny
+  use shr_nuopc_fldList_mod , only: flds_scalar_index_dead_comps
+  use shr_nuopc_fldList_mod , only: flds_scalar_index_rofice_present
+  use shr_nuopc_fldList_mod , only: flds_scalar_index_flood_present
+  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Realize, shr_nuopc_fldList_Concat
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
+  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
+  use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
+  use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
+  use shr_file_mod          , only: shr_file_setIO, shr_file_getUnit
+  use shr_strdata_mod       , only: shr_strdata_type
 
   use ESMF
   use NUOPC

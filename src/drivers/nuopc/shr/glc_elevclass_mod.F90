@@ -419,6 +419,5 @@ contains
 
   end function glc_errcode_to_string
 
-
 end module glc_elevclass_mod
 

@@ -1,38 +1,33 @@
 module med_connectors_mod
 
   !-----------------------------------------------------------------------------
-  ! Mediator Component.
-  ! This mediator operates on two timescales and keeps two internal Clocks to
-  ! do so.
+  ! Connector phases 
   !-----------------------------------------------------------------------------
 
   use ESMF
   use NUOPC
-  use shr_kind_mod                , only: SHR_KIND_CL
-  use shr_nuopc_fldList_types_mod , only: compatm, compocn, compice
-  use shr_nuopc_fldList_types_mod , only: complnd, comprof, compwav, compglc
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_ChkErr
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_State_diagnose
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_State_reset
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_reset
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_copy
-  use med_infodata_mod            , only: med_infodata_CopyStateToInfodata
-  use med_infodata_mod            , only: med_infodata_CopyInfodataToState
-  use med_infodata_mod            , only: infodata=>med_infodata
+  use shr_nuopc_fldList_mod , only: compatm, compocn, compice
+  use shr_nuopc_fldList_mod , only: complnd, comprof, compwav, compglc
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_diagnose
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_reset
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_reset
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_copy
+  use med_infodata_mod      , only: med_infodata_CopyStateToInfodata
+  use med_infodata_mod      , only: med_infodata_CopyInfodataToState
+  use med_infodata_mod      , only: infodata=>med_infodata
   use med_internalstate_mod
   use med_constants_mod
 
   implicit none
-
   private
 
-  integer            :: dbug_flag = med_constants_dbug_flag
-  logical            :: statewrite_flag = med_constants_statewrite_flag
+  integer                       :: dbug_flag = med_constants_dbug_flag
+  logical                       :: statewrite_flag = med_constants_statewrite_flag
   real(ESMF_KIND_R8), parameter :: spval = med_constants_spval
   real(ESMF_KIND_R8), parameter :: czero = med_constants_czero
-  integer            :: dbrc
-  character(*),parameter :: u_FILE_u = &
-    __FILE__
+  character(*)      , parameter :: u_FILE_u = __FILE__
+  integer                       :: dbrc
 
   !--------------------------------------------------------------------------
   ! Public interfaces

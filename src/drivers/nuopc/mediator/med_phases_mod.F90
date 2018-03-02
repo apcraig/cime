@@ -6,46 +6,43 @@ module med_phases_mod
 
   use ESMF
   use NUOPC
-  use shr_kind_mod                , only : CL=>SHR_KIND_CL, CS=>SHR_KIND_CS
-  use shr_sys_mod                 , only : shr_sys_abort
-  use shr_nuopc_fldList_types_mod , only : flds_scalar_name
-  use shr_nuopc_fldList_types_mod , only : flds_scalar_index_nextsw_cday
-  use shr_nuopc_fldList_types_mod , only : flds_scalar_index_dead_comps
-  use shr_nuopc_fldList_types_mod , only : compmed, compatm, complnd, compocn
-  use shr_nuopc_fldList_types_mod , only : compice, comprof, compwav, compglc
-  use shr_nuopc_fldList_types_mod , only : ncomps, compname, mapnames, mapconsf
-  use shr_nuopc_fldList_types_mod , only : mapconsf, mapfcopy
-  use shr_nuopc_fldList_types_mod , only : fldListFr, fldListTo
-  use shr_nuopc_fldList_types_mod , only : fldListMed_aoflux_a, fldListMed_aoflux_o
-  use shr_nuopc_fldList_types_mod , only : fldListMed_ocnalb_a, fldListMed_ocnalb_o
-  use shr_nuopc_fldList_types_mod , only : shr_nuopc_fldList_src_entry_type
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_ChkErr
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_init
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_reset
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_clean
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_diagnose
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_FieldRegrid
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_GetFldPtr
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_accum
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_FldChk
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_average
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_FB_copy
-  use shr_nuopc_methods_mod       , only : shr_nuopc_methods_State_GetScalar
-  use med_internalstate_mod       , only : InternalState
-  use med_fraction_mod            , only : fraclist
-  use med_fraction_mod            , only : med_fraction_setupflds
-  use med_fraction_mod            , only : med_fraction_init
-  use med_fraction_mod            , only : med_fraction_set
-  use med_constants_mod           , only : med_constants_dbug_flag
-  use med_constants_mod           , only : med_constants_statewrite_flag
-  use med_constants_mod           , only : med_constants_spval_init
-  use med_constants_mod           , only : med_constants_spval
-  use med_constants_mod           , only : med_constants_czero
-  use med_constants_mod           , only : med_constants_ispval_mask
-  use med_merge_mod               , only : med_merge_auto
-  use med_ocnalb_mod              , only : med_ocnalb_init, med_ocnalb
-  use med_aofluxes_mod            , only : med_aofluxes_init, med_aofluxes
-  use med_map_mod                 , only : med_map_FB_Regrid_Norm 
+  use shr_kind_mod            , only : CL=>SHR_KIND_CL, CS=>SHR_KIND_CS
+  use shr_sys_mod             , only : shr_sys_abort
+  use shr_nuopc_fldList_mod   , only : flds_scalar_name
+  use shr_nuopc_fldList_mod   , only : flds_scalar_index_nextsw_cday
+  use shr_nuopc_fldList_mod   , only : flds_scalar_index_dead_comps
+  use shr_nuopc_fldList_mod   , only : compmed, compatm, complnd, compocn
+  use shr_nuopc_fldList_mod   , only : compice, comprof, compwav, compglc
+  use shr_nuopc_fldList_mod   , only : ncomps, compname, mapnames, mapconsf, mapfcopy
+  use shr_nuopc_fldList_mod   , only : fldListFr, fldListTo
+  use shr_nuopc_fldList_mod   , only : shr_nuopc_fldList_src_entry_type
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_init
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_reset
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_clean
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_diagnose
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_FieldRegrid
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_GetFldPtr
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_accum
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_FldChk
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_average
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_copy
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_State_GetScalar
+  use med_internalstate_mod   , only : InternalState
+  use med_fraction_mod        , only : fraclist
+  use med_fraction_mod        , only : med_fraction_setupflds
+  use med_fraction_mod        , only : med_fraction_init
+  use med_fraction_mod        , only : med_fraction_set
+  use med_constants_mod       , only : med_constants_dbug_flag
+  use med_constants_mod       , only : med_constants_statewrite_flag
+  use med_constants_mod       , only : med_constants_spval_init
+  use med_constants_mod       , only : med_constants_spval
+  use med_constants_mod       , only : med_constants_czero
+  use med_constants_mod       , only : med_constants_ispval_mask
+  use med_merge_mod           , only : med_merge_auto
+  use med_ocnalb_mod          , only : med_ocnalb_init, med_ocnalb
+  use med_map_mod             , only : med_map_FB_Regrid_Norm 
+  use med_phases_aofluxes_mod , only : med_phases_aofluxes_init
 
   implicit none
 
@@ -62,20 +59,18 @@ module med_phases_mod
   integer                       :: dbrc
   logical                       :: mastertask
 
-  public med_phases_prep_atm
-  public med_phases_prep_ocn
-  public med_phases_prep_ice
-  public med_phases_prep_lnd
-  public med_phases_prep_rof
-  public med_phases_prep_wav
-  public med_phases_prep_glc
-  public med_phases_accum_fast
-  public med_phases_ocnalb_init
-  public med_phases_ocnalb
-  public med_phases_aofluxes_init
-  public med_phases_aofluxes
-
-  private med_phases_map_frac
+  public  :: med_phases_init
+  public  :: med_phases_prep_atm
+  public  :: med_phases_prep_ocn
+  public  :: med_phases_prep_ice
+  public  :: med_phases_prep_lnd
+  public  :: med_phases_prep_rof
+  public  :: med_phases_prep_wav
+  public  :: med_phases_prep_glc
+  public  :: med_phases_accum_fast
+  public  :: med_phases_ocnalb_init
+  public  :: med_phases_ocnalb
+  private :: med_phases_map_frac
 
   !-----------------------------------------------------------------------------
   contains
@@ -191,6 +186,9 @@ module med_phases_mod
   !-----------------------------------------------------------------------------
 
   subroutine med_phases_prep_atm(gcomp, rc)
+    use shr_nuopc_fldList_mod , only : fldListMed_ocnalb_a, fldListMed_ocnalb_o
+    use shr_nuopc_fldList_mod , only : fldListMed_aoflux_a, fldListMed_aoflux_o
+
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
 
@@ -1509,6 +1507,9 @@ module med_phases_mod
 
   subroutine med_phases_ocnalb_init(gcomp, rc)
 
+    use shr_nuopc_fldList_mod , only : fldListMed_ocnalb_a, fldListMed_ocnalb_o
+    use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_GetFldNames
+
     !----------------------------------------------------------
     ! Initialize the ocean albedo calculation and the field bundles 
     ! FBMed_ocnalb_a and FBMed_ocnalb_o
@@ -1541,9 +1542,9 @@ module med_phases_mod
     ! contain control data and no grid information if if the target
     ! component (n2) is not prognostic only receives control data back
 
-    nflds = size(fldListMed_aoflux_o%flds)
+    nflds = size(fldListMed_ocnalb_o%flds)
     allocate(fldnames(nflds))
-    call shr_nuopc_fldList_getfldnames(fldnames)
+    call shr_nuopc_fldList_getfldnames(fldListMed_ocnalb_o%flds, fldnames)
 
     call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_a, &
          STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=fldnames, name='FBMed_ocnalb_a', rc=rc)
@@ -1552,7 +1553,6 @@ module med_phases_mod
     call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_o, &
          STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_ocnalb_o', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
     deallocate(fldnames)
 
     ! Initialize module array pointers in med_ocnalb_mod
@@ -1563,6 +1563,8 @@ module med_phases_mod
   !-----------------------------------------------------------------------------
 
   subroutine med_phases_ocnalb(gcomp, rc)
+
+    use shr_nuopc_fldList_mod , only : fldListMed_ocnalb_a, fldListMed_ocnalb_o
 
     ! Compute ocean albedos (on the ocean grid)
 
@@ -1725,258 +1727,5 @@ module med_phases_mod
     end if
 
   end subroutine med_phases_ocnalb
-
-  !-----------------------------------------------------------------------------
-
-  subroutine med_phases_aofluxes_init(gcomp, rc)
-
-    ! Initialize ocn/atm flux calculations
-
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-
-    ! local variables
-    character(CL)          :: cvalue
-    character(CL)          :: aoflux_grid
-    type(InternalState)    :: is_local
-    integer                :: nflds
-    character(CL), pointer :: fldnames(:)
-    character(len=*),parameter :: subname='(med_phases_aofluxes_init)'
-    !---------------------------------------
-
-    if (dbug_flag > 5) then
-       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
-    endif
-    rc = ESMF_SUCCESS
-
-    ! Get the internal state from Component.
-    nullify(is_local%wrap)
-    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    ! Create field bundles for ocean/atmosphere flux computation
-    ! NOTE: the NStateImp(compocn) or NStateImp(compatm) used here
-    ! rather than NStateExp(n2), since the export state might only
-    ! contain control data and no grid information if if the target
-    ! component (n2) is not prognostic only receives control data back
-
-    nflds = size(fldListMed_ocnalb_o%flds)
-    allocate(fldnames(nflds))
-    call shr_nuopc_fldList_getfldnames(fldnames)
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_a, &
-         STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=fldnames, name='FBMed_aoflux_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_o, &
-         STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_aoflux_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_accum_o, &
-         STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_aoflux_o_accum', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    deallocate(fldnames)
-
-    ! Determine src and dst comps depending on the aoflux_grid setting
-    call NUOPC_CompAttributeGet(gcomp, name='aoflux_grid', value=cvalue, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    read(cvalue,*) aoflux_grid
-
-    if (trim(aoflux_grid) == 'ocn') then
-
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compatm,compocn), value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       ! Regrid atm import field bundle from atm to ocn grid as input for ocn/atm flux calculation
-       call med_map_FB_Regrid_Norm( &
-            fldListFr(compatm)%flds, compocn,  &
-            is_local%wrap%FBImp(compatm,compatm), &
-            is_local%wrap%FBImp(compatm,compocn), &
-            is_local%wrap%FBFrac(compatm), &
-            is_local%wrap%FBNormOne(compatm,compocn,:), &
-            is_local%wrap%RH(compatm,compocn,:), &
-            string=trim(compname(compatm))//'2'//trim(compname(compocn)), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compatm,compocn), &
-               string=trim(subname) //' FBImp('//trim(compname(compatm))//','//trim(compname(compocn))//') ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
-
-       ! Create FBMed_aoflux_o (field bundle on the ocean grid)
-       call med_aofluxes_init(gcomp, &
-            is_local%wrap%FBImp(compatm,compocn), &
-            is_local%wrap%FBImp(compocn,compocn), &
-            is_local%wrap%FBfrac(compocn), &
-            is_local%wrap%FBMed_ocnalb_o, &
-            is_local%wrap%FBMed_aoflux_o, &
-            is_local%wrap%FBMed_aoflux_diurnl_o, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    else if (trim(aoflux_grid) == 'atm') then
-
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compocn,compatm), value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call med_map_FB_Regrid_Norm( &
-            fldListFr(compocn)%flds, compatm, &
-            is_local%wrap%FBImp(compocn,compocn), &
-            is_local%wrap%FBImp(compocn,compatm), &
-            is_local%wrap%FBFrac(compocn), &
-            is_local%wrap%FBNormOne(compocn,compatm,:), &
-            is_local%wrap%RH(compocn,compatm,:), &
-            string=trim(compname(compocn))//'2'//trim(compname(compatm)), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compocn,compatm), &
-               string=trim(subname) //' FBImp('//trim(compname(compocn))//','//trim(compname(compatm))//') ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
-
-       ! Create FBMed_aoflux_a (field bundle on the atmosphere grid)
-       call med_aofluxes_init(gcomp, &
-            is_local%wrap%FBImp(compatm,compatm), &
-            is_local%wrap%FBImp(compocn,compatm), &
-            is_local%wrap%FBfrac(compatm), &
-            is_local%wrap%FBMed_ocnalb_a, &
-            is_local%wrap%FBMed_aoflux_a, &
-            is_local%wrap%FBMed_aoflux_diurnl_a, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    else
-
-       call ESMF_LogWrite(trim(subname)//' aoflux_grid = '//trim(aoflux_grid)//' not available', &
-            ESMF_LOGMSG_INFO, rc=dbrc)
-       return
-
-    end if
-
-  end subroutine med_phases_aofluxes_init
-
-  !-----------------------------------------------------------------------------
-
-  subroutine med_phases_aofluxes(gcomp, rc)
-
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-
-    ! local variables
-    type(InternalState) :: is_local
-    type(ESMF_Clock)    :: clock
-    character(CL)       :: cvalue
-    real(ESMF_KIND_R8)  :: rdead_comps
-    logical             :: dead_comps
-    logical             :: ocn_prognostic
-    character(CL)       :: aoflux_grid
-    character(len=*),parameter :: subname='(med_phases_aofluxes)'
-    !---------------------------------------
-
-    if (dbug_flag > 5) then
-       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
-    endif
-    rc = ESMF_SUCCESS
-
-    ! Get the clock from the mediator Component
-    call ESMF_GridCompGet(gcomp, clock=clock, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    ! Get the internal state from the mediator Component.
-    nullify(is_local%wrap)
-    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    ! Determine dead_comps
-    call shr_nuopc_methods_State_GetScalar(is_local%wrap%NStateImp(compatm), &
-         scalar_id=flds_scalar_index_dead_comps, value=rdead_comps, mpicom=is_local%wrap%mpicom, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    dead_comps = (rdead_comps /= 0._ESMF_KIND_r8)
-
-    call shr_nuopc_methods_State_GetScalar(is_local%wrap%NStateImp(compocn), &
-         scalar_id=flds_scalar_index_dead_comps, value=rdead_comps, mpicom=is_local%wrap%mpicom, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    dead_comps = (rdead_comps /= 0._ESMF_KIND_r8)
-
-    ! Determine if ocean is prognostic
-    ocn_prognostic = NUOPC_IsConnected(is_local%wrap%NStateImp(compocn))
-
-    ! Determine source and destination comps depending on the aoflux_grid setting
-    call NUOPC_CompAttributeGet(gcomp, name='aoflux_grid', value=cvalue, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    read(cvalue,*) aoflux_grid
-
-    if (trim(aoflux_grid) == 'ocn') then
-
-       ! Reset the field bundle on the destination grid to zero
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compatm,compocn), value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       ! Regrid atm import field bundle from atm to ocn grid as input for ocn/atm flux calculation
-       call med_map_FB_Regrid_Norm( &
-            fldListFr(compatm)%flds, compocn, &
-            is_local%wrap%FBImp(compatm,compatm), &
-            is_local%wrap%FBImp(compatm,compocn), &
-            is_local%wrap%FBFrac(compatm), &
-            is_local%wrap%FBNormOne(compatm,compocn,:), &
-            is_local%wrap%RH(compatm,compocn,:), &
-            string=trim(compname(compatm))//'2'//trim(compname(compocn)), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compatm,compocn), &
-               string=trim(subname) //' FBImp('//trim(compname(compatm))//','//trim(compname(compocn))//') ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
-
-       ! Calculate atm/ocn fluxes on the destination grid
-       call med_aofluxes(gcomp, clock, ocn_prognostic, dead_comps, rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBMed_aoflux_o, string=trim(subname) //' FBAMed_aoflux_o' , rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
-
-    else if (trim(aoflux_grid) == 'atm') then
-
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compocn,compatm), value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call med_map_FB_Regrid_Norm( &
-            fldListFr(compocn)%flds, compatm, &
-            is_local%wrap%FBImp(compocn,compocn), &
-            is_local%wrap%FBImp(compocn,compatm), &
-            is_local%wrap%FBFrac(compocn), &
-            is_local%wrap%FBNormOne(compocn,compatm,:), &
-            is_local%wrap%RH(compocn,compatm,:), &
-            string=trim(compname(compocn))//'2'//trim(compname(compatm)), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compocn,compatm), &
-               string=trim(subname) //' FBImp('//trim(compname(compocn))//','//trim(compname(compatm))//') ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
-
-       ! Calculate atm/ocn fluxes on the destination grid
-       call med_aofluxes(gcomp, clock, ocn_prognostic, dead_comps, rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compocn,compatm), &
-               string=trim(subname) //' FBImp('//trim(compname(compocn))//','//trim(compname(compatm))//') ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
-
-    else
-
-       call ESMF_LogWrite(trim(subname)//' aoflux_grid = '//trim(aoflux_grid)//' not available', &
-            ESMF_LOGMSG_INFO, rc=dbrc)
-       return
-
-    end if
-
-  end subroutine med_phases_aofluxes
 
 end module med_phases_mod

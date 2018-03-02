@@ -3,29 +3,29 @@ module med_map_mod
   use mpi
   use ESMF
   use NUOPC
-  use shr_kind_mod                , only: SHR_KIND_CX, SHR_KIND_CL, SHR_KIND_CS
-  use shr_sys_mod                 , only: shr_sys_flush
-  use shr_nuopc_fldList_types_mod , only: shr_nuopc_fldList_src_entry_type
-  use shr_nuopc_fldList_types_mod , only: flds_scalar_name
-  use shr_nuopc_fldList_types_mod , only: fldListFr, fldListTo
-  use shr_nuopc_fldList_types_mod , only: ncomps, compmed, compatm, compocn
-  use shr_nuopc_fldList_types_mod , only: compice, complnd, comprof, compwav, compglc, compname
-  use shr_nuopc_fldList_types_mod , only: mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy, mapunset 
-  use shr_nuopc_fldList_types_mod , only: mapnames, nmappers
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_Init
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_Reset
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_Clean
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_Copy
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_GetFldPtr
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_FieldRegrid
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_FB_FldChk
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_RH_Init
-  use shr_nuopc_methods_mod       , only: shr_nuopc_methods_ChkErr
-  use med_internalstate_mod       , only: InternalState
+  use shr_kind_mod          , only: SHR_KIND_CX, SHR_KIND_CL, SHR_KIND_CS
+  use shr_sys_mod           , only: shr_sys_flush
+  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_src_entry_type
+  use shr_nuopc_fldList_mod , only: flds_scalar_name
+  use shr_nuopc_fldList_mod , only: fldListFr, fldListTo
+  use shr_nuopc_fldList_mod , only: ncomps, compmed, compatm, compocn
+  use shr_nuopc_fldList_mod , only: compice, complnd, comprof, compwav, compglc, compname
+  use shr_nuopc_fldList_mod , only: mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy, mapunset 
+  use shr_nuopc_fldList_mod , only: mapnames, nmappers
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_Init
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_Reset
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_Clean
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_Copy
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_GetFldPtr
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_FieldRegrid
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_getFieldN
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_FldChk
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_RH_Init
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
+  use med_internalstate_mod , only: InternalState
   use med_constants_mod           
 
   implicit none
-
   private
 
   ! public routines

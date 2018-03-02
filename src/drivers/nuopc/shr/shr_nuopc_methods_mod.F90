@@ -6,8 +6,8 @@ module shr_nuopc_methods_mod
 
   use ESMF
   use NUOPC
-  use shr_nuopc_fldList_types_mod , only : flds_scalar_name, flds_scalar_num
-  use seq_comm_mct                , only : llogunit => logunit
+  use shr_nuopc_fldList_mod , only : flds_scalar_name, flds_scalar_num
+  use seq_comm_mct          , only : llogunit => logunit
   use mpi
 
   implicit none
@@ -56,8 +56,7 @@ module shr_nuopc_methods_mod
   real(ESMF_KIND_R8), parameter         :: czero = 0.0_ESMF_KIND_R8  ! spval
   integer           , parameter         :: ispval_mask = -987987     ! spval for RH mask values
   type(ESMF_PoleMethod_Flag), parameter :: polemethod=ESMF_POLEMETHOD_ALLAVG
-  character(*),parameter                :: u_FILE_u = &
-    __FILE__
+  character(*)      , parameter         :: u_FILE_u = __FILE__
 
   public shr_nuopc_methods_FB_copy
   public shr_nuopc_methods_FB_accum

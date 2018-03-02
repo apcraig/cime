@@ -15,7 +15,6 @@ module ESM
 
   use shr_sys_mod           , only : shr_sys_abort
   use shr_kind_mod          , only : SHR_KIND_R8, SHR_KIND_CS, SHR_KIND_CL
-  use shr_kind_mod          , only : CL => SHR_KIND_CL
   use shr_scam_mod          , only : shr_scam_checkSurface
   use shr_mpi_mod           , only : shr_mpi_bcast, shr_mpi_chkerr
   use shr_mem_mod           , only : shr_mem_init, shr_mem_getusage
@@ -43,8 +42,8 @@ module ESM
   use seq_comm_mct          , only : seq_comm_iamin, seq_comm_name, seq_comm_namelen, seq_comm_iamroot
   use seq_timemgr_mod       , only : seq_timemgr_clockInit, seq_timemgr_EClockGetData
 
-  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Init
-  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_setDict
+  use esmFlds               , only : esmFlds_Init
+  use esmFlds               , only : esmFlds_SetDict
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
 
@@ -332,6 +331,17 @@ module ESM
     call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+    attrFF = NUOPC_FreeFormatCreate(config, label="DRIVER_cplflds_attributes::", relaxedflag=.true., rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (mastertask) then
+       call NUOPC_FreeFormatPrint(attrFF, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
+    call NUOPC_CompAttributeIngest(driver, attrFF, addFlag=.true., rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call NUOPC_FreeFormatDestroy(attrFF, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     !-------------------------------------------
     ! Initialize mct and pets and cesm stuff
     !-------------------------------------------
@@ -340,7 +350,7 @@ module ESM
          Eclock_d, Eclock_a, Eclock_l, Eclock_o, &
          Eclock_i, Eclock_g, Eclock_r, Eclock_w, Eclock_e)
 
-    call shr_nuopc_fldList_setDict(rc)
+    call esmFlds_SetDict(rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--------
@@ -1687,7 +1697,8 @@ module ESM
     ! Initialize coupled fields
     !----------------------------------------------------------
 
-    call shr_nuopc_flds_set(nlfilename, GLOID)
+    call esmFlds_Init(driver, GLOID, rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
 
     !----------------------------------------------------------
     ! Initialize options for reproducible sums
@@ -2164,7 +2175,7 @@ module ESM
     integer            ,intent(inout) :: rc
 
     ! locals
-    character(len=CL)  :: cvalue
+    character(len=SHR_KIND_CL)  :: cvalue
     integer            :: n
     integer, parameter :: nattrlist = 28
     character(len=*), parameter :: attrList(nattrlist) = &

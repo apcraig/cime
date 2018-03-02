@@ -2142,13 +2142,13 @@
   </entry>
 
   <!-- =========================== -->
-  <!-- group seq_cplflds_inparm    -->
+  <!-- group DRIVER_cplflds        -->
   <!-- =========================== -->
 
   <entry id="flds_co2a">
     <type>logical</type>
     <category>flds</category>
-    <group>seq_cplflds_inparm</group>
+    <group>DRIVER_cplflds_attributes</group>
     <desc>
       Previously, new fields that were needed to be passed between components
       for certain compsets were specified by cpp-variables. This has been
@@ -2165,7 +2165,7 @@
   <entry id="flds_co2b">
     <type>logical</type>
     <category>flds</category>
-    <group>seq_cplflds_inparm</group>
+    <group>DRIVER_cplflds_attributes</group>
     <desc>
       Previously, new fields that were needed to be passed between components
       for certain compsets were specified by cpp-variables. This has been
@@ -2182,7 +2182,7 @@
   <entry id="flds_co2c">
     <type>logical</type>
     <category>flds</category>
-    <group>seq_cplflds_inparm</group>
+    <group>DRIVER_cplflds_attributes</group>
     <desc>
       Previously, new fields that were needed to be passed between components
       for certain compsets were specified by cpp-variables. This has been
@@ -2199,7 +2199,7 @@
   <entry  id="flds_wiso" modify_via_xml="FLDS_WISO">
     <type>logical</type>
     <category>flds</category>
-    <group>seq_cplflds_inparm</group>
+    <group>DRIVER_cplflds_attributes</group>
     <desc>
       Pass water isotopes between components
     </desc>
@@ -2211,7 +2211,7 @@
   <entry  id="glc_nec" modify_via_xml="GLC_NEC">
     <type>integer</type>
     <category>flds</category>
-    <group>seq_cplflds_inparm</group>
+    <group>DRIVER_cplflds_attributes</group>
     <desc>
       Number of cism elevation classes. Set by the xml variable GLC_NEC in env_run.xml
     </desc>
@@ -2223,7 +2223,7 @@
   <entry id="ice_ncat" modify_via_xml="ICE_NCAT">
     <type>integer</type>
     <category>flds</category>
-    <group>seq_cplflds_inparm</group>
+    <group>DRIVER_cplflds_attributes</group>
     <desc>
       Number of sea ice thickness categories. Set by the xml variable ICE_NCAT in env_build.xml
     </desc>
@@ -2235,7 +2235,7 @@
   <entry id="flds_i2o_per_cat" modify_via_xml="CPL_I2O_PER_CAT">
     <type>logical</type>
     <category>flds</category>
-    <group>seq_cplflds_inparm</group>
+    <group>DRIVER_cplflds_attributes</group>
     <desc>
       .true. if select per ice thickness category fields are passed to the ocean.
       Set by the xml variable CPL_I2O_PER_CAT in env_run.xml
@@ -2249,30 +2249,30 @@
   <!-- -group seq_cplflds_custom   -->
   <!-- =========================== -->
 
-  <entry id="cplflds_custom">
-    <type>char(200)</type>
-    <category>flds</category>
-    <group>seq_cplflds_userspec</group>
-    <desc>
-      New fields that are user specidied can be added as namelist variables
-      by the user in the cpl namelist flds_user using the namelist variable
-      array cplflds_customs. The user specified new fields must follow the
-      above naming convention.
-      As an example, say you want to add a new state 'foo' that is passed
-      from the land to the atm - you would do this as follows
-      &amp;flds_user
-      cplflds_custom = 'Sa_foo->a2x', 'Sa_foo->x2a'
-      /
-      This would add the field 'Sa_foo' to the character strings defining the
-      attribute vectors a2x and x2a. It is assumed that code would need to be
-      introduced in the atm and land components to deal with this new attribute
-      vector field.
-      Modify user_nl_cpl to edit this.
-    </desc>
-    <values>
-      <value>''</value>
-    </values>
-  </entry>
+  <!-- <entry id="cplflds_custom"> -->
+  <!--   <type>char(200)</type> -->
+  <!--   <category>flds</category> -->
+  <!--   <group>seq_cplflds_userspec</group> -->
+  <!--   <desc> -->
+  <!--     New fields that are user specidied can be added as namelist variables -->
+  <!--     by the user in the cpl namelist flds_user using the namelist variable -->
+  <!--     array cplflds_customs. The user specified new fields must follow the -->
+  <!--     above naming convention. -->
+  <!--     As an example, say you want to add a new state 'foo' that is passed -->
+  <!--     from the land to the atm - you would do this as follows -->
+  <!--     &amp;flds_user -->
+  <!--     cplflds_custom = 'Sa_foo->a2x', 'Sa_foo->x2a' -->
+  <!--     / -->
+  <!--     This would add the field 'Sa_foo' to the character strings defining the -->
+  <!--     attribute vectors a2x and x2a. It is assumed that code would need to be -->
+  <!--     introduced in the atm and land components to deal with this new attribute -->
+  <!--     vector field. -->
+  <!--     Modify user_nl_cpl to edit this. -->
+  <!--   </desc> -->
+  <!--   <values> -->
+  <!--     <value>''</value> -->
+  <!--   </values> -->
+  <!-- </entry> -->
 
   <!-- =========================== -->
   <!-- group seq_timemgr_inparm    -->
