@@ -43,7 +43,6 @@ module ESM
   use seq_timemgr_mod       , only : seq_timemgr_clockInit, seq_timemgr_EClockGetData
 
   use esmFlds               , only : esmFlds_Init
-  use esmFlds               , only : esmFlds_SetDict
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
 
@@ -349,9 +348,6 @@ module ESM
     call esm_SetAttributes_and_InitClocks(driver, &
          Eclock_d, Eclock_a, Eclock_l, Eclock_o, &
          Eclock_i, Eclock_g, Eclock_r, Eclock_w, Eclock_e)
-
-    call esmFlds_SetDict(rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--------
     ! check component list for active components and set present flags
@@ -2177,7 +2173,7 @@ module ESM
     ! locals
     character(len=SHR_KIND_CL)  :: cvalue
     integer            :: n
-    integer, parameter :: nattrlist = 28
+    integer, parameter :: nattrlist = 29
     character(len=*), parameter :: attrList(nattrlist) = &
       (/ "case_name"    ,"single_column","scmlat"        ,"scmlon"               , &
          "read_restart" ,"start_type"   ,"tfreeze_option","model_version"        , &
@@ -2185,7 +2181,8 @@ module ESM
          "info_debug"   ,"atm_aero"     ,"aqua_planet"   ,"brnch_retain_casename", &
          "perpetual"    ,"perpetual_ymd","hostname"      ,"username"             , &
          "atm_present"  ,"lnd_present"  ,"ocn_present"   ,"ice_present"          , &
-         "rof_present"  ,"wav_present"  ,"glc_present"   ,"med_present"          /)
+         "rof_present"  ,"wav_present"  ,"glc_present"   ,"med_present"          , &
+         "flds_i2o_per_cat"/)
     character(len=*), parameter :: subname = "(esm.F90:esm_AddAttributes)"
     !-------------------------------------------
 

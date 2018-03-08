@@ -63,8 +63,8 @@ contains
 
     ! Arguments
     type(ESMF_GridComp)    :: gcomp
-    type(ESMF_FieldBundle) :: FBMedOcnalb ! Ocean albedos computed in mediator on ocean grid
     type(ESMF_FieldBundle) :: FBAtm       ! Atm Import fields ocn grid
+    type(ESMF_FieldBundle) :: FBMedOcnalb ! Ocean albedos computed in mediator on ocean grid
     integer, intent(out)   :: rc
     !
     ! Local variables

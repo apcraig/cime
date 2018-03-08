@@ -5,12 +5,15 @@ module med_phases_aofluxes_mod
   use shr_kind_mod          , only : R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
   use shr_kind_mod          , only : CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod           , only : shr_sys_abort
+  use esmFlds               , only : flds_scalar_name
+  use esmFlds               , only : flds_scalar_num
+  use esmFlds               , only : flds_scalar_index_dead_comps
+  use esmFlds               , only : fldListMed_aoflux_a
+  use esmFlds               , only : fldListMed_aoflux_o
+  use esmFlds               , only : fldListFr, fldListTo
+  use esmFlds               , only : flds_scalar_index_dead_comps
+  use esmFlds               , only : compatm, compocn, compname
   use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_GetFldNames
-  use shr_nuopc_fldList_mod , only : flds_scalar_index_dead_comps
-  use shr_nuopc_fldList_mod , only : fldListMed_aoflux_a, fldListMed_aoflux_o
-  use shr_nuopc_fldList_mod , only : fldListFr, fldListTo
-  use shr_nuopc_fldList_mod , only : flds_scalar_index_dead_comps
-  use shr_nuopc_fldList_mod , only : compatm, compocn, compname
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_init
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_getFieldN
@@ -27,11 +30,21 @@ module med_phases_aofluxes_mod
   use med_constants_mod     , only : med_constants_czero
   use med_internalstate_mod , only : InternalState
   use med_map_mod           , only : med_map_FB_Regrid_Norm
+
   implicit none
   private
 
+  !--------------------------------------------------------------------------
+  ! Public routines
+  !--------------------------------------------------------------------------
+
   public  :: med_phases_aofluxes_init
   public  :: med_phases_aofluxes
+
+  !--------------------------------------------------------------------------
+  ! Private routines
+  !--------------------------------------------------------------------------
+
   private :: med_aofluxes_init
   private :: med_aofluxes
 
@@ -123,6 +136,13 @@ module med_phases_aofluxes_mod
   character(len=1024)            :: tmpstr
   logical                        :: mastertask
 
+  ! Mediator field bundles used for atm/ocn flux computation
+  type(ESMF_FieldBundle), public  :: FBMed_aoflux_o        ! Ocn/Atm flux fields on ocn grid
+  type(ESMF_FieldBundle), public  :: FBMed_aoflux_a        ! Ocn/Atm flux fields on atm grid
+  type(ESMF_FieldBundle), public  :: FBMed_aoflux_accum_o  ! Ocn/Atm flux accumulator on ocn grid
+  type(ESMF_FieldBundle), public  :: FBMed_aoflux_diurnl_o ! Ocn/Atm flux fields only needed for history
+  type(ESMF_FieldBundle), public  :: FBMed_aoflux_diurnl_a ! Ocn/Atm flux fields only needed for history
+
 !================================================================================
 contains
 !================================================================================
@@ -163,15 +183,15 @@ contains
     allocate(fldnames(nflds))
     call shr_nuopc_fldList_getfldnames(fldListMed_aoflux_a%flds, fldnames)
 
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_a, &
+    call shr_nuopc_methods_FB_init(FBMed_aoflux_a, flds_scalar_name, &
          STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=fldnames, name='FBMed_aoflux_a', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_o, &
+    call shr_nuopc_methods_FB_init(FBMed_aoflux_o, flds_scalar_name, &
          STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_aoflux_o', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_accum_o, &
+    call shr_nuopc_methods_FB_init(FBMed_aoflux_accum_o, flds_scalar_name, &
          STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_aoflux_o_accum', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     deallocate(fldnames)
@@ -209,8 +229,8 @@ contains
             is_local%wrap%FBImp(compocn,compocn), &
             is_local%wrap%FBfrac(compocn), &
             is_local%wrap%FBMed_ocnalb_o, &
-            is_local%wrap%FBMed_aoflux_o, &
-            is_local%wrap%FBMed_aoflux_diurnl_o, rc=rc)
+            FBMed_aoflux_o, &
+            FBMed_aoflux_diurnl_o, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     else if (trim(aoflux_grid) == 'atm') then
@@ -240,8 +260,8 @@ contains
             is_local%wrap%FBImp(compocn,compatm), &
             is_local%wrap%FBfrac(compatm), &
             is_local%wrap%FBMed_ocnalb_a, &
-            is_local%wrap%FBMed_aoflux_a, &
-            is_local%wrap%FBMed_aoflux_diurnl_a, rc=rc)
+            FBMed_aoflux_a, &
+            FBMed_aoflux_diurnl_a, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     else
@@ -288,12 +308,14 @@ contains
 
     ! Determine dead_comps
     call shr_nuopc_methods_State_GetScalar(is_local%wrap%NStateImp(compatm), &
-         scalar_id=flds_scalar_index_dead_comps, value=rdead_comps, mpicom=is_local%wrap%mpicom, rc=rc)
+         scalar_id=flds_scalar_index_dead_comps, value=rdead_comps, mpicom=is_local%wrap%mpicom, &
+         flds_scalar_name=flds_scalar_name, flds_scalar_num=flds_scalar_num, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     dead_comps = (rdead_comps /= 0._ESMF_KIND_r8)
 
     call shr_nuopc_methods_State_GetScalar(is_local%wrap%NStateImp(compocn), &
-         scalar_id=flds_scalar_index_dead_comps, value=rdead_comps, mpicom=is_local%wrap%mpicom, rc=rc)
+         scalar_id=flds_scalar_index_dead_comps, value=rdead_comps, mpicom=is_local%wrap%mpicom, &
+         flds_scalar_name=flds_scalar_name, flds_scalar_num=flds_scalar_num, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     dead_comps = (rdead_comps /= 0._ESMF_KIND_r8)
 
@@ -333,7 +355,7 @@ contains
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBMed_aoflux_o, string=trim(subname) //' FBAMed_aoflux_o' , rc=rc)
+          call shr_nuopc_methods_FB_diagnose(FBMed_aoflux_o, string=trim(subname) //' FBAMed_aoflux_o' , rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        end if
 
@@ -380,22 +402,22 @@ contains
 
 !================================================================================
 
-  subroutine med_aofluxes_init(gcomp, FBAtm, FBOcn, FBFrac, &
-       FBMed_ocnalb, FBMed_aoflux, FBMed_aoflux_diurnl, rc)
+  subroutine med_aofluxes_init(gcomp, FBAtm, FBOcn, FBFrac, FBMed_ocnalb, &
+       FBMed_aoflux, FBMed_aoflux_diurnl, rc)
 
     !-----------------------------------------------------------------------
     ! Initialize pointers to the module variables 
     !-----------------------------------------------------------------------
 
     ! Arguments
-    type(ESMF_GridComp)    :: gcomp
-    type(ESMF_FieldBundle) :: FBAtm               ! Atm Import fields on aoflux grid
-    type(ESMF_FieldBundle) :: FBOcn               ! Ocn Import fields on aoflux grid
-    type(ESMF_FieldBundle) :: FBfrac              ! Fraction data for various components, on their grid
-    type(ESMF_FieldBundle) :: FBMed_ocnalb        ! Ocn albedos computed in mediator 
-    type(ESMF_FieldBundle) :: FBMed_aoflux        ! Ocn/Atm flux fields
-    type(ESMF_FieldBundle) :: FBMed_aoflux_diurnl ! Ocn/Atm flux fields needed only for history output
-    integer, intent(out)   :: rc
+    type(ESMF_GridComp)                    :: gcomp
+    type(ESMF_FieldBundle) , intent(in)    :: FBAtm               ! Atm Import fields on aoflux grid
+    type(ESMF_FieldBundle) , intent(in)    :: FBOcn               ! Ocn Import fields on aoflux grid
+    type(ESMF_FieldBundle) , intent(in)    :: FBfrac              ! Fraction data for various components, on their grid
+    type(ESMF_FieldBundle) , intent(in)    :: FBMed_ocnalb        ! Ocn albedos computed in mediator 
+    type(ESMF_FieldBundle) , intent(inout) :: FBMed_aoflux        ! Ocn albedos computed in mediator 
+    type(ESMF_FieldBundle) , intent(inout) :: FBMed_aoflux_diurnl ! Ocn albedos computed in mediator 
+    integer                , intent(out)   :: rc
     !
     ! Local variables
     type(ESMF_VM)            :: vm

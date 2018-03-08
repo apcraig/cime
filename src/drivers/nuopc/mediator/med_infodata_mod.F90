@@ -12,13 +12,13 @@ module med_infodata_mod
   use seq_comm_mct          , only: num_inst_atm, num_inst_lnd, num_inst_rof
   use seq_comm_mct          , only: num_inst_ocn, num_inst_ice, num_inst_glc
   use seq_comm_mct          , only: num_inst_wav
-  use shr_nuopc_fldList_mod , only: flds_scalar_num, flds_scalar_name
-  use shr_nuopc_fldList_mod , only: flds_scalar_index_nx,  flds_scalar_index_ny
-  use shr_nuopc_fldList_mod , only: flds_scalar_index_flood_present
-  use shr_nuopc_fldList_mod , only: flds_scalar_index_rofice_present
-  use shr_nuopc_fldList_mod , only: flds_scalar_index_precip_fact
-  use shr_nuopc_fldList_mod , only: flds_scalar_index_nextsw_cday
-  use shr_nuopc_fldList_mod , only: flds_scalar_index_dead_comps
+  use esmFlds               , only: flds_scalar_num, flds_scalar_name
+  use esmFlds               , only: flds_scalar_index_nx,  flds_scalar_index_ny
+  use esmFlds               , only: flds_scalar_index_flood_present
+  use esmFlds               , only: flds_scalar_index_rofice_present
+  use esmFlds               , only: flds_scalar_index_precip_fact
+  use esmFlds               , only: flds_scalar_index_nextsw_cday
+  use esmFlds               , only: flds_scalar_index_dead_comps
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_chkErr
 
   implicit none
@@ -162,7 +162,6 @@ CONTAINS
     else
       call ESMF_StateGet(State, itemName=trim(flds_scalar_name), field=field, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
       if (mytask == 0) then
         call ESMF_FieldGet(field, farrayPtr = farrayptr, rc=rc)

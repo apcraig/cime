@@ -4,28 +4,35 @@ module dice_comp_nuopc
 ! This is the NUOPC cap
 !----------------------------------------------------------------------------
 
-  use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
-  use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, CXX => shr_kind_CXX
   use shr_sys_mod   ! shared system calls
-
-  use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
-  use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
-
-  use shr_nuopc_fldList_mod , only: fldListFr, fldListTo, compice
-  use shr_nuopc_fldList_mod , only: flds_scalar_name, flds_scalar_index_nextsw_cday
-  use shr_nuopc_fldList_mod , only: flds_scalar_index_nx, flds_scalar_index_ny
-  use shr_nuopc_fldList_mod , only: flds_scalar_index_dead_comps
-  use shr_nuopc_fldList_mod , only: flds_scalar_index_iceberg_prognostic
-  use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_Realize, shr_nuopc_fldList_Concat
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
-  use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
-  use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
-  use shr_file_mod          , only: shr_file_setIO, shr_file_getUnit
-  use shr_strdata_mod       , only: shr_strdata_type
+  use shr_kind_mod          , only : R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
+  use shr_kind_mod          , only : CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, CXX => shr_kind_CXX
+  use seq_comm_mct          , only : seq_comm_inst, seq_comm_name, seq_comm_suffix
+  use seq_timemgr_mod       , only : seq_timemgr_ETimeGet
+  use esmFlds               , only : fldListFr, fldListTo, compice, compname
+  use esmFlds               , only : flds_scalar_name
+  use esmFlds               , only : flds_scalar_num
+  use esmFlds               , only : flds_scalar_index_nx
+  use esmFlds               , only : flds_scalar_index_ny
+  use esmFlds               , only : flds_scalar_index_dead_comps
+  use esmFlds               , only : flds_scalar_index_iceberg_prognostic
+  use esmFlds               , only : flds_scalar_index_nextsw_cday
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Realize
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Concat
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Deactivate
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Getnumflds
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Getfldinfo
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_Clock_TimePrint
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_SetScalar
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_Diagnose
+  use shr_nuopc_grid_mod    , only : shr_nuopc_grid_Meshinit
+  use shr_nuopc_grid_mod    , only : shr_nuopc_grid_ArrayToState
+  use shr_nuopc_grid_mod    , only : shr_nuopc_grid_StateToArray
+  use shr_file_mod          , only : shr_file_getlogunit, shr_file_setlogunit
+  use shr_file_mod          , only : shr_file_getloglevel, shr_file_setloglevel
+  use shr_file_mod          , only : shr_file_setIO, shr_file_getUnit
+  use shr_strdata_mod       , only : shr_strdata_type
 
   use ESMF
   use NUOPC
@@ -39,7 +46,6 @@ module dice_comp_nuopc
   use dice_comp_mod, only: dice_comp_init, dice_comp_run, dice_comp_final
   use perf_mod
   use mct_mod
-  use shr_nuopc_methods_mod, only: shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
 
   implicit none
 
@@ -105,37 +111,37 @@ module dice_comp_nuopc
 
     ! the NUOPC gcomp component will register the generic methods
     call NUOPC_CompDerive(gcomp, model_routine_SS, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! switching to IPD versions
     call ESMF_GridCompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
          userRoutine=InitializeP0, phase=0, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! set entry point for methods that require specific implementation
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
          phaseLabelList=(/"IPDv01p1"/), userRoutine=InitializeAdvertise, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
          phaseLabelList=(/"IPDv01p3"/), userRoutine=InitializeRealize, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! attach specializing method(s)
 
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Advance, &
          specRoutine=ModelAdvance, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_MethodRemove(gcomp, label=model_label_SetRunClock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetRunClock, &
          specRoutine=ModelSetRunClock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Finalize, &
          specRoutine=ModelFinalize, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -155,7 +161,7 @@ module dice_comp_nuopc
     ! Switch to IPDv01 by filtering all other phaseMap entries
     call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, &
          acceptStringList=(/"IPDv01p"/), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
   end subroutine InitializeP0
 
@@ -173,7 +179,9 @@ module dice_comp_nuopc
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
     logical       :: exists
-    integer(IN)   :: n       
+    character(CS) :: stdname, shortname
+    logical       :: activefld
+    integer(IN)   :: n,nflds       
     integer(IN)   :: ierr       ! error code
     integer(IN)   :: shrlogunit ! original log unit
     integer(IN)   :: shrloglev  ! original log level
@@ -188,10 +196,10 @@ module dice_comp_nuopc
     !----------------------------------------------------------------------------
 
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_VMGet(vm, mpiCommunicator=lmpicom, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call mpi_comm_dup(lmpicom, mpicom, ierr)
     call mpi_comm_rank(mpicom, my_task, ierr)
@@ -201,7 +209,7 @@ module dice_comp_nuopc
     !----------------------------------------------------------------------------
 
     call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) compid  ! convert from string to integer
 
     !----------------------------------------------------------------------------
@@ -254,32 +262,39 @@ module dice_comp_nuopc
     ! create import and export field list needed by data models
     !--------------------------------
 
-    call shr_nuopc_fldList_Concat(fldListFr(compice), fldListTo(compice), flds_i2x, flds_x2i)
-
+    call shr_nuopc_fldList_Concat(fldListFr(compice), fldListTo(compice), flds_i2x, flds_x2i, flds_scalar_name)
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    do n = 1,size(fldListFr(compice)%flds)
-       if ( (trim(fldListFr(compice)%flds(n)%shortname) /= flds_scalar_name .and. ice_prognostic) .or. &
-            (trim(fldListFr(compice)%flds(n)%shortname) == flds_scalar_name)) then
-             call NUOPC_Advertise(importState, &
-                  standardName=trim(fldListFr(compice)%flds(n)%stdname), &
-                  shortname=trim(fldListFr(compice)%flds(n)%shortname), &
-                  name=trim(fldListFr(compice)%flds(n)%shortname), &
-                  TransferOfferGeomObject='will provide')
-             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          end if
+    ! First deactivate fldListTo(compatm) if atm_prognostic is .false.
+    if (.not. ice_prognostic) then
+       call shr_nuopc_fldList_Deactivate(fldListTo(compice), flds_scalar_name)
+    end if
+
+    nflds = shr_nuopc_fldList_Getnumflds(fldListFr(compice))
+    do n = 1,nflds
+       call shr_nuopc_fldList_Getfldinfo(fldListFr(compice), n, activefld, stdname, shortname)
+       if (activefld) then
+          call NUOPC_Advertise(exportState, standardName=stdname, shortname=shortname, name=shortname, &
+               TransferOfferGeomObject='will provide')
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_LogWrite(subname//':Fr_'//trim(compname(compice))//': '//trim(shortname), ESMF_LOGMSG_INFO)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
     end do
 
-    do n = 1,size(fldListTo(compice)%flds)
-       call NUOPC_Advertise(exportState, &
-            standardName=trim(fldListTo(compice)%flds(n)%stdname), &
-            shortname=trim(fldListTo(compice)%flds(n)%shortname), &
-            name=trim(fldListTo(compice)%flds(n)%shortname), &
-            TransferOfferGeomObject='will provide')
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    nflds = shr_nuopc_fldList_Getnumflds(fldListTo(compice))
+    do n = 1,nflds
+       call shr_nuopc_fldList_Getfldinfo(fldListTo(compice), n, activefld, stdname, shortname)
+       if (activefld) then
+          call NUOPC_Advertise(importState, standardName=stdname, shortname=shortname, name=shortname, &
+               TransferOfferGeomObject='will provide')
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_LogWrite(subname//':To_'//trim(compname(compice))//': '//trim(shortname), ESMF_LOGMSG_INFO)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
     end do
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
@@ -337,26 +352,26 @@ module dice_comp_nuopc
     ggrid => ggrid_target
 
     call NUOPC_CompAttributeGet(gcomp, name='case_name', value=case_name, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(gcomp, name='scmlon', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) scmlon
 
     call NUOPC_CompAttributeGet(gcomp, name='scmlat', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) scmlat
 
     call NUOPC_CompAttributeGet(gcomp, name='single_column', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) scmMode
 
     call NUOPC_CompAttributeGet(gcomp, name='read_restart', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) read_restart
 
     call NUOPC_CompAttributeGet(gcomp, name='flds_i2o_per_cat', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) flds_i2o_per_cat  ! module variable
 
     call dice_comp_init(clock, x2d, d2x, &
@@ -383,7 +398,7 @@ module dice_comp_nuopc
     call mct_gsMap_OrderedPoints(gsMap_target, iam, gindex)
 
     call shr_nuopc_grid_MeshInit(gcomp, nx_global, ny_global, mpicom, compid, gindex, lon, lat, Emesh, rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     deallocate(lon)
     deallocate(lat)
@@ -403,11 +418,13 @@ module dice_comp_nuopc
     !  by replacing the advertised fields with the fields in fldsToIce of the same name.
     !--------------------------------
 
-    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldsTo=fldListTo(compice)%flds, tag=subname//':diceImport', rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    call shr_nuopc_fldList_Realize(importState, fldListTo(compice), flds_scalar_name, flds_scalar_num, &
+         mesh=Emesh, tag=subname//':diceImport', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldsFr=fldListFr(compice)%flds, tag=subname//':diceExport', rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    call shr_nuopc_fldList_Realize(exportState, fldListFr(compice), flds_scalar_name, flds_scalar_num, &
+         mesh=Emesh, tag=subname//':diceExport', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--------------------------------
     ! Pack export state
@@ -416,27 +433,31 @@ module dice_comp_nuopc
     !--------------------------------
 
     call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_i2x, exportState, grid_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_methods_State_SetScalar(dble(ny_global),flds_scalar_index_nx, exportState, mpicom, rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    call shr_nuopc_methods_State_SetScalar(dble(ny_global),flds_scalar_index_nx, exportState, mpicom, &
+         flds_scalar_name, flds_scalar_num, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_State_SetScalar(dble(nx_global),flds_scalar_index_ny, exportState, mpicom, &
+         flds_scalar_name, flds_scalar_num, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_methods_State_SetScalar(dble(nx_global),flds_scalar_index_ny, exportState, mpicom, rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_dead_comps, exportState, mpicom, &
+         flds_scalar_name, flds_scalar_num, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_dead_comps, exportState, mpicom, rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
-
-    call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_dead_comps, exportState, mpicom, rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    call shr_nuopc_methods_State_SetScalar(0.0_r8, flds_scalar_index_dead_comps, exportState, mpicom, &
+         flds_scalar_name, flds_scalar_num, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (iceberg_prognostic) then
        scalar = 1.0_r8
     else
        scalar = 0.0_r8
     end if
-    call shr_nuopc_methods_State_SetScalar(scalar, flds_scalar_index_iceberg_prognostic, exportState, mpicom, rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    call shr_nuopc_methods_State_SetScalar(scalar, flds_scalar_index_iceberg_prognostic, exportState, mpicom, &
+         flds_scalar_name, flds_scalar_num, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--------------------------------
     ! diagnostics
@@ -445,7 +466,7 @@ module dice_comp_nuopc
     if (dbug > 1) then
       call mct_aVect_info(2, d2x, istr=subname//':AV')
       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return  ! bail out
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
 #ifdef USE_ESMF_METADATA
@@ -519,12 +540,8 @@ module dice_comp_nuopc
     ! query the Component for its clock, importState and exportState
     !--------------------------------
 
-    call NUOPC_ModelGet(gcomp, modelClock=clock, importState=importState, &
-      exportState=exportState, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-      line=__LINE__, &
-      file=u_FILE_u)) &
-      return  ! bail out
+    call NUOPC_ModelGet(gcomp, modelClock=clock, importState=importState, exportState=exportState, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug > 1) then
       call shr_nuopc_methods_Clock_TimePrint(clock,subname//'clock',rc=rc)
@@ -535,20 +552,20 @@ module dice_comp_nuopc
     !--------------------------------
 
     call shr_nuopc_grid_StateToArray(importState, x2d%rattr, flds_x2i, grid_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--------------------------------
     ! Run model
     !--------------------------------
 
     call ESMF_ClockGetAlarm(clock, alarmname='seq_timemgr_alarm_restart', alarm=alarm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (ESMF_AlarmIsRinging(alarm, rc=rc)) then
        write_restart = .true.
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_AlarmRingerOff( alarm, rc=rc )
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
        write_restart = .false.
     endif
@@ -571,7 +588,7 @@ module dice_comp_nuopc
     !--------------------------------
 
     call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_i2x, exportState, grid_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--------------------------------
     ! diagnostics
@@ -580,14 +597,14 @@ module dice_comp_nuopc
     if (dbug > 1) then
       call mct_aVect_info(2, d2x, istr=subname//':AV')
       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     call ESMF_ClockPrint(clock, options="currTime", preString="------>Advancing ICE from: ", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_ClockPrint(clock, options="stopTime", preString="--------------------------------> to: ", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call shr_file_setLogLevel(shrloglev)
     call shr_file_setLogUnit (shrlogunit)
@@ -619,13 +636,13 @@ module dice_comp_nuopc
 
     ! query the Component for its clock, importState and exportState
     call NUOPC_ModelGet(gcomp, driverClock=dclock, modelClock=mclock, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_ClockGet(dclock, currTime=dcurrtime, timeStep=dtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_ClockGet(mclock, currTime=mcurrtime, timeStep=mtimestep, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--------------------------------
     ! check that the current time in the model and driver are the same
@@ -633,15 +650,15 @@ module dice_comp_nuopc
 
     if (mcurrtime /= dcurrtime) then
       call ESMF_TimeGet(dcurrtime, timeString=dtimestring, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       call ESMF_TimeGet(mcurrtime, timeString=mtimestring, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
       rc=ESMF_Failure
 
       call ESMF_LogWrite(subname//" ERROR in time consistency; "//trim(dtimestring)//" ne "//trim(mtimestring),  &
            ESMF_LOGMSG_ERROR, rc=dbrc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     !--------------------------------
@@ -654,32 +671,32 @@ module dice_comp_nuopc
     mstoptime = mcurrtime + dtimestep
 
     call ESMF_ClockSet(mclock, timeStep=dtimestep, stopTime=mstoptime, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_ClockGetAlarmList(mclock, alarmlistflag=ESMF_ALARMLIST_ALL, alarmCount=alarmCount, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--------------------------------
     ! copy alarms from driver to model clock if model clock has no alarms (do this only once!)
     !--------------------------------
 
     if (alarmCount == 0) then
-      call ESMF_ClockGetAlarmList(dclock, alarmlistflag=ESMF_ALARMLIST_ALL, alarmCount=alarmCount, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      allocate(alarmList(alarmCount))
-      call ESMF_ClockGetAlarmList(dclock, alarmlistflag=ESMF_ALARMLIST_ALL, alarmList=alarmList, rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+       call ESMF_ClockGetAlarmList(dclock, alarmlistflag=ESMF_ALARMLIST_ALL, alarmCount=alarmCount, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       allocate(alarmList(alarmCount))
+       call ESMF_ClockGetAlarmList(dclock, alarmlistflag=ESMF_ALARMLIST_ALL, alarmList=alarmList, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      do n = 1, alarmCount
-!         call ESMF_AlarmPrint(alarmList(n), rc=rc)
-!         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-         dalarm = ESMF_AlarmCreate(alarmList(n), rc=rc)
-         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-         call ESMF_AlarmSet(dalarm, clock=mclock, rc=rc)
-         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-      enddo
+       do n = 1, alarmCount
+          !call ESMF_AlarmPrint(alarmList(n), rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          dalarm = ESMF_AlarmCreate(alarmList(n), rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_AlarmSet(dalarm, clock=mclock, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       enddo
 
-      deallocate(alarmList)
+       deallocate(alarmList)
     endif
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)

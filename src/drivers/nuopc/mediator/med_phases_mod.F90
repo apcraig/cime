@@ -8,14 +8,19 @@ module med_phases_mod
   use NUOPC
   use shr_kind_mod            , only : CL=>SHR_KIND_CL, CS=>SHR_KIND_CS
   use shr_sys_mod             , only : shr_sys_abort
-  use shr_nuopc_fldList_mod   , only : flds_scalar_name
-  use shr_nuopc_fldList_mod   , only : flds_scalar_index_nextsw_cday
-  use shr_nuopc_fldList_mod   , only : flds_scalar_index_dead_comps
-  use shr_nuopc_fldList_mod   , only : compmed, compatm, complnd, compocn
-  use shr_nuopc_fldList_mod   , only : compice, comprof, compwav, compglc
-  use shr_nuopc_fldList_mod   , only : ncomps, compname, mapnames, mapconsf, mapfcopy
-  use shr_nuopc_fldList_mod   , only : fldListFr, fldListTo
-  use shr_nuopc_fldList_mod   , only : shr_nuopc_fldList_src_entry_type
+  use esmFlds                 , only : flds_scalar_index_nextsw_cday
+  use esmFlds                 , only : flds_scalar_index_dead_comps
+  use esmFlds                 , only : compmed, compatm, complnd, compocn
+  use esmFlds                 , only : compice, comprof, compwav, compglc
+  use esmFlds                 , only : ncomps, compname 
+  use esmFlds                 , only : flds_scalar_name
+  use esmFlds                 , only : flds_scalar_num
+  use esmFlds                 , only : fldListFr, fldListTo
+  use esmFlds                 , only : fldListMed_aoflux_a
+  use esmFlds                 , only : fldListMed_aoflux_o
+  use esmFlds                 , only : fldListMed_ocnalb_a
+  use esmFlds                 , only : fldListMed_ocnalb_o
+  use shr_nuopc_fldList_mod   , only : mapconsf, mapnames
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_init
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_reset
@@ -29,8 +34,6 @@ module med_phases_mod
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_copy
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_State_GetScalar
   use med_internalstate_mod   , only : InternalState
-  use med_fraction_mod        , only : fraclist
-  use med_fraction_mod        , only : med_fraction_setupflds
   use med_fraction_mod        , only : med_fraction_init
   use med_fraction_mod        , only : med_fraction_set
   use med_constants_mod       , only : med_constants_dbug_flag
@@ -40,9 +43,11 @@ module med_phases_mod
   use med_constants_mod       , only : med_constants_czero
   use med_constants_mod       , only : med_constants_ispval_mask
   use med_merge_mod           , only : med_merge_auto
-  use med_ocnalb_mod          , only : med_ocnalb_init, med_ocnalb
+  use med_ocnalb_mod          , only : med_ocnalb_init
+  use med_ocnalb_mod          , only : med_ocnalb
   use med_map_mod             , only : med_map_FB_Regrid_Norm 
   use med_phases_aofluxes_mod , only : med_phases_aofluxes_init
+  use med_phases_aofluxes_mod , only : FBMed_aoflux_o, FBMed_aoflux_a
 
   implicit none
 
@@ -116,26 +121,6 @@ module med_phases_mod
     ! Create FBfrac field bundles and initialize fractions
     !----------------------------------------------------------
     
-    ! Initialize fraclist module array in med_fraction_mod 
-    call med_fraction_setupflds(rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    ! Initialize FBfrac for component n1 - the field names will be fraclist(:,n1)
-    ! Note - must use import state here - since export state might not contain anything other
-    ! than scalar data if the component is not prognostic
-
-    do n1 = 1,ncomps
-       if (is_local%wrap%comp_present(n1) .and. &
-            ESMF_StateIsCreated(is_local%wrap%NStateImp(n1),rc=rc) .and. &
-            ESMF_StateIsCreated(is_local%wrap%NStateExp(n1),rc=rc)) then
-
-          call shr_nuopc_methods_FB_init(is_local%wrap%FBfrac(n1), &
-               STgeom=is_local%wrap%NStateImp(n1), &
-               fieldNameList=fraclist(:,n1), &
-               name='FBfrac'//trim(compname(n1)), rc=rc)
-       end if
-    end do
-
     ! Initialize fractions
     call med_fraction_init(gcomp,rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -186,8 +171,6 @@ module med_phases_mod
   !-----------------------------------------------------------------------------
 
   subroutine med_phases_prep_atm(gcomp, rc)
-    use shr_nuopc_fldList_mod , only : fldListMed_ocnalb_a, fldListMed_ocnalb_o
-    use shr_nuopc_fldList_mod , only : fldListMed_aoflux_a, fldListMed_aoflux_o
 
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
@@ -312,23 +295,28 @@ module med_phases_mod
                ' FBMed_ocnalb_a ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        endif
+    end if
 
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBMed_aoflux_a, value=czero, rc=rc)
+    !---------------------------------------
+    !--- map FBMed_aoflux_o to atm grid
+    !---------------------------------------
+
+    if (is_local%wrap%med_coupling_active(compocn,compatm)) then
+       call shr_nuopc_methods_FB_reset(FBMed_aoflux_a, value=czero, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        call med_map_FB_Regrid_Norm(&
             fldListMed_aoflux_o%flds, compatm, &
-            is_local%wrap%FBMed_aoflux_o, &
-            is_local%wrap%FBMed_aoflux_a, &
+            FBMed_aoflux_o, &
+            FBMed_aoflux_a, &
             is_local%wrap%FBFrac(compatm), &
             is_local%wrap%FBNormOne(compocn,compatm,:), &
             is_local%wrap%RH(compocn,compatm,:), &
-            string='FBMed_aoflux_o_To_FBMed_aoflux_a', rc=rc)
+            string='FBMed_aoflux_o_To_FBMEd_aoflux_a', rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBMed_aoflux_a, string=trim(subname)//&
-               ' FBMed_aoflux_a ', rc=rc)
+          call shr_nuopc_methods_FB_diagnose(FBMed_aoflux_a, string=trim(subname)//' FBMed_aoflux_a ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        endif
     endif
@@ -343,7 +331,7 @@ module med_phases_mod
     call med_merge_auto(is_local%wrap%FBExp(compatm), &
          FB1=is_local%wrap%FBImp(compocn,compatm), FB1w=is_local%wrap%FBfrac(compatm), fldw1='ofrac', &
          FB2=is_local%wrap%FBMed_ocnalb_a        , FB2w=is_local%wrap%FBfrac(compatm), fldw2='ofrac', &
-         FB3=is_local%wrap%FBMed_aoflux_a        , FB3w=is_local%wrap%FBfrac(compatm), fldw3='ofrac', &
+         FB3=FBMed_aoflux_a                      , FB3w=is_local%wrap%FBfrac(compatm), fldw3='ofrac', &
          FB4=is_local%wrap%FBImp(compice,compatm), FB4w=is_local%wrap%FBfrac(compatm), fldw4='ifrac', &
          FB5=is_local%wrap%FBImp(complnd,compatm), FB5w=is_local%wrap%FBfrac(compatm), fldw5='lfrac', &
          document=first_call, string=subname, rc=rc)
@@ -1368,7 +1356,7 @@ module med_phases_mod
 
     call med_merge_auto(is_local%wrap%FBExp(compocn), &
          FB1=is_local%wrap%FBImp(compatm,compocn)   , FB1w=is_local%wrap%FBfrac(compocn), fldw1='afrac', &
-         FB2=is_local%wrap%FBMed_aoflux_o           , FB2w=is_local%wrap%FBfrac(compocn), fldw2='afrac', &
+         FB2=FBMed_aoflux_o                         , FB2w=is_local%wrap%FBfrac(compocn), fldw2='afrac', &
          FB3=is_local%wrap%FBImp(compice,compocn)   , FB3w=is_local%wrap%FBfrac(compocn), fldw3='ifrac', &
          FB4=is_local%wrap%FBImp(comprof,compocn)   , &
          FB5=is_local%wrap%FBImp(compglc,compocn)   , &
@@ -1507,7 +1495,6 @@ module med_phases_mod
 
   subroutine med_phases_ocnalb_init(gcomp, rc)
 
-    use shr_nuopc_fldList_mod , only : fldListMed_ocnalb_a, fldListMed_ocnalb_o
     use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_GetFldNames
 
     !----------------------------------------------------------
@@ -1546,25 +1533,23 @@ module med_phases_mod
     allocate(fldnames(nflds))
     call shr_nuopc_fldList_getfldnames(fldListMed_ocnalb_o%flds, fldnames)
 
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_a, &
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_a, flds_scalar_name, &
          STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=fldnames, name='FBMed_ocnalb_a', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_o, &
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_o, flds_scalar_name, &
          STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_ocnalb_o', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     deallocate(fldnames)
 
     ! Initialize module array pointers in med_ocnalb_mod
-    call med_ocnalb_init(gcomp, is_local%wrap%FBImp(compocn,compocn), is_local%wrap%FBMed_ocnalb_o, rc=rc)
+    call med_ocnalb_init(gcomp, is_local%wrap%FBImp(compatm,compocn), is_local%wrap%FBMed_ocnalb_o, rc=rc)
 
   end subroutine med_phases_ocnalb_init
 
   !-----------------------------------------------------------------------------
 
   subroutine med_phases_ocnalb(gcomp, rc)
-
-    use shr_nuopc_fldList_mod , only : fldListMed_ocnalb_a, fldListMed_ocnalb_o
 
     ! Compute ocean albedos (on the ocean grid)
 
@@ -1642,6 +1627,7 @@ module med_phases_mod
 
        ! Note that shr_nuopc_methods_State_GetScalar includes a broadcast to all other pets im mpicom
        call shr_nuopc_methods_State_GetScalar(is_local%wrap%NstateImp(compatm), &
+            flds_scalar_name=flds_scalar_name, flds_scalar_num=flds_scalar_num, &
             scalar_id=flds_scalar_index_nextsw_cday, value=nextsw_cday, mpicom=is_local%wrap%mpicom, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -1653,26 +1639,26 @@ module med_phases_mod
 
     if (ESMF_RouteHandleIsCreated(is_local%wrap%RH(compatm,compocn,mapconsf), rc=rc)) then
        call shr_nuopc_methods_FB_FieldRegrid(&
-            is_local%wrap%FBMed_aoflux_a, 'Faxa_swvdf', &
-            is_local%wrap%FBMed_aoflux_o, 'Faxa_swvdf', &
+            FBMed_aoflux_a, 'Faxa_swvdf', &
+            FBMed_aoflux_o, 'Faxa_swvdf', &
             is_local%wrap%RH(compatm,compocn,mapconsf), rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        call shr_nuopc_methods_FB_FieldRegrid(&
-            is_local%wrap%FBMed_aoflux_a, 'Faxa_swndf', &
-            is_local%wrap%FBMed_aoflux_o, 'Faxa_swndf', &
+            FBMed_aoflux_a, 'Faxa_swndf', &
+            FBMed_aoflux_o, 'Faxa_swndf', &
             is_local%wrap%RH(compatm,compocn,mapconsf), rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        call shr_nuopc_methods_FB_FieldRegrid(&
-            is_local%wrap%FBMed_aoflux_a, 'Faxa_swvdr', &
-            is_local%wrap%FBMed_aoflux_o, 'Faxa_swvdr', &
+            FBMed_aoflux_a, 'Faxa_swvdr', &
+            FBMed_aoflux_o, 'Faxa_swvdr', &
             is_local%wrap%RH(compatm,compocn,mapconsf), rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        call shr_nuopc_methods_FB_FieldRegrid(&
-            is_local%wrap%FBMed_aoflux_a, 'Faxa_swndr', &
-            is_local%wrap%FBMed_aoflux_o, 'Faxa_swndr', &
+            FBMed_aoflux_a, 'Faxa_swndr', &
+            FBMed_aoflux_o, 'Faxa_swndr', &
             is_local%wrap%RH(compatm,compocn,mapconsf), rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
@@ -1722,7 +1708,7 @@ module med_phases_mod
     endif
 
     if (dbug_flag > 1) then
-       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBMed_aoflux_o, string=trim(subname)//' FBMed_aoflux_o', rc=rc)
+       call shr_nuopc_methods_FB_diagnose(FBMed_aoflux_o, string=trim(subname)//' FBMed_aoflux_o', rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 

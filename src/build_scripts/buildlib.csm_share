@@ -71,6 +71,10 @@ my @filepath = ("$CASEROOT/SourceMods/src.share",
 		"$CIMEROOT/src/share/RandNum/src/kissvec",
 		"$CIMEROOT/src/share/RandNum/src/mt19937");
 
+if($comp eq "nuopc"){
+    push(@filepath, "$CIMEROOT/src/drivers/${comp}/cime_flds");
+}
+
 if($useesmf eq "noesmf"){
     push(@filepath,"$CIMEROOT/src/share/esmf_wrf_timemgr");
 }

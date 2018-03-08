@@ -5,10 +5,10 @@ module med_internalstate_mod
   !-----------------------------------------------------------------------------
 
   use ESMF
-  use shr_nuopc_fldList_mod, only: ncomps, nmappers
+  use esmFlds               , only: ncomps
+  use shr_nuopc_fldList_mod , only: nmappers
 
   implicit none
-
   public
 
   ! Active coupling definitions
@@ -60,11 +60,6 @@ module med_internalstate_mod
     integer               :: FBExpAccumcnt(ncomps)              ! Accumulator counter for each FBExpAccum
     type(ESMF_FieldBundle):: FBMed_ocnalb_o                     ! FB only in mediator- Ocn albedo on ocn grid
     type(ESMF_FieldBundle):: FBMed_ocnalb_a                     ! FB only in mediator- Ocn albedo on atm grid
-    type(ESMF_FieldBundle):: FBMed_aoflux_o                     ! FB only in mediator- Ocn/Atm flux fields on ocn grid
-    type(ESMF_FieldBundle):: FBMed_aoflux_a                     ! FB only in mediator- Ocn/Atm flux fields on atm grid
-    type(ESMF_FieldBundle):: FBMed_aoflux_diurnl_o              ! FB only in mediator- Ocn/Atm flux fields only needed for history
-    type(ESMF_FieldBundle):: FBMed_aoflux_diurnl_a              ! FB only in mediator- Ocn/Atm flux fields only needed for history
-    type(ESMF_FieldBundle):: FBMed_aoflux_accum_o               ! FB only in mediator- Ocn/Atm flux accumulator on ocn grid
     type(ESMF_FieldBundle):: FBMed_l2x_to_glc_l                 ! FB only in mediator- Land->glc on lnd grid
     type(ESMF_FieldBundle):: FBMed_l2x_to_glc_accum_l           ! FB only in mediator- Land->glc accumulator on lnd grid
     integer               :: conn_prep_cnt(ncomps)              ! Connector prep count

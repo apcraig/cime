@@ -6,8 +6,8 @@ module med_connectors_mod
 
   use ESMF
   use NUOPC
-  use shr_nuopc_fldList_mod , only: compatm, compocn, compice
-  use shr_nuopc_fldList_mod , only: complnd, comprof, compwav, compglc
+  use esmFlds               , only: compatm, compocn, compice
+  use esmFlds               , only: complnd, comprof, compwav, compglc
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_diagnose
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_reset

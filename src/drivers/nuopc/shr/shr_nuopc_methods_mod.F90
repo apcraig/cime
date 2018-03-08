@@ -6,8 +6,7 @@ module shr_nuopc_methods_mod
 
   use ESMF
   use NUOPC
-  use shr_nuopc_fldList_mod , only : flds_scalar_name, flds_scalar_num
-  use seq_comm_mct          , only : llogunit => logunit
+  use seq_comm_mct, only : llogunit => logunit
   use mpi
 
   implicit none
@@ -617,13 +616,14 @@ module shr_nuopc_methods_mod
 
   !-----------------------------------------------------------------------------
 
-  subroutine shr_nuopc_methods_FB_init(FBout, fieldNameList, FBgeom, STgeom, FBflds, STflds, name, rc)
+  subroutine shr_nuopc_methods_FB_init(FBout, flds_scalar_name, fieldNameList, FBgeom, STgeom, FBflds, STflds, name, rc)
 
     ! ----------------------------------------------
     ! Create FBout from fieldNameList, FBflds, STflds, FBgeom or STgeom in that order or priority
     ! Pass in FBgeom OR STgeom, get grid/mesh from that object
     ! ----------------------------------------------
     type(ESMF_FieldBundle), intent(inout) :: FBout
+    character(len=*)      , intent(in)    :: flds_scalar_name
     character(len=*)      , intent(in), optional :: fieldNameList(:)
     type(ESMF_FieldBundle), intent(in), optional :: FBgeom
     type(ESMF_State)      , intent(in), optional :: STgeom
@@ -1309,13 +1309,14 @@ module shr_nuopc_methods_mod
 
   !-----------------------------------------------------------------------------
 
-  subroutine shr_nuopc_methods_FB_Regrid(shortnames, mappings, &
+  subroutine shr_nuopc_methods_FB_Regrid(shortnames, flds_scalar_name, mappings, &
        FBin, FBout, &
        consfmap, consdmap, bilnrmap, patchmap, &
        fcopymap, string, rc)
 
     character(len=*)       , intent(in)               :: shortnames(:)
     character(len=*)       , intent(in)               :: mappings(:)
+    character(len=*)       , intent(in)               :: flds_scalar_name
     type(ESMF_FieldBundle) , intent(inout)            :: FBin
     type(ESMF_FieldBundle) , intent(inout)            :: FBout
     type(ESMF_Routehandle) , intent(inout) , optional :: consfmap
@@ -3808,7 +3809,7 @@ module shr_nuopc_methods_mod
 
 !================================================================================
 
-  subroutine shr_nuopc_methods_State_GetScalar(State, scalar_id, value, mpicom, rc)
+  subroutine shr_nuopc_methods_State_GetScalar(State, scalar_id, value, mpicom, flds_scalar_name, flds_scalar_num, rc)
     ! ----------------------------------------------
     ! Get scalar data from State for a particular name and broadcast it to all other pets
     ! in mpicom
@@ -3817,6 +3818,8 @@ module shr_nuopc_methods_mod
     integer,           intent(in)     :: scalar_id
     real(ESMF_KIND_R8),intent(out)    :: value
     integer,           intent(in)     :: mpicom
+    character(len=*),  intent(in)     :: flds_scalar_name 
+    integer,           intent(in)     :: flds_scalar_num         
     integer,           intent(inout)  :: rc
 
     ! local variables
@@ -3855,7 +3858,7 @@ module shr_nuopc_methods_mod
 
 !================================================================================
 
-  subroutine shr_nuopc_methods_State_SetScalar(value, scalar_id, State, mpicom, rc)
+  subroutine shr_nuopc_methods_State_SetScalar(value, scalar_id, State, mpicom, flds_scalar_name, flds_scalar_num,  rc)
     ! ----------------------------------------------
     ! Set scalar data from State for a particular name
     ! ----------------------------------------------
@@ -3863,6 +3866,8 @@ module shr_nuopc_methods_mod
     integer,           intent(in)     :: scalar_id
     type(ESMF_State),  intent(inout)  :: State
     integer,           intent(in)     :: mpicom
+    character(len=*),  intent(in)     :: flds_scalar_name   
+    integer,           intent(in)     :: flds_scalar_num 
     integer,           intent(inout)  :: rc
 
     ! local variables
