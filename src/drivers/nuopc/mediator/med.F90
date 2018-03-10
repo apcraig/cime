@@ -855,7 +855,7 @@ module MED
 
   subroutine InitializeIPDv03p4(gcomp, importState, exportState, clock, rc)
 
-    ! Otionally modify the decomp/distr of transferred Grid/Mesh
+    ! Optionally modify the decomp/distr of transferred Grid/Mesh
 
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
@@ -934,7 +934,7 @@ module MED
       type(ESMF_FieldStatus_Flag)   :: fieldStatus
       character(len=*),parameter :: subname='(module_MEDIATOR:realizeConnectedGrid)'
 
-      !NOTE: All fo the Fields that set their TransferOfferGeomObject Attribute
+      !NOTE: All of the Fields that set their TransferOfferGeomObject Attribute
       !NOTE: to "cannot provide" should now have the accepted Grid available.
       !NOTE: Go and pull out this Grid for one of a representative Field and
       !NOTE: modify the decomposition and distribution of the Grid to match the
@@ -978,6 +978,11 @@ module MED
             call ESMF_AttributeGet(field, name="ArbDimCount", value=arbDimCount, &
               convention="NUOPC", purpose="Instance", rc=rc)
             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            if (dbug_flag > 1) then
+               write(msgString,'(A,i8)') trim(subname)//':arbdimcount =',arbdimcount
+               call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=dbrc)
+            endif
 
             ! make decision on whether the incoming Grid is arbDistr or not
             if (arbDimCount>0) then
@@ -1157,21 +1162,25 @@ module MED
 
             endif  ! arbdimCount
 
-          ! Swap all the Grids in the State
+            ! Swap all the Grids in the State
 
 !            do n1=n,n
             do n1=1, fieldCount
               ! access a field in the State and set the Grid
               call ESMF_StateGet(State, field=field, itemName=fieldNameList(n1), rc=rc)
               if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-              call ESMF_FieldEmptySet(field, grid=grid, rc=rc)
+              call ESMF_FieldGet(field, status=fieldStatus, rc=rc)
               if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+              if (fieldStatus==ESMF_FIELDSTATUS_EMPTY) then
+                call ESMF_FieldEmptySet(field, grid=grid, rc=rc)
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+              endif
               if (dbug_flag > 1) then
                  call ESMF_LogWrite(trim(subname)//trim(string)//": attach grid for "//trim(fieldNameList(n1)), &
                       ESMF_LOGMSG_INFO, rc=rc)
                 if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
               endif
-              call shr_nuopc_methods_Field_GeomPrint(field,trim(fieldNameList(n))//'_new',rc)
+              call shr_nuopc_methods_Field_GeomPrint(field,trim(fieldNameList(n1))//'_new',rc)
               if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
             enddo
 
@@ -1282,8 +1291,12 @@ module MED
 
       integer                     :: n, fieldCount
       character(ESMF_MAXSTR)      :: fieldName
+      type(ESMF_Grid)             :: grid
+      type(ESMF_Mesh)             :: mesh
+      type(ESMF_Field)            :: meshField
       type(ESMF_Field),pointer    :: fieldList(:)
       type(ESMF_FieldStatus_Flag) :: fieldStatus
+      type(ESMF_GeomType_Flag)    :: geomtype
       character(len=*),parameter  :: subname='(module_MEDIATOR:completeFieldInitialization)'
 
       if (dbug_flag > 5) then
@@ -1302,10 +1315,32 @@ module MED
 
         do n=1, fieldCount
 
-          call ESMF_FieldGet(fieldList(n), status=fieldStatus, name=fieldName, rc=rc)
+          call ESMF_FieldGet(fieldList(n), status=fieldStatus, name=fieldName, &
+            geomtype=geomtype, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+          if (geomtype == ESMF_GEOMTYPE_GRID .and. fieldName /= flds_scalar_name) then
+            ! Grab grid
+            call shr_nuopc_methods_Field_GeomPrint(fieldList(n),trim(fieldName)//'_premesh',rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+            call ESMF_FieldGet(fieldList(n), grid=grid, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            ! Convert grid to mesh
+            mesh = ESMF_GridToMeshCell(grid,rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            meshField = ESMF_FieldCreate(mesh, typekind=ESMF_TYPEKIND_R8, meshloc=ESMF_MESHLOC_ELEMENT, &
+                        name=fieldName, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            ! Swap grid for mesh, at this point, only connected fields are in the state
+            call NUOPC_Realize(State, field=meshField, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          endif
+
           if (fieldStatus==ESMF_FIELDSTATUS_GRIDSET) then
+
             if (dbug_flag > 1) then
               call ESMF_LogWrite(subname//" is allocating field memory for field "//trim(fieldName), &
                    ESMF_LOGMSG_INFO, rc=rc)

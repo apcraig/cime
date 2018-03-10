@@ -3274,7 +3274,13 @@ module shr_nuopc_methods_mod
     integer                     :: localDeCount
     integer                     :: DeCount
     integer                     :: dimCount, tileCount
+    integer                     :: staggerlocCount, arbdimCount, rank
+    type(ESMF_StaggerLoc)       :: staggerloc
+    character(len=32)           :: staggerstr
     integer, allocatable        :: minIndexPTile(:,:), maxIndexPTile(:,:)
+    real(ESMF_KIND_R8), pointer :: fldptr1(:)
+    real(ESMF_KIND_R8), pointer :: fldptr2(:,:)
+    integer                     :: n1,n2,n3
     character(len=*),parameter  :: subname='(shr_nuopc_methods_Grid_Print)'
 
     if (dbug_flag > 10) then
@@ -3324,6 +3330,66 @@ module shr_nuopc_methods_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     deallocate(minIndexPTile, maxIndexPTile)
+
+    ! get staggerlocCount, arbDimCount
+!    call ESMF_GridGet(grid, staggerlocCount=staggerlocCount, rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+!    write (msgString,*) trim(subname)//":"//trim(string)//": staggerlocCount=", staggerlocCount
+!    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+!    call ESMF_GridGet(grid, arbDimCount=arbDimCount, rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+!    write (msgString,*) trim(subname)//":"//trim(string)//": arbDimCount=", arbDimCount
+!    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
+!    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    ! get rank
+    call ESMF_GridGet(grid, rank=rank, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    write (msgString,*) trim(subname)//":"//trim(string)//": rank=", rank
+    call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    do n1 = 1,2
+      if (n1 == 1) then
+        staggerloc = ESMF_STAGGERLOC_CENTER
+        staggerstr = 'ESMF_STAGGERLOC_CENTER'
+      elseif (n1 == 2) then
+        staggerloc = ESMF_STAGGERLOC_CORNER
+        staggerstr = 'ESMF_STAGGERLOC_CORNER'
+      else
+        rc = ESMF_FAILURE
+        call ESMF_LogWrite(trim(subname)//":staggerloc failure", ESMF_LOGMSG_INFO, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+      call ESMF_GridGetCoord(grid, staggerloc=staggerloc, isPresent=isPresent, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      write (msgString,*) trim(subname)//":"//trim(staggerstr)//" present=",isPresent
+      call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (isPresent) then
+        do n3 = 0,localDECount-1
+        do n2 = 1,dimCount
+          if (rank == 1) then
+            call ESMF_GridGetCoord(grid,coordDim=n2,localDE=n3,staggerloc=staggerloc,farrayPtr=fldptr1,rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+            write (msgString,'(a,2i4,2f16.8)') trim(subname)//":"//trim(staggerstr)//" coord=",n2,n3,minval(fldptr1),maxval(fldptr1)
+          endif
+          if (rank == 2) then
+            call ESMF_GridGetCoord(grid,coordDim=n2,localDE=n3,staggerloc=staggerloc,farrayPtr=fldptr2,rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+            write (msgString,'(a,2i4,2f16.8)') trim(subname)//":"//trim(staggerstr)//" coord=",n2,n3,minval(fldptr2),maxval(fldptr2)
+          endif
+          call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        enddo
+        enddo
+      endif
+    enddo
 
     if (dbug_flag > 10) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
