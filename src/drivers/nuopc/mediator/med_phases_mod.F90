@@ -8,18 +8,13 @@ module med_phases_mod
   use NUOPC
   use shr_kind_mod            , only : CL=>SHR_KIND_CL, CS=>SHR_KIND_CS
   use shr_sys_mod             , only : shr_sys_abort
-  use esmFlds                 , only : flds_scalar_index_nextsw_cday
-  use esmFlds                 , only : flds_scalar_index_dead_comps
   use esmFlds                 , only : compmed, compatm, complnd, compocn
   use esmFlds                 , only : compice, comprof, compwav, compglc
   use esmFlds                 , only : ncomps, compname 
   use esmFlds                 , only : flds_scalar_name
   use esmFlds                 , only : flds_scalar_num
   use esmFlds                 , only : fldListFr, fldListTo
-  use esmFlds                 , only : fldListMed_aoflux_a
   use esmFlds                 , only : fldListMed_aoflux_o
-  use esmFlds                 , only : fldListMed_ocnalb_a
-  use esmFlds                 , only : fldListMed_ocnalb_o
   use shr_nuopc_fldList_mod   , only : mapconsf, mapnames
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_init
@@ -32,7 +27,6 @@ module med_phases_mod
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_FldChk
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_average
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_copy
-  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_State_GetScalar
   use med_internalstate_mod   , only : InternalState
   use med_fraction_mod        , only : med_fraction_init
   use med_fraction_mod        , only : med_fraction_set
@@ -43,11 +37,11 @@ module med_phases_mod
   use med_constants_mod       , only : med_constants_czero
   use med_constants_mod       , only : med_constants_ispval_mask
   use med_merge_mod           , only : med_merge_auto
-  use med_ocnalb_mod          , only : med_ocnalb_init
-  use med_ocnalb_mod          , only : med_ocnalb
-  use med_map_mod             , only : med_map_FB_Regrid_Norm 
+  use med_phases_ocnalb_mod   , only : med_phases_ocnalb_init
+  use med_phases_ocnalb_mod   , only : med_phases_ocnalb_run
+  use med_phases_ocnalb_mod   , only : med_phases_ocnalb_mapo2a
   use med_phases_aofluxes_mod , only : med_phases_aofluxes_init
-  use med_phases_aofluxes_mod , only : FBMed_aoflux_o, FBMed_aoflux_a
+  use med_map_mod             , only : med_map_FB_Regrid_Norm 
 
   implicit none
 
@@ -73,9 +67,7 @@ module med_phases_mod
   public  :: med_phases_prep_wav
   public  :: med_phases_prep_glc
   public  :: med_phases_accum_fast
-  public  :: med_phases_ocnalb_init
-  public  :: med_phases_ocnalb
-  private :: med_phases_map_frac
+
 
   !-----------------------------------------------------------------------------
   contains
@@ -137,18 +129,17 @@ module med_phases_mod
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        ! Initialize ocean albedo module
-       call med_phases_ocnalb_init(gcomp, rc)
-
-       ! Compute ocean albedoes
-       ! This will update the relevant module arrays in med_ocnalb_mod.F90
-       ! since they are simply pointers into field bundle arrays in the internal state is_local%wrap
-       call med_phases_ocnalb(gcomp, rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call med_phases_ocnalb_init(gcomp, rc=rc)
 
        ! Initialize atm/ocn fluxes module
        call med_phases_aofluxes_init(gcomp, rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+       ! Compute ocean albedoes
+       ! This will update the relevant module arrays in med_ocnalb_mod.F90
+       ! since they are simply pointers into field bundle arrays in the internal state is_local%wrap
+       call med_phases_ocnalb_run(gcomp, rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
     !----------------------------------------------------------
@@ -277,24 +268,7 @@ module med_phases_mod
     !---------------------------------------
 
     if (is_local%wrap%med_coupling_active(compocn,compatm)) then
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBMed_ocnalb_a, value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call med_map_FB_Regrid_Norm( &
-            fldListMed_ocnalb_o%flds, compocn, &
-            is_local%wrap%FBMed_ocnalb_o, &
-            is_local%wrap%FBMed_ocnalb_a, &
-            is_local%wrap%FBFrac(compocn), &
-            is_local%wrap%FBNormOne(compocn,compatm,:), &
-            is_local%wrap%RH(compocn,compatm,:), &
-            string='FBMed_ocnalb_o_To_FBMed_ocnalb_a', rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBMed_ocnalb_a, string=trim(subname)//&
-               ' FBMed_ocnalb_a ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       endif
+       call med_phases_ocnalb_mapo2a(gcomp, rc)
     end if
 
     !---------------------------------------
@@ -302,13 +276,13 @@ module med_phases_mod
     !---------------------------------------
 
     if (is_local%wrap%med_coupling_active(compocn,compatm)) then
-       call shr_nuopc_methods_FB_reset(FBMed_aoflux_a, value=czero, rc=rc)
+       call shr_nuopc_methods_FB_reset(is_local%wrap%FBMed_aoflux_a, value=czero, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        call med_map_FB_Regrid_Norm(&
             fldListMed_aoflux_o%flds, compatm, &
-            FBMed_aoflux_o, &
-            FBMed_aoflux_a, &
+            is_local%wrap%FBMed_aoflux_o, &
+            is_local%wrap%FBMed_aoflux_a, &
             is_local%wrap%FBFrac(compatm), &
             is_local%wrap%FBNormOne(compocn,compatm,:), &
             is_local%wrap%RH(compocn,compatm,:), &
@@ -316,7 +290,7 @@ module med_phases_mod
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(FBMed_aoflux_a, string=trim(subname)//' FBMed_aoflux_a ', rc=rc)
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBMed_aoflux_a, string=trim(subname)//' FBMed_aoflux_a ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        endif
     endif
@@ -331,7 +305,7 @@ module med_phases_mod
     call med_merge_auto(is_local%wrap%FBExp(compatm), &
          FB1=is_local%wrap%FBImp(compocn,compatm), FB1w=is_local%wrap%FBfrac(compatm), fldw1='ofrac', &
          FB2=is_local%wrap%FBMed_ocnalb_a        , FB2w=is_local%wrap%FBfrac(compatm), fldw2='ofrac', &
-         FB3=FBMed_aoflux_a                      , FB3w=is_local%wrap%FBfrac(compatm), fldw3='ofrac', &
+         FB3=is_local%wrap%FBMed_aoflux_a        , FB3w=is_local%wrap%FBfrac(compatm), fldw3='ofrac', &
          FB4=is_local%wrap%FBImp(compice,compatm), FB4w=is_local%wrap%FBfrac(compatm), fldw4='ifrac', &
          FB5=is_local%wrap%FBImp(complnd,compatm), FB5w=is_local%wrap%FBfrac(compatm), fldw5='lfrac', &
          document=first_call, string=subname, rc=rc)
@@ -1356,7 +1330,7 @@ module med_phases_mod
 
     call med_merge_auto(is_local%wrap%FBExp(compocn), &
          FB1=is_local%wrap%FBImp(compatm,compocn)   , FB1w=is_local%wrap%FBfrac(compocn), fldw1='afrac', &
-         FB2=FBMed_aoflux_o                         , FB2w=is_local%wrap%FBfrac(compocn), fldw2='afrac', &
+         FB2=is_local%wrap%FBMed_aoflux_o           , FB2w=is_local%wrap%FBfrac(compocn), fldw2='afrac', &
          FB3=is_local%wrap%FBImp(compice,compocn)   , FB3w=is_local%wrap%FBfrac(compocn), fldw3='ifrac', &
          FB4=is_local%wrap%FBImp(comprof,compocn)   , &
          FB5=is_local%wrap%FBImp(compglc,compocn)   , &
@@ -1437,281 +1411,5 @@ module med_phases_mod
   end subroutine med_phases_accum_fast
 
   !-----------------------------------------------------------------------------
-
-  subroutine med_phases_map_frac(FBin, fldin, FBout, fldout, RH, iarr, iarr_r, rc)
-
-    ! Map field bundles with appropriate fraction weighting
-
-    type(ESMF_FieldBundle)      :: FBin      ! input FB
-    character(len=*)            :: fldin     ! input fieldname
-    type(ESMF_FieldBundle)      :: FBout     ! output FB
-    character(len=*)            :: fldout    ! output fieldname
-    type(ESMF_RouteHandle)      :: RH        ! RH
-    real(ESMF_KIND_R8), pointer :: iarr(:)   ! mapped field
-    real(ESMF_KIND_R8), pointer :: iarr_r(:) ! reciprical of mapped field
-    integer                     :: rc        ! return code
-
-    ! local
-    integer :: i
-    real(ESMF_KIND_R8), pointer :: dataPtr2(:)
-    character(len=*),parameter :: subname='(med_phases_map_frac)'
-    !---------------------------------------
-
-    if (dbug_flag > 5) then
-       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
-    endif
-    rc = ESMF_SUCCESS
-
-    if (ESMF_RouteHandleIsCreated(RH, rc=rc)) then
-       call shr_nuopc_methods_FB_FieldRegrid(FBin, fldin, FBout, fldout, RH, rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       !--- copy out the ifrac on ice grid and ifrac on atm grid
-       call shr_nuopc_methods_FB_GetFldPtr(FBout, fldout, fldptr1=dataPtr2, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       allocate(iarr  (lbound(dataptr2,1):ubound(dataptr2,1)))
-       allocate(iarr_r(lbound(dataptr2,1):ubound(dataptr2,1)))
-
-       do i=lbound(dataptr2,1),ubound(dataptr2,1)
-          !--- compute ice fraction on atm grid and reciprocal
-          if (dataPtr2(i) == 0.0_ESMF_KIND_R8) then
-             iarr(i)   = 0.0_ESMF_KIND_R8
-             iarr_r(i) = 0.0_ESMF_KIND_R8
-          else
-             iarr(i)   = dataPtr2(i)
-             iarr_r(i) = 1.0_ESMF_KIND_R8/dataPtr2(i)
-          endif
-       enddo
-    endif
-
-    if (dbug_flag > 5) then
-       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
-    endif
-
-  end subroutine med_phases_map_frac
-
-  !-----------------------------------------------------------------------------
-
-  subroutine med_phases_ocnalb_init(gcomp, rc)
-
-    use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_GetFldNames
-
-    !----------------------------------------------------------
-    ! Initialize the ocean albedo calculation and the field bundles 
-    ! FBMed_ocnalb_a and FBMed_ocnalb_o
-    !----------------------------------------------------------
-
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-
-    ! local variables
-    type(InternalState)    :: is_local
-    integer                :: nflds
-    character(CL), pointer :: fldnames(:)
-    character(len=*), parameter :: subname='(module_MED_PHASES:med_phases_ocnalb_init)'
-    !-----------------------------------------------------------
-
-    if (dbug_flag > 5) then
-       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
-    endif
-
-    rc = ESMF_SUCCESS
-
-    ! Get the internal state from gcomp
-    nullify(is_local%wrap)
-    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    ! Create field bundles for ocean albedo computation
-    ! NOTE: the NStateImp(compocn) or NStateImp(compatm) used here
-    ! rather than NStateExp(n2), since the export state might only
-    ! contain control data and no grid information if if the target
-    ! component (n2) is not prognostic only receives control data back
-
-    nflds = size(fldListMed_ocnalb_o%flds)
-    allocate(fldnames(nflds))
-    call shr_nuopc_fldList_getfldnames(fldListMed_ocnalb_o%flds, fldnames)
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_a, flds_scalar_name, &
-         STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=fldnames, name='FBMed_ocnalb_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_o, flds_scalar_name, &
-         STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_ocnalb_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    deallocate(fldnames)
-
-    ! Initialize module array pointers in med_ocnalb_mod
-    call med_ocnalb_init(gcomp, is_local%wrap%FBImp(compatm,compocn), is_local%wrap%FBMed_ocnalb_o, rc=rc)
-
-  end subroutine med_phases_ocnalb_init
-
-  !-----------------------------------------------------------------------------
-
-  subroutine med_phases_ocnalb(gcomp, rc)
-
-    ! Compute ocean albedos (on the ocean grid)
-
-    type(ESMF_GridComp)  :: gcomp
-    integer, intent(out) :: rc
-
-    ! local variables
-    type(InternalState)         :: is_local
-    type(ESMF_Clock)            :: clock
-    type(ESMF_Time)             :: currTime
-    character(CL)               :: cvalue
-    character(CS)               :: starttype     ! config start type
-    character(CL)               :: runtype       ! initial, continue, hybrid, branch
-    character(CL)               :: aoflux_grid
-    real(ESMF_KIND_R8)          :: nextsw_cday  ! calendar day of next atm shortwave
-    real(ESMF_KIND_R8), pointer :: ofrac(:)
-    real(ESMF_KIND_R8), pointer :: ofrad(:)
-    real(ESMF_KIND_R8), pointer :: ifrac(:)
-    real(ESMF_KIND_R8), pointer :: ifrad(:)
-    logical                     :: update_alb
-    logical                     :: first_time = .true.
-    character(len=*),parameter :: subname='(med_phases_ocnalb)'
-    !---------------------------------------
-
-    if (dbug_flag > 5) then
-       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
-    endif
-    rc = ESMF_SUCCESS
-
-    ! Get the internal state from Component.
-    nullify(is_local%wrap)
-    call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    ! Note that in the mct version the atm was initialized first so
-    ! that nextsw_cday could be passed to the other components - this
-    ! assumed that atmosphere component was ALWAYS initialized first.
-    ! In the nuopc version it will be easier to assume that on startup
-    ! - nextsw_cday is just what cam was setting it as the current
-    ! calendar day
-
-    ! TODO: need to determine how to handle restart and branch runs -
-    ! for now will just assume that nextsw_cday is not computed on
-    ! initialization and is read from the restart file.
-
-    if (first_time) then
-
-       call NUOPC_CompAttributeGet(gcomp, name='start_type', value=cvalue, rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-       read(cvalue,*) starttype
-
-       if (trim(starttype) == trim('startup')) then
-          runtype = "initial"
-       else if (trim(starttype) == trim('continue') ) then
-          runtype = "continue"
-       else if (trim(starttype) == trim('branch')) then
-          runtype = "continue"
-       else
-          call shr_sys_abort( subname//' ERROR: unknown starttype' )
-       end if
-
-       if (trim(runtype) /= 'initial') then
-          nextsw_cday = -1.0_ESMF_KIND_R8
-       else
-          call ESMF_GridCompGet(gcomp, clock=clock)
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-          call ESMF_ClockGet( clock, currTime=currTime, rc=rc )
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-          call ESMF_TimeGet( currTime, dayOfYear_r8=nextsw_cday, rc=rc )
-          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-       end if
-       first_time = .false.
-
-    else
-
-       ! Note that shr_nuopc_methods_State_GetScalar includes a broadcast to all other pets im mpicom
-       call shr_nuopc_methods_State_GetScalar(is_local%wrap%NstateImp(compatm), &
-            flds_scalar_name=flds_scalar_name, flds_scalar_num=flds_scalar_num, &
-            scalar_id=flds_scalar_index_nextsw_cday, value=nextsw_cday, mpicom=is_local%wrap%mpicom, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    end if
-
-    ! Map relevant atm fluxes to the ocean grid
-    ! NOTE: there are already pointers in place as module variables in med_ocnalb_mod.F90
-    ! to the arrays in FBMed_aoflux_o below - so do not need to pass them as arguments to med_ocnalb_run
-
-    if (ESMF_RouteHandleIsCreated(is_local%wrap%RH(compatm,compocn,mapconsf), rc=rc)) then
-       call shr_nuopc_methods_FB_FieldRegrid(&
-            FBMed_aoflux_a, 'Faxa_swvdf', &
-            FBMed_aoflux_o, 'Faxa_swvdf', &
-            is_local%wrap%RH(compatm,compocn,mapconsf), rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call shr_nuopc_methods_FB_FieldRegrid(&
-            FBMed_aoflux_a, 'Faxa_swndf', &
-            FBMed_aoflux_o, 'Faxa_swndf', &
-            is_local%wrap%RH(compatm,compocn,mapconsf), rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call shr_nuopc_methods_FB_FieldRegrid(&
-            FBMed_aoflux_a, 'Faxa_swvdr', &
-            FBMed_aoflux_o, 'Faxa_swvdr', &
-            is_local%wrap%RH(compatm,compocn,mapconsf), rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call shr_nuopc_methods_FB_FieldRegrid(&
-            FBMed_aoflux_a, 'Faxa_swndr', &
-            FBMed_aoflux_o, 'Faxa_swndr', &
-            is_local%wrap%RH(compatm,compocn,mapconsf), rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    else
-       call ESMF_LogWrite(trim(subname)//": ERROR RH not available for "//trim(mapnames(mapconsf)), &
-            ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
-       rc = ESMF_FAILURE
-    end if
-
-    ! Calculate ocean albedos on the ocean grid
-    call med_ocnalb(gcomp, nextsw_cday=nextsw_cday, update_alb=update_alb, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    ! If the aoflux grid is the atm - then need to map swdn and swup from the ocean grid (where
-    ! they were calculated to the atmosphere grid)
-    call NUOPC_CompAttributeGet(gcomp, name='aoflux_grid', value=cvalue, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    read(cvalue,*) aoflux_grid
-
-    if (trim(aoflux_grid) == 'atm') then
-       if (ESMF_RouteHandleIsCreated(is_local%wrap%RH(compocn,compatm,mapconsf), rc=rc)) then
-          call shr_nuopc_methods_FB_FieldRegrid(&
-               is_local%wrap%FBMed_ocnalb_o, 'Faox_swdn', &
-               is_local%wrap%FBMed_ocnalb_a, 'Faox_swdn', &
-               is_local%wrap%RH(compocn,compatm,mapconsf), rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          call shr_nuopc_methods_FB_FieldRegrid(&
-               is_local%wrap%FBMed_ocnalb_o, 'Faox_swsup', &
-               is_local%wrap%FBMed_ocnalb_a, 'Faox_swsup', &
-               is_local%wrap%RH(compocn,compatm,mapconsf), rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
-    end if
-
-    ! Update current ifrad/ofrad values if albedo was updated in field bundle
-    if (update_alb) then
-       call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(compocn), fldname='ifrac', fldptr1=ifrac, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(compocn), fldname='ifrad', fldptr1=ifrad, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(compocn), fldname='ofrac', fldptr1=ofrac, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call shr_nuopc_methods_FB_getFldPtr(is_local%wrap%FBfrac(compocn), fldname='ofrad', fldptr1=ofrad, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       ifrad(:) = ifrac(:)
-       ofrad(:) = ofrac(:)
-    endif
-
-    if (dbug_flag > 1) then
-       call shr_nuopc_methods_FB_diagnose(FBMed_aoflux_o, string=trim(subname)//' FBMed_aoflux_o', rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    end if
-
-  end subroutine med_phases_ocnalb
 
 end module med_phases_mod

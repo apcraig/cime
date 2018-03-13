@@ -2792,7 +2792,7 @@ module shr_nuopc_methods_mod
     rc = ESMF_SUCCESS
 
     if (.not. shr_nuopc_methods_FB_FldChk(FB, trim(fldname), rc=rc)) then
-       call ESMF_LogWrite(trim(subname)//": ERROR field not in FB "//trim(fldname), &
+       call ESMF_LogWrite(trim(subname)//": ERROR field "//trim(fldname)//" not in FB ", &
             ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
       rc = ESMF_FAILURE
       return

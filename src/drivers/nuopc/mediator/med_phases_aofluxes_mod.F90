@@ -39,14 +39,14 @@ module med_phases_aofluxes_mod
   !--------------------------------------------------------------------------
 
   public  :: med_phases_aofluxes_init
-  public  :: med_phases_aofluxes
+  public  :: med_phases_aofluxes_run
 
   !--------------------------------------------------------------------------
   ! Private routines
   !--------------------------------------------------------------------------
 
   private :: med_aofluxes_init
-  private :: med_aofluxes
+  private :: med_aofluxes_run
 
   !--------------------------------------------------------------------------
   ! Private data
@@ -137,8 +137,6 @@ module med_phases_aofluxes_mod
   logical                        :: mastertask
 
   ! Mediator field bundles used for atm/ocn flux computation
-  type(ESMF_FieldBundle), public  :: FBMed_aoflux_o        ! Ocn/Atm flux fields on ocn grid
-  type(ESMF_FieldBundle), public  :: FBMed_aoflux_a        ! Ocn/Atm flux fields on atm grid
   type(ESMF_FieldBundle), public  :: FBMed_aoflux_accum_o  ! Ocn/Atm flux accumulator on ocn grid
   type(ESMF_FieldBundle), public  :: FBMed_aoflux_diurnl_o ! Ocn/Atm flux fields only needed for history
   type(ESMF_FieldBundle), public  :: FBMed_aoflux_diurnl_a ! Ocn/Atm flux fields only needed for history
@@ -183,11 +181,11 @@ contains
     allocate(fldnames(nflds))
     call shr_nuopc_fldList_getfldnames(fldListMed_aoflux_a%flds, fldnames)
 
-    call shr_nuopc_methods_FB_init(FBMed_aoflux_a, flds_scalar_name, &
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_a, flds_scalar_name, &
          STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=fldnames, name='FBMed_aoflux_a', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_methods_FB_init(FBMed_aoflux_o, flds_scalar_name, &
+    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_o, flds_scalar_name, &
          STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_aoflux_o', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -229,7 +227,7 @@ contains
             is_local%wrap%FBImp(compocn,compocn), &
             is_local%wrap%FBfrac(compocn), &
             is_local%wrap%FBMed_ocnalb_o, &
-            FBMed_aoflux_o, &
+            is_local%wrap%FBMed_aoflux_o, &
             FBMed_aoflux_diurnl_o, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -260,7 +258,7 @@ contains
             is_local%wrap%FBImp(compocn,compatm), &
             is_local%wrap%FBfrac(compatm), &
             is_local%wrap%FBMed_ocnalb_a, &
-            FBMed_aoflux_a, &
+            is_local%wrap%FBMed_aoflux_a, &
             FBMed_aoflux_diurnl_a, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -276,7 +274,7 @@ contains
 
 !================================================================================
 
-  subroutine med_phases_aofluxes(gcomp, rc)
+  subroutine med_phases_aofluxes_run(gcomp, rc)
 
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
@@ -351,11 +349,11 @@ contains
        end if
 
        ! Calculate atm/ocn fluxes on the destination grid
-       call med_aofluxes(gcomp, clock, ocn_prognostic, dead_comps, rc)
+       call med_aofluxes_run(gcomp, clock, ocn_prognostic, dead_comps, rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(FBMed_aoflux_o, string=trim(subname) //' FBAMed_aoflux_o' , rc=rc)
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBMed_aoflux_o, string=trim(subname) //' FBAMed_aoflux_o' , rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        end if
 
@@ -381,7 +379,7 @@ contains
        end if
 
        ! Calculate atm/ocn fluxes on the destination grid
-       call med_aofluxes(gcomp, clock, ocn_prognostic, dead_comps, rc)
+       call med_aofluxes_run(gcomp, clock, ocn_prognostic, dead_comps, rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        if (dbug_flag > 1) then
@@ -398,7 +396,7 @@ contains
 
     end if
 
-  end subroutine med_phases_aofluxes
+  end subroutine med_phases_aofluxes_run
 
 !================================================================================
 
@@ -736,7 +734,7 @@ contains
 
 !===============================================================================
 
-  subroutine med_aofluxes(gcomp, clock, ocn_prognostic, dead_comps, rc)
+  subroutine med_aofluxes_run(gcomp, clock, ocn_prognostic, dead_comps, rc)
 
     !-----------------------------------------------------------------------
     ! Determine atm/ocn fluxes eother on atm or on ocean grid
@@ -763,8 +761,6 @@ contains
     logical       :: read_restart            ! .true. => continue run
     logical       :: flux_diurnal            ! .true. => turn on diurnal cycle in atm/ocn fluxes
     logical,save  :: first_call = .true.
-    real(r8),parameter :: albdif = 0.06_r8 ! 60 deg reference albedo, diffuse
-    real(r8),parameter :: albdir = 0.07_r8 ! 60 deg reference albedo, direct
     character(*),parameter :: subName =   '(med_fluxes) '
     !-----------------------------------------------------------------------
 
@@ -909,6 +905,6 @@ contains
        end if
     enddo
 
-  end subroutine med_aofluxes
+  end subroutine med_aofluxes_run
 
 end module med_phases_aofluxes_mod

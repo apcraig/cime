@@ -69,8 +69,8 @@ module MED
   use med_phases_mod          , only: med_phases_prep_wav
   use med_phases_mod          , only: med_phases_prep_glc
   use med_phases_mod          , only: med_phases_accum_fast
-  use med_phases_mod          , only: med_phases_ocnalb
-  use med_phases_aofluxes_mod , only: med_phases_aofluxes
+  use med_phases_ocnalb_mod   , only: med_phases_ocnalb_run
+  use med_phases_aofluxes_mod , only: med_phases_aofluxes_run
   use med_fraction_mod        , only: med_fraction_set
   use med_constants_mod       , only: med_constants_dbug_flag
   use med_constants_mod       , only: med_constants_spval_init
@@ -356,21 +356,25 @@ contains
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
-    ! phase routines for ocn/atm flux computation and and ocean albedo computation
+    ! phase routine for ocean albedo computation
     !------------------
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
-         phaseLabelList=(/"med_phases_ocnalb"/), userRoutine=mediator_routine_Run, rc=rc)
+         phaseLabelList=(/"med_phases_ocnalb_run"/), userRoutine=mediator_routine_Run, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
-      specPhaseLabel="med_phases_ocnalb", specRoutine=med_phases_ocnalb, rc=rc)
+      specPhaseLabel="med_phases_ocnalb_run", specRoutine=med_phases_ocnalb_run, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+    !------------------
+    ! phase routine for ocn/atm flux computation 
+    !------------------
+
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_RUN, &
-         phaseLabelList=(/"med_phases_aofluxes"/), userRoutine=mediator_routine_Run, rc=rc)
+         phaseLabelList=(/"med_phases_aofluxes_run"/), userRoutine=mediator_routine_Run, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=mediator_label_Advance, &
-         specPhaseLabel="med_phases_aofluxes", specRoutine=med_phases_aofluxes, rc=rc)
+         specPhaseLabel="med_phases_aofluxes_run", specRoutine=med_phases_aofluxes_run, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !------------------
@@ -1179,6 +1183,7 @@ contains
     character(ESMF_MAXSTR),allocatable    :: fieldNameList(:)
     character(len=128)                    :: value
     logical                               :: first_call = .true.
+    character(SHR_KIND_CL)                :: cvalue
     character(len=*), parameter :: subname='(module_MED:DataInitialize)'
     !-----------------------------------------------------------
 

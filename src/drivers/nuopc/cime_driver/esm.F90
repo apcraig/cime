@@ -222,7 +222,7 @@ module ESM
     integer                     :: petCount, i
     integer, allocatable        :: petList(:)
 #endif
-    integer                     :: n, stat
+    integer                     :: n, n1, stat
     integer                     :: GlobalComm
     integer, pointer            :: petList(:)
     type(ESMF_Config)           :: config
@@ -350,87 +350,6 @@ module ESM
          Eclock_i, Eclock_g, Eclock_r, Eclock_w, Eclock_e)
 
     !--------
-    ! check component list for active components and set present flags
-    !--------
-
-    med_present = "false"
-    atm_present = "false"
-    lnd_present = "false"
-    ocn_present = "false"
-    ice_present = "false"
-    rof_present = "false"
-    wav_present = "false"
-    glc_present = "false"
-
-    do n=1, componentCount
-
-      !--- construct component prefix
-      prefix=trim(compLabels(n))
-
-      !--- read in model instance name
-      call ESMF_ConfigGetAttribute(config, model, label=trim(prefix)//"_model:", default="none", rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-      !--- check that there was a model instance specified
-      if (trim(model) == "none") then
-        ! Error condition: no model was specified
-        write (msgstr, *) "No model was specified for component: ",trim(prefix)
-        call ESMF_LogSetError(ESMF_RC_NOT_VALID, msg=msgstr, line=__LINE__, &
-          file=__FILE__, rcToReturn=rc)
-        return  ! bail out
-      endif
-
-      if (trim(prefix) == "MED") then
-        med_present = "true"
-      elseif (trim(prefix) == "ATM") then
-        atm_present = "true"
-      elseif (trim(prefix) == "LND") then
-        lnd_present = "true"
-      elseif (trim(prefix) == "OCN") then
-        ocn_present = "true"
-      elseif (trim(prefix) == "ICE") then
-        ice_present = "true"
-      elseif (trim(prefix) == "ROF") then
-        rof_present = "true"
-      elseif (trim(prefix) == "WAV") then
-        wav_present = "true"
-      elseif (trim(prefix) == "GLC") then
-        glc_present = "true"
-      endif
-
-    enddo
-
-    call ESMF_LogWrite(trim(subname)//":atm_present="//trim(atm_present), ESMF_LOGMSG_INFO, rc=dbrc)
-    call ESMF_LogWrite(trim(subname)//":lnd_present="//trim(lnd_present), ESMF_LOGMSG_INFO, rc=dbrc)
-    call ESMF_LogWrite(trim(subname)//":ocn_present="//trim(ocn_present), ESMF_LOGMSG_INFO, rc=dbrc)
-    call ESMF_LogWrite(trim(subname)//":ice_present="//trim(ice_present), ESMF_LOGMSG_INFO, rc=dbrc)
-    call ESMF_LogWrite(trim(subname)//":rof_present="//trim(rof_present), ESMF_LOGMSG_INFO, rc=dbrc)
-    call ESMF_LogWrite(trim(subname)//":wav_present="//trim(wav_present), ESMF_LOGMSG_INFO, rc=dbrc)
-    call ESMF_LogWrite(trim(subname)//":glc_present="//trim(glc_present), ESMF_LOGMSG_INFO, rc=dbrc)
-    call ESMF_LogWrite(trim(subname)//":med_present="//trim(med_present), ESMF_LOGMSG_INFO, rc=dbrc)
-
-    call NUOPC_CompAttributeAdd(driver, attrList=(/'atm_present','lnd_present','ocn_present', &
-      'ice_present','rof_present','wav_present','glc_present','med_present'/), rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call NUOPC_CompAttributeSet(driver, name="atm_present", value=atm_present, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_CompAttributeSet(driver, name="lnd_present", value=lnd_present, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_CompAttributeSet(driver, name="ocn_present", value=ocn_present, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_CompAttributeSet(driver, name="ice_present", value=ice_present, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_CompAttributeSet(driver, name="rof_present", value=rof_present, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_CompAttributeSet(driver, name="wav_present", value=wav_present, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_CompAttributeSet(driver, name="glc_present", value=glc_present, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    call NUOPC_CompAttributeSet(driver, name="med_present", value=med_present, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !--------
     ! determine information for each component and add to the driver
     !--------
 
@@ -475,13 +394,6 @@ module ESM
       !--------
 
       if (trim(prefix) == "ATM") then
-
-        if (atm_present /= "true") then
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' atm_present inconsistent = '//trim(prefix)//':'//trim(atm_present), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-        endif
 
         call seq_comm_petlist(ATMID(1),petList)
         if (trim(model) == "datm") then
@@ -539,13 +451,6 @@ module ESM
       !--------
 
       elseif (trim(prefix) == "OCN") then
-
-        if (ocn_present /= "true") then
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' ocn_present inconsistent = '//trim(prefix)//':'//trim(ocn_present), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-        endif
 
         call seq_comm_petlist(OCNID(1),petList)
         if (trim(model) == "docn") then
@@ -615,13 +520,6 @@ module ESM
 
       elseif (trim(prefix) == "ICE") then
 
-        if (ice_present /= "true") then
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' ice_present inconsistent = '//trim(prefix)//':'//trim(ice_present), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-        endif
-
         call seq_comm_petlist(ICEID(1),petList)
         if (trim(model) == "dice") then
 #ifdef ESMFUSE_dice
@@ -679,13 +577,6 @@ module ESM
       !--------
 
       elseif (trim(prefix) == "LND") then
-
-        if (lnd_present /= "true") then
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' lnd_present inconsistent = '//trim(prefix)//':'//trim(lnd_present), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-        endif
 
         call seq_comm_petlist(LNDID(1),petList)
         if (trim(model) == "dlnd") then
@@ -851,13 +742,6 @@ module ESM
 
       elseif (trim(prefix) == "ROF") then
 
-        if (rof_present /= "true") then
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' rof_present inconsistent = '//trim(prefix)//':'//trim(rof_present), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-        endif
-
         call seq_comm_petlist(ROFID(1),petList)
         if (trim(model) == "drof") then
 #ifdef ESMFUSE_drof
@@ -925,13 +809,6 @@ module ESM
 
       elseif (trim(prefix) == "WAV") then
 
-        if (wav_present /= "true") then
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' wav_present inconsistent = '//trim(prefix)//':'//trim(wav_present), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-        endif
-
         call seq_comm_petlist(WAVID(1),petList)
         if (trim(model) == "dwav") then
 #ifdef ESMFUSE_dwav
@@ -988,13 +865,6 @@ module ESM
       !--------
 
       elseif (trim(prefix) == "GLC") then
-
-        if (glc_present /= "true") then
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' glc_present inconsistent = '//trim(prefix)//':'//trim(glc_present), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-        endif
 
         call seq_comm_petlist(GLCID(1),petList)
         if (trim(model) == "dglc") then
@@ -1053,13 +923,6 @@ module ESM
 
       elseif (trim(prefix) == "MED") then
 
-        if (med_present /= "true") then
-          call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
-            msg=subname//' med_present inconsistent = '//trim(prefix)//':'//trim(med_present), &
-            line=__LINE__, file=u_FILE_u, rcToReturn=rc)
-          return  ! bail out
-        endif
-
         call seq_comm_petlist(CPLID,petList)
         if (trim(model) == "cesm") then
           call NUOPC_DriverAddComp(driver, "MED", med_SS, petList=petList, comp=child, rc=rc)
@@ -1072,6 +935,58 @@ module ESM
         endif
         call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+        ! add attributes for component present flags
+        call NUOPC_CompAttributeAdd(child, &
+             attrList=(/'atm_present','lnd_present','ocn_present','ice_present',&
+                        'rof_present','wav_present','glc_present','med_present'/), rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+
+        med_present = "false"
+        atm_present = "false"
+        lnd_present = "false"
+        ocn_present = "false"
+        ice_present = "false"
+        rof_present = "false"
+        wav_present = "false"
+        glc_present = "false"
+        do n1=1, componentCount
+          prefix=trim(compLabels(n1))
+          if (trim(prefix) == "MED") med_present = "true"
+          if (trim(prefix) == "ATM") atm_present = "true"
+          if (trim(prefix) == "LND") lnd_present = "true"
+          if (trim(prefix) == "OCN") ocn_present = "true"
+          if (trim(prefix) == "ICE") ice_present = "true"
+          if (trim(prefix) == "ROF") rof_present = "true"
+          if (trim(prefix) == "WAV") wav_present = "true"
+          if (trim(prefix) == "GLC") glc_present = "true"
+        enddo
+        
+        call NUOPC_CompAttributeSet(child, name="atm_present", value=atm_present, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeSet(child, name="lnd_present", value=lnd_present, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeSet(child, name="ocn_present", value=ocn_present, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeSet(child, name="ice_present", value=ice_present, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeSet(child, name="rof_present", value=rof_present, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeSet(child, name="wav_present", value=wav_present, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeSet(child, name="glc_present", value=glc_present, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        call NUOPC_CompAttributeSet(child, name="med_present", value=med_present, rc=rc)
+        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        
+        call ESMF_LogWrite(trim(subname)//":atm_present="//trim(atm_present), ESMF_LOGMSG_INFO, rc=dbrc)
+        call ESMF_LogWrite(trim(subname)//":lnd_present="//trim(lnd_present), ESMF_LOGMSG_INFO, rc=dbrc)
+        call ESMF_LogWrite(trim(subname)//":ocn_present="//trim(ocn_present), ESMF_LOGMSG_INFO, rc=dbrc)
+        call ESMF_LogWrite(trim(subname)//":ice_present="//trim(ice_present), ESMF_LOGMSG_INFO, rc=dbrc)
+        call ESMF_LogWrite(trim(subname)//":rof_present="//trim(rof_present), ESMF_LOGMSG_INFO, rc=dbrc)
+        call ESMF_LogWrite(trim(subname)//":wav_present="//trim(wav_present), ESMF_LOGMSG_INFO, rc=dbrc)
+        call ESMF_LogWrite(trim(subname)//":glc_present="//trim(glc_present), ESMF_LOGMSG_INFO, rc=dbrc)
+        call ESMF_LogWrite(trim(subname)//":med_present="//trim(med_present), ESMF_LOGMSG_INFO, rc=dbrc)
 
         ! read MED attributes from config file into FreeFormat
         attrFF = NUOPC_FreeFormatCreate(config, label=trim(prefix)//"_Attributes::", relaxedflag=.true., rc=rc)
@@ -1398,18 +1313,6 @@ module ESM
     logical                         :: exists                ! true if file exists
     integer                         :: ierr                  ! MPI error return
     integer                         :: rc                    ! return code
-    logical                         :: lnd_present           ! .true.  => land is present
-    logical                         :: ice_present           ! .true.  => ice is present
-    logical                         :: ocn_present           ! .true.  => ocn is present
-    logical                         :: glc_present           ! .true.  => glc is present
-    logical                         :: glclnd_present        ! .true.  => glc is computing land coupling
-    logical                         :: glcocn_present        ! .true.  => glc is computing ocean runoff
-    logical                         :: glcice_present        ! .true.  => glc is computing icebergs
-    logical                         :: rofice_present        ! .true.  => rof is computing icebergs
-    logical                         :: rof_present           ! .true.  => rof is present
-    logical                         :: flood_present         ! .true.  => rof is computing flood
-    logical                         :: wav_present           ! .true.  => wav is present
-    logical                         :: esp_present           ! .true.  => esp is present
     character(len=*) , parameter    :: NLFileName = "drv_in" ! input namelist filename
     integer          , parameter    :: ens1=1                ! use first instance of ensemble only
     integer          , parameter    :: fix1=1                ! temporary hard-coding to first ensemble, needs to be fixed
@@ -2041,14 +1944,14 @@ module ESM
 
        ! TODO: Single column mode needs to be re-implemented - previously all of the xxx_present flags were set
        ! in med_infodata calls, reset here and the copied back into med_infodata - this is no longer the case
-       call shr_scam_checkSurface(scmlon, scmlat, &
-            OCNID(ens1), mpicom_OCNID,            &
-            lnd_present=lnd_present,              &
-            ocn_present=ocn_present,              &
-            ice_present=ice_present,              &
-            rof_present=rof_present,              &
-            flood_present=flood_present,          &
-            rofice_present=rofice_present)
+       ! call shr_scam_checkSurface(scmlon, scmlat, &
+       !      OCNID(ens1), mpicom_OCNID,            &
+       !      lnd_present=lnd_present,              &
+       !      ocn_present=ocn_present,              &
+       !      ice_present=ice_present,              &
+       !      rof_present=rof_present,              &
+       !      flood_present=flood_present,          &
+       !      rofice_present=rofice_present)
 
     endif
 
@@ -2171,18 +2074,16 @@ module ESM
     integer            ,intent(inout) :: rc
 
     ! locals
-    character(len=SHR_KIND_CL)  :: cvalue
-    integer            :: n
-    integer, parameter :: nattrlist = 29
+    integer, parameter :: nattrlist = 22
     character(len=*), parameter :: attrList(nattrlist) = &
       (/ "case_name"    ,"single_column","scmlat"        ,"scmlon"               , &
          "read_restart" ,"start_type"   ,"tfreeze_option","model_version"        , &
          "orb_eccen"    ,"orb_obliqr"   ,"orb_lambm0"    ,"orb_mvelpp"           , &
          "info_debug"   ,"atm_aero"     ,"aqua_planet"   ,"brnch_retain_casename", &
          "perpetual"    ,"perpetual_ymd","hostname"      ,"username"             , &
-         "atm_present"  ,"lnd_present"  ,"ocn_present"   ,"ice_present"          , &
-         "rof_present"  ,"wav_present"  ,"glc_present"   ,"med_present"          , &
-         "flds_i2o_per_cat"/)
+         "flds_i2o_per_cat", "flds_wiso"/)
+    integer                     :: n
+    character(len=SHR_KIND_CL)  :: cvalue
     character(len=*), parameter :: subname = "(esm.F90:esm_AddAttributes)"
     !-------------------------------------------
 

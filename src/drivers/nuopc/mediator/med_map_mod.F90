@@ -34,12 +34,12 @@ module med_map_mod
   ! private module variables
   integer                       :: dbrc
   logical                       :: mastertask
+  integer                       :: srcTermProcessing_Value = 0
   integer                       :: dbug_flag   = med_constants_dbug_flag
   real(ESMF_KIND_R8), parameter :: spval_init  = med_constants_spval_init
   real(ESMF_KIND_R8), parameter :: spval       = med_constants_spval
   real(ESMF_KIND_R8), parameter :: czero       = med_constants_czero
   integer           , parameter :: ispval_mask = med_constants_ispval_mask
-  integer                       :: srcTermProcessing_Value = 0
   character(*)      , parameter :: u_FILE_u    = __FILE__
 
 !================================================================================
@@ -371,7 +371,7 @@ contains
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! Create the normalization field bundles
-    normname = 'MapNormOne'
+    normname = 'one'
     do n1 = 1,ncomps
        do n2 = 1,ncomps
           if (n1 /= n2) then
@@ -380,8 +380,9 @@ contains
                    if (ESMF_RouteHandleIsCreated(is_local%wrap%RH(n1,n2,m), rc=rc)) then
                       if (dbug_flag > 1) then
                          write(cn1,'(i1)') n1; write(cn2,'(i1)') n2; write(cm ,'(i1)') m 
-                         call ESMF_LogWrite(trim(subname)//":"//'creating FBMapNormOne for indices'&
-                              //cn1//','//cn2//','//cm, ESMF_LOGMSG_INFO, rc=dbrc)
+                         call ESMF_LogWrite(trim(subname)//":"//'creating FBMapNormOne for '&
+                              //compname(n1)//'->'//compname(n2)//'with mapping '//mapnames(m), &
+                              ESMF_LOGMSG_INFO, rc=dbrc)
                       endif
                       call shr_nuopc_methods_FB_init(FBout=is_local%wrap%FBNormOne(n1,n2,m), &
                            flds_scalar_name=flds_scalar_name, &
@@ -480,7 +481,11 @@ contains
     do n = 1,size(fldsSrc)
 
        fldname  = fldsSrc(n)%shortname
+       if (fldname == flds_scalar_name) CYCLE
+
        mapindex = fldsSrc(n)%mapindex(destcomp)
+       if (mapindex == 0) CYCLE
+
        mapnorm  = fldsSrc(n)%mapnorm(destcomp)
 
        ! Error checks
@@ -503,16 +508,19 @@ contains
 
        else
 
-          ! Create a new temporary field bundle if needed
           if (.not. ESMF_FieldBundleIsCreated(FBSrcTmp)) then
-             call shr_nuopc_methods_FB_init(FBSrcTmp, flds_scalar_name, FBgeom=FBSrc, fieldNameList=(/trim(fldname)/), rc=rc)
+             ! Create a new temporary field bundle, FBSrcTmp if needed
+             call shr_nuopc_methods_FB_init(FBSrcTmp, flds_scalar_name, FBgeom=FBSrc, fieldNameList=(/'tempname'/), rc=rc)
              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
           end if
 
-          ! Get pointer to source field data in both FBSrc and FBSRcTmp
-          call shr_nuopc_methods_FB_GetFldPtr(FBSrc, fldname, data_src, rc=rc)
+          ! Get pointer to source field data in FBSrcTmp
+          call shr_nuopc_methods_FB_GetFldPtr(FBSrcTmp, 'tempname', data_srctmp, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_FB_GetFldPtr(FBSrcTmp, fldname, data_srctmp, rc=rc)
+
+          ! Get pointer to source field data in both FBSrc 
+          call shr_nuopc_methods_FB_GetFldPtr(FBSrc, fldname, data_src, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
           if ( trim(mapnorm) /= 'unset' .and. trim(mapnorm) /= 'one') then

@@ -72,7 +72,6 @@ module esmFlds
 
   type (shr_nuopc_fldList_type) :: fldListMed_aoflux_a
   type (shr_nuopc_fldList_type) :: fldListMed_aoflux_o
-  type (shr_nuopc_fldList_type) :: fldListMed_ocnalb_a
   type (shr_nuopc_fldList_type) :: fldListMed_ocnalb_o
   type (shr_nuopc_fldList_type) :: fldListMed_aoflux_diurnl
   type (shr_nuopc_fldList_type) :: fldListMed_l2x_to_glc
@@ -455,6 +454,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Sa_z')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapbilnr, 'one', atm2ice_smapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)
 
     longname = 'Surface height'
     stdname  = 'height'
@@ -478,6 +478,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compwav)%flds, 'Sa_u')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mappatch, 'one', atm2ice_vmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mappatch, 'one', atm2ocn_vmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compwav, mapbilnr, 'one', atm2wav_smapname)
 
     longname = 'Meridional wind at the lowest model level'
@@ -490,6 +491,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compwav)%flds, 'Sa_v')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mappatch, 'one', atm2ice_vmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mappatch, 'one', atm2ocn_vmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compwav, mapbilnr, 'one', atm2wav_smapname)
 
     longname = 'Temperature at the lowest model level'
@@ -502,6 +504,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compwav)%flds, 'Sa_tbot')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapbilnr, 'one', atm2ice_smapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compwav, mapbilnr, 'one', atm2wav_smapname)
 
     longname = 'Potential temperature at the lowest model level'
@@ -513,6 +516,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Sa_ptem')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapbilnr, 'one', atm2ice_smapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)
 
     longname = 'Specific humidity at the lowest model level'
     stdname  = 'specific_humidity'
@@ -523,6 +527,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Sa_shum')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapbilnr, 'one', atm2ice_smapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)
 
     longname = 'Pressure at the lowest model level'
     stdname  = 'air_pressure'
@@ -533,6 +538,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Sa_pbot')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapbilnr, 'one', atm2ice_smapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)
 
     longname = 'Density at the lowest model level'
     stdname  = 'air_density'
@@ -541,6 +547,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListFr(compatm)%flds, 'Sa_dens', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Sa_dens')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice,  mapbilnr, 'one', atm2ice_smapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn,  mapbilnr, 'one', atm2ocn_smapname)
 
     units    = 'kg m-2 s-1'
     longname = 'Convective precipitation rate'
@@ -855,8 +862,6 @@ contains
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
-    write(6,*)'DEBUG2: mapfile for atm2ocn Faxa_rainc is ',compatm, n1,compocn, fldListFr(compatm)%flds(n1)%mapfile(compocn)
-
     !----------------------------------------------------------
     ! states/fluxes to atm (and ocean)
     !----------------------------------------------------------
@@ -871,9 +876,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListFr(complnd)%flds , 'Sl_avsdr', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListFr(compice)%flds , 'Si_avsdr', fldindex=n2)
     call shr_nuopc_fldList_AddFld(fldListMed_ocnalb_o%flds, 'So_avsdr', fldindex=n3)
-    write(6,*)'DEBUG3a: mapfile for atm2ocn Faxa_rainc is ',compatm, n1,compocn, fldListFr(compatm)%flds(n1)%mapfile(compocn)
     call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds , 'Sx_avsdr', merge_with_weights=.true.)
-    write(6,*)'DEBUG3b: mapfile for atm2ocn Faxa_rainc is ',compatm, n1,compocn, fldListFr(compatm)%flds(n1)%mapfile(compocn)
     call shr_nuopc_fldList_AddMap(fldListFr(complnd)%flds(n1) , complnd, compatm, mapconsf, 'lfrin', lnd2atm_smapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compice)%flds(n2) , compice, compatm, mapconsf, 'ifrac', ice2atm_smapname)
     call shr_nuopc_fldList_AddMap(fldListMed_ocnalb_o%flds(n3), compocn, compatm, mapconsf, 'ofrac', ocn2atm_smapname)
@@ -1355,9 +1358,9 @@ contains
     stdname  = 'Fraction_of_sw_penetrating_surface_layer'
     units    = '1'
     call shr_nuopc_fldList_AddMetadata(fldname="So_fswpen", longname=longname, stdname=stdname, units=units)
-    call shr_nuopc_fldList_AddFld(fldListFr(compocn)%flds, 'So_fswpen', fldindex=n1)
-    call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'So_fswpen')
-    call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
+    call shr_nuopc_fldList_AddFld(fldListFr(compocn)%flds , 'So_fswpen', fldindex=n1)
+    call shr_nuopc_fldList_AddFld(fldListMed_aoflux_a%flds, 'So_fswpen')
+    call shr_nuopc_fldList_AddFld(fldListMed_aoflux_o%flds, 'So_fswpen')
 
     !-----------------------------
     ! lnd->rof exchange
@@ -1519,23 +1522,25 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Sw_hstokes')
     call shr_nuopc_fldList_AddMap(fldListFr(compwav)%flds(n1), compwav, compocn, mapbilnr, 'one', wav2ocn_smapname)
 
+    longname = 'Downward solar radiation'
+    stdname  = 'surface_downward_shortwave_flux'
+    units    = 'W m-2'
+    call shr_nuopc_fldList_AddMetadata(fldname="Faox_swdn", longname=longname, stdname=stdname, units=units)
+    call shr_nuopc_fldList_AddFld(FldListMed_ocnalb_o%flds, 'Faox_swdn', fldindex=n1) 
+    call shr_nuopc_fldList_AddMap(fldListMed_ocnalb_o%flds(n1), compocn, compatm, mapconsf, 'ofrac', ocn2atm_smapname)
+
+    longname = 'Upward solar radiation'
+    stdname  = 'surface_upward_shortwave_flux'
+    units    = 'W m-2'
+    call shr_nuopc_fldList_AddMetadata(fldname="Faox_swup", longname=longname, stdname=stdname, units=units)
+    call shr_nuopc_fldList_AddFld(FldListMed_ocnalb_o%flds, 'Faox_swup', fldindex=n1) 
+    call shr_nuopc_fldList_AddMap(fldListMed_ocnalb_o%flds(n1), compocn, compatm, mapconsf, 'ofrac', ocn2atm_smapname)
+
     !-----------------------------
     ! fields for history output only
     !-----------------------------
 
     if (do_flux_diurnal) then
-       longname = 'Downward solar radiation'
-       stdname  = 'surface_downward_shortwave_flux'
-       units    = 'W m-2'
-       call shr_nuopc_fldList_AddMetadata(fldname="Faox_swdn", longname=longname, stdname=stdname, units=units)
-       call shr_nuopc_fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'Faox_swdn') ! Needed for FB initialization
-
-       longname = 'Upward solar radiation'
-       stdname  = 'surface_upward_shortwave_flux'
-       units    = 'W m-2'
-       call shr_nuopc_fldList_AddMetadata(fldname="Faox_swup", longname=longname, stdname=stdname, units=units)
-       call shr_nuopc_fldList_AddFld(FldListMed_aoflux_diurnl%flds, 'Faox_swup') ! Needed for FB initialization
-
        longname = 'atm/ocn flux temperature bulk'
        stdname  = 'aoflux_tbulk'
        units    = 'K'
