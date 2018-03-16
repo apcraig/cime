@@ -831,7 +831,6 @@ contains
           windMaxInc  (n) = 0.0_r8
           qSolInc     (n) = 0.0_r8
           windInc     (n) = 0.0_r8
-          nInc        (n) = 0.0_r8
           tbulk       (n) = 0.0_r8
           tskin       (n) = 0.0_r8
           tskin_day   (n) = 0.0_r8
@@ -843,7 +842,6 @@ contains
        enddo
     else
        do n = 1,lsize
-          nInc(n) = 0._r8 ! needed for minval/maxval calculation
           if (mask(n) /= 0) then
              !--- mask missing atm or ocn data if found
              if (dens(n) < 1.0e-12 .or. tocn(n) < 1.0) then
@@ -870,6 +868,9 @@ contains
     end do
 
     if (flux_diurnal) then
+       do n = 1,lsize
+          nInc(n) = 0._r8 ! needed for minval/maxval calculation
+       end do
        call shr_flux_atmocn_diurnal (lsize , zbot , ubot, vbot, thbot, &
             shum , shum_16O , shum_HDO, shum_18O, dens , tbot, uocn, vocn , &
             tocn , mask, sen , lat , lwup , &

@@ -104,11 +104,10 @@ module esmFlds
 contains
 !================================================================================
 
-  subroutine esmFlds_Init(gcomp, ID, rc)
+  subroutine esmFlds_Init(gcomp, rc)
 
     ! input/output parameters:
     type(ESMF_GridComp)    :: gcomp
-    integer, intent(in)    :: ID        ! seq_comm ID TODO: this needs to be depracated
     integer, intent(inout) :: rc
 
     ! local variables:
@@ -161,12 +160,13 @@ contains
     logical                :: flds_wiso  ! use case
     logical                :: do_flux_diurnal
     integer                :: glc_nec
+    integer                :: mpicom
     character(CXX)         :: concatFr, concatTo
     character(len=*), parameter :: subname='(shr_nuopc_fldList_Init)'
     !---------------------------------------------------------------------------
 
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    call ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    call ESMF_VMGet(vm, localPet=localPet, mpiCommunicator=mpicom, rc=rc)
     mastertask = .false.
     if (localPet == 0) mastertask=.true.
 
@@ -2357,7 +2357,7 @@ contains
     ! if carma_flds are specified then setup fields for CLM to CAM communication
     !-----------------------------------------------------------------------------
 
-    call shr_carma_readnl(nlfilename='drv_flds_in', carma_fields=carma_fields)
+    call shr_carma_readnl('drv_flds_in', carma_fields)
     if (carma_fields /= ' ') then
        longname = 'Volumetric soil water'
        stdname  = 'soil_water'
@@ -2377,7 +2377,7 @@ contains
     ! if MEGAN emission are specified then setup fields for CLM to CAM communication
     !-----------------------------------------------------------------------------
 
-    call shr_megan_readnl(nlfilename='drv_flds_in', ID=ID, megan_fields=megan_voc_fields)
+    call shr_megan_readnl('drv_flds_in', mpicom, mastertask, megan_voc_fields)
     if (shr_megan_mechcomps_n > 0) then
        longname = 'MEGAN emission fluxes'
        stdname  = 'megan'
@@ -2397,7 +2397,7 @@ contains
     ! (emissions fluxes)
     !-----------------------------------------------------------------------------
 
-    call shr_fire_emis_readnl(nlfilename='drv_flds_in', ID=ID, emis_fields=fire_emis_fields)
+    call shr_fire_emis_readnl('drv_flds_in', mpicom, mastertask, fire_emis_fields)
     if (shr_fire_emis_mechcomps_n>0) then
        longname = 'wild fire emission fluxes'
        stdname  = 'fire_emis'
@@ -2429,7 +2429,7 @@ contains
     ! Note: CAM and CLM will then call seq_drydep_setHCoeff
     !-----------------------------------------------------------------------------
 
-    call seq_drydep_readnl(nlfilename="drv_flds_in", ID=ID, seq_drydep_fields=drydep_fields)
+    call seq_drydep_readnl("drv_flds_in", mpicom, mastertask, drydep_fields)
     if ( lnd_drydep ) then
        longname = 'dry deposition velocity'
        stdname  = 'drydep_vel'
@@ -2451,7 +2451,7 @@ contains
     ! Then add nitrogen deposition fields to atm export, lnd import and ocn import
     !-----------------------------------------------------------------------------
 
-    call shr_ndep_readnl(nlfilename="drv_flds_in", ID=ID, ndep_fields=ndep_fields, add_ndep_fields=add_ndep_fields)
+    call shr_ndep_readnl("drv_flds_in", mpicom, mastertask, ndep_fields, add_ndep_fields)
     if (add_ndep_fields) then
        longname = 'nitrogen deposition flux'
        stdname  = 'nitrogen_deposition'
