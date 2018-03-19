@@ -13,7 +13,6 @@ module med_phases_ocnalb_mod
   use esmFlds               , only : compatm, compocn
   use esmFlds               , only : flds_scalar_index_nextsw_cday
   use shr_nuopc_fldList_mod , only : mapconsf, mapnames
-  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_GetFldNames
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_init
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_getFieldN
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_GetFldPtr
@@ -95,8 +94,6 @@ contains
     integer                     :: spatialDim
     integer                     :: numOwnedElements
     type(InternalState)         :: is_local
-    integer                     :: nflds
-    character(CL), pointer      :: fldnames(:)
     real(ESMF_KIND_R8), pointer :: ownedElemCoords(:)
     character(*), parameter     :: subname = '(med_phases_ocnalb_init) '
     !-----------------------------------------------------------------------
@@ -118,28 +115,12 @@ contains
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    ! Create field bundles for ocean albedo computation
-    ! NOTE: the NStateImp(compocn) or NStateImp(compatm) used here
-    ! rather than NStateExp(n2), since the export state might only
-    ! contain control data and no grid information if if the target
-    ! component (n2) is not prognostic only receives control data back
-
-    nflds = size(fldListMed_ocnalb_o%flds)
-    allocate(fldnames(nflds))
-    call shr_nuopc_fldList_getfldnames(fldListMed_ocnalb_o%flds, fldnames)
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_a, flds_scalar_name, &
-         STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=fldnames, name='FBMed_ocnalb_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_o, flds_scalar_name, &
-         STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_ocnalb_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    deallocate(fldnames)
-
     !----------------------------------
-    ! fields needed for albedo calculations - must be on the ocean grid
+    ! Set pointers to fields needed for albedo calculations 
     !----------------------------------
+
+    ! These must must be on the ocean grid since the ocean albedo computation is on the ocean grid
+    ! The following sets pointers to the module arrays
 
     call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compatm,compocn), fldname='Faxa_swndr', fldptr1=swndr, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -214,6 +195,12 @@ contains
       rc = ESMF_FAILURE
       return
     end if
+
+    ! Compute ocean albedoes
+    ! This will update the relevant module arrays 
+
+    call med_phases_ocnalb_run(gcomp, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)

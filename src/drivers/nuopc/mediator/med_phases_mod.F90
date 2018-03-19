@@ -6,55 +6,42 @@ module med_phases_mod
 
   use ESMF
   use NUOPC
-  use shr_kind_mod            , only : CL=>SHR_KIND_CL, CS=>SHR_KIND_CS
-  use shr_sys_mod             , only : shr_sys_abort
+  use shr_kind_mod            , only : CL=>SHR_KIND_CL
   use esmFlds                 , only : compmed, compatm, complnd, compocn
   use esmFlds                 , only : compice, comprof, compwav, compglc
   use esmFlds                 , only : ncomps, compname 
   use esmFlds                 , only : flds_scalar_name
-  use esmFlds                 , only : flds_scalar_num
   use esmFlds                 , only : fldListFr, fldListTo
+  use esmFlds                 , only : fldListMed_aoflux_a
   use esmFlds                 , only : fldListMed_aoflux_o
-  use shr_nuopc_fldList_mod   , only : mapconsf, mapnames
+  use esmFlds                 , only : fldListMed_ocnalb_o
+  use shr_nuopc_fldList_mod   , only : shr_nuopc_fldList_GetFldNames
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_init
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_reset
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_clean
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_diagnose
-  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_FieldRegrid
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_GetFldPtr
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_accum
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_FldChk
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_average
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_copy
-  use med_internalstate_mod   , only : InternalState
   use med_fraction_mod        , only : med_fraction_init
-  use med_fraction_mod        , only : med_fraction_set
   use med_constants_mod       , only : med_constants_dbug_flag
-  use med_constants_mod       , only : med_constants_statewrite_flag
-  use med_constants_mod       , only : med_constants_spval_init
-  use med_constants_mod       , only : med_constants_spval
   use med_constants_mod       , only : med_constants_czero
-  use med_constants_mod       , only : med_constants_ispval_mask
   use med_merge_mod           , only : med_merge_auto
   use med_phases_ocnalb_mod   , only : med_phases_ocnalb_init
-  use med_phases_ocnalb_mod   , only : med_phases_ocnalb_run
   use med_phases_ocnalb_mod   , only : med_phases_ocnalb_mapo2a
   use med_phases_aofluxes_mod , only : med_phases_aofluxes_init
   use med_map_mod             , only : med_map_FB_Regrid_Norm 
+  use med_internalstate_mod   , only : InternalState
 
   implicit none
-
   private
 
-  integer           , parameter :: dbug_flag       = med_constants_dbug_flag
-  logical           , parameter :: statewrite_flag = med_constants_statewrite_flag
-  real(ESMF_KIND_R8), parameter :: spval_init      = med_constants_spval_init
-  real(ESMF_KIND_R8), parameter :: spval           = med_constants_spval
-  real(ESMF_KIND_R8), parameter :: czero           = med_constants_czero
-  integer           , parameter :: ispval_mask     = med_constants_ispval_mask
-  character(len=*)  , parameter :: ice_fraction_name = 'Si_ifrac'
-  character(*)      , parameter :: u_FILE_u        = __FILE__
+  integer           , parameter :: dbug_flag = med_constants_dbug_flag
+  real(ESMF_KIND_R8), parameter :: czero     = med_constants_czero
+  character(*)      , parameter :: u_FILE_u  = __FILE__
   integer                       :: dbrc
   logical                       :: mastertask
 
@@ -68,10 +55,9 @@ module med_phases_mod
   public  :: med_phases_prep_glc
   public  :: med_phases_accum_fast
 
-
-  !-----------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
   contains
-  !-----------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 
   subroutine med_phases_init(gcomp, llogunit, rc)
 
@@ -85,10 +71,11 @@ module med_phases_mod
     integer, intent(out) :: rc
 
     ! local variables
-    type(InternalState) :: is_local
-    type(ESMF_VM)       :: vm
-    integer             :: localPet
-    integer             :: n, n1, n2, ncomp
+    type(InternalState)    :: is_local
+    type(ESMF_VM)          :: vm
+    integer                :: localPet
+    integer                :: n, n1, n2, ncomp, nflds
+    character(CL), pointer :: fldnames(:)
     !-----------------------------------------------------------
 
     if (dbug_flag > 1) then
@@ -113,7 +100,6 @@ module med_phases_mod
     ! Create FBfrac field bundles and initialize fractions
     !----------------------------------------------------------
     
-    ! Initialize fractions
     call med_fraction_init(gcomp,rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -124,21 +110,54 @@ module med_phases_mod
     if (is_local%wrap%med_coupling_active(compocn,compatm) .and. &
         is_local%wrap%med_coupling_active(compatm,compocn)) then
 
+       ! NOTE: the NStateImp(compocn) or NStateImp(compatm) used below
+       ! rather than NStateExp(n2), since the export state might only
+       ! contain control data and no grid information if if the target
+       ! component (n2) is not prognostic only receives control data back
+
+       ! Create field bundles for ocean albedo computation
+
+       nflds = size(fldListMed_ocnalb_o%flds)
+       allocate(fldnames(nflds))
+       call shr_nuopc_fldList_getfldnames(fldListMed_ocnalb_o%flds, fldnames)
+
+       call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_a, flds_scalar_name, &
+            STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=fldnames, name='FBMed_ocnalb_a', rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_ocnalb_o, flds_scalar_name, &
+            STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_ocnalb_o', rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       deallocate(fldnames)
+
+       ! Create field bundles for ocean/atmosphere flux computation
+
+       nflds = size(fldListMed_aoflux_o%flds)
+       allocate(fldnames(nflds))
+       call shr_nuopc_fldList_getfldnames(fldListMed_aoflux_a%flds, fldnames)
+
+       call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_a, flds_scalar_name, &
+            STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=fldnames, name='FBMed_aoflux_a', rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_o, flds_scalar_name, &
+            STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_aoflux_o', rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       deallocate(fldnames)
+
        ! Initialize the atm/ocean fluxes and compute the ocean albedos
+
        call ESMF_LogWrite("MED - initialize atm/ocn fluxes and compute ocean albedo", ESMF_LOGMSG_INFO, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-       ! Initialize ocean albedo module
-       call med_phases_ocnalb_init(gcomp, rc=rc)
+       ! Initialize ocean albedo module and compute ocean albedos
 
-       ! Initialize atm/ocn fluxes module
-       call med_phases_aofluxes_init(gcomp, rc)
+       call med_phases_ocnalb_init(gcomp, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-       ! Compute ocean albedoes
-       ! This will update the relevant module arrays in med_ocnalb_mod.F90
-       ! since they are simply pointers into field bundle arrays in the internal state is_local%wrap
-       call med_phases_ocnalb_run(gcomp, rc)
+       ! Initialize atm/ocn fluxes module
+
+       call med_phases_aofluxes_init(gcomp, rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
@@ -1239,7 +1258,8 @@ module med_phases_mod
     type(InternalState)         :: is_local
     integer                     :: i,j,n,n1,ncnt
     logical,save                :: first_call = .true.
-    character(len=*),parameter :: subname='(med_phases_accum_fast)'
+    character(len=*), parameter :: ice_fraction_name = 'Si_ifrac'
+    character(len=*), parameter :: subname='(med_phases_accum_fast)'
     !---------------------------------------
 
     if (dbug_flag > 5) then

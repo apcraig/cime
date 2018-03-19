@@ -8,12 +8,11 @@ module med_phases_aofluxes_mod
   use esmFlds               , only : flds_scalar_name
   use esmFlds               , only : flds_scalar_num
   use esmFlds               , only : flds_scalar_index_dead_comps
-  use esmFlds               , only : fldListMed_aoflux_a
-  use esmFlds               , only : fldListMed_aoflux_o
   use esmFlds               , only : fldListFr, fldListTo
   use esmFlds               , only : flds_scalar_index_dead_comps
   use esmFlds               , only : compatm, compocn, compname
-  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_GetFldNames
+  use esmFlds               , only : fldListMed_aoflux_o
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldlist_getfldnames
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_init
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_getFieldN
@@ -23,13 +22,12 @@ module med_phases_aofluxes_mod
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_GetScalar
   use shr_flux_mod          , only : shr_flux_atmocn, shr_flux_atmocn_diurnal
-  use shr_orb_mod           , only : shr_orb_params, shr_orb_cosz, shr_orb_decl
-  use shr_const_mod         , only : shr_const_pi, shr_const_spval
+  use shr_const_mod         , only : shr_const_spval, shr_const_pi
   use seq_timemgr_mod       , only : seq_timemgr_EclockGetData
   use med_constants_mod     , only : med_constants_dbug_flag
   use med_constants_mod     , only : med_constants_czero
-  use med_internalstate_mod , only : InternalState
   use med_map_mod           , only : med_map_FB_Regrid_Norm
+  use med_internalstate_mod , only : InternalState
 
   implicit none
   private
@@ -129,8 +127,7 @@ module med_phases_aofluxes_mod
   ! Conversion from degrees to radians
   integer                        :: dbug_flag      = med_constants_dbug_flag
   real(ESMF_KIND_R8) , parameter :: czero          = med_constants_czero
-  real(ESMF_KIND_R8) , parameter :: const_pi       = shr_const_pi       ! pi
-  real(ESMF_KIND_R8) , parameter :: const_deg2rad  = const_pi/180.0_r8  ! deg to rads
+  real(ESMF_KIND_R8) , parameter :: const_deg2rad  = shr_const_pi/180.0_r8  ! deg to rads
   character(*)       , parameter :: u_FILE_u       = __FILE__
   integer                        :: dbrc
   character(len=1024)            :: tmpstr
@@ -171,30 +168,33 @@ contains
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    ! Create field bundles for ocean/atmosphere flux computation
-    ! NOTE: the NStateImp(compocn) or NStateImp(compatm) used here
-    ! rather than NStateExp(n2), since the export state might only
-    ! contain control data and no grid information if if the target
-    ! component (n2) is not prognostic only receives control data back
+    ! Create module field bundles
+    
+    call NUOPC_CompAttributeGet(gcomp, name='flux_diurnal', value=cvalue, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    read(cvalue,*) do_flux_diurnal
 
     nflds = size(fldListMed_aoflux_o%flds)
     allocate(fldnames(nflds))
-    call shr_nuopc_fldList_getfldnames(fldListMed_aoflux_a%flds, fldnames)
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_a, flds_scalar_name, &
-         STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=fldnames, name='FBMed_aoflux_a', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call shr_nuopc_methods_FB_init(is_local%wrap%FBMed_aoflux_o, flds_scalar_name, &
-         STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_aoflux_o', rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_fldList_getfldnames(fldListMed_aoflux_o%flds, fldnames)
 
     call shr_nuopc_methods_FB_init(FBMed_aoflux_accum_o, flds_scalar_name, &
          STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_aoflux_o_accum', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (do_flux_diurnal) then
+       call shr_nuopc_methods_FB_init(FBMed_aoflux_diurnl_o, flds_scalar_name, &
+            STgeom=is_local%wrap%NStateImp(compocn), fieldnamelist=fldnames, name='FBMed_diurnl_o_accum', rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call shr_nuopc_methods_FB_init(FBMed_aoflux_diurnl_a, flds_scalar_name, &
+            STgeom=is_local%wrap%NStateImp(compatm), fieldnamelist=fldnames, name='FBMed_diurnl_a_accum', rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
     deallocate(fldnames)
 
     ! Determine src and dst comps depending on the aoflux_grid setting
+
     call NUOPC_CompAttributeGet(gcomp, name='aoflux_grid', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) aoflux_grid
