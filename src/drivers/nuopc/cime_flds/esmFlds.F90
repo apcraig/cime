@@ -11,6 +11,7 @@ module esmFlds
   use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_AddFld
   use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_AddMap
   use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Concat
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_chkerr
   use seq_drydep_mod        , only : seq_drydep_init, seq_drydep_readnl, lnd_drydep
   use shr_megan_mod         , only : shr_megan_readnl, shr_megan_mechcomps_n
   use shr_fire_emis_mod     , only : shr_fire_emis_readnl, shr_fire_emis_mechcomps_n, shr_fire_emis_ztop_token
@@ -79,8 +80,6 @@ module esmFlds
   type (shr_nuopc_fldList_type) :: fldListMed_g2x_to_lnd
 
   ! The following is used in the advertise AND realize fields in the components and mediator
-  ! Advertise  mediator fields in med.F90 routine InitializeIPDv03p1
-  ! Realize    mediator fields in med.F90 routine InitializeIPDv03p3
 
   type (shr_nuopc_fldList_type) :: fldListTo(ncomps)
   type (shr_nuopc_fldList_type) :: fldListFr(ncomps)
@@ -88,7 +87,6 @@ module esmFlds
   !----------------------------------------------------------------------------
   ! other field lists - column deliminated string
   !----------------------------------------------------------------------------
-  ! TODO: these must move away from colon delimited fields
 
   character(len=CXX) :: drydep_fields       ! List of dry-deposition fields
   character(len=CXX) :: megan_voc_fields    ! List of MEGAN VOC emission fields
@@ -98,7 +96,9 @@ module esmFlds
   integer            :: ice_ncat            ! number of sea ice thickness categories
   logical            :: flds_i2o_per_cat    ! .true. => select per ice thickness category fields passed from ice to ocn
   logical            :: add_ndep_fields     ! .true. => add ndep fields
-  integer, parameter :: CSS = 256           ! use longer short character
+
+  integer     , parameter :: CSS = 256           ! use longer short character
+  character(*), parameter :: u_FILE_u = __FILE__
 
 !================================================================================
 contains
@@ -171,43 +171,43 @@ contains
     if (localPet == 0) mastertask=.true.
 
     call NUOPC_CompAttributeGet(gcomp, name='flds_co2a', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) flds_co2a
     call ESMF_LogWrite('flds_co2a = '// trim(cvalue), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='flds_co2b', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) flds_co2b
     call ESMF_LogWrite('flds_co2b = '// trim(cvalue), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='flds_co2c', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) flds_co2c
     call ESMF_LogWrite('flds_co2c = '// trim(cvalue), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='flds_wiso', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) flds_wiso
     call ESMF_LogWrite('flds_wiso = '// trim(cvalue), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='ice_ncat', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) ice_ncat
     call ESMF_LogWrite('ice_ncat = '// trim(cvalue), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='flds_i2o_per_cat', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) flds_i2o_per_cat
     call ESMF_LogWrite('flds_i2o_per_cat = '// trim(cvalue), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='glc_nec', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) glc_nec
     call glc_elevclass_init(glc_nec)
     call ESMF_LogWrite('glc_nec = '// trim(cvalue), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='flux_diurnal', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) do_flux_diurnal
     call ESMF_LogWrite('flux_diurnal = '// trim(cvalue), ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -218,127 +218,127 @@ contains
     ! To atm
 
     call NUOPC_CompAttributeGet(gcomp, name='ice2atm_fmapname', value=ice2atm_fmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('ice2atm_fmapname = '// trim(ice2atm_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='ice2atm_smapname', value=ice2atm_smapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('ice2atm_smapname = '// trim(ice2atm_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='lnd2atm_fmapname', value=lnd2atm_fmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('lnd2atm_fmapname = '// trim(lnd2atm_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='ocn2atm_smapname', value=ocn2atm_smapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('ocn2atm_smapname = '// trim(ocn2atm_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='ocn2atm_fmapname', value=ocn2atm_fmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('ocn2atm_fmapname = '// trim(ocn2atm_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='lnd2atm_smapname', value=lnd2atm_smapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('lnd2atm_smapname = '// trim(lnd2atm_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To lnd
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2lnd_fmapname', value=atm2lnd_fmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('atm2lnd_fmapname = '// trim(atm2lnd_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2lnd_smapname', value=atm2lnd_smapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('atm2lnd_smapname = '// trim(atm2lnd_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='rof2lnd_fmapname', value=rof2lnd_fmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('rof2lnd_fmapname = '// trim(rof2lnd_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='glc2lnd_fmapname', value=glc2lnd_fmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('glc2lnd_smapname = '// trim(glc2lnd_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='glc2lnd_smapname', value=glc2lnd_smapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('glc2lnd_smapname = '// trim(glc2lnd_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To ice
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ice_fmapname', value=atm2ice_fmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('atm2ice_fmapname = '// trim(atm2ice_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ice_smapname', value=atm2ice_smapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('atm2ice_smapname = '// trim(atm2ice_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ice_vmapname', value=atm2ice_vmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('atm2ice_vmapname = '// trim(atm2ice_vmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='glc2ice_rmapname', value=glc2ice_rmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('glc2ice_rmapname = '// trim(glc2ice_rmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To ocn
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ocn_fmapname', value=atm2ocn_fmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('atm2ocn_fmapname = '// trim(atm2ocn_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ocn_smapname', value=atm2ocn_smapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('atm2ocn_smapname = '// trim(atm2ocn_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2ocn_vmapname', value=atm2ocn_vmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('atm2ocn_vmapname = '// trim(atm2ocn_vmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='glc2ocn_rmapname', value=glc2ocn_rmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('glc2ocn_rmapname = '// trim(glc2ocn_rmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='rof2ocn_fmapname', value=rof2ocn_fmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('rof2ocn_fmapname = '// trim(rof2ocn_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='rof2ocn_liq_rmapname', value=rof2ocn_liq_rmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('rof2ocn_liq_rmapname = '// trim(rof2ocn_liq_rmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='rof2ocn_ice_rmapname', value=rof2ocn_ice_rmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('rof2ocn_ice_rmapname = '// trim(rof2ocn_ice_rmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To rof
 
     call NUOPC_CompAttributeGet(gcomp, name='lnd2rof_fmapname', value=lnd2rof_fmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('lnd2rof_fmapname = '// trim(lnd2rof_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To glc
 
     call NUOPC_CompAttributeGet(gcomp, name='lnd2glc_fmapname', value=lnd2glc_fmapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('lnd2glc_fmapname = '// trim(lnd2glc_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='lnd2glc_smapname', value=lnd2glc_smapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('lnd2glc_smapname = '// trim(lnd2glc_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! To wav
 
     call NUOPC_CompAttributeGet(gcomp, name='atm2wav_smapname', value=atm2wav_smapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('atm2wav_smapname = '// trim(atm2wav_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='ice2wav_smapname', value=ice2wav_smapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('ice2wav_smapname = '// trim(ice2wav_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     call NUOPC_CompAttributeGet(gcomp, name='ocn2wav_smapname', value=ocn2wav_smapname, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('ocn2wav_smapname = '// trim(ocn2wav_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
     !----------------------------------------------------------
@@ -415,8 +415,8 @@ contains
     longname = 'Surface ocean fraction'
     stdname  = 'sea_area_fraction'
     units    = '1'
-    call shr_nuopc_fldList_AddMetadata(fldname="So_ifrac", longname=longname, stdname=stdname, units=units)
-    call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, 'So_ifrac')
+    call shr_nuopc_fldList_AddMetadata(fldname="So_ofrac", longname=longname, stdname=stdname, units=units)
+    call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, 'So_ofrac')
 
     longname = 'Sea surface mask'
     stdname  = 'sea_surface_mask'
@@ -439,7 +439,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, 'Si_ifrac')
     call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Si_ifrac')
     call shr_nuopc_fldList_AddFld(fldListTo(compwav)%flds, 'Si_ifrac')
-    call shr_nuopc_fldList_AddMap(fldListFr(compice)%flds(n1), compice, compatm,  mapconsf, 'ifrac', ice2atm_fmapname)
+   !call shr_nuopc_fldList_AddMap(fldListFr(compice)%flds(n1), compice, compatm,  mapconsf, 'ifrac', ice2atm_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
     !----------------------------------------------------------
@@ -632,6 +632,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swndr')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Direct visible incident solar radiation'
     stdname  = 'surface_downward_direct_shortwave_flux_due_to_visible_radiation'
@@ -642,6 +643,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swvdr')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Diffuse near-infrared incident solar radiation'
     stdname  = 'surface_downward_diffuse_shortwave_flux_due_to_near_infrared_radiation'
@@ -652,6 +654,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swndf')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Diffuse visible incident solar radiation'
     stdname  = 'surface_downward_diffuse_shortwave_flux_due_to_visible_radiation'
@@ -662,6 +665,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swvdf')
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Net shortwave radiation'
     stdname  = 'surface_net_shortwave_flux'
@@ -976,6 +980,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListFr(compice)%flds, 'Si_t', fldindex=n2)
     call shr_nuopc_fldList_AddFld(fldListFr(compocn)%flds, 'So_t', fldindex=n3)
     call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, 'Sx_t', merge_with_weights=.true.)
+    call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, 'So_t')
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'So_t')
     call shr_nuopc_fldList_AddFld(fldListTo(compwav)%flds, 'So_t')
     call shr_nuopc_fldList_AddMap(fldListFr(complnd)%flds(n1), complnd, compatm, mapconsf , 'lfrin', lnd2atm_fmapname)
@@ -1239,6 +1244,7 @@ contains
     call shr_nuopc_fldList_AddFld(fldListMed_aoflux_a%flds, 'So_ustar', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListMed_aoflux_o%flds, 'So_ustar')
     call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds , 'So_ustar')
+    call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds , 'So_ustar')
     call shr_nuopc_fldList_AddMap(fldListMed_aoflux_o%flds(n1), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
     call shr_nuopc_fldList_AddMap(fldListMed_aoflux_a%flds(n1), compatm, compocn, mapbilnr, 'one'  , atm2ocn_fmapname) ! map atm->ocn
 
@@ -2331,8 +2337,6 @@ contains
           call shr_nuopc_fldList_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
        end do
 
-       ! Fractional atmosphere coverage wrt ocean
-
        longname = 'fractional atmosphere coverage wrt ocean'
        stdname  = 'atmosphere_area_fraction'
        units    = '1'
@@ -2346,8 +2350,6 @@ contains
        call shr_nuopc_fldList_AddMetadata(fldname='Sf_afracr', longname=longname, stdname=stdname, units=units)
        call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Sf_afracr')
        ! TODO: add mapping
-
-       ! Net shortwave radiation
 
        name = 'Foxx_swnet_afracr'
        longname = 'net shortwave radiation times atmosphere fraction'
@@ -2384,11 +2386,16 @@ contains
     ! if MEGAN emission are specified then setup fields for CLM to CAM communication
     !-----------------------------------------------------------------------------
 
+    ! Note that shr_megan_readnl returns megan_voc_fields which is a
+    ! colon deliminated string of the megan foc fields that will be
+    ! exported by the land model
+
     call shr_megan_readnl('drv_flds_in', mpicom, mastertask, megan_voc_fields)
     if (shr_megan_mechcomps_n > 0) then
        longname = 'MEGAN emission fluxes'
        stdname  = 'megan'
        units    = 'molecules/m2/sec'
+       num = shr_string_listGetNum(megan_voc_fields)
        do n = 1,num
           call shr_string_listGetName(megan_voc_fields, n, name)
           call shr_nuopc_fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
@@ -2409,6 +2416,7 @@ contains
        longname = 'wild fire emission fluxes'
        stdname  = 'fire_emis'
        units    = 'kg/m2/sec'
+       num = shr_string_listGetNum(fire_emis_fields)
        do n = 1,num
           call shr_string_listGetName(fire_emis_fields, n, name)
           call shr_nuopc_fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
@@ -2441,6 +2449,7 @@ contains
        longname = 'dry deposition velocity'
        stdname  = 'drydep_vel'
        units    = 'cm/sec'
+       num = shr_string_listGetNum(drydep_fields)
        do n = 1,num
           call shr_string_listGetName(drydep_fields, n, name)
           call shr_nuopc_fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
@@ -2463,11 +2472,12 @@ contains
        longname = 'nitrogen deposition flux'
        stdname  = 'nitrogen_deposition'
        units    = 'kg(N)/m2/sec'
+       num = shr_string_listGetNum(ndep_fields)
        do n = 1,num
           call shr_string_listGetName(ndep_fields, n, name)
           call shr_nuopc_fldList_AddMetadata(fldname=trim(name), longname=longname, stdname=stdname, units=units)
           call shr_nuopc_fldList_AddFld(fldListFr(compatm)%flds, trim(name), fldindex=n1)
-          call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, trim(name))
+          call shr_nuopc_fldList_AddFld(fldListTo(complnd)%flds, trim(name))
           call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, trim(name))
           call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapbilnr, 'one', atm2lnd_smapname)
           call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapbilnr, 'one', atm2ocn_smapname)

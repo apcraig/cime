@@ -1381,23 +1381,22 @@ contains
       !---------------------------------------
 
       do n1 = 1,ncomps
-        is_local%wrap%FBImpAccumCnt(n1) = 0
-        is_local%wrap%FBExpAccumCnt(n1) = 0
-        if (is_local%wrap%comp_present(n1) .and. ESMF_StateIsCreated(is_local%wrap%NStateImp(n1),rc=rc)) then
-           write(6,*)'DEBUG: n1 = ',n1
-           call med_infodata_CopyStateToInfodata(is_local%wrap%NStateImp(n1), med_infodata, trim(compname(n1))//'2cpli', &
-                is_local%wrap%mpicom, rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+         is_local%wrap%FBImpAccumCnt(n1) = 0
+         is_local%wrap%FBExpAccumCnt(n1) = 0
+         if (is_local%wrap%comp_present(n1) .and. ESMF_StateIsCreated(is_local%wrap%NStateImp(n1),rc=rc)) then
+            call med_infodata_CopyStateToInfodata(is_local%wrap%NStateImp(n1), med_infodata, trim(compname(n1))//'2cpli', &
+                 is_local%wrap%mpicom, rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          call shr_nuopc_methods_FB_reset(is_local%wrap%FBImpAccum(n1), value=czero, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+            call shr_nuopc_methods_FB_reset(is_local%wrap%FBImpAccum(n1), value=czero, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          call shr_nuopc_methods_FB_reset(is_local%wrap%FBExpAccum(n1), value=czero, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+            call shr_nuopc_methods_FB_reset(is_local%wrap%FBExpAccum(n1), value=czero, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          call shr_nuopc_methods_FB_copy(is_local%wrap%FBImp(n1,n1), is_local%wrap%NStateImp(n1), rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        endif
+            call shr_nuopc_methods_FB_copy(is_local%wrap%FBImp(n1,n1), is_local%wrap%NStateImp(n1), rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+         endif
       enddo
 
 #if (1 == 0)

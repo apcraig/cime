@@ -4,29 +4,33 @@ module dlnd_comp_nuopc
   ! This is the NUOPC cap for DLND
   !----------------------------------------------------------------------------
 
-  use shr_kind_mod, only:  R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
-  use shr_kind_mod, only:  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_sys_mod   ! shared system calls
-
-  use seq_comm_mct          , only: seq_comm_inst, seq_comm_name, seq_comm_suffix
-  use seq_timemgr_mod       , only: seq_timemgr_ETimeGet
-
-  use shr_nuopc_fldList_mod
-  use shr_nuopc_flds_mod    , only: flds_l2x, flds_l2x_map, flds_x2l, flds_x2l_map
-  use shr_nuopc_flds_mod    , only: flds_scalar_name
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_nx, flds_scalar_index_ny
-  use shr_nuopc_flds_mod    , only: flds_scalar_index_dead_comps
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_Clock_TimePrint
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_SetScalar
-  use shr_nuopc_methods_mod , only: shr_nuopc_methods_State_Diagnose
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_Meshinit
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_ArrayToState
-  use shr_nuopc_grid_mod    , only: shr_nuopc_grid_StateToArray
-  use shr_file_mod          , only: shr_file_getlogunit, shr_file_setlogunit
-  use shr_file_mod          , only: shr_file_getloglevel, shr_file_setloglevel
-  use shr_file_mod          , only: shr_file_setIO, shr_file_getUnit
-  use shr_strdata_mod       , only: shr_strdata_type
+  use shr_kind_mod          , only : R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
+  use shr_kind_mod          , only : CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, CXX => shr_kind_CXX
+  use seq_comm_mct          , only : seq_comm_inst, seq_comm_name, seq_comm_suffix
+  use seq_timemgr_mod       , only : seq_timemgr_ETimeGet
+  use esmFlds               , only : fldListFr, fldListTo, complnd, compname
+  use esmFlds               , only : flds_scalar_name
+  use esmFlds               , only : flds_scalar_num
+  use esmFlds               , only : flds_scalar_index_nx
+  use esmFlds               , only : flds_scalar_index_ny
+  use esmFlds               , only : flds_scalar_index_dead_comps
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Realize
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Concat
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Deactivate
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Getnumflds
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Getfldinfo
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_Clock_TimePrint
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_SetScalar
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_Diagnose
+  use shr_nuopc_grid_mod    , only : shr_nuopc_grid_Meshinit
+  use shr_nuopc_grid_mod    , only : shr_nuopc_grid_ArrayToState
+  use shr_nuopc_grid_mod    , only : shr_nuopc_grid_StateToArray
+  use shr_file_mod          , only : shr_file_getlogunit, shr_file_setlogunit
+  use shr_file_mod          , only : shr_file_getloglevel, shr_file_setloglevel
+  use shr_file_mod          , only : shr_file_setIO, shr_file_getUnit
+  use shr_strdata_mod       , only : shr_strdata_type
 
   use ESMF
   use NUOPC
@@ -42,6 +46,7 @@ module dlnd_comp_nuopc
   use mct_mod
 
   implicit none
+  private ! except
 
   public :: SetServices
 
@@ -51,8 +56,6 @@ module dlnd_comp_nuopc
   private :: ModelAdvance
   private :: ModelSetRunClock
   private :: ModelFinalize
-
-  private ! except
 
   !--------------------------------------------------------------------------
   ! Private module data
@@ -81,8 +84,8 @@ module dlnd_comp_nuopc
   integer, parameter         :: dbug = 10
   character(len=*),parameter :: grid_option = "mesh"      ! grid_de, grid_arb, grid_reg, mesh
 
-  type (shr_nuopc_fldList_Type) :: fldsToLnd
-  type (shr_nuopc_fldList_Type) :: fldsFrLnd
+  character(CXX)             :: flds_l2x = ''
+  character(CXX)             :: flds_x2l = ''
 
   !----- formats -----
   character(*),parameter :: modName =  "(dlnd_comp_nuopc)"
@@ -170,6 +173,9 @@ module dlnd_comp_nuopc
     integer(IN)   :: lmpicom
     character(CL) :: cvalue
     logical       :: exists
+    character(CS) :: stdname, shortname
+    logical       :: activefld
+    integer(IN)   :: n,nflds       
     integer(IN)   :: ierr       ! error code
     integer(IN)   :: shrlogunit ! original log unit
     integer(IN)   :: shrloglev  ! original log level
@@ -237,42 +243,41 @@ module dlnd_comp_nuopc
          logunit, shrlogunit, SDLND, lnd_present, lnd_prognostic)
 
     !--------------------------------
-    ! create import fields list
+    ! create import and export field list needed by data models
     !--------------------------------
 
-    call shr_nuopc_fldList_Zero(fldsToLnd, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    if (lnd_prognostic) then
-       call shr_nuopc_fldList_fromflds(fldsToLnd, flds_x2l, flds_x2l_map, "will provide", subname//":flds_x2l", rc=rc)
-       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-    end if
-
-    call shr_nuopc_fldList_Add(fldsToLnd, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    !--------------------------------
-    ! create export fields list
-    !--------------------------------
-
-    call shr_nuopc_fldList_Zero(fldsFrLnd, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_fromflds(fldsFrLnd, flds_l2x, flds_l2x_map, "will provide", subname//":flds_l2x", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-    call shr_nuopc_fldList_Add(fldsFrLnd, trim(flds_scalar_name), "will provide", subname//":flds_scalar_name", rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    call shr_nuopc_fldList_Concat(fldListFr(complnd), fldListTo(complnd), flds_l2x, flds_x2l, flds_scalar_name)
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    call shr_nuopc_fldList_Advertise(importState, fldsToLnd, subname//':dlndImport', rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    ! First deactivate fldListTo(compatm) if atm_prognostic is .false.
+    if (.not. lnd_prognostic) then
+       call shr_nuopc_fldList_Deactivate(fldListTo(complnd), flds_scalar_name)
+    end if
 
-    call shr_nuopc_fldList_Advertise(exportState, fldsFrLnd, subname//':dlndExport', rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    nflds = shr_nuopc_fldList_Getnumflds(fldListFr(complnd))
+    do n = 1,nflds
+       call shr_nuopc_fldList_Getfldinfo(fldListFr(complnd), n, activefld, stdname, shortname)
+       if (activefld) then
+          call NUOPC_Advertise(exportState, standardName=stdname, shortname=shortname, name=shortname, &
+               TransferOfferGeomObject='will provide', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_LogWrite(subname//':Fr_'//trim(compname(complnd))//': '//trim(shortname), ESMF_LOGMSG_INFO)
+       end if
+    end do
+
+    nflds = shr_nuopc_fldList_Getnumflds(fldListTo(complnd))
+    do n = 1,nflds
+       call shr_nuopc_fldList_Getfldinfo(fldListTo(complnd), n, activefld, stdname, shortname)
+       if (activefld) then
+          call NUOPC_Advertise(importState, standardName=stdname, shortname=shortname, name=shortname, &
+               TransferOfferGeomObject='will provide', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_LogWrite(subname//':To_'//trim(compname(complnd))//': '//trim(shortname), ESMF_LOGMSG_INFO)
+       end if
+    end do
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
@@ -376,11 +381,13 @@ module dlnd_comp_nuopc
     !  by replacing the advertised fields with the fields in fldsToLnd of the same name.
     !--------------------------------
 
-    call shr_nuopc_fldList_Realize(importState, mesh=Emesh, fldlist=fldsToLnd, tag=subname//':dlndImport', rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    call shr_nuopc_fldList_Realize(importState, fldListTo(complnd), flds_scalar_name, flds_scalar_num, &
+         mesh=Emesh, tag=subname//':dlndImport', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call shr_nuopc_fldList_Realize(exportState, mesh=Emesh, fldlist=fldsFrLnd, tag=subname//':dlndExport', rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+    call shr_nuopc_fldList_Realize(exportState, fldListFr(complnd), flds_scalar_name, flds_scalar_num, &
+         mesh=Emesh, tag=subname//':dlndExport', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--------------------------------
     ! Pack export state

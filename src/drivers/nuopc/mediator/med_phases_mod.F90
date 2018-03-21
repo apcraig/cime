@@ -283,7 +283,7 @@ module med_phases_mod
     enddo
 
     !---------------------------------------
-    !--- map FBMed_ocnalb_o and FBMed_aoflux_o to atm grid
+    !--- map FBMed_ocnalb_o to atm grid
     !---------------------------------------
 
     if (is_local%wrap%med_coupling_active(compocn,compatm)) then

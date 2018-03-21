@@ -50,6 +50,30 @@ contains
 
     !---------------------------------------------
     ! Initialize route handles in the mediator
+    ! Assumptions: 
+    !   -  Route handles are created per target field bundles NOT
+    !      per individual fields in the bundle
+    !   -  ALL fields in the bundle are on identical grids
+    !   -  MULTIPLE route handles are going to be generated for
+    !      given field bundle source and destination grids
+    !    - Route handles will ONLY be created if coupling is active
+    !      between n1 and n2
+    ! Algorithm
+    !     n1=source component index
+    !     n2=destination component index
+    !     nf=field index
+    !     fldListFr(n)%flds(nf) is queried to determine the mapindex and mapfile
+    !     and the appropriate route handle is created
+    !
+    ! Regridding is done on a per-field basis AND only for those fields that have a 
+    ! valid mapping index for the destination component
+    !     n = source field index field index        
+    !     destcomp = destination component index
+    !     The fldsSrc input argument is queried for the mapping type of the field
+    !     for the desination component
+    !        mapindex = fldsSrc(n)%mapindex(destcomp)
+    !     If the mapindex is 0 (there is no valid mapping) then NO mapping is done
+    !        for the field
     !---------------------------------------------
 
     type(ESMF_GridComp)  :: gcomp
@@ -301,7 +325,7 @@ contains
 
     if (mapfile == 'idmap') then
        call ESMF_LogWrite(trim(subname) // trim(string) //&
-            ' RH '//trim(mapname)// 'is redist', ESMF_LOGMSG_INFO, rc=dbrc)
+            ' RH '//trim(mapname)// ' is redist', ESMF_LOGMSG_INFO, rc=dbrc)
        call ESMF_FieldRedistStore(fldsrc, flddst, &
             routehandle=RouteHandle, &
             ignoreUnmatchedIndices = .true., rc=rc)
@@ -471,7 +495,7 @@ contains
     endif
 
     if (dbug_flag > 5) then
-      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+      call ESMF_LogWrite(trim(subname)//": called for "//trim(lstring), ESMF_LOGMSG_INFO, rc=dbrc)
     endif
     rc = ESMF_SUCCESS
 

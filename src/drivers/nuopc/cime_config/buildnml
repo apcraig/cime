@@ -360,11 +360,11 @@ def buildnml(case, caseroot, component):
 
     # create cplconf/namelist
     infile_text = ""
-    if case.get_value('COMP_ATM') == 'cam':
-        # cam is actually changing the driver namelist settings
-        cam_config_opts = case.get_value("CAM_CONFIG_OPTS")
-        if "aquaplanet" in cam_config_opts:
-            infile_text = "aqua_planet = .true. \n aqua_planet_sst = 1"
+    # if case.get_value('COMP_ATM') == 'cam':
+    #     # cam is actually changing the driver namelist settings
+    #     cam_config_opts = case.get_value("CAM_CONFIG_OPTS")
+    #     if "aquaplanet" in cam_config_opts:
+    #         infile_text = "aqua_planet = .true. \n aqua_planet_sst = 1"
 
     # determine infile list for nmlgen
     user_nl_file = os.path.join(caseroot, "user_nl_cpl")

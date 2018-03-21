@@ -60,7 +60,6 @@ module seq_comm_mct
   integer, public, parameter :: default_logunit = 6
   integer, public :: logunit  = default_logunit     ! log unit number
   integer, public :: loglevel = 1     ! log level
-
   integer, public :: global_mype = -1  !! To be initialized
 
   !!! Note - NUM_COMP_INST_XXX are cpp variables set in buildlib.csm_share

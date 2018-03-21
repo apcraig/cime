@@ -403,7 +403,6 @@ contains
 
           call shr_orb_decl(nextsw_cday, eccen, mvelpp,lambm0, obliqr, delta, eccf)
 
-          write(6,*)'DEBUG: ocnalb nextsw_cday = ',nextsw_cday
           ! Compute albedos
           do n = 1,lsize
              rlat = const_deg2rad * lats(n)
@@ -485,7 +484,7 @@ contains
 
     ! Local variables
     type(InternalState) :: is_local
-    character(*), parameter :: subName =   '(med_ocnalb_mapa2o) '
+    character(*), parameter :: subName =   '(med_ocnalb_mapo2a) '
     !-----------------------------------------------------------------------
 
     if (dbug_flag > 5) then
@@ -504,7 +503,7 @@ contains
     
     ! Map the field bundle from the ocean to the atm grid
     call med_map_FB_Regrid_Norm( &
-         fldListMed_ocnalb_o%flds, compocn, &
+         fldListMed_ocnalb_o%flds, compatm, &
          is_local%wrap%FBMed_ocnalb_o, &
          is_local%wrap%FBMed_ocnalb_a, &
          is_local%wrap%FBFrac(compocn), &
@@ -514,6 +513,10 @@ contains
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     
     if (dbug_flag > 1) then
+       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBMed_ocnalb_o, string=trim(subname)//&
+            ' FBMed_ocnalb_o ', rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
        call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBMed_ocnalb_a, string=trim(subname)//&
             ' FBMed_ocnalb_a ', rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return

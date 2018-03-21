@@ -280,10 +280,9 @@ module docn_comp_nuopc
        call shr_nuopc_fldList_Getfldinfo(fldListFr(compocn), n, activefld, stdname, shortname)
        if (activefld) then
           call NUOPC_Advertise(exportState, standardName=stdname, shortname=shortname, name=shortname, &
-               TransferOfferGeomObject='will provide')
+               TransferOfferGeomObject='will provide', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_LogWrite(subname//':Fr_'//trim(compname(compocn))//': '//trim(shortname), ESMF_LOGMSG_INFO)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        end if
     end do
 
@@ -292,10 +291,9 @@ module docn_comp_nuopc
        call shr_nuopc_fldList_Getfldinfo(fldListTo(compocn), n, activefld, stdname, shortname)
        if (activefld) then
           call NUOPC_Advertise(importState, standardName=stdname, shortname=shortname, name=shortname, &
-               TransferOfferGeomObject='will provide')
+               TransferOfferGeomObject='will provide', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_LogWrite(subname//':To_'//trim(compname(compocn))//': '//trim(shortname), ESMF_LOGMSG_INFO)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        end if
     end do
 

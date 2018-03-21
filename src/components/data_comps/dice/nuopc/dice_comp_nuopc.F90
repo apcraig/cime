@@ -1,8 +1,8 @@
 module dice_comp_nuopc
 
-!----------------------------------------------------------------------------
-! This is the NUOPC cap
-!----------------------------------------------------------------------------
+  !----------------------------------------------------------------------------
+  ! This is the NUOPC cap for DICE
+  !----------------------------------------------------------------------------
 
   use shr_sys_mod   ! shared system calls
   use shr_kind_mod          , only : R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
@@ -278,10 +278,9 @@ module dice_comp_nuopc
        call shr_nuopc_fldList_Getfldinfo(fldListFr(compice), n, activefld, stdname, shortname)
        if (activefld) then
           call NUOPC_Advertise(exportState, standardName=stdname, shortname=shortname, name=shortname, &
-               TransferOfferGeomObject='will provide')
+               TransferOfferGeomObject='will provide', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_LogWrite(subname//':Fr_'//trim(compname(compice))//': '//trim(shortname), ESMF_LOGMSG_INFO)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        end if
     end do
 
@@ -290,10 +289,9 @@ module dice_comp_nuopc
        call shr_nuopc_fldList_Getfldinfo(fldListTo(compice), n, activefld, stdname, shortname)
        if (activefld) then
           call NUOPC_Advertise(importState, standardName=stdname, shortname=shortname, name=shortname, &
-               TransferOfferGeomObject='will provide')
+               TransferOfferGeomObject='will provide', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call ESMF_LogWrite(subname//':To_'//trim(compname(compice))//': '//trim(shortname), ESMF_LOGMSG_INFO)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        end if
     end do
 
