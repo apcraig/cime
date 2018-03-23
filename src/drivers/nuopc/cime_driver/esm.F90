@@ -29,11 +29,14 @@ module ESM
   use shr_wv_sat_mod        , only : ShrWVSatTableSpec, shr_wv_sat_make_tables
   use shr_wv_sat_mod        , only : shr_wv_sat_get_scheme_idx, shr_wv_sat_valid_idx
   use shr_file_mod          , only : shr_file_getUnit, shr_file_freeUnit
-  use shr_file_mod          , only : shr_file_setloglevel, shr_file_setlogunit, shr_file_setio
+  use shr_file_mod          , only : shr_file_setlogLevel, shr_file_setLogunit
+  use shr_log_mod           , only : shr_log_Level
+  use shr_log_mod           , only : shr_log_Unit
   use shr_assert_mod        , only : shr_assert_in_domain
 
   use seq_comm_mct          , only : CPLID, GLOID, logunit, loglevel
   use seq_comm_mct          , only : ATMID, LNDID, OCNID, ICEID, GLCID, ROFID, WAVID, ESPID
+  use seq_comm_mct          , only : seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_comm_mct          , only : num_inst_atm, num_inst_lnd, num_inst_rof
   use seq_comm_mct          , only : num_inst_ocn, num_inst_ice, num_inst_glc
   use seq_comm_mct          , only : num_inst_wav, num_inst_esp, num_inst_total
@@ -42,7 +45,7 @@ module ESM
   use seq_comm_mct          , only : seq_comm_iamin, seq_comm_name, seq_comm_namelen, seq_comm_iamroot
   use seq_timemgr_mod       , only : seq_timemgr_clockInit, seq_timemgr_EClockGetData
 
-  use esmFlds               , only : esmFlds_Init
+  use esmFlds               , only : esmFlds_Init, esmFlds_Concat
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
 
@@ -130,13 +133,20 @@ module ESM
 #endif
 
   implicit none
+  private
 
   include 'mpif.h'
-  integer, parameter      :: dbug_flag = 10
-  character(len=512)      :: msgstr
-  integer                 :: dbrc
-  logical                 :: mastertask
-  character(*), parameter :: u_FILE_u = __FILE__
+
+  integer, parameter             :: dbug_flag = 10
+  character(len=512)             :: msgstr
+  integer                        :: dbrc
+  logical                        :: mastertask ! master processor for driver gcomp
+  integer                        :: componentCount
+  character(len=32), allocatable :: compLabels(:)
+  character(len=8)               :: atm_present, lnd_present, ocn_present
+  character(len=8)               :: ice_present, rof_present, wav_present
+  character(len=8)               :: glc_present, med_present
+  character(*), parameter        :: u_FILE_u = __FILE__
 
   type(ESMF_Clock), target :: EClock_d
   type(ESMF_Clock), target :: EClock_a
@@ -147,8 +157,6 @@ module ESM
   type(ESMF_Clock), target :: EClock_r
   type(ESMF_Clock), target :: EClock_w
   type(ESMF_Clock), target :: EClock_e
-
-  private
 
   public  :: SetServices
 
@@ -222,17 +230,16 @@ module ESM
     type(ESMF_VM)                  :: vm
     type(ESMF_GridComp)            :: child
     type(ESMF_Config)              :: config
+    integer                        :: compid
     integer                        :: n, n1, stat
     integer, pointer               :: petList(:)
-    character(len=32), allocatable :: compLabels(:)
     character(len=20)              :: model, prefix
-    character(len=8)               :: atm_present, lnd_present, ocn_present
-    character(len=8)               :: ice_present, rof_present, wav_present
-    character(len=8)               :: glc_present, med_present
-    integer                        :: componentCount
     integer                        :: petCount, i
     integer                        :: localPet
     logical                        :: is_set
+    character(SHR_KIND_CS)         :: cvalue
+    character(len=512)             :: diro
+    character(len=512)             :: logfile
     character(len=*), parameter    :: subname = "(esm.F90:SetModelServices)"
     !-------------------------------------------
 
@@ -241,7 +248,12 @@ module ESM
        call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
+    call ESMF_GridCompGet(driver, vm=vm, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     if (localPet == 0) then
        mastertask=.true.
     else
@@ -350,7 +362,8 @@ module ESM
 
       if (trim(prefix) == "ATM") then
 
-        call seq_comm_petlist(ATMID(1),petList)
+        compid = ATMID(1)
+        call seq_comm_petlist(compid, petList)
 
         is_set = .false.
         if (trim(model) == "datm") then
@@ -382,18 +395,7 @@ module ESM
            return 
         end if
 
-        ! obtain ATM attributes
-
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        
-        call AddAttributes(child, driver, ATMID(1), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "ATM_attributes::", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "ALLCOMP_attributes::", rc=rc)
+        call AddAttributes(child, driver, config, compid, 'ATM', verbosity='high', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -402,8 +404,10 @@ module ESM
 
       elseif (trim(prefix) == "OCN") then
 
+         compid = OCNID(1)
+         call seq_comm_petlist(compid,petList)
+
          is_set = .false.
-         call seq_comm_petlist(OCNID(1),petList)
          if (trim(model) == "docn") then
 #ifdef ESMFUSE_docn
           call NUOPC_DriverAddComp(driver, "OCN", docn_SS, petList=petList, comp=child, rc=rc)
@@ -439,18 +443,7 @@ module ESM
            return 
         end if
 
-        ! obtain OCN attributes 
-
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call AddAttributes(child, driver, OCNID(1), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "OCN_attributes::", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "ALLCOMP_attributes::", rc=rc)
+        call AddAttributes(child, driver, config, compid, 'OCN', verbosity='high', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -459,7 +452,8 @@ module ESM
 
       elseif (trim(prefix) == "ICE") then
 
-        call seq_comm_petlist(ICEID(1),petList)
+        compid = ICEID(1)
+        call seq_comm_petlist(compid, petList)
 
         is_set = .false.
         if (trim(model) == "dice") then
@@ -491,18 +485,7 @@ module ESM
            return 
         end if
 
-        ! obtain ICE attributes
-
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call AddAttributes(child, driver, ICEID(1), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "ICE_attributes::", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "ALLCOMP_attributes::", rc=rc)
+        call AddAttributes(child, driver, config, compid, 'ICE', verbosity='high', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -511,7 +494,8 @@ module ESM
 
       elseif (trim(prefix) == "LND") then
 
-        call seq_comm_petlist(LNDID(1),petList)
+        compid = LNDID(1)
+        call seq_comm_petlist(compid, petList)
 
         is_set = .false.
         if (trim(model) == "dlnd") then
@@ -543,18 +527,7 @@ module ESM
            return 
         end if
 
-        ! obtain LND attributes
-
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call AddAttributes(child, driver, LNDID(1), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "LND_attributes::", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "ALLCOMP_attributes::", rc=rc)
+        call AddAttributes(child, driver, config, compid, 'LND', verbosity='high', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -563,7 +536,8 @@ module ESM
 
       elseif (trim(prefix) == "WAV") then
 
-        call seq_comm_petlist(WAVID(1),petList)
+        compid = WAVID(1)
+        call seq_comm_petlist(compid, petList)
 
         is_set = .false.
         if (trim(model) == "dwav") then
@@ -595,18 +569,7 @@ module ESM
            return 
         end if
 
-        ! obtain WAV attributes
-
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call AddAttributes(child, driver, WAVID(1), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "WAV_attributes::", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "ALLCOMP_attributes::", rc=rc)
+        call AddAttributes(child, driver, config, compid, 'WAV', verbosity='high', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -614,6 +577,9 @@ module ESM
       !--------
 
       elseif (trim(prefix) == "GLC") then
+
+        compid = GLCID(1)
+        call seq_comm_petlist(compid, petList)
 
         is_set = .false.
         if (trim(model) == "cism") then
@@ -639,18 +605,7 @@ module ESM
            return 
         end if
 
-        ! obtain GLC attributes
-
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call AddAttributes(child, driver, GLCID(1), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "GLC_attributes::", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "ALLCOMP_attributes::", rc=rc)
+        call AddAttributes(child, driver, config, compid, 'GLC', verbosity='high', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -659,7 +614,8 @@ module ESM
 
       elseif (trim(prefix) == "ROF") then
 
-        call seq_comm_petlist(ROFID(1),petList)
+        compid = ROFID(1) 
+        call seq_comm_petlist(compid, petList)
 
         is_set = .false.
         if (trim(model) == "drof") then
@@ -697,18 +653,7 @@ module ESM
            return 
         end if
 
-        ! obtain ROF attributes
-
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call AddAttributes(child, driver, ROFID(1), rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "ROF_attributes::", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "ALLCOMP_attributes::", rc=rc)
+        call AddAttributes(child, driver, config, compid, 'ROF', verbosity='high', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -717,7 +662,8 @@ module ESM
 
       elseif (trim(prefix) == "MED") then
 
-        call seq_comm_petlist(CPLID,petList)
+        compid = CPLID
+        call seq_comm_petlist(compid, petList)
 
         if (trim(model) == "cesm") then
           call NUOPC_DriverAddComp(driver, "MED", med_SS, petList=petList, comp=child, rc=rc)
@@ -728,77 +674,43 @@ module ESM
           return  ! bail out
         endif
 
-        ! add attributes for component present flags
-        call NUOPC_CompAttributeAdd(child, &
-             attrList=(/'atm_present','lnd_present','ocn_present','ice_present',&
-                        'rof_present','wav_present','glc_present','med_present'/), rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
-        med_present = "false"
-        atm_present = "false"
-        lnd_present = "false"
-        ocn_present = "false"
-        ice_present = "false"
-        rof_present = "false"
-        wav_present = "false"
-        glc_present = "false"
-        do n1=1, componentCount
-          if (trim(compLabels(n1)) == "MED") med_present = "true"
-          if (trim(compLabels(n1)) == "ATM") atm_present = "true"
-          if (trim(compLabels(n1)) == "LND") lnd_present = "true"
-          if (trim(compLabels(n1)) == "OCN") ocn_present = "true"
-          if (trim(compLabels(n1)) == "ICE") ice_present = "true"
-          if (trim(compLabels(n1)) == "ROF") rof_present = "true"
-          if (trim(compLabels(n1)) == "WAV") wav_present = "true"
-          if (trim(compLabels(n1)) == "GLC") glc_present = "true"
-        enddo
-        
-        call NUOPC_CompAttributeSet(child, name="atm_present", value=atm_present, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call NUOPC_CompAttributeSet(child, name="lnd_present", value=lnd_present, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call NUOPC_CompAttributeSet(child, name="ocn_present", value=ocn_present, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call NUOPC_CompAttributeSet(child, name="ice_present", value=ice_present, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call NUOPC_CompAttributeSet(child, name="rof_present", value=rof_present, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call NUOPC_CompAttributeSet(child, name="wav_present", value=wav_present, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call NUOPC_CompAttributeSet(child, name="glc_present", value=glc_present, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call NUOPC_CompAttributeSet(child, name="med_present", value=med_present, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        
-        call ESMF_LogWrite(trim(subname)//":atm_present="//trim(atm_present), ESMF_LOGMSG_INFO, rc=dbrc)
-        call ESMF_LogWrite(trim(subname)//":lnd_present="//trim(lnd_present), ESMF_LOGMSG_INFO, rc=dbrc)
-        call ESMF_LogWrite(trim(subname)//":ocn_present="//trim(ocn_present), ESMF_LOGMSG_INFO, rc=dbrc)
-        call ESMF_LogWrite(trim(subname)//":ice_present="//trim(ice_present), ESMF_LOGMSG_INFO, rc=dbrc)
-        call ESMF_LogWrite(trim(subname)//":rof_present="//trim(rof_present), ESMF_LOGMSG_INFO, rc=dbrc)
-        call ESMF_LogWrite(trim(subname)//":wav_present="//trim(wav_present), ESMF_LOGMSG_INFO, rc=dbrc)
-        call ESMF_LogWrite(trim(subname)//":glc_present="//trim(glc_present), ESMF_LOGMSG_INFO, rc=dbrc)
-        call ESMF_LogWrite(trim(subname)//":med_present="//trim(med_present), ESMF_LOGMSG_INFO, rc=dbrc)
-
-        ! obtain MED attributes
-        call NUOPC_CompAttributeSet(child, name="Verbosity", value="high", rc=rc)
+        call AddAttributes(child, driver, config, compid, 'MED', verbosity='high', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        call AddAttributes(child, driver, CPLID, rc=rc)
+        ! Create logfile for mediator
+        call ESMF_GridCompGet(child, vm=vm, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "MED_attributes::", rc=rc)
+        call ESMF_VMGet(vm, localPet=localPet, rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        if (localPet == 0) then
+           call NUOPC_CompAttributeGet(child, name="diro", value=diro, rc=rc)
+           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           call NUOPC_CompAttributeGet(child, name="logfile", value=logfile, rc=rc)
+           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+           logunit = shr_file_getUnit()
+           if (len_trim(logfile) > 0) then
+              open(logunit,file=trim(diro)//"/"//trim(logfile))
+           else
+              if (shr_log_Level > 0) write(shr_log_Unit,*) subname // "logfile not opened"
+           endif
+           call shr_file_setLogUnit(logunit)
+           call shr_file_setLogLevel(newlevel=1)
+        else
+           call shr_file_setLogLevel(newlevel=0)
+        endif
 
-        call ReadAttributes(child, config, "MED_history_attributes::", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+        ! Print out present flags to mediator log file
+        write(logunit,*) trim(subname)//":atm_present="//trim(atm_present)
+        write(logunit,*) trim(subname)//":lnd_present="//trim(lnd_present)
+        write(logunit,*) trim(subname)//":ocn_present="//trim(ocn_present)
+        write(logunit,*) trim(subname)//":ice_present="//trim(ice_present)
+        write(logunit,*) trim(subname)//":rof_present="//trim(rof_present)
+        write(logunit,*) trim(subname)//":wav_present="//trim(wav_present)
+        write(logunit,*) trim(subname)//":glc_present="//trim(glc_present)
+        write(logunit,*) trim(subname)//":med_present="//trim(med_present)
 
-        call ReadAttributes(child, config, "CLOCK_attributes::", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "FLDS_attributes::", rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-        call ReadAttributes(child, config, "ALLCOMP_attributes::", rc=rc)
+        ! Print out colon delimited string of fields from mediator log file
+        call esmFlds_Concat(child, logunit, rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       else
@@ -1165,31 +1077,12 @@ module ESM
     ! ESP components do not use the coupler (they are 'external')
 
     !----------------------------------------------------------
-    !| Set logging parameters both for shr code and locally
-    !----------------------------------------------------------
-
-    call seq_comm_getinfo(CPLID, iamroot=iamroot_CPLID)
-    if (iamroot_CPLID) then
-       inquire(file='cpl_modelio.nml',exist=exists)
-       if (exists) then
-          logunit = shr_file_getUnit()
-          call shr_file_setIO('cpl_modelio.nml',logunit)
-          call shr_file_setLogUnit(logunit)
-          loglevel = 1
-          call shr_file_setLogLevel(loglevel)
-       endif
-    else
-       loglevel = 0
-       call shr_file_setLogLevel(loglevel)
-    endif
-
-    !----------------------------------------------------------
     ! Log info about the environment settings
     !----------------------------------------------------------
 
     !  When using io servers (pio_async_interface=.true.) the server tasks do not return from
     !  shr_pio_init2
-    call shr_pio_init2(comp_id,comp_name,comp_iamin,comp_comm,comp_comm_iam)
+    call shr_pio_init2(comp_id, comp_name, comp_iamin, comp_comm, comp_comm_iam)
 
     !----------------------------------------------------------
     ! Timer initialization (has to be after mpi init)
@@ -1646,32 +1539,35 @@ module ESM
 
   !===============================================================================
 
-  subroutine AddAttributes(gcomp, driver, MCTID, rc)
+  subroutine AddAttributes(gcomp, driver, config, compid, compname, verbosity, rc)
 
     ! Add specific set of attributes to gcomp from driver attributes
 
     ! input/output parameters
-    type(ESMF_GridComp),intent(inout) :: gcomp
-    type(ESMF_GridComp),intent(in)    :: driver
-    integer            ,intent(in)    :: MCTID
-    integer            ,intent(inout) :: rc
+    type(ESMF_GridComp) , intent(inout) :: gcomp
+    type(ESMF_GridComp) , intent(in)    :: driver
+    type(ESMF_Config)   , intent(in)    :: config
+    integer             , intent(in)    :: compid
+    character(len=*)    , intent(in)    :: compname 
+    character(len=*)    , intent(in)    :: verbosity 
+    integer             , intent(inout) :: rc
 
     ! locals
+    integer                     :: n
+    character(len=SHR_KIND_CL)  :: cvalue
     integer         , parameter :: nattrlist = 5
     character(len=*), parameter :: attrList(nattrlist) = &
          (/"read_restart", "orb_eccen", "orb_obliqr", "orb_lambm0", "orb_mvelpp"/)
-    integer                     :: n
-    character(len=SHR_KIND_CL)  :: cvalue
     character(len=*), parameter :: subname = "(esm.F90:AddAttributes)"
     !-------------------------------------------
 
     rc = ESMF_Success
 
-    ! First add MCTID to gcomp attributes
-    write(cvalue,*) MCTID
+    ! First add compid to gcomp attributes
+
+    write(cvalue,*) compid
     call NUOPC_CompAttributeAdd(gcomp, attrList=(/'MCTID'/), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
-
     call NUOPC_CompAttributeSet(gcomp, name='MCTID', value=trim(cvalue), rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
 
@@ -1685,6 +1581,90 @@ module ESM
        call NUOPC_CompAttributeSet(gcomp, name=trim(attrList(n)), value=trim(cvalue), rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     enddo
+
+    ! Now add component specific attributes
+    call NUOPC_CompAttributeSet(gcomp, name="Verbosity", value=trim(verbosity), rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call ReadAttributes(gcomp, config, trim(compname)//"_attributes::", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call ReadAttributes(gcomp, config, "ALLCOMP_attributes::", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call ReadAttributes(gcomp, config, trim(compname)//"_modelio::", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (compname == 'MED') then
+
+       call ReadAttributes(gcomp, config, "MED_history_attributes::", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call ReadAttributes(gcomp, config, "CLOCK_attributes::", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call ReadAttributes(gcomp, config, "FLDS_attributes::", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call NUOPC_CompAttributeAdd(gcomp, &
+            attrList=(/'atm_present','lnd_present','ocn_present','ice_present',&
+                       'rof_present','wav_present','glc_present','med_present'/), rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       med_present = "false"
+       atm_present = "false"
+       lnd_present = "false"
+       ocn_present = "false"
+       ice_present = "false"
+       rof_present = "false"
+       wav_present = "false"
+       glc_present = "false"
+       do n=1, componentCount
+          if (trim(compLabels(n)) == "MED") med_present = "true"
+          if (trim(compLabels(n)) == "ATM") atm_present = "true"
+          if (trim(compLabels(n)) == "LND") lnd_present = "true"
+          if (trim(compLabels(n)) == "OCN") ocn_present = "true"
+          if (trim(compLabels(n)) == "ICE") ice_present = "true"
+          if (trim(compLabels(n)) == "ROF") rof_present = "true"
+          if (trim(compLabels(n)) == "WAV") wav_present = "true"
+          if (trim(compLabels(n)) == "GLC") glc_present = "true"
+       enddo
+
+       call NUOPC_CompAttributeSet(gcomp, name="atm_present", value=atm_present, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call NUOPC_CompAttributeSet(gcomp, name="lnd_present", value=lnd_present, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call NUOPC_CompAttributeSet(gcomp, name="ocn_present", value=ocn_present, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call NUOPC_CompAttributeSet(gcomp, name="ice_present", value=ice_present, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call NUOPC_CompAttributeSet(gcomp, name="rof_present", value=rof_present, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call NUOPC_CompAttributeSet(gcomp, name="wav_present", value=wav_present, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call NUOPC_CompAttributeSet(gcomp, name="glc_present", value=glc_present, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call NUOPC_CompAttributeSet(gcomp, name="med_present", value=med_present, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    else
+
+       call NUOPC_CompAttributeAdd(gcomp, attrList=(/'inst_name','inst_index','inst_suffix'/), rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call NUOPC_CompAttributeSet(gcomp, name='inst_name', value=trim(seq_comm_name(compid)), rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       write(cvalue,*) seq_comm_inst(compid)
+       call NUOPC_CompAttributeSet(gcomp, name='inst_index', value=trim(cvalue), rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       if (seq_comm_suffix(compid) /= '') then
+          call NUOPC_CompAttributeSet(gcomp, name='inst_suffix', value=trim(seq_comm_suffix(compid)), rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
+
+    end if
 
   end subroutine AddAttributes
 

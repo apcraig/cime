@@ -13,17 +13,15 @@ module shr_ndep_mod
   use shr_kind_mod,  only : r8 => shr_kind_r8, CS => SHR_KIND_CS, CX => SHR_KIND_CX
 
   implicit none
-  save
-
   private
 
   ! !PUBLIC MEMBER FUNCTIONS
   public :: shr_ndep_readnl       ! Read namelist
-  !====================================================================================
 
+!====================================================================================
 CONTAINS
+!====================================================================================
 
-  !====================================================================================
   subroutine shr_ndep_readnl(NLFilename, mpicom, mastertask, ndep_fields, add_ndep_fields)
 
     !========================================================================

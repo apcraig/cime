@@ -3,7 +3,6 @@ module esmFlds
   use ESMF
   use NUOPC
   use shr_kind_mod          , only : CX => shr_kind_CX, CXX => shr_kind_CXX, CS=>shr_kind_CS, CL=>shr_kind_CL
-  use seq_comm_mct          , only : llogunit => logunit
   use shr_nuopc_fldList_mod , only : mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy, mapunset 
   use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_type
   use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_AddDomain
@@ -29,6 +28,7 @@ module esmFlds
   !----------------------------------------------------------------------------
 
   public :: esmFlds_Init
+  public :: esmFlds_Concat
 
   !----------------------------------------------------------------------------
   ! scalars
@@ -161,12 +161,15 @@ contains
     logical                :: do_flux_diurnal
     integer                :: glc_nec
     integer                :: mpicom
-    character(CXX)         :: concatFr, concatTo
     character(len=*), parameter :: subname='(shr_nuopc_fldList_Init)'
-    !---------------------------------------------------------------------------
+    !--------------------------------------
 
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     call ESMF_VMGet(vm, localPet=localPet, mpiCommunicator=mpicom, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
     mastertask = .false.
     if (localPet == 0) mastertask=.true.
 
@@ -776,9 +779,12 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_dstwet1')
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Faxa_dstwet1')
     call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstwet1', merge_with_weights=.true.)
-    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
-    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
-    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
+   !call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+   !call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+   !call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'none', atm2lnd_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'none', atm2ice_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'none', atm2ocn_fmapname)
 
     longname = 'Dust wet deposition flux (size 2)'
     stdname  = 'wet_deposition_flux_of_dust'
@@ -2366,7 +2372,7 @@ contains
     ! if carma_flds are specified then setup fields for CLM to CAM communication
     !-----------------------------------------------------------------------------
 
-    call shr_carma_readnl('drv_flds_in', carma_fields)
+    call shr_carma_readnl('drv_flds_in', mpicom, mastertask, carma_fields)
     if (carma_fields /= ' ') then
        longname = 'Volumetric soil water'
        stdname  = 'soil_water'
@@ -2484,68 +2490,96 @@ contains
        enddo
     end if
 
+  end subroutine esmFlds_Init
+
+  !================================================================================
+
+  subroutine esmFlds_Concat(gcomp, logunit, rc)
+
     !----------------------------------------------------------------------------
     ! creation of colon delimited field list
     !----------------------------------------------------------------------------
+
+    ! input/output variables
+    type(ESMF_GridComp)    :: gcomp
+    integer, intent(in)    :: logunit
+    integer, intent(inout) :: rc
+
+    ! local variables
+    type(ESMF_VM)  :: vm
+    integer        :: localPet
+    logical        :: mastertask
+    character(CXX) :: concatFr, concatTo
+    character(len=*), parameter :: subname='(esmFlds_Concat)'
+    !--------------------------------------
+
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    mastertask = .false.
+    if (localPet == 0) mastertask=.true.
 
     ! Determine character list of fields
     concatFr = ''; concatTo = ''
     call shr_nuopc_fldList_Concat(fldListFr(compatm), fldListTo(compatm), concatFr, concatTo, flds_scalar_name)
     if (mastertask) then
-       write(llogunit, "(A)") subname//': flds_a2x        = ',trim(concatFr)
-       write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2a        = ',trim(concatTo)
-       write(llogunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_a2x        = ',trim(concatFr)
+       write(logunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_x2a        = ',trim(concatTo)
+       write(logunit, "(A)") '-------------------------------------------------'
     end if
     concatFr = ''; concatTo = ''
     call shr_nuopc_fldList_Concat(fldListFr(complnd), fldListTo(complnd), concatFr, concatTo, flds_scalar_name)
     if (mastertask) then
-       write(llogunit, "(A)") subname//': flds_l2x        = ',trim(concatFr)
-       write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2l        = ',trim(concatTo)
-       write(llogunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_l2x        = ',trim(concatFr)
+       write(logunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_x2l        = ',trim(concatTo)
+       write(logunit, "(A)") '-------------------------------------------------'
     end if
     concatFr = ''; concatTo = ''
     call shr_nuopc_fldList_Concat(fldListFr(compice), fldListTo(compice), concatFr, concatTo, flds_scalar_name)
     if (mastertask) then
-       write(llogunit, "(A)") subname//': flds_i2x        = ',trim(concatFr)
-       write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2i        = ',trim(concatTo)
-       write(llogunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_i2x        = ',trim(concatFr)
+       write(logunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_x2i        = ',trim(concatTo)
+       write(logunit, "(A)") '-------------------------------------------------'
     end if
     concatFr = ''; concatTo = ''
     call shr_nuopc_fldList_Concat(fldListFr(compocn), fldListTo(compocn), concatFr, concatTo, flds_scalar_name)
     if (mastertask) then
-       write(llogunit, "(A)") subname//': flds_o2x        = ',trim(concatFr)
-       write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2o        = ',trim(concatTo)
-       write(llogunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_o2x        = ',trim(concatFr)
+       write(logunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_x2o        = ',trim(concatTo)
+       write(logunit, "(A)") '-------------------------------------------------'
     end if
     concatFr = ''; concatTo = ''
     call shr_nuopc_fldList_Concat(fldListFr(compglc), fldListTo(compglc), concatFr, concatTo, flds_scalar_name)
     if (mastertask) then
-       write(llogunit, "(A)") subname//': flds_g2x        = ',trim(concatFr)
-       write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2g        = ',trim(concatTo)
-       write(llogunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_g2x        = ',trim(concatFr)
+       write(logunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_x2g        = ',trim(concatTo)
+       write(logunit, "(A)") '-------------------------------------------------'
     end if
     concatFr = ''; concatTo = ''
     call shr_nuopc_fldList_Concat(fldListFr(comprof), fldListTo(comprof), concatFr, concatTo, flds_scalar_name)
     if (mastertask) then
-       write(llogunit, "(A)") subname//': flds_r2x        = ',trim(concatFr)
-       write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_r2x        = ',trim(concatTo)
-       write(llogunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_r2x        = ',trim(concatFr)
+       write(logunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_r2x        = ',trim(concatTo)
+       write(logunit, "(A)") '-------------------------------------------------'
     end if
     concatFr = ''; concatTo = ''
     call shr_nuopc_fldList_Concat(fldListFr(compwav), fldListTo(compwav), concatFr, concatTo, flds_scalar_name)
     if (mastertask) then
-       write(llogunit, "(A)") subname//': flds_w2x        = ',trim(concatFr)
-       write(llogunit, "(A)") '-------------------------------------------------'
-       write(llogunit, "(A)") subname//': flds_x2w        = ',trim(concatTo)
-       write(llogunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_w2x        = ',trim(concatFr)
+       write(logunit, "(A)") '-------------------------------------------------'
+       write(logunit, "(A)") subname//': flds_x2w        = ',trim(concatTo)
+       write(logunit, "(A)") '-------------------------------------------------'
     end if
 
-  end subroutine esmFlds_Init
+  end subroutine esmFlds_Concat
 
 end module esmFlds

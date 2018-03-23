@@ -593,13 +593,14 @@ CONTAINS
     !--- Make sure method is valid and determine if land is passing drydep fields ---
     lnd_drydep = n_drydep>0 .and. drydep_method == DD_XLND
 
-    if ( s_loglev > 0 ) then
-       write(s_logunit,*) 'seq_drydep_read: drydep_method: ', trim(drydep_method)
-       if ( n_drydep == 0 )then
-          write(s_logunit,F00) 'No dry deposition fields will be transfered'
-       else
-          write(s_logunit,FI1) 'Number of dry deposition fields transfered is ', &
-                                n_drydep
+    if (mastertask) then
+       if ( s_loglev > 0 ) then
+          write(s_logunit,*) 'seq_drydep_read: drydep_method: ', trim(drydep_method)
+          if ( n_drydep == 0 )then
+             write(s_logunit,F00) 'No dry deposition fields will be transfered'
+          else
+             write(s_logunit,FI1) 'Number of dry deposition fields transfered is ', n_drydep
+          end if
        end if
     end if
 

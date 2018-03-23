@@ -1,13 +1,15 @@
 module datm_comp_nuopc
 
-!----------------------------------------------------------------------------
-! This is the NUOPC cap
-!----------------------------------------------------------------------------
+  !----------------------------------------------------------------------------
+  ! This is the NUOPC cap for DATM
+  !----------------------------------------------------------------------------
 
-  use shr_sys_mod   ! shared system calls
   use shr_kind_mod          , only : R8=>SHR_KIND_R8, IN=>SHR_KIND_IN
   use shr_kind_mod          , only : CS=>SHR_KIND_CS, CL=>SHR_KIND_CL, CXX => shr_kind_CXX
-  use seq_comm_mct          , only : seq_comm_inst, seq_comm_name, seq_comm_suffix
+  use shr_log_mod           , only : shr_log_Unit
+  use shr_file_mod          , only : shr_file_getlogunit, shr_file_setlogunit
+  use shr_file_mod          , only : shr_file_getloglevel, shr_file_setloglevel
+  use shr_file_mod          , only : shr_file_setIO, shr_file_getUnit
   use seq_timemgr_mod       , only : seq_timemgr_ETimeGet
   use esmFlds               , only : fldListFr, fldListTo, compatm, compname
   use esmFlds               , only : flds_scalar_name
@@ -28,9 +30,6 @@ module datm_comp_nuopc
   use shr_nuopc_grid_mod    , only : shr_nuopc_grid_Meshinit
   use shr_nuopc_grid_mod    , only : shr_nuopc_grid_ArrayToState
   use shr_nuopc_grid_mod    , only : shr_nuopc_grid_StateToArray
-  use shr_file_mod          , only : shr_file_getlogunit, shr_file_setlogunit
-  use shr_file_mod          , only : shr_file_getloglevel, shr_file_setloglevel
-  use shr_file_mod          , only : shr_file_setIO, shr_file_getUnit
   use shr_strdata_mod       , only : shr_strdata_type
 
   use ESMF
@@ -180,16 +179,18 @@ module datm_comp_nuopc
     integer, intent(out) :: rc
 
     ! local variables
-    type(ESMF_VM) :: vm
-    integer(IN)   :: lmpicom
-    character(CL) :: cvalue
-    logical       :: exists
-    character(CS) :: stdname, shortname
-    logical       :: activefld
-    integer(IN)   :: n,nflds       
-    integer(IN)   :: ierr       ! error code
-    integer(IN)   :: shrlogunit ! original log unit
-    integer(IN)   :: shrloglev  ! original log level
+    type(ESMF_VM)      :: vm
+    integer(IN)        :: lmpicom
+    character(CL)      :: cvalue
+    character(CS)      :: stdname, shortname
+    logical            :: activefld
+    integer(IN)        :: n,nflds       
+    integer(IN)        :: ierr       ! error code
+    integer(IN)        :: shrlogunit ! original log unit
+    integer(IN)        :: shrloglev  ! original log level
+    logical            :: isPresent
+    character(len=512) :: diro
+    character(len=512) :: logfile
     character(len=*),parameter :: subname=trim(modName)//':(InitializeAdvertise) '
     !-------------------------------------------------------------------------------
 
@@ -221,25 +222,36 @@ module datm_comp_nuopc
     ! determine instance information
     !----------------------------------------------------------------------------
 
-    inst_name   = seq_comm_name(compid)
-    inst_index  = seq_comm_inst(compid)
-    inst_suffix = seq_comm_suffix(compid)
+    call NUOPC_CompAttributeGet(gcomp, name="inst_name", value=inst_name, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call NUOPC_CompAttributeGet(gcomp, name="inst_index", value=cvalue, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    read(cvalue,*) inst_index 
+
+    call ESMF_AttributeGet(gcomp, name="inst_suffix", isPresent=isPresent, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (isPresent) then
+       call NUOPC_CompAttributeGet(gcomp, name="inst_suffix", value=inst_suffix, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    else
+       inst_suffix = ''
+    end if
 
     !----------------------------------------------------------------------------
-    ! set logunit
+    ! set logunit and set shr logging to my log file
     !----------------------------------------------------------------------------
 
     if (my_task == master_task) then
-       inquire(FILE='atm_modelio.nml'//trim(inst_suffix), exist=exists)
-       if (exists) then
-         logUnit = shr_file_getUnit()
-         call shr_file_setIO('atm_modelio.nml'//trim(inst_suffix),logUnit)
-       end if
+       call NUOPC_CompAttributeGet(gcomp, name="diro", value=diro, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call NUOPC_CompAttributeGet(gcomp, name="logfile", value=logfile, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       logunit = shr_file_getUnit()
+       open(logunit,file=trim(diro)//"/"//trim(logfile))
+    else
+       logunit = shrlogunit 
     endif
-
-    !----------------------------------------------------------------------------
-    ! Reset shr logging to my log file
-    !----------------------------------------------------------------------------
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)

@@ -272,7 +272,7 @@ def compare_drv_flds_in(first, second, infile1, infile2):
                    % (infile1, infile2))
 
 ###############################################################################
-def _create_component_modelio_namelists(case, files):
+def _create_component_modelio_namelists(confdir, case, files):
 ###############################################################################
 
     # will need to create a new namelist generator
@@ -282,11 +282,13 @@ def _create_component_modelio_namelists(case, files):
     confdir = os.path.join(case.get_value("CASEBUILD"), "cplconf")
     lid = os.environ["LID"] if "LID" in os.environ else get_timestamp("%y%m%d-%H%M%S")
 
-    #if we are in multi-coupler mode the number of instances of cpl will be the max
+    #if we are in multi-coupler mode the number of instances of mediator will be the max
     # of any NINST_* value
     maxinst = 1
     if case.get_value("MULTI_DRIVER"):
         maxinst = case.get_value("NINST_MAX")
+
+    nuopc_config_file = os.path.join(confdir, "cesm.runconfig")
 
     for model in case.get_values("COMP_CLASSES"):
         model = model.lower()
@@ -306,23 +308,29 @@ def _create_component_modelio_namelists(case, files):
                 if inst_count > 1:
                     inst_string = '_{:04d}'.format(inst_index)
 
-                # set default values
+                # Write out just the pio_inparm to the output file
                 for entry in entries:
                     nmlgen.add_default(entry.get("id"))
-
-                # overwrite defaults
-                moddiri = case.get_value('EXEROOT') + "/" + model
-                nmlgen.set_value('diri', moddiri)
-
-                moddiro = case.get_value('RUNDIR')
-                nmlgen.set_value('diro', moddiro)
-
-                logfile = model + inst_string + ".log." + str(lid)
-                nmlgen.set_value('logfile', logfile)
-
-                # Write output file
                 modelio_file = model + "_modelio.nml" + inst_string
-                nmlgen.write_modelio_file(os.path.join(confdir, modelio_file))
+                nmlgen.write_nuopc_modelio_file(os.path.join(confdir, modelio_file))
+
+                # Output the following to cesm.runconfig
+                moddiro = case.get_value('RUNDIR')
+                if model == 'cpl':
+                    logfile = 'med' + inst_string + ".log." + str(lid)
+                else:
+                    logfile = model + inst_string + ".log." + str(lid)
+
+                with open(nuopc_config_file, 'a') as outfile:
+                    if model == 'cpl':
+                        model = 'MED'
+                    if inst_string:
+                        outfile.write("{}::\n".format(model.upper() + "_modelio_" + inst_string))
+                    else:
+                        outfile.write("{}::\n".format(model.upper() + "_modelio"))
+                    outfile.write("     {}{}{}".format("diro = ", moddiro,"\n"))
+                    outfile.write("     {}{}{}".format("logfile = ", logfile,"\n"))
+                    outfile.write("::\n\n")
 
                 inst_index = inst_index + 1
 
@@ -376,7 +384,8 @@ def buildnml(case, caseroot, component):
     _create_drv_namelists(case, infile, confdir, nmlgen, files)
 
     # create the files comp_modelio.nml where comp = [atm, lnd...]
-    _create_component_modelio_namelists(case, files)
+    _create_component_modelio_namelists(confdir, case, files)
+    #expect(False, "debugging")
 
     # copy drv_in, drv_flds_in, cesm.runconfig and all *modio* fiels to rundir
     rundir = case.get_value("RUNDIR")

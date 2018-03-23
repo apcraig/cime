@@ -8,8 +8,7 @@ module seq_timemgr_mod
   use shr_cal_mod
   use SHR_KIND_mod, only: SHR_KIND_IN, SHR_KIND_R8, SHR_KIND_CS
   use SHR_KIND_mod, only: SHR_KIND_CL, SHR_KIND_I8
-  use seq_comm_mct, only: logunit, loglevel, seq_comm_iamin, CPLID
-  use seq_comm_mct, only: seq_comm_gloroot
+  use seq_comm_mct, only: logunit, loglevel, seq_comm_iamin, seq_comm_gloroot, CPLID
   use shr_sys_mod,  only: shr_sys_abort, shr_sys_flush
 
   implicit none
