@@ -15,6 +15,10 @@ module ESM
 
   use shr_sys_mod           , only : shr_sys_abort
   use shr_kind_mod          , only : SHR_KIND_R8, SHR_KIND_CS, SHR_KIND_CL
+  use shr_log_mod           , only : shr_log_Unit, shr_log_Level
+  use shr_file_mod          , only : shr_file_getlogunit, shr_file_setLogunit
+  use shr_file_mod          , only : shr_file_getlogLevel, shr_file_setLogLevel
+  use shr_file_mod          , only : shr_file_getUnit, shr_file_freeUnit
   use shr_scam_mod          , only : shr_scam_checkSurface
   use shr_mpi_mod           , only : shr_mpi_bcast, shr_mpi_chkerr
   use shr_mem_mod           , only : shr_mem_init, shr_mem_getusage
@@ -26,12 +30,8 @@ module ESM
   use shr_const_mod         , only : shr_const_tkfrz, shr_const_tktrip
   use shr_const_mod         , only : shr_const_mwwv, shr_const_mwdair
   use shr_wv_sat_mod        , only : shr_wv_sat_set_default, shr_wv_sat_init
-  use shr_wv_sat_mod        , only : ShrWVSatTableSpec, shr_wv_sat_make_tables
+  use shr_wv_sat_mod        , only : shr_wv_sat_make_tables, ShrWVSatTableSpec 
   use shr_wv_sat_mod        , only : shr_wv_sat_get_scheme_idx, shr_wv_sat_valid_idx
-  use shr_file_mod          , only : shr_file_getUnit, shr_file_freeUnit
-  use shr_file_mod          , only : shr_file_setlogLevel, shr_file_setLogunit
-  use shr_log_mod           , only : shr_log_Level
-  use shr_log_mod           , only : shr_log_Unit
   use shr_assert_mod        , only : shr_assert_in_domain
 
   use seq_comm_mct          , only : logunit, loglevel
@@ -40,8 +40,9 @@ module ESM
   use seq_comm_mct          , only : num_inst_atm, num_inst_lnd, num_inst_rof
   use seq_comm_mct          , only : num_inst_ocn, num_inst_ice, num_inst_glc
   use seq_comm_mct          , only : num_inst_wav, num_inst_esp, num_inst_total
-  use seq_comm_mct          , only : seq_comm_init, seq_comm_setnthreads, seq_comm_getnthreads
-  use seq_comm_mct          , only : seq_comm_getinfo => seq_comm_setptrs, seq_comm_petlist
+  use seq_comm_mct          , only : seq_comm_init, seq_comm_petlist, seq_comm_printcomms
+  use seq_comm_mct          , only : seq_comm_setnthreads, seq_comm_getnthreads
+  use seq_comm_mct          , only : seq_comm_getinfo => seq_comm_setptrs 
   use seq_comm_mct          , only : seq_comm_iamin, seq_comm_name, seq_comm_namelen, seq_comm_iamroot
   use seq_timemgr_mod       , only : seq_timemgr_clockInit, seq_timemgr_EClockGetData
 
@@ -49,7 +50,7 @@ module ESM
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
 
-  use med_infodata_mod      , only : med_infodata_init1, med_infodata_init2, med_infodata
+  use med_infodata_mod      , only : med_infodata
   use pio                   , only : file_desc_t, pio_closefile, pio_file_is_open
   use t_drv_timers_mod
   use perf_mod
@@ -146,6 +147,7 @@ module ESM
   character(len=8)               :: atm_present, lnd_present, ocn_present
   character(len=8)               :: ice_present, rof_present, wav_present
   character(len=8)               :: glc_present, med_present
+  character(*), parameter        :: nlfilename = "drv_in" ! input namelist filename
   character(*), parameter        :: u_FILE_u = __FILE__
 
   type(ESMF_Clock), target :: EClock_d
@@ -240,6 +242,10 @@ module ESM
     character(SHR_KIND_CS)         :: cvalue
     character(len=512)             :: diro
     character(len=512)             :: logfile
+    integer                        :: shrlogunit ! original log unit
+    integer                        :: shrloglev  ! original log level
+    integer                        :: global_comm
+    logical                        :: iamroot_med           ! mediator masterproc
     character(len=*), parameter    :: subname = "(esm.F90:SetModelServices)"
     !-------------------------------------------
 
@@ -316,6 +322,54 @@ module ESM
     ! Initialize communicators and PIO and
     !-------------------------------------------
 
+    ! Call first phase of pio initialization The call to pio_init1
+    ! should be the first routine called after mpi_init.  It reads the
+    ! pio default settings (pio_default_inparm) from the file
+    ! 'nlfilename' and if the namelist variable 'pio_async_interface'
+    ! is true, it splits the IO tasks away from the Compute tasks.  It
+    ! then returns the new compute comm in Global_Comm and sets module
+    ! variable io_comm.  
+    ! TODO: this must be reconciled with having the asynchronous io
+    ! processors just be a separate gridded component in NUOPC
+    ! TODO: global_comm should be the same as mpicom for the driver vm - however
+    ! cannot set this to mpicom since the call to shr_pio_init1 can possibly change this
+
+    global_comm = MPI_COMM_WORLD
+    call shr_pio_init1(num_inst_total, nlfilename, global_comm)
+
+    ! NOTE: if pio_async_interface is true global_comm is MPI_COMM_NULL on the servernodes
+    ! and server nodes do not return from shr_pio_init2
+    ! NOTE: if (global_comm /= MPI_COMM_NULL) then the following call also initializes 
+    ! MCT which is still needed for some models
+    call seq_comm_init(global_comm, nlfilename)
+
+    !Create logfile for mediator
+    !TODO: this is not directing things correctly - not sure why
+    call ReadAttributes(driver, config, "MED_modelio::", rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call seq_comm_getinfo(CPLID, iamroot=iamroot_med)
+    if (iamroot_med) then
+       call NUOPC_CompAttributeGet(driver, name="diro", value=diro, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call NUOPC_CompAttributeGet(driver, name="logfile", value=logfile, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       logunit = shr_file_getUnit()
+       open(logunit,file=trim(diro)//"/"//trim(logfile))
+    else
+       logUnit = 6
+    endif
+    
+    call shr_file_getLogUnit (shrlogunit)
+    call shr_file_getLogLevel(shrloglev)
+    call shr_file_setLogLevel(max(shrloglev,1))
+    call shr_file_setLogUnit (logunit)
+
+    ! Print communicator info to mediator log file
+    call ESMF_VMBarrier(vm, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (iamroot_med) call seq_comm_printcomms()
+
+    ! Now finish the pio initialization (this calls shr_pio_init2)
     call InitPIO(driver, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     
@@ -697,30 +751,8 @@ module ESM
         call AddAttributes(child, driver, config, compid, 'MED', verbosity='high', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-        ! Create logfile for mediator
-        call ESMF_GridCompGet(child, vm=vm, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        call ESMF_VMGet(vm, localPet=localPet, rc=rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-        if (localPet == 0) then
-           call NUOPC_CompAttributeGet(child, name="diro", value=diro, rc=rc)
-           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-           call NUOPC_CompAttributeGet(child, name="logfile", value=logfile, rc=rc)
-           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-           logunit = shr_file_getUnit()
-           if (len_trim(logfile) > 0) then
-              open(logunit,file=trim(diro)//"/"//trim(logfile))
-           else
-              if (shr_log_Level > 0) write(shr_log_Unit,*) subname // "logfile not opened"
-           endif
-           call shr_file_setLogUnit(logunit)
-           call shr_file_setLogLevel(newlevel=1)
-        else
-           call shr_file_setLogLevel(newlevel=0)
-        endif
-
         ! Print out present flags to mediator log file
-        if (localPet == 0) then
+        if (iamroot_med == 0) then
            write(logunit,*) trim(subname)//":atm_present="//trim(atm_present)
            write(logunit,*) trim(subname)//":lnd_present="//trim(lnd_present)
            write(logunit,*) trim(subname)//":ocn_present="//trim(ocn_present)
@@ -765,6 +797,13 @@ module ESM
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
+
+    !----------------------------------------------------------------------------
+    ! Reset shr logging to original values
+    !----------------------------------------------------------------------------
+
+    call shr_file_setLogLevel(shrloglev)
+    call shr_file_setLogUnit (shrlogunit)
 
   end subroutine SetModelServices
 
@@ -920,7 +959,6 @@ module ESM
 
     ! local variables
     integer                         :: it,n
-    integer                         :: Global_Comm
     integer                         :: mpicom_GLOID          ! MPI global communicator
     integer                         :: mpicom_OCNID          ! MPI ocn communicator for ensemble member 1
     integer                         :: nthreads_GLOID        ! OMP global number of threads
@@ -943,7 +981,6 @@ module ESM
     logical                         :: iamroot_med 
     character(SHR_KIND_CL)          :: cvalue
     character(len=seq_comm_namelen) :: comp_name(num_inst_total)
-    character(len=*) , parameter    :: nlfilename = "drv_in" ! input namelist filename
     character(len=*) , parameter    :: subname = "(esm.F90:InitPIO)"
     !----------------------------------------------------------
 
@@ -951,18 +988,6 @@ module ESM
     if (dbug_flag > 5) then
        call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
-
-    Global_Comm = MPI_COMM_WORLD
-
-    ! Call first phase of pio initialization
-    call shr_pio_init1(num_inst_total, nlfilename, Global_Comm)
-
-    ! If pio_async_interface is true Global_Comm is MPI_COMM_NULL on the servernodes
-    ! and server nodes do not return from shr_pio_init2
-    ! NOTE - if (Global_Comm /= MPI_COMM_NULL) then the following call also initializes 
-    ! MCT which is still needed for some models
-
-    call seq_comm_init(Global_Comm, nlfilename)
 
     ! set task based threading counts
     call seq_comm_getinfo(GLOID, pethreads=pethreads_GLOID)
@@ -1260,10 +1285,6 @@ module ESM
     ! Initialize time manager
     !----------------------------------------------------------
 
-    ! TODO: make logunit an attribute of the driver gridded component so that
-    ! you do not have to pass it in as a separate argument
-    ! Initialize clocks
-
     call ESMF_GridCompGet(driver, vm=vm, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -1291,7 +1312,6 @@ module ESM
     ! local variables
     character(SHR_KIND_CL)          :: errstring
     character(SHR_KIND_CL)          :: cvalue
-    integer                         :: Global_Comm
     integer                         :: mpicom_GLOID          ! MPI global communicator
     integer                         :: mpicom_OCNID          ! MPI ocn communicator for ensemble member 1
     logical                         :: iamroot_med           ! mediator masterproc
@@ -1447,8 +1467,8 @@ module ESM
 
     ! Determine orbital params
 
+    call seq_comm_getinfo(CPLID, iamroot=iamroot_med)
     if (trim(orb_mode) == trim(orb_variable_year)) then
-       call seq_comm_getinfo(CPLID, iamroot=iamroot_med)
        call seq_timemgr_EClockGetData( EClock_d, curr_ymd=ymd)
        call shr_cal_date2ymd(ymd,year,month,day)
        orb_cyear = orb_iyear + (year - orb_iyear_align)

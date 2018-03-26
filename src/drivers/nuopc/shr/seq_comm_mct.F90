@@ -864,8 +864,7 @@ contains
     do n = 1,ncomps
        gloroot = -999
        if (seq_comms(n)%iamroot) gloroot = seq_comms(n)%gloiam
-       call shr_mpi_max(gloroot,seq_comms(n)%gloroot,GLOBAL_COMM, &
-                        trim(subname)//' gloroot',all=.true.)
+       call shr_mpi_max(gloroot,seq_comms(n)%gloroot,GLOBAL_COMM, trim(subname)//' gloroot',all=.true.)
     enddo
 
     ! Initialize MCT
@@ -922,8 +921,6 @@ contains
        endif
        call shr_sys_abort(trim(subname)//' ERROR: Invalid value for esmf_logging '//esmf_logging)
     end select
-
-    call seq_comm_printcomms()
 
   end subroutine seq_comm_init
 
@@ -1310,33 +1307,25 @@ contains
   end subroutine seq_comm_jcommarr
 
 !---------------------------------------------------------
+
   subroutine seq_comm_printcomms()
 
-    implicit none
+    integer :: n
     character(*),parameter :: subName =   '(seq_comm_printcomms) '
-    integer :: n,mype,npes,ierr
 
-    call mpi_comm_size(GLOBAL_COMM, npes  , ierr)
-    call shr_mpi_chkerr(ierr,subname//' mpi_comm_size comm_world')
-    call mpi_comm_rank(GLOBAL_COMM, mype  , ierr)
-    call shr_mpi_chkerr(ierr,subname//' mpi_comm_rank comm_world')
-
+    do n = 1,ncomps
+       write(logunit,'(a,4i6,2x,3a)') trim(subName), n, &
+            seq_comms(n)%gloroot, seq_comms(n)%npes, seq_comms(n)%nthreads, &
+            trim(seq_comms(n)%name),':',trim(seq_comms(n)%suffix)
+    enddo
     call shr_sys_flush(logunit)
-    call mpi_barrier(GLOBAL_COMM,ierr)
-    if (mype == 0) then
-       do n = 1,ncomps
-          write(logunit,'(a,4i6,2x,3a)') trim(subName),n, &
-             seq_comms(n)%gloroot,seq_comms(n)%npes,seq_comms(n)%nthreads, &
-             trim(seq_comms(n)%name),':',trim(seq_comms(n)%suffix)
-       enddo
-       call shr_sys_flush(logunit)
-    endif
 
   end subroutine seq_comm_printcomms
 
 !---------------------------------------------------------
+
   subroutine seq_comm_setptrs(ID,mpicom,mpigrp,npes,nthreads,iam,iamroot,gloiam,gloroot, &
-                                 cplpe,cmppe,pethreads, name)
+       cplpe,cmppe,pethreads, name)
 
     implicit none
     integer,intent(in) :: ID
