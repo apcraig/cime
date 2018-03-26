@@ -1103,7 +1103,7 @@ CONTAINS
     ! Debug output
     !----------------------------------------------------------
 
-    if (dbug > 0 .and. my_task == master_task) then
+    if (dbug > 1 .and. my_task == master_task) then
        do n = 1,lsize
           write(logunit,F01)'export: ymd,tod,n,Sa_z       = ',currentYMD, currentTOD, n,a2x%rAttr(kz,n)
           write(logunit,F01)'export: ymd,tod,n,Sa_topo    = ',currentYMD, currentTOD, n,a2x%rAttr(ktopo,n)

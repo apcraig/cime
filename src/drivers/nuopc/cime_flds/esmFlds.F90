@@ -779,12 +779,9 @@ contains
     call shr_nuopc_fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_dstwet1')
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Faxa_dstwet1')
     call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_dstwet1', merge_with_weights=.true.)
-   !call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
-   !call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
-   !call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
-    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'none', atm2lnd_fmapname)
-    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'none', atm2ice_fmapname)
-    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'none', atm2ocn_fmapname)
+   call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
+   call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
+   call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Dust wet deposition flux (size 2)'
     stdname  = 'wet_deposition_flux_of_dust'

@@ -79,6 +79,7 @@ module datm_comp_nuopc
   character(len=16)          :: inst_suffix = ""          ! char string associated with instance (ie. "_0001" or "")
   integer(IN)                :: logunit                   ! logging unit number
   integer(IN),parameter      :: master_task=0             ! task number of master task
+  integer(IN)                :: localPet
   logical                    :: atm_present               ! flag
   logical                    :: atm_prognostic            ! flag
   logical                    :: unpack_import
@@ -204,7 +205,7 @@ module datm_comp_nuopc
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call ESMF_VMGet(vm, mpiCommunicator=lmpicom, rc=rc)
+    call ESMF_VMGet(vm, mpiCommunicator=lmpicom, localPet=localPet, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call mpi_comm_dup(lmpicom, mpicom, ierr)
@@ -250,11 +251,12 @@ module datm_comp_nuopc
        logunit = shr_file_getUnit()
        open(logunit,file=trim(diro)//"/"//trim(logfile))
     else
-       logunit = shrlogunit 
+       logUnit = 6
     endif
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
+    call shr_file_setLogLevel(max(shrloglev,1))
     call shr_file_setLogUnit (logunit)
 
     !----------------------------------------------------------------------------
@@ -375,7 +377,8 @@ module datm_comp_nuopc
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
-    call shr_file_setLogUnit (logunit)
+    call shr_file_setLogLevel(max(shrloglev,1))
+    call shr_file_setLogUnit (logUnit)
 
     !--------------------------------
     ! call datm init routine
@@ -504,9 +507,9 @@ module datm_comp_nuopc
     !--------------------------------
 
     if (dbug > 1) then
-      call mct_aVect_info(2, d2x, istr='initial diag'//':AV')
+      call mct_aVect_info(2, d2x, istr='initial diag'//':AV', pe=localPet)
       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
 #ifdef USE_ESMF_METADATA
@@ -535,6 +538,8 @@ module datm_comp_nuopc
     call ESMF_AttributeSet(comp, "ResponsiblePartyRole", "contact", convention=convCIM, purpose=purpComp, rc=rc)
 #endif
 
+    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
+
     !----------------------------------------------------------------------------
     ! Reset shr logging to original values
     !----------------------------------------------------------------------------
@@ -542,7 +547,6 @@ module datm_comp_nuopc
     call shr_file_setLogLevel(shrloglev)
     call shr_file_setLogUnit (shrlogunit)
 
-    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine InitializeRealize
 
@@ -649,16 +653,18 @@ module datm_comp_nuopc
     !--------------------------------
 
     if (dbug > 1) then
-      call mct_aVect_info(2, d2x, istr='run diag'//':AV')
+      call mct_aVect_info(2, d2x, istr='run diag'//':AV', pe=localPet)
       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
-     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
-    call ESMF_ClockPrint(clock, options="currTime", preString="------>Advancing ATM from: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (my_task == master_task) then
+       call ESMF_ClockPrint(clock, options="currTime", preString="------>Advancing ATM from: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call ESMF_ClockPrint(clock, options="stopTime", preString="--------------------------------> to: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_ClockPrint(clock, options="stopTime", preString="--------------------------------> to: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
 
     call shr_file_setLogLevel(shrloglev)
     call shr_file_setLogUnit (shrlogunit)

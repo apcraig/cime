@@ -75,6 +75,7 @@ module docn_comp_nuopc
   character(len=16)          :: inst_suffix = ""          ! char string associated with instance (ie. "_0001" or "")
   integer(IN)                :: logunit                   ! logging unit number
   integer(IN),parameter      :: master_task=0             ! task number of master task
+  integer(IN)                :: localPet
   logical                    :: ocn_prognostic            ! flag
   logical                    :: rofice_present            ! flag
   logical                    :: flood_present             ! flag
@@ -198,7 +199,7 @@ module docn_comp_nuopc
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call ESMF_VMGet(vm, mpiCommunicator=lmpicom, rc=rc)
+    call ESMF_VMGet(vm, mpiCommunicator=lmpicom, localPet=localPet, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call mpi_comm_dup(lmpicom, mpicom, ierr)
@@ -244,11 +245,12 @@ module docn_comp_nuopc
        logunit = shr_file_getUnit()
        open(logunit,file=trim(diro)//"/"//trim(logfile))
     else
-       logunit = shrlogunit
+       logUnit = 6
     endif
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
+    call shr_file_setLogLevel(max(shrloglev,1))
     call shr_file_setLogUnit (logunit)
 
     !----------------------------------------------------------------------------
@@ -311,6 +313,13 @@ module docn_comp_nuopc
 
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
+    !----------------------------------------------------------------------------
+    ! Reset shr logging to original values
+    !----------------------------------------------------------------------------
+
+    call shr_file_setLogUnit (shrlogunit)
+    call shr_file_setLogLevel(shrloglev)
+
   end subroutine InitializeAdvertise
 
   !===============================================================================
@@ -354,7 +363,8 @@ module docn_comp_nuopc
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
-    call shr_file_setLogUnit (logunit)
+    call shr_file_setLogLevel(max(shrloglev,1))
+    call shr_file_setLogUnit (logUnit)
 
     !--------------------------------
     ! call docn init routine
@@ -463,7 +473,7 @@ module docn_comp_nuopc
     !--------------------------------
 
     if (dbug > 1) then
-      call mct_aVect_info(2, d2x, istr=subname//':AV')
+      call mct_aVect_info(2, d2x, istr=subname//':AV', pe=localPet)
       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
@@ -494,9 +504,14 @@ module docn_comp_nuopc
     call ESMF_AttributeSet(comp, "ResponsiblePartyRole", "contact", convention=convCIM, purpose=purpComp, rc=rc)
 #endif
 
-    call shr_file_setLogUnit (shrlogunit)
-
     if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
+
+    !----------------------------------------------------------------------------
+    ! Reset shr logging to original values
+    !----------------------------------------------------------------------------
+
+    call shr_file_setLogLevel(shrloglev)
+    call shr_file_setLogUnit (shrlogunit)
 
   end subroutine InitializeRealize
 
@@ -523,6 +538,10 @@ module docn_comp_nuopc
 
     rc = ESMF_SUCCESS
     if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
+
+    !--------------------------------
+    ! Reset shr logging to my log file
+    !--------------------------------
 
     call shr_file_getLogUnit (shrlogunit)
     call shr_file_getLogLevel(shrloglev)
@@ -596,21 +615,23 @@ module docn_comp_nuopc
     !--------------------------------
 
     if (dbug > 1) then
-      call mct_aVect_info(2, d2x, istr=subname//':AV')
+      call mct_aVect_info(2, d2x, istr=subname//':AV', pe=localPet)
       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
-    call ESMF_ClockPrint(clock, options="currTime", preString="------>Advancing OCN from: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (my_task == master_task) then
+       call ESMF_ClockPrint(clock, options="currTime", preString="------>Advancing OCN from: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call ESMF_ClockPrint(clock, options="stopTime", preString="--------------------------------> to: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_ClockPrint(clock, options="stopTime", preString="--------------------------------> to: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
+
+    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
     call shr_file_setLogLevel(shrloglev)
     call shr_file_setLogUnit (shrlogunit)
-
-    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine ModelAdvance
 

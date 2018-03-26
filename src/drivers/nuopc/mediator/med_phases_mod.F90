@@ -251,9 +251,10 @@ module med_phases_mod
        call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
-    call ESMF_ClockPrint(clock, options="currTime", &
-         preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (mastertask) then
+       call ESMF_ClockPrint(clock, options="currTime", preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
 
     !---------------------------------------
     !--- Map to create import field bundle on atm grid - FBimp(:,compatm)
@@ -478,9 +479,10 @@ module med_phases_mod
        call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
-    call ESMF_ClockPrint(clock, options="currTime", &
-         preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (mastertask) then
+       call ESMF_ClockPrint(clock, options="currTime", preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
 
     !---------------------------------------
     !--- map to create FBimp(:,compice)
@@ -648,9 +650,10 @@ module med_phases_mod
        call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
-    call ESMF_ClockPrint(clock, options="currTime", &
-         preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (mastertask) then
+       call ESMF_ClockPrint(clock, options="currTime", preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
 
     !---------------------------------------
     !--- map to create FBimp(:,complnd)
@@ -781,9 +784,10 @@ module med_phases_mod
        call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
-    call ESMF_ClockPrint(clock, options="currTime", &
-         preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (mastertask) then
+       call ESMF_ClockPrint(clock, options="currTime", preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
 
     !---------------------------------------
     !--- map to create FBimp(:,comprof)
@@ -912,9 +916,10 @@ module med_phases_mod
        call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
-    call ESMF_ClockPrint(clock, options="currTime", &
-         preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (mastertask) then
+       call ESMF_ClockPrint(clock, options="currTime", preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
 
     !---------------------------------------
     !--- map to create FBimp(:,compwav)
@@ -1044,9 +1049,10 @@ module med_phases_mod
        call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
-    call ESMF_ClockPrint(clock, options="currTime", &
-         preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (mastertask) then
+       call ESMF_ClockPrint(clock, options="currTime", preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
 
     !---------------------------------------
     !--- mapping
@@ -1179,9 +1185,10 @@ module med_phases_mod
        call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
-    call ESMF_ClockPrint(clock, options="currTime", &
-         preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (mastertask) then
+       call ESMF_ClockPrint(clock, options="currTime", preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
 
     !---------------------------------------
     !--- average ocn accumulator
@@ -1309,9 +1316,10 @@ module med_phases_mod
        call ESMF_LogWrite(trim(subname)//": time = "//trim(timestr), ESMF_LOGMSG_INFO, rc=dbrc)
     endif
 
-    call ESMF_ClockPrint(clock, options="currTime", &
-         preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (mastertask) then
+       call ESMF_ClockPrint(clock, options="currTime", preString="-------->"//trim(subname)//" mediating for: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    end if
 
     !---------------------------------------
     !--- map all fields in FBImp that have active

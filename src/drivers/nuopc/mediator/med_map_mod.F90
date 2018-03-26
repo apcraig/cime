@@ -547,30 +547,39 @@ contains
           call shr_nuopc_methods_FB_GetFldPtr(FBSrc, fldname, data_src, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          if ( trim(mapnorm) /= 'unset' .and. trim(mapnorm) /= 'one') then
+          if ( trim(mapnorm) /= 'unset' .and. trim(mapnorm) /= 'one' .and. trim(mapnorm) /= 'none') then
 
              !-------------------------------------------------
              ! fractional normalization
              !-------------------------------------------------
-             ! create a temporary field bundle that will contain the mapped normalization factor
 
+             ! create a temporary field bundle that will contain normalization on the source grid
              call shr_nuopc_methods_FB_init(FBout=FBNormSrc, flds_scalar_name=flds_scalar_name, &
                   FBgeom=FBSrc, fieldNameList=(/trim(mapnorm)/), rc=rc)
              if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
-             call shr_nuopc_methods_FB_init(FBout=FBNormDst, flds_scalar_name=flds_scalar_name, &
-                  FBgeom=FBDst, fieldNameList=(/trim(mapnorm)/), rc=rc)
+             call shr_nuopc_methods_FB_reset(FBNormSrc, value=czero, rc=rc)
              if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
 
-             call shr_nuopc_methods_FB_reset(FBNormSrc, value=czero, rc=rc)
+             ! create a temporary field bundle that will contain normalization on the destination grid
+             call shr_nuopc_methods_FB_init(FBout=FBNormDst, flds_scalar_name=flds_scalar_name, &
+                  FBgeom=FBDst, fieldNameList=(/trim(mapnorm)/), rc=rc)
              if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
              call shr_nuopc_methods_FB_reset(FBNormDst, value=czero, rc=rc)
              if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
 
+             ! get a pointer to the array of the normalization on the source grid - this must
+             ! be the same size is as fraction on the source grid
              call shr_nuopc_methods_FB_GetFldPtr(FBNormSrc, trim(mapnorm), data_srcnorm, rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+             ! get a pointer to the FBFrac array based on the mapnorm name
+             call shr_nuopc_methods_FB_GetFldPtr(FBFrac, trim(mapnorm), data_frac, rc=rc)
              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
              ! error checks
              if (size(data_srcnorm) /= size(data_frac)) then
+                call ESMF_LogWrite(trim(subname)//"fldname= "//trim(fldname)//" mapnorm= "//trim(mapnorm), &
+                     ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
                 call ESMF_LogWrite(trim(subname)//": ERROR data_normsrc size and data_frac size are inconsistent", &
                      ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
                 rc = ESMF_FAILURE
@@ -582,10 +591,6 @@ contains
                 return
              end if
 
-             ! get a pointer to the FBFrac array based on the mapnorm name
-             call shr_nuopc_methods_FB_GetFldPtr(FBFrac, trim(mapnorm), data_frac, rc=rc)
-             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
              ! now fill in the values for data_srcnorm and data_srctmp - these are the two arrays needed for normalization
              ! Note that FBsrcTmp will now have the data_srctmp value
              do i = 1,size(data_frac)
@@ -594,7 +599,6 @@ contains
              end do
 
              ! regrid FBSrcTmp to FBDst
-
              if (trim(fldname) == trim(flds_scalar_name)) then
                 if (dbug_flag > 1) then
                    call ESMF_LogWrite(trim(subname)//trim(lstring)//": skip : fld="//trim(fldname), &
@@ -606,14 +610,12 @@ contains
              end if
 
              ! regrid FBNormSrc to from the source to the desination grid (FBNormDst)
-
              call shr_nuopc_methods_FB_reset(FBNormSrc, value=czero, rc=rc)
              if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
              call shr_nuopc_methods_FB_FieldRegrid(FBNormSrc, mapnorm, FBNormDst, mapnorm, RouteHandles(mapindex), rc)
              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
              ! multiply interpolated field (FBDst) by reciprocal of fraction on destination grid (FBNormDst)
-
              call shr_nuopc_methods_FB_GetFldPtr(FBNormDst, trim(mapnorm), data_dstnorm, rc=rc)
              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
              call shr_nuopc_methods_FB_GetFldPtr(FBDst, trim(fldname), data_dst, rc=rc)
