@@ -32,6 +32,7 @@ module med_atmocn_mod
   real(r8) , pointer :: lats        (:) ! latitudes  (degrees)
   real(r8) , pointer :: lons        (:) ! longitudes (degrees)
   integer  , pointer :: mask        (:) ! ocn domain mask: 0 <=> inactive cell
+  real(r8) , pointer :: rmask       (:) ! ocn domain mask: 0 <=> inactive cell
   real(r8) , pointer :: anidr       (:) ! albedo: near infrared, direct
   real(r8) , pointer :: avsdr       (:) ! albedo: visible      , direct
   real(r8) , pointer :: anidf       (:) ! albedo: near infrared, diffuse
@@ -145,7 +146,6 @@ contains
     type(ESMF_GeomType_Flag) :: geomtype
     integer                  :: n
     integer                  :: lsize
-    real(r8), pointer        :: rmask(:)  ! ocn domain mask
     real(r8), pointer        :: ofrac(:)
     real(r8), pointer        :: ifrac(:)
     integer                  :: dimCount
@@ -270,6 +270,8 @@ contains
     ! Ocn import fields
     !----------------------------------
 
+    call shr_nuopc_methods_FB_GetFldPtr(FBOcn, fldname='So_omask', fldptr1=rmask, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_FB_GetFldPtr(FBOcn, fldname='So_t', fldptr1=tocn, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_FB_GetFldPtr(FBOcn, fldname='So_u', fldptr1=uocn, rc=rc)
@@ -362,7 +364,7 @@ contains
        call ESMF_LogWrite(trim(subname)//" : FBATM is on a mesh ", ESMF_LOGMSG_INFO, rc=rc)
        call ESMF_FieldGet(lfield, mesh=lmesh, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call ESMF_MeshGet(lmesh, spatialDim=spatialDim, numOwnedElements=numOwnedElements)
+       call ESMF_MeshGet(lmesh, spatialDim=spatialDim, numOwnedElements=numOwnedElements, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        if (numOwnedElements /= lsize) then
           call ESMF_LogWrite(trim(subname)//": ERROR numOwnedElements not equal to local size", ESMF_LOGMSG_INFO, rc=rc)
@@ -372,12 +374,15 @@ contains
        allocate(ownedElemCoords(spatialDim*numOwnedElements))
        allocate(lons(numOwnedElements))
        allocate(lats(numOwnedElements))
-       call ESMF_MeshGet(lmesh, ownedElemCoords=ownedElemCoords)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       do n = 1,lsize
-          lons(n) = ownedElemCoords(2*n-1)
-          lats(n) = ownedElemCoords(2*n)
-       end do
+! tcraig tcx temporary until update esmf
+       lons = 0.0
+       lats = 0.0
+!       call ESMF_MeshGet(lmesh, ownedElemCoords=ownedElemCoords,rc=rc)
+!       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+!       do n = 1,lsize
+!          lons(n) = ownedElemCoords(2*n-1)
+!          lats(n) = ownedElemCoords(2*n)
+!       end do
     else if (geomtype == ESMF_GEOMTYPE_GRID) then
        call ESMF_LogWrite(trim(subname)//" : FBATM is on a grid ", ESMF_LOGMSG_INFO, rc=rc)
        call ESMF_FieldGet(lfield, grid=lgrid, rc=rc)
@@ -420,14 +425,13 @@ contains
     allocate(mask(lsize))
     mask(:) = 1
 
-    ! use domain mask first
-    if (trim(aoflux_grid) == 'ocn') then
-       call shr_nuopc_methods_FB_getFldPtr(FBOcn, 'So_omask' , rmask, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    else
-       rmask(:) = 1._r8
-    end if
+    write(tmpstr,'(i12,g22.12,i12)') lsize,sum(rmask),sum(mask)
+    call ESMF_LogWrite(trim(subname)//" : maskA= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+
     where (rmask(:) == 0._r8) mask(:) = 0   ! like nint
+
+    write(tmpstr,'(i12,g22.12,i12)') lsize,sum(rmask),sum(mask)
+    call ESMF_LogWrite(trim(subname)//" : maskB= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
 
     ! TODO: need to check if this logic is correct
     ! then check ofrac + ifrac
@@ -632,6 +636,9 @@ contains
 
     call seq_timemgr_EClockGetData( clock, curr_tod=tod, dtime=dt )
 
+    write(tmpstr,'(2i12)') tod,dt
+    call ESMF_LogWrite(trim(subname)//" : tod,dt= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+
     call NUOPC_CompAttributeGet(gcomp, name='gust_fac', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) gust_fac
@@ -654,6 +661,18 @@ contains
 
     ! Determine local size
     lsize = size(lons)
+
+    write(tmpstr,'(3L4,i12)') cold_start,first_call,dead_comps,lsize
+    call ESMF_LogWrite(trim(subname)//" : c,f,d,lsize= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+
+    write(tmpstr,'(i12,g22.12,i12)') lsize,sum(rmask),sum(mask)
+    call ESMF_LogWrite(trim(subname)//" : maskA= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+
+    mask = 1
+    where (rmask(:) == 0._r8) mask(:) = 0   ! like nint
+
+    write(tmpstr,'(i12,g22.12,i12)') lsize,sum(rmask),sum(mask)
+    call ESMF_LogWrite(trim(subname)//" : maskB= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
 
     ! Update ocean surface fluxes
     ! Must fabricate "reasonable" data (when using dead components)
@@ -755,6 +774,8 @@ contains
             !duu10n,ustar, re  , ssq, missval = 0.0_r8, &
             cold_start=cold_start)
     else
+       write(tmpstr,'(3i12)') lsize,size(mask),sum(mask)
+       call ESMF_LogWrite(trim(subname)//" : mask= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
        call shr_flux_atmocn (lsize , zbot , ubot, vbot, thbot, prec_gust, gust_fac, &
             shum , shum_16O , shum_HDO, shum_18O, dens , tbot, uocn, vocn , &
             tocn , mask, sen , lat , lwup , &

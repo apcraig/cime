@@ -1378,7 +1378,7 @@ module MED
     type(ESMF_Time)             :: time
     type(ESMF_Field)            :: field
     type(ESMF_StateItem_Flag)   :: itemType
-    logical                     :: atCorrectTime, allDone, connected
+    logical                     :: atCorrectTime, connected
     type(InternalState)         :: is_local
     integer                     :: n1,n2,cntn1,cntn2
     character(len=512)          :: fmapfile, smapfile, dmapfile, pmapfile
@@ -1388,7 +1388,10 @@ module MED
     integer                     :: n, fieldCount
     integer                     :: len
     integer                     :: ierr
-    logical                     :: first_call = .true.
+    logical,save                :: atmDone = .false.
+    logical,save                :: ocnDone = .false.
+    logical,save                :: allDone = .false.
+    logical,save                :: first_call = .true.
     character(ESMF_MAXSTR),allocatable :: fieldNameList(:)
     character(MPI_MAX_ERROR_STRING)    :: lstring
     character(len=*), parameter :: subname='(module_MEDIATOR:DataInitialize)'
@@ -1833,42 +1836,6 @@ module MED
       endif
 #endif
 
-      !---------------------------------------
-      ! Carry out atmocn init if appropriate
-      !---------------------------------------
-
-      if (is_local%wrap%med_coupling_active(compocn,compatm) .and. &
-          is_local%wrap%med_coupling_active(compatm,compocn)) then
-
-         ! Initialize the atm/ocean fluxes and compute the ocean albedos
-         call ESMF_LogWrite("MED - initialize atm/ocn fluxes and compute ocean albedo", ESMF_LOGMSG_INFO, rc=rc)
-         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-         ! Initialize atm/ocn fluxes and ocean albedo
-         call med_phases_atmocn_init(gcomp, rc=rc)
-         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-         ! Compute ocean albedoes
-         ! This will update the relevant module arrays in med_atmocn_mod.F90
-         ! since they are simply pointers into the FBAtmOcn, FBAtm and FBOcn field bundles
-         call med_phases_atmocn_ocnalb(gcomp, rc=rc)
-         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      end if
-
-      !---------------------------------------
-      ! If atmosphere is not present, than data initialization is complete
-      !---------------------------------------
-
-      if (.not. is_local%wrap%comp_present(compatm)) then
-
-         ! here if atm component is not present - so initialization is complete
-         ! -> set InitializeDataComplete Component Attribute to "true", indicating
-         ! to the driver that this Component has fully initialized its data
-         call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
-         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-      end if
-
     endif  ! end first_call if-block
     first_call = .false.
 
@@ -1876,13 +1843,78 @@ module MED
     ! End of first_call block - reset first_call to .false.
     !---------------------------------------
 
+    if (.not. is_local%wrap%comp_present(compocn)) then
+       ocnDone = .true.
+    endif
+
+    if (.not. is_local%wrap%comp_present(compocn)) then
+       atmDone = .true.
+    endif
+
+    if (.not. ocnDone .and. is_local%wrap%comp_present(compocn)) then
+      !---------------------------------------
+      ! Carry out atmocn init if appropriate
+      !---------------------------------------
+
+      ocnDone = .true.  ! reset if an item is found that is not done
+
+      if (is_local%wrap%med_coupling_active(compocn,compatm) .and. &
+          is_local%wrap%med_coupling_active(compatm,compocn)) then
+
+         call ESMF_StateGet(is_local%wrap%NStateImp(compocn), itemCount=fieldCount, rc=rc)
+         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+         allocate(fieldNameList(fieldCount))
+         call ESMF_StateGet(is_local%wrap%NStateImp(compocn), itemNameList=fieldNameList, rc=rc)
+         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+         do n=1, fieldCount
+            call ESMF_StateGet(is_local%wrap%NStateImp(compocn), itemName=fieldNameList(n), field=field, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            atCorrectTime = NUOPC_IsAtTime(field, time, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            if (.not. atCorrectTime) then
+               ! If any ocn import fields are not time stamped correctly, then dependency is not satisified - must return to ocn
+               call ESMF_LogWrite("MED - Initialize-Data-Dependency from OCN NOT YET SATISFIED!!!", ESMF_LOGMSG_INFO, rc=rc)
+               if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+               ocnDone = .false.
+               exit  ! break out of the loop when first not satisfied found
+            endif
+         enddo
+         deallocate(fieldNameList)
+
+         if (ocnDone) then
+            ! Initialize the atm/ocean fluxes and compute the ocean albedos
+            call ESMF_LogWrite("MED - initialize atm/ocn fluxes and compute ocean albedo", ESMF_LOGMSG_INFO, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+! tcraig, causes an abort
+!            ! Copy the NstateImp(compocn) to FBImp(compocn)
+!            call med_connectors_post_ocn2med(gcomp, rc=rc)
+!            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            ! Initialize atm/ocn fluxes and ocean albedo
+            call med_phases_atmocn_init(gcomp, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            ! Compute ocean albedoes
+            ! This will update the relevant module arrays in med_atmocn_mod.F90
+            ! since they are simply pointers into the FBAtmOcn, FBAtm and FBOcn field bundles
+            call med_phases_atmocn_ocnalb(gcomp, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+         endif
+      end if
+
+    endif
+
     !---------------------------------------
     ! Carry out data dependency for atm initialization if needed
     !---------------------------------------
 
-    if (is_local%wrap%comp_present(compatm)) then
+    if (.not. atmDone .and. ocnDone .and. is_local%wrap%comp_present(compatm)) then
 
-       allDone = .true.  ! reset if an item is found that is not done
+       atmDone = .true.  ! reset if an item is found that is not done
 
        call ESMF_StateGet(is_local%wrap%NStateImp(compatm), itemCount=fieldCount, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -1901,13 +1933,13 @@ module MED
              ! If any atm import fields are not time stamped correctly, then dependency is not satisified - must return to atm
              call ESMF_LogWrite("MED - Initialize-Data-Dependency from ATM NOT YET SATISFIED!!!", ESMF_LOGMSG_INFO, rc=rc)
              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-             allDone = .false.
+             atmdone = .false.
              exit  ! break out of the loop when first not satisfied found
           endif
        enddo
        deallocate(fieldNameList)
 
-       if (.not. allDone) then  ! allDone is not true
+       if (.not. atmdone) then  ! atmdone is not true
 
           ! initialize fractions
           call med_fraction_set(gcomp, rc=rc)
@@ -1938,23 +1970,21 @@ module MED
           ! Connectors will be automatically called between the mediator and atm until allDone is true
           call ESMF_LogWrite("MED - Initialize-Data-Dependency Sending Data to ATM", ESMF_LOGMSG_INFO, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+    end if
 
-       else ! allDone is true
+    if (atmDone .and. ocnDone) then
+       ! Copy the NstateImp(compatm) to FBImp(compatm)
+       call med_connectors_post_atm2med(gcomp, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          ! Copy the NstateImp(compatm) to FBImp(compatm)
-          call med_connectors_post_atm2med(gcomp, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       ! set InitializeDataComplete Component Attribute to "true", indicating
+       ! to the driver that this Component has fully initialized its data
+       call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          ! set InitializeDataComplete Component Attribute to "true", indicating
-          ! to the driver that this Component has fully initialized its data
-          call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          call ESMF_LogWrite("MED - Initialize-Data-Dependency from ATM is SATISFIED!!!", ESMF_LOGMSG_INFO, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       end if
-
+       call ESMF_LogWrite("MED - Initialize-Data-Dependency from ATM is SATISFIED!!!", ESMF_LOGMSG_INFO, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
     if (dbug_flag > 5) then
