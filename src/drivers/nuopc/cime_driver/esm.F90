@@ -34,7 +34,6 @@ module ESM
   use shr_wv_sat_mod        , only : shr_wv_sat_get_scheme_idx, shr_wv_sat_valid_idx
   use shr_assert_mod        , only : shr_assert_in_domain
 
-  use seq_comm_mct          , only : logunit, loglevel
   use seq_comm_mct          , only : CPLID, GLOID, ATMID, LNDID, OCNID, ICEID, GLCID, ROFID, WAVID, ESPID
   use seq_comm_mct          , only : seq_comm_inst, seq_comm_name, seq_comm_suffix
   use seq_comm_mct          , only : num_inst_atm, num_inst_lnd, num_inst_rof
@@ -50,7 +49,7 @@ module ESM
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
 
-  use med_infodata_mod      , only : med_infodata
+  use med_internalstate_mod , only : logunit, loglevel
   use pio                   , only : file_desc_t, pio_closefile, pio_file_is_open
   use t_drv_timers_mod
   use perf_mod
@@ -752,7 +751,7 @@ module ESM
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! Print out present flags to mediator log file
-        if (iamroot_med == 0) then
+        if (iamroot_med) then
            write(logunit,*) trim(subname)//":atm_present="//trim(atm_present)
            write(logunit,*) trim(subname)//":lnd_present="//trim(lnd_present)
            write(logunit,*) trim(subname)//":ocn_present="//trim(ocn_present)
@@ -1076,6 +1075,10 @@ module ESM
     maxthreads = max(nthreads_GLOID, nthreads_CPLID, nthreads_ATMID,                 &
                      nthreads_LNDID, nthreads_ICEID, nthreads_OCNID, nthreads_GLCID, &
                      nthreads_ROFID, nthreads_WAVID, nthreads_ESPID, pethreads_GLOID )
+
+    !----------------------------------------------------------
+    ! Initialize timing library
+    !----------------------------------------------------------
 
     call t_initf(nlfilename, LogPrint=.true., mpicom=mpicom_GLOID, mastertask=mastertask, MaxThreads=maxthreads)
 
@@ -1603,16 +1606,6 @@ module ESM
        !      rofice_present=rofice_present)
 
     endif
-
-    !----------------------------------------------------------
-    ! Finalize initialization
-    !----------------------------------------------------------
-
-
-    call t_stopf('CPL:cesm_init')
-
-    call t_adj_detailf(-1)
-    call t_stopf('CPL:INIT')
 
   end subroutine InitAttributes
 

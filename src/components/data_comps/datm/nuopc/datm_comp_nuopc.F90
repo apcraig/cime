@@ -47,6 +47,7 @@ module datm_comp_nuopc
   use mct_mod
 
   implicit none
+  private ! except
 
   public  :: SetServices
 
@@ -56,8 +57,6 @@ module datm_comp_nuopc
   private :: ModelAdvance
   private :: ModelSetRunClock
   private :: ModelFinalize
-
-  private ! except
 
   !--------------------------------------------------------------------------
   ! Private module data
@@ -594,8 +593,10 @@ module datm_comp_nuopc
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (dbug > 1) then
-      call shr_nuopc_methods_Clock_TimePrint(clock,subname//'clock',rc=rc)
-      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       if (my_task == master_task) then
+          call shr_nuopc_methods_Clock_TimePrint(clock,subname//'clock',rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
     endif
 
     !--------------------------------
@@ -666,10 +667,10 @@ module datm_comp_nuopc
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
+    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
+
     call shr_file_setLogLevel(shrloglev)
     call shr_file_setLogUnit (shrlogunit)
-
-    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine ModelAdvance
 
@@ -715,8 +716,8 @@ module datm_comp_nuopc
 
       call ESMF_TimeGet(mcurrtime, timeString=mtimestring, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      rc=ESMF_Failure
 
+      rc=ESMF_Failure
       call ESMF_LogWrite(subname//" ERROR in time consistency; "//trim(dtimestring)//" ne "//trim(mtimestring),  &
            ESMF_LOGMSG_ERROR, rc=dbrc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -749,8 +750,8 @@ module datm_comp_nuopc
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       do n = 1, alarmCount
-!         call ESMF_AlarmPrint(alarmList(n), rc=rc)
-!         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) return
+         !call ESMF_AlarmPrint(alarmList(n), rc=rc)
+         !if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
          dalarm = ESMF_AlarmCreate(alarmList(n), rc=rc)
          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
          call ESMF_AlarmSet(dalarm, clock=mclock, rc=rc)

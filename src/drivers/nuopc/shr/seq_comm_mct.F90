@@ -16,7 +16,7 @@ module seq_comm_mct
 !!! the namelist).  ARE OTHER PROTECTIONS/CHECKS NEEDED???
 
 
-  use mct_mod     , only : mct_world_init, mct_world_clean, mct_die
+  use mct_mod     , only : mct_world_init, mct_die
   use shr_sys_mod , only : shr_sys_abort, shr_sys_flush
   use shr_mpi_mod , only : shr_mpi_chkerr, shr_mpi_bcast, shr_mpi_max
   use shr_file_mod, only : shr_file_getUnit, shr_file_freeUnit
@@ -34,15 +34,11 @@ module seq_comm_mct
 !--------------------------------------------------------------------------
 
   public seq_comm_init
-  public seq_comm_clean
   public seq_comm_iamin
   public seq_comm_iamroot
   public seq_comm_mpicom
   public seq_comm_iam
-  public seq_comm_gloiam
   public seq_comm_gloroot
-  public seq_comm_cplpe
-  public seq_comm_cmppe
   public seq_comm_name
   public seq_comm_inst
   public seq_comm_suffix
@@ -51,22 +47,15 @@ module seq_comm_mct
   public seq_comm_setnthreads
   public seq_comm_getnthreads
   public seq_comm_printcomms
-  public seq_comm_get_ncomps
 
 !--------------------------------------------------------------------------
 ! Public data
 !--------------------------------------------------------------------------
 
-  integer, public, parameter :: default_logunit = 6
-  integer, public :: logunit  = default_logunit     ! log unit number
+  integer, public :: logunit  = 6     ! log unit number
   integer, public :: loglevel = 1     ! log level
-  integer, public :: global_mype = -1  !! To be initialized
 
-  !!! Note - NUM_COMP_INST_XXX are cpp variables set in buildlib.csm_share
-
-  integer, parameter :: ncomptypes = 8  ! total number of component types
-  integer, parameter :: nphysmod   = 7  ! number of physical component types
-  integer, parameter :: ncouplers  = 1  ! number of couplers
+  ! NOTE: NUM_COMP_INST_XXX are cpp variables set in buildlib.csm_share
   integer, parameter, public :: num_inst_atm = NUM_COMP_INST_ATM
   integer, parameter, public :: num_inst_lnd = NUM_COMP_INST_LND
   integer, parameter, public :: num_inst_ocn = NUM_COMP_INST_OCN
@@ -76,57 +65,17 @@ module seq_comm_mct
   integer, parameter, public :: num_inst_rof = NUM_COMP_INST_ROF
   integer, parameter, public :: num_inst_esp = NUM_COMP_INST_ESP
 
-  integer, parameter, public :: num_inst_total= num_inst_atm + &
-                                                num_inst_lnd + &
-                                                num_inst_ocn + &
-                                                num_inst_ice + &
-                                                num_inst_glc + &
-                                                num_inst_wav + &
-                                                num_inst_rof + &
-                                                num_inst_esp + 1
-
   integer, public :: num_inst_min, num_inst_max
-  integer, public :: num_inst_xao    ! for xao flux
-  integer, public :: num_inst_frc    ! for fractions
 
-  !!! Each component instance needs two communicators: one internal to the
-  !!! instance, and one for communicating with the coupler.
-  !!! Additionally, one communicator is needed for the coupler's
-  !!! internal communications, and one is needed for the global space.
-  !!! All instances of a component type also share a separate communicator
-  !!! All instances of a component type share a communicator with the coupler
+  integer, parameter, public :: num_inst_total = &
+       num_inst_atm + num_inst_lnd + num_inst_ocn + num_inst_ice + &
+       num_inst_glc + num_inst_wav + num_inst_rof + num_inst_esp + 1
 
-  integer, parameter, public :: num_inst_phys = num_inst_atm + num_inst_lnd + &
-                                                num_inst_ocn + num_inst_ice + &
-                                                num_inst_glc + num_inst_rof + &
-                                                num_inst_wav + num_inst_esp
-  integer, parameter, public :: num_cpl_phys  = num_inst_atm + num_inst_lnd + &
-                                                num_inst_ocn + num_inst_ice + &
-                                                num_inst_glc + num_inst_rof + &
-                                                num_inst_wav + num_inst_esp
-  integer, parameter :: ncomps = (1 + ncouplers + ncomptypes + nphysmod + num_inst_phys + num_cpl_phys)
+  integer, parameter :: ncouplers  = 1  ! number of couplers
+  integer, parameter :: ncomps = (ncouplers + num_inst_total)
 
   integer, public :: GLOID
   integer, public :: CPLID
-
-  integer, public :: ALLATMID
-  integer, public :: ALLLNDID
-  integer, public :: ALLOCNID
-  integer, public :: ALLICEID
-  integer, public :: ALLGLCID
-  integer, public :: ALLROFID
-  integer, public :: ALLWAVID
-  integer, public :: ALLESPID
-
-  integer, public :: CPLALLATMID
-  integer, public :: CPLALLLNDID
-  integer, public :: CPLALLOCNID
-  integer, public :: CPLALLICEID
-  integer, public :: CPLALLGLCID
-  integer, public :: CPLALLROFID
-  integer, public :: CPLALLWAVID
-  integer, public :: CPLALLESPID
-
   integer, public :: ATMID(num_inst_atm)
   integer, public :: LNDID(num_inst_lnd)
   integer, public :: OCNID(num_inst_ocn)
@@ -135,15 +84,6 @@ module seq_comm_mct
   integer, public :: ROFID(num_inst_rof)
   integer, public :: WAVID(num_inst_wav)
   integer, public :: ESPID(num_inst_esp)
-
-  integer, public :: CPLATMID(num_inst_atm)
-  integer, public :: CPLLNDID(num_inst_lnd)
-  integer, public :: CPLOCNID(num_inst_ocn)
-  integer, public :: CPLICEID(num_inst_ice)
-  integer, public :: CPLGLCID(num_inst_glc)
-  integer, public :: CPLROFID(num_inst_rof)
-  integer, public :: CPLWAVID(num_inst_wav)
-  integer, public :: CPLESPID(num_inst_esp)
 
   type(ESMF_LogKind_Flag), public :: esmf_logfile_kind
 
@@ -160,13 +100,8 @@ module seq_comm_mct
     integer :: nthreads        ! number of omp threads per task
     integer :: iam             ! my task number in mpicom
     logical :: iamroot         ! am i the root task in mpicom
-    integer :: gloiam          ! my task number in mpi_comm_world
     integer :: gloroot         ! the global task number of each comps root on all pes
     integer :: pethreads       ! max number of threads on my task
-    integer :: cplpe           ! a common task in mpicom from the cpl group for join mpicoms
-                               ! cplpe is used to broadcast information from the coupler to the component
-    integer :: cmppe           ! a common task in mpicom from the component group for join mpicoms
-                               ! cmppe is used to broadcast information from the component to the coupler
     logical :: set             ! has this datatype been set
     integer, pointer    :: petlist(:)  ! esmf pet list
     logical :: petlist_allocated ! whether the petlist pointer variable was allocated
@@ -193,17 +128,10 @@ module seq_comm_mct
 !=======================================================================
 contains
 !======================================================================
-  integer function seq_comm_get_ncomps()
-    seq_comm_get_ncomps = ncomps
-  end function seq_comm_get_ncomps
-
 
   subroutine seq_comm_init(Comm_in, nmlfile)
-
     !----------------------------------------------------------
-    !
     ! Arguments
-    implicit none
     integer, intent(in) :: Comm_in
     character(len=*), intent(IN) :: nmlfile
     !
@@ -211,11 +139,10 @@ contains
     !
     logical :: error_state
     integer :: ierr, n, count
-    character(*), parameter :: subName =   '(seq_comm_init) '
     integer :: mpi_group_world   ! MPI_COMM_WORLD group
     integer :: mype,numpes,myncomps,max_threads,gloroot
-    integer :: atm_inst_tasks, lnd_inst_tasks, ocn_inst_tasks, ice_inst_tasks, &
-               glc_inst_tasks, rof_inst_tasks, wav_inst_tasks, esp_inst_tasks
+    integer :: atm_inst_tasks, lnd_inst_tasks, ocn_inst_tasks, ice_inst_tasks
+    integer :: glc_inst_tasks, rof_inst_tasks, wav_inst_tasks, esp_inst_tasks
     integer :: current_task_rootpe, droot
     integer :: amin(num_inst_atm), amax(num_inst_atm), astr(num_inst_atm)
     integer :: lmin(num_inst_lnd), lmax(num_inst_lnd), lstr(num_inst_lnd)
@@ -227,9 +154,11 @@ contains
     integer :: emin(num_inst_esp), emax(num_inst_esp), estr(num_inst_esp)
     integer :: cmin,cmax,cstr
     integer :: pelist(3,1)       ! start, stop, stride for group
+    integer :: nu, i
+    character(len=24) :: esmf_logging
     integer, pointer :: comps(:) ! array with component ids
     integer, pointer :: comms(:) ! array with mpicoms
-    integer :: nu, i
+    character(*), parameter :: subName =   '(seq_comm_init) '
 
     integer :: &
          atm_ntasks, atm_rootpe, atm_pestride, atm_nthreads, &
@@ -241,7 +170,6 @@ contains
          ocn_ntasks, ocn_rootpe, ocn_pestride, ocn_nthreads, &
          esp_ntasks, esp_rootpe, esp_pestride, esp_nthreads, &
          cpl_ntasks, cpl_rootpe, cpl_pestride, cpl_nthreads
-    character(len=24) :: esmf_logging
 
     namelist /ccsm_pes/  &
          atm_ntasks, atm_rootpe, atm_pestride, atm_nthreads, atm_layout, &
@@ -276,36 +204,21 @@ contains
        seq_comms(n)%iamroot = .false.
        seq_comms(n)%npes = -1
        seq_comms(n)%nthreads = -1
-       seq_comms(n)%gloiam = -1
        seq_comms(n)%gloroot = -1
        seq_comms(n)%pethreads = -1
-       seq_comms(n)%cplpe = -1
-       seq_comms(n)%cmppe = -1
     enddo
 
-
-    ! Initialize MPI
-    ! Note that if no MPI, will call MCTs fake version
-
+    ! Initialize MPI -  Note that if no MPI, will call MCTs fake version
     call mpi_comm_rank(GLOBAL_COMM, mype  , ierr)
     call shr_mpi_chkerr(ierr,subname//' mpi_comm_rank comm_world')
+
     call mpi_comm_size(GLOBAL_COMM, numpes, ierr)
     call shr_mpi_chkerr(ierr,subname//' mpi_comm_size comm_world')
 
-    ! Initialize gloiam on all IDs
-
-    global_mype = mype
-
-    do n = 1,ncomps
-       seq_comms(n)%gloiam = mype
-    enddo
-
     ! Set ntasks, rootpe, pestride, nthreads for all components
-
     if (mype == 0) then
 
        !! Set up default component process parameters
-
        atm_ntasks = numpes
        atm_rootpe = 0
        atm_pestride = 1
@@ -362,7 +275,7 @@ contains
        esmf_logging = "ESMF_LOGKIND_NONE"
 
        ! Read namelist if it exists
-
+       ! TODO: obtain this from attributes
        nu = shr_file_getUnit()
        open(nu, file=trim(nmlfile), status='old', iostat=ierr)
 
@@ -374,13 +287,7 @@ contains
           close(nu)
        end if
        call shr_file_freeUnit(nu)
-
     end if
-
-    !--- compute some other num_inst values
-
-    num_inst_xao = max(num_inst_atm,num_inst_ocn)
-    num_inst_frc = num_inst_ice
 
     !--- compute num_inst_min, num_inst_max
     !--- instances must be either 1 or a constant across components
@@ -394,8 +301,8 @@ contains
     num_inst_min = min(num_inst_min, num_inst_glc)
     num_inst_min = min(num_inst_min, num_inst_wav)
     num_inst_min = min(num_inst_min, num_inst_rof)
-! ESP is currently limited to one instance, should not affect other comps
-!    num_inst_min = min(num_inst_min, num_inst_esp)
+    ! ESP is currently limited to one instance, should not affect other comps
+    !    num_inst_min = min(num_inst_min, num_inst_esp)
     num_inst_max = num_inst_atm
     num_inst_max = max(num_inst_max, num_inst_lnd)
     num_inst_max = max(num_inst_max, num_inst_ocn)
@@ -426,101 +333,42 @@ contains
     ! Initialize IDs
 
     count = 0
-
     count = count + 1
     GLOID = count
     count = count + 1
     CPLID = count
-
-    count = count + 1
-    ALLATMID = count
-    count = count + 1
-    ALLLNDID = count
-    count = count + 1
-    ALLOCNID = count
-    count = count + 1
-    ALLICEID = count
-    count = count + 1
-    ALLGLCID = count
-    count = count + 1
-    ALLROFID = count
-    count = count + 1
-    ALLWAVID = count
-    count = count + 1
-    ALLESPID = count
-
-    count = count + 1
-    CPLALLATMID = count
-    count = count + 1
-    CPLALLLNDID = count
-    count = count + 1
-    CPLALLOCNID = count
-    count = count + 1
-    CPLALLICEID = count
-    count = count + 1
-    CPLALLGLCID = count
-    count = count + 1
-    CPLALLROFID = count
-    count = count + 1
-    CPLALLWAVID = count
-    count = count + 1
-    CPLALLESPID = count
-
     do n = 1, num_inst_atm
        count = count + 1
        ATMID(n) = count
-       count = count + 1
-       CPLATMID(n) = count
     end do
-
     do n = 1, num_inst_lnd
        count = count + 1
        LNDID(n) = count
-       count = count + 1
-       CPLLNDID(n) = count
     end do
-
     do n = 1, num_inst_ocn
        count = count + 1
        OCNID(n) = count
-       count = count + 1
-       CPLOCNID(n) = count
     end do
-
     do n = 1, num_inst_ice
        count = count + 1
        ICEID(n) = count
-       count = count + 1
-       CPLICEID(n) = count
     end do
-
     do n = 1, num_inst_glc
        count = count + 1
        GLCID(n) = count
-       count = count + 1
-       CPLGLCID(n) = count
     end do
-
     do n = 1, num_inst_rof
        count = count + 1
        ROFID(n) = count
-       count = count + 1
-       CPLROFID(n) = count
     end do
-
     do n = 1, num_inst_wav
        count = count + 1
        WAVID(n) = count
-       count = count + 1
-       CPLWAVID(n) = count
     end do
-
     do n = 1, num_inst_esp
        count = count + 1
        ESPID(n) = count
-       CPLESPID(n) = -1
     end do
-
     if (count /= ncomps) then
        write(logunit,*) trim(subname),' ERROR in ID count ',count,ncomps
        call shr_sys_abort(trim(subname)//' ERROR in ID count')
@@ -754,10 +602,7 @@ contains
        end if
        call mpi_bcast(pelist, size(pelist), MPI_INTEGER, 0, GLOBAL_COMM, ierr)
        call seq_comm_setcomm(ATMID(n), pelist, atm_nthreads, 'ATM', n, num_inst_atm)
-       call seq_comm_joincomm(CPLID, ATMID(n), CPLATMID(n), 'CPLATM', n, num_inst_atm)
     end do
-    call seq_comm_jcommarr(ATMID,ALLATMID,'ALLATMID',1,1)
-    call seq_comm_joincomm(CPLID,ALLATMID,CPLALLATMID,'CPLALLATMID',1,1)
 
     do n = 1, num_inst_lnd
        if (mype == 0) then
@@ -767,10 +612,7 @@ contains
        end if
        call mpi_bcast(pelist, size(pelist), MPI_INTEGER, 0, GLOBAL_COMM, ierr)
        call seq_comm_setcomm(LNDID(n), pelist, lnd_nthreads, 'LND', n, num_inst_lnd)
-       call seq_comm_joincomm(CPLID, LNDID(n), CPLLNDID(n), 'CPLLND', n, num_inst_lnd)
     end do
-    call seq_comm_jcommarr(LNDID,ALLLNDID,'ALLLNDID',1,1)
-    call seq_comm_joincomm(CPLID,ALLLNDID,CPLALLLNDID,'CPLALLLNDID',1,1)
 
     do n = 1, num_inst_ocn
        if (mype == 0) then
@@ -780,10 +622,7 @@ contains
        end if
        call mpi_bcast(pelist, size(pelist), MPI_INTEGER, 0, GLOBAL_COMM, ierr)
        call seq_comm_setcomm(OCNID(n), pelist, ocn_nthreads, 'OCN', n, num_inst_ocn)
-       call seq_comm_joincomm(CPLID, OCNID(n), CPLOCNID(n), 'CPLOCN', n, num_inst_ocn)
     end do
-    call seq_comm_jcommarr(OCNID,ALLOCNID,'ALLOCNID',1,1)
-    call seq_comm_joincomm(CPLID,ALLOCNID,CPLALLOCNID,'CPLALLOCNID',1,1)
 
     do n = 1, num_inst_ice
        if (mype == 0) then
@@ -793,10 +632,7 @@ contains
        end if
        call mpi_bcast(pelist, size(pelist), MPI_INTEGER, 0, GLOBAL_COMM, ierr)
        call seq_comm_setcomm(ICEID(n), pelist, ice_nthreads, 'ICE', n, num_inst_ice)
-       call seq_comm_joincomm(CPLID, ICEID(n), CPLICEID(n), 'CPLICE', n, num_inst_ice)
     end do
-    call seq_comm_jcommarr(ICEID,ALLICEID,'ALLICEID',1,1)
-    call seq_comm_joincomm(CPLID,ALLICEID,CPLALLICEID,'CPLALLICEID',1,1)
 
     do n = 1, num_inst_glc
        if (mype == 0) then
@@ -806,10 +642,7 @@ contains
        end if
        call mpi_bcast(pelist, size(pelist), MPI_INTEGER, 0, GLOBAL_COMM, ierr)
        call seq_comm_setcomm(GLCID(n), pelist, glc_nthreads, 'GLC', n, num_inst_glc)
-       call seq_comm_joincomm(CPLID, GLCID(n), CPLGLCID(n), 'CPLGLC', n, num_inst_glc)
     end do
-    call seq_comm_jcommarr(GLCID,ALLGLCID,'ALLGLCID',1,1)
-    call seq_comm_joincomm(CPLID,ALLGLCID,CPLALLGLCID,'CPLALLGLCID',1,1)
 
     do n = 1, num_inst_rof
        if (mype == 0) then
@@ -819,10 +652,7 @@ contains
        end if
        call mpi_bcast(pelist, size(pelist), MPI_INTEGER, 0, GLOBAL_COMM, ierr)
        call seq_comm_setcomm(ROFID(n), pelist, rof_nthreads, 'ROF', n, num_inst_rof)
-       call seq_comm_joincomm(CPLID, ROFID(n), CPLROFID(n), 'CPLROF', n, num_inst_rof)
     end do
-    call seq_comm_jcommarr(ROFID,ALLROFID,'ALLROFID',1,1)
-    call seq_comm_joincomm(CPLID,ALLROFID,CPLALLROFID,'CPLALLROFID',1,1)
 
     do n = 1, num_inst_wav
        if (mype == 0) then
@@ -832,10 +662,7 @@ contains
        end if
        call mpi_bcast(pelist, size(pelist), MPI_INTEGER, 0, GLOBAL_COMM, ierr)
        call seq_comm_setcomm(WAVID(n), pelist, wav_nthreads, 'WAV', n, num_inst_wav)
-       call seq_comm_joincomm(CPLID, WAVID(n), CPLWAVID(n), 'CPLWAV', n, num_inst_wav)
     end do
-    call seq_comm_jcommarr(WAVID,ALLWAVID,'ALLWAVID',1,1)
-    call seq_comm_joincomm(CPLID,ALLWAVID,CPLALLWAVID,'CPLALLWAVID',1,1)
 
     do n = 1, num_inst_esp
        if (mype == 0) then
@@ -846,8 +673,6 @@ contains
        call mpi_bcast(pelist, size(pelist), MPI_INTEGER, 0, GLOBAL_COMM, ierr)
        call seq_comm_setcomm(ESPID(n), pelist, esp_nthreads, 'ESP', n, num_inst_esp)
     end do
-    call seq_comm_jcommarr(ESPID,ALLESPID,'ALLESPID',1,1)
-    call seq_comm_joincomm(CPLID,ALLESPID,CPLALLESPID,'CPLALLESPID',1,1)
 
     !! Count the total number of threads
 
@@ -860,17 +685,16 @@ contains
     enddo
 
     ! compute each components root pe global id and broadcast so all pes have info
-
     do n = 1,ncomps
        gloroot = -999
-       if (seq_comms(n)%iamroot) gloroot = seq_comms(n)%gloiam
        call shr_mpi_max(gloroot,seq_comms(n)%gloroot,GLOBAL_COMM, trim(subname)//' gloroot',all=.true.)
     enddo
 
+    !------------------------------------------
     ! Initialize MCT
+    !------------------------------------------
 
     ! add up valid comps on local pe
-
     myncomps = 0
     do n = 1,ncomps
        if (seq_comms(n)%mpicom /= MPI_COMM_NULL) then
@@ -879,7 +703,6 @@ contains
     enddo
 
     ! set comps and comms
-
     allocate(comps(myncomps),comms(myncomps),stat=ierr)
     if(ierr/=0) call mct_die(subName,'allocate comps comms',ierr)
 
@@ -895,7 +718,6 @@ contains
           comms(myncomps) = seq_comms(n)%mpicom
        endif
     enddo
-
     if (myncomps /= size(comps)) then
        write(logunit,*) trim(subname),' ERROR in myncomps ',myncomps,size(comps)
        call shr_sys_abort()
@@ -905,7 +727,10 @@ contains
 
     deallocate(comps,comms)
 
+    !------------------------------------------
     ! ESMF logging (only has effect if ESMF libraries are used)
+    !------------------------------------------
+
     call mpi_bcast(esmf_logging, len(esmf_logging), MPI_CHARACTER, 0, GLOBAL_COMM, ierr)
 
     select case(esmf_logging)
@@ -923,36 +748,6 @@ contains
     end select
 
   end subroutine seq_comm_init
-
-!---------------------------------------------------------
-  subroutine seq_comm_clean()
-    ! Resets this module - freeing memory, etc.
-    !
-    ! This potentially allows seq_comm_init can be called again, e.g., from unit tests.
-    !
-    ! Also calls mct_world_clean, to be symmetric with the mct_world_init call from
-    ! seq_comm_init.
-
-    integer :: id
-
-    character(*), parameter :: subName =   '(seq_comm_clean) '
-    !----------------------------------------------------------
-
-    if (.not. seq_comm_mct_initialized) then
-       write(logunit,*) trim(subname),' ERROR seq_comm_init has not been called '
-       call shr_sys_abort()
-    end if
-    seq_comm_mct_initialized = .false.
-
-    do id = 1, ncomps
-       if (seq_comms(id)%petlist_allocated) then
-          deallocate(seq_comms(id)%petlist)
-       end if
-    end do
-
-    call mct_world_clean()
-
-  end subroutine seq_comm_clean
 
 !---------------------------------------------------------
   subroutine seq_comm_setcomm(ID,pelist,nthreads,iname,inst,tinst)
@@ -1062,252 +857,6 @@ contains
   end subroutine seq_comm_setcomm
 
 !---------------------------------------------------------
-  subroutine seq_comm_joincomm(ID1,ID2,ID,iname,inst,tinst)
-
-    implicit none
-    integer,intent(IN) :: ID1    ! src id
-    integer,intent(IN) :: ID2    ! srd id
-    integer,intent(IN) :: ID     ! computed id
-    character(len=*),intent(IN),optional :: iname  ! comm name
-    integer,intent(IN),optional :: inst
-    integer,intent(IN),optional :: tinst
-
-    integer :: mpigrp
-    integer :: mpicom
-    integer :: ierr
-    integer :: n,nsize
-    character(len=seq_comm_namelen) :: cname
-    logical :: set_suffix
-    integer,allocatable :: pe_t1(:),pe_t2(:)
-    character(*),parameter :: subName =   '(seq_comm_joincomm) '
-
-    ! check that IDs are in valid range, that ID1 and ID2 have
-    ! been set, and that ID has not been set
-
-    if (ID1 < 1 .or. ID1 > ncomps) then
-       write(logunit,*) subname,' ID1 out of range, abort ',ID1
-       call shr_sys_abort()
-    endif
-    if (ID2 < 1 .or. ID2 > ncomps) then
-       write(logunit,*) subname,' ID2 out of range, abort ',ID2
-       call shr_sys_abort()
-    endif
-    if (ID < 1 .or. ID > ncomps) then
-       write(logunit,*) subname,' ID out of range, abort ',ID
-       call shr_sys_abort()
-    endif
-    if (.not. seq_comms(ID1)%set .or. .not. seq_comms(ID2)%set) then
-       write(logunit,*) subname,' ID1 or ID2 not set ',ID1,ID2
-       call shr_sys_abort()
-    endif
-    if (seq_comms(ID)%set) then
-       write(logunit,*) subname,' ID already set ',ID
-       call shr_sys_abort()
-    endif
-
-    call mpi_group_union(seq_comms(ID1)%mpigrp,seq_comms(ID2)%mpigrp,mpigrp,ierr)
-    call shr_mpi_chkerr(ierr,subname//' mpi_comm_union mpigrp')
-    call mpi_comm_create(GLOBAL_COMM, mpigrp, mpicom, ierr)
-    call shr_mpi_chkerr(ierr,subname//' mpi_comm_create mpigrp')
-
-    seq_comms(ID)%set = .true.
-    seq_comms(ID)%ID = ID
-
-    if (present(inst)) then
-       seq_comms(ID)%inst = inst
-    else
-       seq_comms(ID)%inst = 1
-    endif
-
-    set_suffix = .true.
-    if (present(tinst)) then
-       if (tinst == 1) set_suffix = .false.
-    endif
-
-    if (present(iname)) then
-       seq_comms(ID)%name = trim(iname)
-       if (set_suffix) then
-          call seq_comm_mkname(cname,iname,seq_comms(ID)%inst)
-          seq_comms(ID)%name = trim(cname)
-       endif
-    endif
-
-    if (set_suffix) then
-       call seq_comm_mkname(cname,'_',seq_comms(ID)%inst)
-       seq_comms(ID)%suffix = trim(cname)
-    else
-       seq_comms(ID)%suffix = ' '
-    endif
-
-    seq_comms(ID)%mpicom = mpicom
-    seq_comms(ID)%mpigrp = mpigrp
-    seq_comms(ID)%nthreads = max(seq_comms(ID1)%nthreads,seq_comms(ID2)%nthreads)
-    seq_comms(ID)%nthreads = max(seq_comms(ID)%nthreads,1)
-
-    if (mpicom /= MPI_COMM_NULL) then
-       call mpi_comm_size(mpicom,seq_comms(ID)%npes,ierr)
-       call shr_mpi_chkerr(ierr,subname//' mpi_comm_size')
-       call mpi_comm_rank(mpicom,seq_comms(ID)%iam,ierr)
-       call shr_mpi_chkerr(ierr,subname//' mpi_comm_rank')
-       if (seq_comms(ID)%iam == 0) then
-          seq_comms(ID)%iamroot = .true.
-       else
-          seq_comms(ID)%iamroot = .false.
-       endif
-    else
-       seq_comms(ID)%npes = -1
-       seq_comms(ID)%iam = -1
-       seq_comms(ID)%iamroot = .false.
-    endif
-
-    allocate(pe_t1(1),pe_t2(1))
-    pe_t1(1) = 0
-    call mpi_group_translate_ranks(seq_comms(ID1)%mpigrp, 1, pe_t1, mpigrp, pe_t2, ierr)
-    seq_comms(ID)%cplpe = pe_t2(1)
-    pe_t1(1) = 0
-    call mpi_group_translate_ranks(seq_comms(ID2)%mpigrp, 1, pe_t1, mpigrp, pe_t2, ierr)
-    seq_comms(ID)%cmppe = pe_t2(1)
-    deallocate(pe_t1,pe_t2)
-
-    if (seq_comms(ID)%iamroot) then
-       if (loglevel > 1) then
-          write(logunit,F12) trim(subname),' initialize ID ',ID,seq_comms(ID)%name, &
-          ' join IDs =',ID1,ID2,' npes =',seq_comms(ID)%npes, &
-          ' nthreads =',seq_comms(ID)%nthreads, &
-          ' cpl/cmp pes =',seq_comms(ID)%cplpe,seq_comms(ID)%cmppe
-       else
-          write(logunit,F13) trim(subname),' initialize ID ',ID,seq_comms(ID)%name, &
-          ' join IDs =',ID1,ID2,' npes =',seq_comms(ID)%npes, &
-          ' nthreads =',seq_comms(ID)%nthreads
-       endif
-    endif
-
-  end subroutine seq_comm_joincomm
-
-!---------------------------------------------------------
-  subroutine seq_comm_jcommarr(IDs,ID,iname,inst,tinst)
-
-    implicit none
-    integer,intent(IN) :: IDs(:) ! src id
-    integer,intent(IN) :: ID     ! computed id
-    character(len=*),intent(IN),optional :: iname  ! comm name
-    integer,intent(IN),optional :: inst
-    integer,intent(IN),optional :: tinst
-
-    integer :: mpigrp, mpigrpp
-    integer :: mpicom, nids
-    integer :: ierr
-    integer :: n,nsize
-    character(len=seq_comm_namelen) :: cname
-    logical :: set_suffix
-    integer,allocatable :: pe_t1(:),pe_t2(:)
-    character(*),parameter :: subName =   '(seq_comm_jcommarr) '
-
-    ! check that IDs are in valid range, that IDs have
-    ! been set, and that ID has not been set
-
-    nids = size(IDs)
-    do n = 1,nids
-       if (IDs(n) < 1 .or. IDs(n) > ncomps) then
-          write(logunit,*) subname,' IDs out of range, abort ',n,IDs(n)
-          call shr_sys_abort()
-       endif
-       if (.not. seq_comms(IDs(n))%set) then
-          write(logunit,*) subname,' IDs not set ',n,IDs(n)
-          call shr_sys_abort()
-       endif
-    enddo
-
-    if (ID < 1 .or. ID > ncomps) then
-       write(logunit,*) subname,' ID out of range, abort ',ID
-       call shr_sys_abort()
-    endif
-    if (seq_comms(ID)%set) then
-       write(logunit,*) subname,' ID already set ',ID
-       call shr_sys_abort()
-    endif
-
-    mpigrp = seq_comms(IDs(1))%mpigrp
-    do n = 1,nids
-       mpigrpp = mpigrp
-       call mpi_group_union(mpigrpp,seq_comms(IDs(n))%mpigrp,mpigrp,ierr)
-       call shr_mpi_chkerr(ierr,subname//' mpi_comm_union mpigrp')
-    enddo
-    call mpi_comm_create(GLOBAL_COMM, mpigrp, mpicom, ierr)
-    call shr_mpi_chkerr(ierr,subname//' mpi_comm_create mpigrp')
-
-    seq_comms(ID)%set = .true.
-    seq_comms(ID)%ID = ID
-
-    if (present(inst)) then
-       seq_comms(ID)%inst = inst
-    else
-       seq_comms(ID)%inst = 1
-    endif
-
-    set_suffix = .true.
-    if (present(tinst)) then
-       if (tinst == 1) set_suffix = .false.
-    endif
-
-    if (present(iname)) then
-       seq_comms(ID)%name = trim(iname)
-       if (set_suffix) then
-          call seq_comm_mkname(cname,iname,seq_comms(ID)%inst)
-          seq_comms(ID)%name = trim(cname)
-       endif
-    endif
-
-    if (set_suffix) then
-       call seq_comm_mkname(cname,'_',seq_comms(ID)%inst)
-       seq_comms(ID)%suffix = trim(cname)
-    else
-       seq_comms(ID)%suffix = ' '
-    endif
-
-    seq_comms(ID)%mpicom = mpicom
-    seq_comms(ID)%mpigrp = mpigrp
-
-    seq_comms(ID)%nthreads = 1
-    do n = 1,nids
-       seq_comms(ID)%nthreads = max(seq_comms(ID)%nthreads,seq_comms(IDs(n))%nthreads)
-    enddo
-
-    if (mpicom /= MPI_COMM_NULL) then
-       call mpi_comm_size(mpicom,seq_comms(ID)%npes,ierr)
-       call shr_mpi_chkerr(ierr,subname//' mpi_comm_size')
-       call mpi_comm_rank(mpicom,seq_comms(ID)%iam,ierr)
-       call shr_mpi_chkerr(ierr,subname//' mpi_comm_rank')
-       if (seq_comms(ID)%iam == 0) then
-          seq_comms(ID)%iamroot = .true.
-       else
-          seq_comms(ID)%iamroot = .false.
-       endif
-    else
-       seq_comms(ID)%npes = -1
-       seq_comms(ID)%iam = -1
-       seq_comms(ID)%iamroot = .false.
-    endif
-
-    seq_comms(ID)%cplpe = -1
-    seq_comms(ID)%cmppe = -1
-
-    if (seq_comms(ID)%iamroot) then
-       if (loglevel > 1) then
-          write(logunit,F14) trim(subname),' initialize ID ',ID,seq_comms(ID)%name, &
-          ' join multiple comp IDs',' npes =',seq_comms(ID)%npes, &
-          ' nthreads =',seq_comms(ID)%nthreads
-       else
-          write(logunit,F14) trim(subname),' initialize ID ',ID,seq_comms(ID)%name, &
-          ' join multiple comp IDs',' npes =',seq_comms(ID)%npes, &
-          ' nthreads =',seq_comms(ID)%nthreads
-       endif
-    endif
-
-  end subroutine seq_comm_jcommarr
-
-!---------------------------------------------------------
-
   subroutine seq_comm_printcomms()
 
     integer :: n
@@ -1324,8 +873,7 @@ contains
 
 !---------------------------------------------------------
 
-  subroutine seq_comm_setptrs(ID,mpicom,mpigrp,npes,nthreads,iam,iamroot,gloiam,gloroot, &
-       cplpe,cmppe,pethreads, name)
+  subroutine seq_comm_setptrs(ID,mpicom,mpigrp,npes,nthreads,iam,iamroot,gloroot, pethreads, name)
 
     implicit none
     integer,intent(in) :: ID
@@ -1335,10 +883,7 @@ contains
     integer,intent(out),optional :: nthreads
     integer,intent(out),optional :: iam
     logical,intent(out),optional :: iamroot
-    integer,intent(out),optional :: gloiam
     integer,intent(out),optional :: gloroot
-    integer,intent(out),optional :: cplpe
-    integer,intent(out),optional :: cmppe
     integer,intent(out),optional :: pethreads
     character(len=seq_comm_namelen)  , intent(out), optional :: name
     character(*),parameter :: subName =   '(seq_comm_setptrs) '
@@ -1397,35 +942,11 @@ contains
        end if
     endif
 
-    if (present(gloiam)) then
-       if (ID > 0) then
-          gloiam = seq_comms(ID)%gloiam
-       else
-          gloiam = -1
-       end if
-    endif
-
     if (present(gloroot)) then
        if (ID > 0) then
           gloroot = seq_comms(ID)%gloroot
        else
           gloroot = -1
-       end if
-    endif
-
-    if (present(cplpe)) then
-       if (ID > 0) then
-          cplpe = seq_comms(ID)%cplpe
-       else
-          cplpe = -1
-       end if
-    endif
-
-    if (present(cmppe)) then
-       if (ID > 0) then
-          cmppe = seq_comms(ID)%cmppe
-       else
-          cmppe = -1
        end if
     endif
 
@@ -1534,20 +1055,7 @@ contains
     end if
 
   end function seq_comm_iam
-!---------------------------------------------------------
-  integer function seq_comm_gloiam(ID)
 
-    implicit none
-    integer,intent(in) :: ID
-    character(*),parameter :: subName =   '(seq_comm_gloiam) '
-
-    if ((ID < 1) .or. (ID > ncomps)) then
-       seq_comm_gloiam = -1
-    else
-       seq_comm_gloiam = seq_comms(ID)%gloiam
-    end if
-
-  end function seq_comm_gloiam
 !---------------------------------------------------------
   integer function seq_comm_gloroot(ID)
 
@@ -1562,34 +1070,7 @@ contains
     end if
 
   end function seq_comm_gloroot
-!---------------------------------------------------------
-  integer function seq_comm_cplpe(ID)
 
-    implicit none
-    integer,intent(in) :: ID
-    character(*),parameter :: subName =   '(seq_comm_cplpe) '
-
-    if ((ID < 1) .or. (ID > ncomps)) then
-       seq_comm_cplpe = -1
-    else
-       seq_comm_cplpe = seq_comms(ID)%cplpe
-    end if
-
-  end function seq_comm_cplpe
-!---------------------------------------------------------
-  integer function seq_comm_cmppe(ID)
-
-    implicit none
-    integer,intent(in) :: ID
-    character(*),parameter :: subName =   '(seq_comm_cmppe) '
-
-    if ((ID < 1) .or. (ID > ncomps)) then
-       seq_comm_cmppe = -1
-    else
-       seq_comm_cmppe = seq_comms(ID)%cmppe
-    end if
-
-  end function seq_comm_cmppe
 !---------------------------------------------------------
   character(len=seq_comm_namelen) function seq_comm_name(ID)
 

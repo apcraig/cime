@@ -11,6 +11,9 @@ module med_internalstate_mod
   implicit none
   public
 
+  integer :: logunit  ! logunit for mediator log output
+  integer :: loglevel ! loglevel for mediator log output
+
   ! Active coupling definitions
   ! This defines the med_mapping_allowed is a starting point for what is
   ! allowed in this coupled system.  It will be revised further after the system

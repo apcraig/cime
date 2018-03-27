@@ -8,10 +8,8 @@ module med_infodata_mod
   use mpi
   use shr_kind_mod          , only: SHR_KIND_CS, SHR_KIND_CL, SHR_KIND_IN, SHR_KIND_R8, SHR_KIND_I8
   use shr_sys_mod           , only: shr_sys_flush, shr_sys_abort
-  use seq_comm_mct          , only: logunit, loglevel
   use seq_comm_mct          , only: num_inst_atm, num_inst_lnd, num_inst_rof
-  use seq_comm_mct          , only: num_inst_ocn, num_inst_ice, num_inst_glc
-  use seq_comm_mct          , only: num_inst_wav
+  use seq_comm_mct          , only: num_inst_ocn, num_inst_ice, num_inst_glc, num_inst_wav
   use esmFlds               , only: flds_scalar_num, flds_scalar_name
   use esmFlds               , only: flds_scalar_index_nx,  flds_scalar_index_ny
   use esmFlds               , only: flds_scalar_index_flood_present
@@ -20,6 +18,7 @@ module med_infodata_mod
   use esmFlds               , only: flds_scalar_index_nextsw_cday
   use esmFlds               , only: flds_scalar_index_dead_comps
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_chkErr
+  use med_internalstate_mod , only: logunit, loglevel
 
   implicit none
 

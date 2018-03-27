@@ -5,7 +5,6 @@ module shr_nuopc_fldList_mod
   use shr_kind_mod   , only : CX => shr_kind_CX, CXX => shr_kind_CXX, CS=>shr_kind_CS, CL=>shr_kind_CL
   use shr_sys_mod    , only : shr_sys_abort
   use shr_string_mod , only : shr_string_lastindex
-  use seq_comm_mct   , only : llogunit => logunit
 
   implicit none
   private
@@ -74,8 +73,6 @@ module shr_nuopc_fldList_mod
 contains
 !================================================================================
 
-  !================================================================================
-
   subroutine shr_nuopc_fldList_Concat(fldsFr, fldsTo, concat_src, concat_dst, flds_scalar_name)
     ! Returns new concatentated colon delimited field lists
     
@@ -101,8 +98,6 @@ contains
        end if
     end do
     if (len_trim(concat_src) >= CXX) then
-       write(llogunit,*)'fields are = ',trim(concat_src)
-       write(llogunit,*)'fields length = ',len_trim(concat_src)
        call shr_sys_abort(subname//'ERROR: maximum length of xxx or xxx has been exceeded')
     end if
     
@@ -116,8 +111,6 @@ contains
        end if
     end do
     if (len_trim(concat_dst) >= CXX) then
-       write(llogunit,*)'fields are = ',trim(concat_dst)
-       write(llogunit,*)'fields length = ',len_trim(concat_dst)
        call shr_sys_abort(subname//'ERROR: maximum length of xxx or xxx has been exceeded')
     end if
     
@@ -147,8 +140,6 @@ contains
     end if
 
     if (len_trim(fldlist) >= CXX) then
-       write(llogunit,*)'fields are = ',trim(fldlist)
-       write(llogunit,*)'fields length = ',len_trim(fldlist)
        call shr_sys_abort(subname//'ERROR: maximum length of xxx or xxx has been exceeded')
     end if
 
@@ -179,75 +170,6 @@ contains
        call NUOPC_FieldDictionaryAddEntry(standardName=fldname, canonicalUnits=units, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
     endif
-  !   ! If the fldname passed in contains colons it is assumed to be a list of fields
-  !   ! all of which have the same names and units
-
-  !   i = index(fldname,':')
-  !   j=1
-
-  !   do while(i>j .and. i<=len_trim(fldname))
-  !      if (get_metadata_entry(fldname(j:i-1)) <= 0) then
-  !         n_entries = n_entries + 1
-  !         shr_nuopc_fldList_metadata(n_entries,1) = fldname(j:i-1)
-  !         shr_nuopc_fldList_metadata(n_entries,2) = trim(longname)
-  !         shr_nuopc_fldList_metadata(n_entries,3) = trim(stdname )
-  !         shr_nuopc_fldList_metadata(n_entries,4) = trim(units   )
-  !         j=i+1
-  !         i =  index(fldname(j:),':') + j - 1
-  !      endif
-  !   enddo
-  !   if (get_metadata_entry(fldname(j:i)) <= 0) then
-  !      n_entries = n_entries + 1
-  !      i = len_trim(fldname)
-  !      shr_nuopc_fldList_metadata(n_entries,1) = fldname(j:i)
-  !      shr_nuopc_fldList_metadata(n_entries,2) = trim(longname)
-  !      shr_nuopc_fldList_metadata(n_entries,3) = trim(stdname )
-  !      shr_nuopc_fldList_metadata(n_entries,4) = trim(units   )
-  !   endif
-
-  !   if (n_entries >= nmax) then
-  !      write(llogunit,*)'n_entries= ',n_entries,' nmax = ',nmax,' fldname= ',trim(fldname)
-  !      call shr_sys_abort(subname//'ERROR: nmax fields in metadata_entry table exceeded')
-  !   end if
-
-  ! contains  !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-  !   integer function get_metadata_entry(shortname)
-  !     character(len=*), intent(in)  :: shortname
-
-  !     integer :: i,n,lnentry
-  !     logical :: found
-  !     character(len=CSS) :: lshortname  ! local copies
-  !     character(len=*),parameter :: subname = '(get_metadata_entry) '
-  !     !-------------------------------------------------------------------------------
-
-  !     found = .false.
-  !     lnentry = 0
-  !     if (.not.found) then
-  !        i = 1
-  !        do while (i <= n_entries .and. .not.found)
-  !           if (trim(shortname) == trim(shr_nuopc_fldList_Metadata(i,1))) then
-  !              found     =.true.
-  !              lnentry   = i
-  !           end if
-  !           i = i + 1
-  !        end do
-  !     endif
-  !     if (.not.found) then
-  !        i = 1
-  !        do while (i <= n_entries .and. .not.found)
-  !           n = shr_string_lastIndex(shortname, "_")
-  !           lshortname = ""
-  !           if (n < len_trim(shortname)) lshortname = shortname(n+1:len_trim(shortname))
-  !           if (trim(lshortname) == trim(shr_nuopc_fldList_Metadata(i,1))) then
-  !              found   = .true.
-  !              lnentry = i
-  !           end if
-  !           i = i + 1
-  !        end do
-  !     endif
-  !     get_metadata_entry = lnentry
-  !   end function get_metadata_entry
 
   end subroutine shr_nuopc_fldList_AddMetadata
 

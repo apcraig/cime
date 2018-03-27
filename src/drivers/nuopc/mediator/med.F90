@@ -18,7 +18,6 @@ module MED
     mediator_label_SetRunClock      => label_SetRunClock, &
     NUOPC_MediatorGet
 
-  use seq_comm_mct            , only: llogunit => logunit
   use shr_kind_mod            , only: SHR_KIND_CX, SHR_KIND_CL, SHR_KIND_CS
   use shr_sys_mod             , only: shr_sys_flush, shr_sys_abort
   use esmFlds                 , only: flds_scalar_name
@@ -44,7 +43,7 @@ module MED
   use shr_nuopc_methods_mod   , only: shr_nuopc_methods_ChkErr
   use med_infodata_mod        , only: med_infodata_CopyStateToInfodata
   use med_infodata_mod        , only: med_infodata
-  use med_internalstate_mod   , only: InternalState
+  use med_internalstate_mod   , only: InternalState, llogunit=>logunit
   use med_internalstate_mod   , only: med_coupling_allowed
   use med_connectors_mod      , only: med_connectors_prep_med2atm
   use med_connectors_mod      , only: med_connectors_prep_med2ocn
