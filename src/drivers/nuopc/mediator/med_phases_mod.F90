@@ -6,7 +6,7 @@ module med_phases_mod
 
   use ESMF
   use NUOPC
-  use shr_kind_mod            , only : CL=>SHR_KIND_CL
+  use shr_kind_mod            , only : CL=>SHR_KIND_CL, CS=>SHR_KIND_CS
   use esmFlds                 , only : compmed, compatm, complnd, compocn
   use esmFlds                 , only : compice, comprof, compwav, compglc
   use esmFlds                 , only : ncomps, compname 
@@ -26,6 +26,7 @@ module med_phases_mod
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_FldChk
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_average
   use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_copy
+  use shr_nuopc_methods_mod   , only : shr_nuopc_methods_FB_FieldRegrid
   use med_fraction_mod        , only : med_fraction_init
   use med_constants_mod       , only : med_constants_dbug_flag
   use med_constants_mod       , only : med_constants_czero
@@ -104,7 +105,7 @@ module med_phases_mod
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !---------------------------------------
-    ! Initialize ocn albedo and ocn/atm flux calculation modules if appropriate
+    ! Initialize field bundles needed for ocn albedo and ocn/atm flux calculations
     !---------------------------------------
 
     if (is_local%wrap%med_coupling_active(compocn,compatm) .and. &
@@ -145,20 +146,6 @@ module med_phases_mod
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        deallocate(fldnames)
 
-       ! Initialize the atm/ocean fluxes and compute the ocean albedos
-
-       call ESMF_LogWrite("MED - initialize atm/ocn fluxes and compute ocean albedo", ESMF_LOGMSG_INFO, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       ! Initialize ocean albedo module and compute ocean albedos
-
-       call med_phases_ocnalb_init(gcomp, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       ! Initialize atm/ocn fluxes module
-
-       call med_phases_aofluxes_init(gcomp, rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
     !----------------------------------------------------------
@@ -429,6 +416,9 @@ module med_phases_mod
     real(ESMF_KIND_R8), pointer :: dataPtr1(:), dataPtr2(:), dataPtr3(:), dataPtr4(:)
     integer                     :: i,n,n1,ncnt
     logical,save                :: first_call = .true.
+    character(len=CS)           :: fldname         
+    real(ESMF_KIND_R8), pointer :: dataptr(:)      
+    character(len=1024)         :: msgString       
     character(len=*),parameter  :: subname='(med_phases_prep_ice)'
     !---------------------------------------
 
@@ -493,15 +483,33 @@ module med_phases_mod
           call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(n1,compice), value=czero, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-          call med_map_FB_Regrid_Norm( &
-               fldListFr(n1)%flds, compice, &
-               is_local%wrap%FBImp(n1,n1), &
-               is_local%wrap%FBImp(n1,compice), &
-               is_local%wrap%FBFrac(compice), &
-               is_local%wrap%FBNormOne(n1,compice,:), &
-               is_local%wrap%RH(n1,compice,:), &
-               string=trim(compname(n1))//'2'//trim(compname(compice)), rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          if (n1 == compocn) then
+             do n = 1,size(fldListFr(compocn)%flds)
+                fldname  = fldListFr(compocn)%flds(n)%shortname
+                if (fldname == flds_scalar_name) CYCLE
+                if (.not. ESMF_RouteHandleIsCreated(is_local%wrap%RH(compocn,compice,5), rc=rc)) then
+                   call ESMF_LogWrite(trim(subname)//"ERROR RH not available for fld="//trim(fldname), &
+                        ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
+                   rc = ESMF_FAILURE
+                   return
+                end if
+                call shr_nuopc_methods_FB_FieldRegrid(&
+                     is_local%wrap%FBImp(compocn,compocn), fldname,&
+                     is_local%wrap%FBImp(compocn,compice), fldname,&
+                     is_local%wrap%RH(compocn,compice,5), rc)
+                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+             end do
+          else
+             call med_map_FB_Regrid_Norm( &
+                  fldListFr(n1)%flds, compice, &
+                  is_local%wrap%FBImp(n1,n1), &
+                  is_local%wrap%FBImp(n1,compice), &
+                  is_local%wrap%FBFrac(compice), &
+                  is_local%wrap%FBNormOne(n1,compice,:), &
+                  is_local%wrap%RH(n1,compice,:), &
+                  string=trim(compname(n1))//'2'//trim(compname(compice)), rc=rc)
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          end if
 
           if (dbug_flag > 1) then
              call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(n1,compice), &
@@ -1217,6 +1225,43 @@ module med_phases_mod
     call shr_nuopc_methods_FB_copy(is_local%wrap%FBExp(compocn), &
          is_local%wrap%FBExpAccum(compocn), rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+    !--- custom calculations
+    !---------------------------------------
+
+    ! TODO: document custom merges below
+    ! TODO: need to obtain flux_epbalfact
+
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compatm,compocn), 'Faxa_rainc', dataPtr1, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compatm,compocn), 'Faxa_rainl', dataPtr2, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(compocn), 'Foxx_rain' , dataPtr3, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    dataPtr3(:) = dataPtr1(:) + dataPtr2(:)
+#if (1 == 0)
+    dataPtr3(:) = dataPtr3(:) * flux_epbalfact
+#endif
+
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compatm,compocn), 'Faxa_snowc', dataPtr1, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBImp(compatm,compocn), 'Faxa_snowl', dataPtr2, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(compocn), 'Foxx_snow' , dataPtr3, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    dataPtr3(:) = dataPtr1(:) + dataPtr2(:)
+#if (1 == 0)
+    dataPtr3(:) = dataPtr3(:) * flux_epbalfact
+#endif
+
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(compocn), 'Foxx_rain' , dataPtr1, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(compocn), 'Foxx_snow' , dataPtr2, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_methods_FB_GetFldPtr(is_local%wrap%FBExp(compocn), 'Foxx_prec' , dataPtr3, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    dataPtr3(:) = dataPtr1(:) + dataPtr2(:)
 
     !---------------------------------------
     !--- zero accumulator

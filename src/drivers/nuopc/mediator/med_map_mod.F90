@@ -8,7 +8,7 @@ module med_map_mod
   use esmFlds               , only: flds_scalar_name
   use esmFlds               , only: flds_scalar_num
   use esmFlds               , only: fldListFr, fldListTo
-  use shr_nuopc_fldList_mod , only: mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy, mapunset 
+  use shr_nuopc_fldList_mod , only: mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy, mapunset, mapfiler 
   use shr_nuopc_fldList_mod , only: mapnames, nmappers
   use shr_nuopc_fldList_mod , only: shr_nuopc_fldList_entry_type
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_Init
@@ -100,7 +100,7 @@ contains
     real(ESMF_KIND_R8)     , pointer :: factorList(:)
     character(SHR_KIND_CL) , pointer :: fldnames(:)
     type(ESMF_PoleMethod_Flag), parameter :: polemethod=ESMF_POLEMETHOD_ALLAVG
-    character(len=*), parameter :: subname='(module_MED_Map:RouteHandles_init)'
+    character(len=*), parameter :: subname=' (module_med_map: RouteHandles_init) '
     !-----------------------------------------------------------
     
     if (dbug_flag > 1) then
@@ -140,7 +140,6 @@ contains
 
              ! Determine route handle names
              rhname = trim(compname(n1))//"2"//trim(compname(n2))
-             if (mastertask) write(llogunit,*) subname,' initialize RH for '//trim(rhname)
 
              if (is_local%wrap%med_coupling_active(n1,n2)) then ! If coupling is active between n1 and n2
 
@@ -164,7 +163,20 @@ contains
                       mapfile  = trim(fldListFr(n1)%flds(nf)%mapfile(n2))
                       string   = trim(rhname)//'_weights'
 
-                      if (mapindex == mapfcopy) then
+                      if (mapindex == mapfiler .and. mapfile /= 'unset') then
+                         ! TODO: actually error out if mapfile is unset in this case
+                         if (mastertask) then
+                            write(llogunit,'(4A)') subname,trim(string),' RH '//trim(mapname)//' via input file ',&
+                                 trim(mapfile)
+                         end if
+                         call ESMF_LogWrite(subname // trim(string) //&
+                              ' RH '//trim(mapname)//' via input file '//trim(mapfile), ESMF_LOGMSG_INFO, rc=dbrc)
+                         call ESMF_FieldSMMStore(fldsrc, flddst, mapfile, &
+                              routehandle=is_local%wrap%RH(n1,n2,mapindex), &
+                              ignoreUnmatchedIndices=.true., &
+                              srcTermProcessing=srcTermProcessing_Value, rc=rc)
+                         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                      else if (mapindex == mapfcopy) then
                          if (mastertask) write(llogunit,'(3A)') subname,trim(string),' RH redist '
                          call ESMF_LogWrite(trim(subname) // trim(string) // ' RH redist ', ESMF_LOGMSG_INFO, rc=dbrc)
                          call ESMF_FieldRedistStore(fldsrc, flddst, &
@@ -292,7 +304,7 @@ contains
     integer                     :: SrcMaskValue
     integer                     :: DstMaskValue
     real(ESMF_KIND_R8), pointer :: factorList(:)
-    character(len=*), parameter :: subname='(module_med_map:med_map_Fractions_init)'
+    character(len=*), parameter :: subname=' (module_med_map: Fractions_init) '
     !---------------------------------------------
 
     if (dbug_flag > 1) then
@@ -515,13 +527,18 @@ contains
        ! Error checks
        if (.not. shr_nuopc_methods_FB_FldChk(FBSrc, fldname, rc=rc)) then
           if (dbug_flag > 1) then
-             call ESMF_LogWrite(trim(subname)//" field not found in FB: "//trim(fldname), ESMF_LOGMSG_INFO, rc=dbrc)
+             call ESMF_LogWrite(trim(subname)//" field not found in FBSrc: "//trim(fldname), ESMF_LOGMSG_INFO, rc=dbrc)
+          endif
+       else if (.not. shr_nuopc_methods_FB_FldChk(FBDst, fldname, rc=rc)) then
+          if (dbug_flag > 1) then
+             call ESMF_LogWrite(trim(subname)//" field not found in FBDst: "//trim(fldname), ESMF_LOGMSG_INFO, rc=dbrc)
           endif
        else if (.not. ESMF_RouteHandleIsCreated(RouteHandles(mapindex), rc=rc)) then
           call ESMF_LogWrite(trim(subname)//trim(lstring)//&
                ": ERROR RH not available for "//mapnames(mapindex)//": fld="//trim(fldname), &
                ESMF_LOGMSG_ERROR, line=__LINE__, file=u_FILE_u, rc=dbrc)
           rc = ESMF_FAILURE
+          return
        end if
 
        ! Do the mapping

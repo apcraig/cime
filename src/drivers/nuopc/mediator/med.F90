@@ -79,6 +79,8 @@ module MED
   use med_constants_mod       , only: med_constants_spval_rhfile
   use med_map_mod             , only: med_map_RouteHandles_init
   use med_map_mod             , only: med_map_MapNorm_init
+  use med_phases_aofluxes_mod , only: med_phases_aofluxes_init 
+  use med_phases_ocnalb_mod   , only: med_phases_ocnalb_init 
 
   implicit none
 
@@ -424,6 +426,8 @@ contains
          convention="NUOPC", purpose="Instance", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+    call ESMF_LogWrite(trim(subname)//": Mediator verbosity is "//trim(value), ESMF_LOGMSG_INFO, rc=dbrc)
+
     dbug_flag = ESMF_UtilString2Int(value, &
          specialStringList=(/"min","max","high"/), specialValueList=(/0,255,255/), rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -637,7 +641,7 @@ contains
 
   subroutine InitializeIPDv03p4(gcomp, importState, exportState, clock, rc)
 
-    ! Otionally modify the decomp/distr of transferred Grid/Mesh
+    ! Optionally modify the decomp/distr of transferred Grid/Mesh
 
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
@@ -656,13 +660,12 @@ contains
     !    integer, allocatable          :: minIndexPTile(:,:), maxIndexPTile(:,:)
     !    integer, allocatable          :: regDecompPTile(:,:)
     !    integer                       :: i, j, n, n1
-    character(len=*),parameter :: subname='(module_MED:InitializeIPDv03p4)'
+    character(len=*),parameter :: subname='(module_MED:realizeConnectedGrid)'
     !-----------------------------------------------------------
 
     if (dbug_flag > 5) then
       call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
-
     rc = ESMF_SUCCESS
 
     ! Get the internal state from the mediator gridded component.
@@ -675,14 +678,20 @@ contains
     !------------------
 
     do n1 = 1,ncomps
-      if (ESMF_StateIsCreated(is_local%wrap%NStateImp(n1),rc=rc)) then
-        call realizeConnectedGrid(is_local%wrap%NStateImp(n1), trim(compname(n1))//'Imp', rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      endif
-      if (ESMF_StateIsCreated(is_local%wrap%NStateExp(n1),rc=rc)) then
-        call realizeConnectedGrid(is_local%wrap%NStateExp(n1), trim(compname(n1))//'Exp', rc)
-        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-      endif
+       if (dbug_flag > 5) then
+          call ESMF_LogWrite(trim(subname)//": calling for component "//trim(compname(n1)), ESMF_LOGMSG_INFO, rc=dbrc)
+       end if
+       if (ESMF_StateIsCreated(is_local%wrap%NStateImp(n1),rc=rc)) then
+          call realizeConnectedGrid(is_local%wrap%NStateImp(n1), trim(compname(n1))//'Imp', rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       endif
+       if (ESMF_StateIsCreated(is_local%wrap%NStateExp(n1),rc=rc)) then
+          call realizeConnectedGrid(is_local%wrap%NStateExp(n1), trim(compname(n1))//'Exp', rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       endif
+       if (dbug_flag > 5) then
+          call ESMF_LogWrite(trim(subname)//": finished for component "//trim(compname(n1)), ESMF_LOGMSG_INFO, rc=dbrc)
+       end if
     enddo
 
     if (dbug_flag > 5) then
@@ -698,34 +707,35 @@ contains
       integer            , intent(out)   :: rc
 
       ! local variables
-      type(ESMF_Field)                           :: field
-      type(ESMF_Grid)                            :: grid
-      integer                                    :: localDeCount
-      type(ESMF_DistGrid)                        :: distgrid
-      type(ESMF_DistGridConnection), allocatable :: connectionList(:)
-      integer                                    :: arbDimCount
-      integer                                    :: dimCount, tileCount, petCount
-      integer                                    :: connectionCount
-      integer                                    :: deCountPTile, extraDEs
-      integer, allocatable                       :: minIndexPTile(:,:), maxIndexPTile(:,:)
-      integer, allocatable                       :: regDecompPTile(:,:)
-      integer                                    :: i, j, n, n1, fieldCount, nxg, i1, i2
-      type(ESMF_GeomType_Flag)                   :: geomtype
-      character(ESMF_MAXSTR),allocatable         :: fieldNameList(:)
-      type(ESMF_FieldStatus_Flag)                :: fieldStatus
-      character(len=*),parameter                 :: subname='(module_MED:realizeConnectedGrid)'
-      !-----------------------------------------------------------
+      type(ESMF_Field)              :: field
+      type(ESMF_Grid)               :: grid
+      integer                       :: localDeCount
 
-      ! NOTE: All of the Fields that had a TransferOfferGeomObject Attribute
-      ! of "cannot provide" should now have the accepted Grid available.
-      ! Pull out this Grid for one of a representative Field and modify 
-      ! the decomposition and distribution of the Grid to match the Mediator PETs.
+      type(ESMF_DistGrid)           :: distgrid
+      type(ESMF_DistGridConnection), allocatable :: connectionList(:)
+      integer                       :: arbDimCount
+      integer                       :: dimCount, tileCount, petCount
+      integer                       :: connectionCount
+      integer                       :: deCountPTile, extraDEs
+      integer, allocatable          :: minIndexPTile(:,:), maxIndexPTile(:,:)
+      integer, allocatable          :: regDecompPTile(:,:)
+      integer                       :: i, j, n, n1, fieldCount, nxg, i1, i2
+      type(ESMF_GeomType_Flag)      :: geomtype
+      character(ESMF_MAXSTR),allocatable :: fieldNameList(:)
+      type(ESMF_FieldStatus_Flag)   :: fieldStatus
+      character(len=*),parameter :: subname='(module_MEDIATOR:realizeConnectedGrid)'
+
+      !NOTE: All of the Fields that set their TransferOfferGeomObject Attribute
+      !NOTE: to "cannot provide" should now have the accepted Grid available.
+      !NOTE: Go and pull out this Grid for one of a representative Field and
+      !NOTE: modify the decomposition and distribution of the Grid to match the
+      !NOTE: Mediator PETs.
 
       !TODO: quick implementation, do it for each field one by one
       !TODO: commented out below are application to other fields
 
       if (dbug_flag > 5) then
-        call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+         call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
       endif
       rc = ESMF_Success
 
@@ -736,6 +746,7 @@ contains
       call ESMF_StateGet(State, itemNameList=fieldNameList, rc=rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
+      !     do n=1, fieldCount
       do n=1, min(fieldCount,1)
 
          call ESMF_StateGet(State, field=field, itemName=fieldNameList(n), rc=rc)
@@ -758,6 +769,13 @@ contains
                call ESMF_AttributeGet(field, name="ArbDimCount", value=arbDimCount, &
                     convention="NUOPC", purpose="Instance", rc=rc)
                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+               if (dbug_flag > 1) then
+                  call ESMF_LogWrite(trim(subname)//": geomtype is ESMF_GEOMTYPE_GRID for "//trim(fieldnameList(n)), &
+                       ESMF_LOGMSG_INFO, rc=dbrc)
+                  write(msgString,'(A,i8)') trim(subname)//':arbdimcount =',arbdimcount
+                  call ESMF_LogWrite(msgString, ESMF_LOGMSG_INFO, rc=dbrc)
+               endif
 
                ! make decision on whether the incoming Grid is arbDistr or not
                if (arbDimCount>0) then
@@ -793,13 +811,11 @@ contains
                      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
                      ! create default regDecomp DistGrid
-                     distgrid = ESMF_DistGridCreate(&
-                          minIndexPTile=minIndexPTile, &
-                          maxIndexPTile=maxIndexPTile, &
-                          connectionList=connectionList, rc=rc)
+                     distgrid = ESMF_DistGridCreate(minIndexPTile=minIndexPTile, &
+                          maxIndexPTile=maxIndexPTile, connectionList=connectionList, rc=rc)
                      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-                     ! create default regDecomp Grid
+                     ! Create default regDecomp Grid
                      grid = ESMF_GridCreate(distgrid, rc=rc)
                      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
@@ -841,8 +857,8 @@ contains
 
                   ! access localDeCount to show this is a real Grid
                   if (dbug_flag > 1) then
-                     call ESMF_LogWrite(trim(subname)//trim(string)//": accept reg2reg grid for "//trim(fieldNameList(n)), &
-                          ESMF_LOGMSG_INFO, rc=dbrc)
+                     call ESMF_LogWrite(trim(subname)//trim(string)//": accept reg2reg grid for "//&
+                          trim(fieldNameList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
                   endif
 
                   call ESMF_FieldGet(field, grid=grid, rc=rc)
@@ -861,15 +877,12 @@ contains
                   if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
                   ! allocate minIndexPTile and maxIndexPTile accord. to dimCount and tileCount
-                  allocate(minIndexPTile(dimCount, tileCount), &
-                           maxIndexPTile(dimCount, tileCount))
+                  allocate(minIndexPTile(dimCount, tileCount), maxIndexPTile(dimCount, tileCount))
                   allocate(connectionList(connectionCount))
 
                   ! get minIndex and maxIndex arrays, and connectionList
-                  call ESMF_DistGridGet(distgrid, &
-                       minIndexPTile=minIndexPTile, &
-                       maxIndexPTile=maxIndexPTile, &
-                       connectionList=connectionList, rc=rc)
+                  call ESMF_DistGridGet(distgrid, minIndexPTile=minIndexPTile, &
+                       maxIndexPTile=maxIndexPTile, connectionList=connectionList, rc=rc)
                   if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
                   ! construct a default regDecompPTile -> TODO: move this into ESMF as default
@@ -892,33 +905,30 @@ contains
 
                   do i2 = 1,tileCount
                      do i1 = 1,dimCount
-                        write(msgString,'(A,5i8)') trim(subname)//':PTile =',i2,i1,&
-                             minIndexPTile(i1,i2),maxIndexPTile(i1,i2),regDecompPTile(i1,i2)
+                        write(msgString,'(A,5i8)') trim(subname)//':PTile =',i2,i1,minIndexPTile(i1,i2),&
+                             maxIndexPTile(i1,i2),regDecompPTile(i1,i2)
                         call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
                      enddo
                   enddo
 
                   !--- tcraig, hardwire i direction wraparound, temporary
                   !--- tcraig, now getting info from model distgrid, see above
-                  ! allocate(connectionList(1))
-                  ! nxg = maxIndexPTile(1,1) - minIndexPTile(1,1) + 1
-                  ! write(msgstring,*) trim(subname)//trim(string),': connlist nxg = ',nxg
-                  ! call ESMF_LogWrite(trim(msgstring), ESMF_LOGMSG_INFO, rc=rc)
-                  ! if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-                  ! call ESMF_DistGridConnectionSet(connectionList(1), tileIndexA=1, &
-                  !   tileIndexB=1, positionVector=(/nxg, 0/), rc=rc)
-                  ! if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                  !              allocate(connectionList(1))
+                  !              nxg = maxIndexPTile(1,1) - minIndexPTile(1,1) + 1
+                  !              write(msgstring,*) trim(subname)//trim(string),': connlist nxg = ',nxg
+                  !              call ESMF_LogWrite(trim(msgstring), ESMF_LOGMSG_INFO, rc=rc)
+                  !              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                  !              call ESMF_DistGridConnectionSet(connectionList(1), tileIndexA=1, &
+                  !                tileIndexB=1, positionVector=(/nxg, 0/), rc=rc)
+                  !              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
                   ! create the new DistGrid with the same minIndexPTile and maxIndexPTile,
                   ! but with a default regDecompPTile
                   ! tcraig, force connectionlist and gridEdge arguments to fix wraparound
                   ! need ESMF fixes to implement properly.
-
                   if (dimcount == 2) then
-                     distgrid = ESMF_DistGridCreate(&
-                          minIndexPTile=minIndexPTile, &
-                          maxIndexPTile=maxIndexPTile, &
-                          regDecompPTile=regDecompPTile, &
+                     distgrid = ESMF_DistGridCreate(minIndexPTile=minIndexPTile, &
+                          maxIndexPTile=maxIndexPTile, regDecompPTile=regDecompPTile, &
                           connectionList=connectionList, rc=rc)
                      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                      if (dbug_flag > 1) then
@@ -929,12 +939,9 @@ contains
                      ! Create a new Grid on the new DistGrid and swap it in the Field
                      grid = ESMF_GridCreate(distgrid, gridEdgeLWidth=(/0,0/), gridEdgeUWidth=(/0,1/), rc=rc)
                      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
                   else
-                     distgrid = ESMF_DistGridCreate(&
-                          minIndexPTile=minIndexPTile, &
-                          maxIndexPTile=maxIndexPTile, &
-                          regDecompPTile=regDecompPTile, rc=rc)
+                     distgrid = ESMF_DistGridCreate(minIndexPTile=minIndexPTile, &
+                          maxIndexPTile=maxIndexPTile, regDecompPTile=regDecompPTile, rc=rc)
                      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                      if (dbug_flag > 1) then
                         call ESMF_LogWrite(trim(subname)//trim(string)//': distgrid with dimcount=1', ESMF_LOGMSG_INFO, rc=rc)
@@ -960,8 +967,13 @@ contains
                   call ESMF_StateGet(State, field=field, itemName=fieldNameList(n1), rc=rc)
                   if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-                  call ESMF_FieldEmptySet(field, grid=grid, rc=rc)
+                  call ESMF_FieldGet(field, status=fieldStatus, rc=rc)
                   if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+                  if (fieldStatus==ESMF_FIELDSTATUS_EMPTY) then
+                     call ESMF_FieldEmptySet(field, grid=grid, rc=rc)
+                     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+                  endif
 
                   if (dbug_flag > 1) then
                      call ESMF_LogWrite(trim(subname)//trim(string)//": attach grid for "//trim(fieldNameList(n1)), &
@@ -969,11 +981,16 @@ contains
                      if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                   endif
 
-                  call shr_nuopc_methods_Field_GeomPrint(field,trim(fieldNameList(n))//'_new',rc)
+                  call shr_nuopc_methods_Field_GeomPrint(field,trim(fieldNameList(n1))//'_new',rc)
                   if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
                enddo
 
             elseif (geomtype == ESMF_GEOMTYPE_MESH) then
+
+               if (dbug_flag > 1) then
+                  call ESMF_LogWrite(trim(subname)//": geomtype is ESMF_GEOMTYPE_MESH for "//trim(fieldnameList(n)), &
+                       ESMF_LOGMSG_INFO, rc=dbrc)
+               end if
 
                call shr_nuopc_methods_Field_GeomPrint(field,trim(fieldNameList(n))//'_orig',rc)
                if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -988,7 +1005,8 @@ contains
 
          elseif (fieldStatus==ESMF_FIELDSTATUS_EMPTY) then
 
-            call ESMF_LogWrite(trim(subname)//trim(string)//": provide grid for "//trim(fieldNameList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+            call ESMF_LogWrite(trim(subname)//trim(string)//": provide grid for "//trim(fieldNameList(n)), &
+                 ESMF_LOGMSG_INFO, rc=dbrc)
 
          elseif (fieldStatus==ESMF_FIELDSTATUS_COMPLETE) then
 
@@ -1003,7 +1021,7 @@ contains
 
          endif   ! fieldStatus
 
-      enddo   ! n fld loop
+      enddo   ! nflds
 
       deallocate(fieldNameList)
 
@@ -1094,8 +1112,12 @@ contains
 
       integer                     :: n, fieldCount
       character(ESMF_MAXSTR)      :: fieldName
+      type(ESMF_Grid)             :: grid
+      type(ESMF_Mesh)             :: mesh
+      type(ESMF_Field)            :: meshField
       type(ESMF_Field),pointer    :: fieldList(:)
       type(ESMF_FieldStatus_Flag) :: fieldStatus
+      type(ESMF_GeomType_Flag)    :: geomtype
       character(len=*),parameter  :: subname='(module_MED:completeFieldInitialization)'
 
       if (dbug_flag > 5) then
@@ -1114,8 +1136,28 @@ contains
 
         do n=1, fieldCount
 
-          call ESMF_FieldGet(fieldList(n), status=fieldStatus, name=fieldName, rc=rc)
+          call ESMF_FieldGet(fieldList(n), status=fieldStatus, name=fieldName, &
+            geomtype=geomtype, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+          if (geomtype == ESMF_GEOMTYPE_GRID .and. fieldName /= flds_scalar_name) then
+            ! Grab grid
+            call shr_nuopc_methods_Field_GeomPrint(fieldList(n),trim(fieldName)//'_premesh',rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+            call ESMF_FieldGet(fieldList(n), grid=grid, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            ! Convert grid to mesh
+            mesh = ESMF_GridToMeshCell(grid,rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            meshField = ESMF_FieldCreate(mesh, typekind=ESMF_TYPEKIND_R8, meshloc=ESMF_MESHLOC_ELEMENT, name=fieldName, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            ! Swap grid for mesh, at this point, only connected fields are in the state
+            call NUOPC_Realize(State, field=meshField, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          endif
 
           if (fieldStatus==ESMF_FIELDSTATUS_GRIDSET) then
             if (dbug_flag > 1) then
@@ -1123,7 +1165,6 @@ contains
                    ESMF_LOGMSG_INFO, rc=rc)
               if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
             endif
-
             call ESMF_FieldEmptyComplete(fieldList(n), typekind=ESMF_TYPEKIND_R8, rc=rc)
             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           endif   ! fieldStatus
@@ -1170,21 +1211,25 @@ contains
     integer, intent(out) :: rc
 
     ! local variables
-    type(InternalState)                   :: is_local
-    type(ESMF_Clock)                      :: clock
-    type(ESMF_State)                      :: importState, exportState
-    type(ESMF_Time)                       :: time
-    type(ESMF_Field)                      :: field
-    type(ESMF_StateItem_Flag)             :: itemType
-    logical                               :: atCorrectTime, allDone, connected
-    integer                               :: n1,n2,n
-    integer                               :: cntn1, cntn2
-    integer                               :: fieldCount
-    character(ESMF_MAXSTR),allocatable    :: fieldNameList(:)
-    character(len=128)                    :: value
-    logical                               :: first_call = .true.
-    character(SHR_KIND_CL)                :: cvalue
-    character(len=*), parameter :: subname='(module_MED:DataInitialize)'
+
+    type(InternalState)                :: is_local
+    type(ESMF_Clock)                   :: clock
+    type(ESMF_State)                   :: importState, exportState
+    type(ESMF_Time)                    :: time
+    type(ESMF_Field)                   :: field
+    type(ESMF_StateItem_Flag)          :: itemType
+    logical                            :: atCorrectTime, connected
+    integer                            :: n1,n2,n
+    integer                            :: cntn1, cntn2
+    integer                            :: fieldCount
+    character(ESMF_MAXSTR),allocatable :: fieldNameList(:)
+    character(len=128)                 :: value
+    character(SHR_KIND_CL)             :: cvalue
+    logical,save                       :: atmDone = .false.
+    logical,save                       :: ocnDone = .false.
+    logical,save                       :: allDone = .false.
+    logical,save                       :: first_call = .true.
+    character(len=*), parameter        :: subname='(module_MED:DataInitialize)'
     !-----------------------------------------------------------
 
     if (dbug_flag > 5) then
@@ -1424,13 +1469,13 @@ contains
       !---------------------------------------
       !--- Initialize route handles and required normalization field bunds
       !---------------------------------------
-
+      
       call med_map_RouteHandles_init(gcomp, llogunit, rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
+      
       call med_map_MapNorm_init(gcomp, llogunit, rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
+      
       !---------------------------------------
       ! Initialize field bundles needed for mediator phases
       ! - initialize fractions
@@ -1440,20 +1485,6 @@ contains
       call med_phases_init(gcomp, llogunit, rc)
       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-      !---------------------------------------
-      ! If atmosphere is not present, than data initialization is complete
-      !---------------------------------------
-
-      if (.not. is_local%wrap%comp_present(compatm)) then
-
-         ! here if atm component is not present - so initialization is complete
-         ! -> set InitializeDataComplete Component Attribute to "true", indicating
-         ! to the driver that this Component has fully initialized its data
-         call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
-         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-      end if
-
     endif  ! end first_call if-block
     first_call = .false.
 
@@ -1461,13 +1492,86 @@ contains
     ! End of first_call block - reset first_call to .false.
     !---------------------------------------
 
+    if (.not. is_local%wrap%comp_present(compocn)) then
+       ocnDone = .true.
+    endif
+
+    if (.not. is_local%wrap%comp_present(compocn)) then
+       atmDone = .true.
+    endif
+
+    !---------------------------------------
+    ! Carry out data dependency for ocn initialization if needed
+    !---------------------------------------
+
+    if (.not. ocnDone .and. is_local%wrap%comp_present(compocn)) then
+
+      ocnDone = .true.  ! reset if an item is found that is not done
+
+      if (is_local%wrap%med_coupling_active(compocn,compatm) .and. &
+          is_local%wrap%med_coupling_active(compatm,compocn)) then
+
+         call ESMF_StateGet(is_local%wrap%NStateImp(compocn), itemCount=fieldCount, rc=rc)
+         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+         allocate(fieldNameList(fieldCount))
+         call ESMF_StateGet(is_local%wrap%NStateImp(compocn), itemNameList=fieldNameList, rc=rc)
+         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+         do n=1, fieldCount
+            call ESMF_StateGet(is_local%wrap%NStateImp(compocn), itemName=fieldNameList(n), field=field, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            atCorrectTime = NUOPC_IsAtTime(field, time, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            if (.not. atCorrectTime) then
+               ! If any ocn import fields are not time stamped correctly, then dependency is not satisified - must return to ocn
+               call ESMF_LogWrite("MED - Initialize-Data-Dependency from OCN NOT YET SATISFIED!!!", ESMF_LOGMSG_INFO, rc=rc)
+               if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+               ocnDone = .false.
+               exit  ! break out of the loop when first not satisfied found
+            endif
+         enddo
+         deallocate(fieldNameList)
+
+         if (ocnDone) then
+            !---------------------------------------
+            ! Initialize the atm/ocean fluxes and compute the ocean albedos
+            !---------------------------------------
+            call ESMF_LogWrite("MED - initialize atm/ocn fluxes and compute ocean albedo", ESMF_LOGMSG_INFO, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            ! TODO: the following causes an abort
+            !!Copy the NstateImp(compocn) to FBImp(compocn)
+            ! call med_connectors_post_ocn2med(gcomp, rc=rc)
+            ! if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            ! Initialize the atm/ocean fluxes and compute the ocean albedos
+            call ESMF_LogWrite("MED - initialize atm/ocn fluxes and compute ocean albedo", ESMF_LOGMSG_INFO, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            ! Initialize ocean albedo module and compute ocean albedos
+            ! This will update the relevant module arrays in med_phases_ocnalb_mod
+            call med_phases_ocnalb_init(gcomp, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+            ! Initialize atm/ocn fluxes module
+            ! This will update the relevant module arrays in med_phases_aoflux_mod
+            call med_phases_aofluxes_init(gcomp, rc=rc)
+            if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+         endif
+      end if
+
+    endif
+
     !---------------------------------------
     ! Carry out data dependency for atm initialization if needed
     !---------------------------------------
 
-    if (is_local%wrap%comp_present(compatm)) then
+    if (.not. atmDone .and. ocnDone .and. is_local%wrap%comp_present(compatm)) then
 
-       allDone = .true.  ! reset if an item is found that is not done
+       atmDone = .true.  ! reset if an item is found that is not done
 
        call ESMF_StateGet(is_local%wrap%NStateImp(compatm), itemCount=fieldCount, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -1486,13 +1590,13 @@ contains
              ! If any atm import fields are not time stamped correctly, then dependency is not satisified - must return to atm
              call ESMF_LogWrite("MED - Initialize-Data-Dependency from ATM NOT YET SATISFIED!!!", ESMF_LOGMSG_INFO, rc=rc)
              if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-             allDone = .false.
+             atmdone = .false.
              exit  ! break out of the loop when first not satisfied found
           endif
        enddo
        deallocate(fieldNameList)
 
-       if (.not. allDone) then  ! allDone is not true
+       if (.not. atmdone) then  ! atmdone is not true
 
           ! initialize fractions
           call med_fraction_set(gcomp, rc=rc)
@@ -1523,23 +1627,24 @@ contains
           ! Connectors will be automatically called between the mediator and atm until allDone is true
           call ESMF_LogWrite("MED - Initialize-Data-Dependency Sending Data to ATM", ESMF_LOGMSG_INFO, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+      endif
+    end if
 
-       else ! allDone is true
+    if (atmDone .and. ocnDone) then
 
+       if (is_local%wrap%comp_present(compatm)) then
           ! Copy the NstateImp(compatm) to FBImp(compatm)
           call med_connectors_post_atm2med(gcomp, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          ! set InitializeDataComplete Component Attribute to "true", indicating
-          ! to the driver that this Component has fully initialized its data
-          call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-          call ESMF_LogWrite("MED - Initialize-Data-Dependency from ATM is SATISFIED!!!", ESMF_LOGMSG_INFO, rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
        end if
 
+       ! set InitializeDataComplete Component Attribute to "true", indicating
+       ! to the driver that this Component has fully initialized its data
+       call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call ESMF_LogWrite("MED - Initialize-Data-Dependency from ATM is SATISFIED!!!", ESMF_LOGMSG_INFO, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
     if (dbug_flag > 5) then

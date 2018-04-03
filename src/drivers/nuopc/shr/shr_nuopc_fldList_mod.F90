@@ -38,13 +38,14 @@ module shr_nuopc_fldList_mod
 
   integer          , public, parameter :: ncomps_max = 8
   integer          , public, parameter :: mapunset=0
-  integer          , public, parameter :: nmappers=5
+  integer          , public, parameter :: nmappers=6
   integer          , public, parameter :: mapbilnr=1
   integer          , public, parameter :: mapconsf=2
   integer          , public, parameter :: mapconsd=3
   integer          , public, parameter :: mappatch=4
   integer          , public, parameter :: mapfcopy=5
-  character(len=*) , public, parameter :: mapnames(nmappers) = (/'bilnr','consf','consd','patch','fcopy'/)
+  integer          , public, parameter :: mapfiler=6
+  character(len=*) , public, parameter :: mapnames(nmappers) = (/'bilnr','consf','consd','patch','fcopy','filer'/)
 
   !-----------------------------------------------
   ! Types and instantiations that determine fields, mappings, mergings

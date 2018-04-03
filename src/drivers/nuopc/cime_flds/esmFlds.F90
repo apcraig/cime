@@ -3,7 +3,7 @@ module esmFlds
   use ESMF
   use NUOPC
   use shr_kind_mod          , only : CX => shr_kind_CX, CXX => shr_kind_CXX, CS=>shr_kind_CS, CL=>shr_kind_CL
-  use shr_nuopc_fldList_mod , only : mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy, mapunset 
+  use shr_nuopc_fldList_mod , only : mapbilnr, mapconsf, mapconsd, mappatch, mapfcopy, mapunset, mapfiler 
   use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_type
   use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_AddDomain
   use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_AddMetaData
@@ -621,54 +621,68 @@ contains
     call shr_nuopc_fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_lwdn', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_lwdn')
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Faxa_lwdn')
-    call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_lwdn')
+    call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_lwdn', fldindex=n2)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n2), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Direct near-infrared incident solar radiation'
     stdname  = 'surface_downward_direct_shortwave_flux_due_to_near_infrared_radiation'
     units    = 'W m-2'
     call shr_nuopc_fldList_AddMetadata(fldname="Faxa_swndr", longname=longname, stdname=stdname, units=units)
+    call shr_nuopc_fldList_AddMetadata(fldname="Foxx_swndr", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swndr', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_swndr')
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swndr')
+    call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_swndr', fldindex=n2)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n2), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Direct visible incident solar radiation'
     stdname  = 'surface_downward_direct_shortwave_flux_due_to_visible_radiation'
     units    = 'W m-2'
     call shr_nuopc_fldList_AddMetadata(fldname="Faxa_swvdr", longname=longname, stdname=stdname, units=units)
+    call shr_nuopc_fldList_AddMetadata(fldname="Foxx_swvdr", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swvdr', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_swvdr')
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swvdr')
+    call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_swvdr', fldindex=n2)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n2), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Diffuse near-infrared incident solar radiation'
     stdname  = 'surface_downward_diffuse_shortwave_flux_due_to_near_infrared_radiation'
     units    = 'W m-2'
     call shr_nuopc_fldList_AddMetadata(fldname="Faxa_swndf", longname=longname, stdname=stdname, units=units)
+    call shr_nuopc_fldList_AddMetadata(fldname="Foxx_swndf", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swndf', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_swndf')
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swndf')
+    call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_swndf', fldindex=n2)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n2), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Diffuse visible incident solar radiation'
     stdname  = 'surface_downward_diffuse_shortwave_flux_due_to_visible_radiation'
     units    = 'W m-2'
     call shr_nuopc_fldList_AddMetadata(fldname='Faxa_swvdf', longname=longname, stdname=stdname, units=units)
+    call shr_nuopc_fldList_AddMetadata(fldname="Foxx_swvdf", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compatm)%flds, 'Faxa_swvdf', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(complnd)%flds, 'Faxa_swvdf')
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Faxa_swvdf')
+    call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_swvdf', fldindex=n2)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, complnd, mapconsf, 'one', atm2lnd_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compice, mapconsf, 'one', atm2ice_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n1), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n2), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compatm)%flds(n2), compatm, compocn, mapconsf, 'one', atm2ocn_fmapname)
 
     longname = 'Net shortwave radiation'
     stdname  = 'surface_net_shortwave_flux'
@@ -1246,7 +1260,6 @@ contains
     call shr_nuopc_fldList_AddMetadata(fldname="So_ustar", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListMed_aoflux_a%flds, 'So_ustar', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListMed_aoflux_o%flds, 'So_ustar')
-    call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds , 'So_ustar')
     call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds , 'So_ustar')
     call shr_nuopc_fldList_AddMap(fldListMed_aoflux_o%flds(n1), compocn, compatm, mapconsf, 'ofrac', ocn2atm_fmapname) ! map ocn->atm
     call shr_nuopc_fldList_AddMap(fldListMed_aoflux_a%flds(n1), compatm, compocn, mapbilnr, 'one'  , atm2ocn_fmapname) ! map atm->ocn
@@ -1335,7 +1348,9 @@ contains
     call shr_nuopc_fldList_AddMetadata(fldname="So_u", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compocn)%flds, 'So_u', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'So_u')
+    call shr_nuopc_fldList_AddFld(fldListTo(compwav)%flds, 'So_u')
     call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
+    call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compwav,  mapbilnr, 'one'  , 'ocn2wav_smapname')
 
     longname = 'Meridional sea water velocity'
     stdname  = 'northward_sea_water_velocity'
@@ -1343,7 +1358,9 @@ contains
     call shr_nuopc_fldList_AddMetadata(fldname="So_v", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compocn)%flds, 'So_v', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'So_v')
+    call shr_nuopc_fldList_AddFld(fldListTo(compwav)%flds, 'So_v')
     call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
+    call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compwav,  mapbilnr, 'one'  , 'ocn2wav_smapname')
 
     longname = 'Zonal sea surface slope'
     stdname  = 'sea_surface_eastward_slope'
@@ -1366,8 +1383,8 @@ contains
     units    = 'm'
     call shr_nuopc_fldList_AddMetadata(fldname="So_bldepth", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compocn)%flds, 'So_bldepth', fldindex=n1)
-    call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'So_bldepth')
-    call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
+    call shr_nuopc_fldList_AddFld(fldListTo(compwav)%flds, 'So_bldepth')
+    call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compwav,  mapbilnr, 'one', 'ocn2wav_smapname')
 
     longname = 'Fraction of sw penetrating surface layer for diurnal cycle'
     stdname  = 'Fraction_of_sw_penetrating_surface_layer'
@@ -1447,7 +1464,8 @@ contains
     call shr_nuopc_fldList_AddMetadata(fldname="Flrr_flood", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(comprof)%flds, 'Flrr_flood', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(complnd)%flds, 'Flrr_flood')
-    call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Flrr_flood')
+    ! TODO: who should this be handled in terms of feeding back to the ocean
+    !call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Flrr_flood')
     call shr_nuopc_fldList_AddMap(fldListFr(comprof)%flds(n1), comprof, complnd, mapconsf, 'one', rof2lnd_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(comprof)%flds(n1), comprof, compocn, mapconsf, 'one', rof2ocn_fmapname)
 
@@ -1478,7 +1496,7 @@ contains
     call shr_nuopc_fldList_AddMetadata(fldname="Foxx_rofl", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(comprof)%flds, 'Forr_rofl', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_rofl')
-    call shr_nuopc_fldList_AddMap(fldListFr(comprof)%flds(n1), comprof, compocn, mapunset, 'none', rof2ocn_liq_rmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(comprof)%flds(n1), comprof, compocn, mapfiler, 'none', rof2ocn_liq_rmapname)
 
     longname = 'Water flux into sea water due to runoff (frozen)'
     stdname  = 'frozen_water_flux_into_sea_water'
@@ -1487,7 +1505,7 @@ contains
     call shr_nuopc_fldList_AddMetadata(fldname="Foxx_rofi", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(comprof)%flds, 'Forr_rofi', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Foxx_rofi')
-    call shr_nuopc_fldList_AddMap(fldListFr(comprof)%flds(n1), comprof, compocn, mapunset, 'none', rof2ocn_ice_rmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(comprof)%flds(n1), comprof, compocn, mapfiler, 'none', rof2ocn_ice_rmapname)
 
     !-----------------------------
     ! rof->ice (frozen)
@@ -1500,7 +1518,7 @@ contains
     call shr_nuopc_fldList_AddMetadata(fldname="Fixx_rofi", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(comprof)%flds, 'Firr_rofi', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Fixx_rofi')
-    call shr_nuopc_fldList_AddMap(fldListFr(comprof)%flds(n1), comprof, compice, mapunset, 'none', rof2ocn_ice_rmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(comprof)%flds(n1), comprof, compice, mapfiler, 'none', rof2ocn_ice_rmapname)
 
     !-----------------------------
     ! wav->ocn
@@ -1681,14 +1699,14 @@ contains
     units    = 'kg m-2 s-1'
     call shr_nuopc_fldList_AddMetadata(fldname='Flgg_rofl', longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compglc)%flds, 'Flgg_rofl', fldindex=n1)
-    call shr_nuopc_fldList_AddMap(fldListFr(compglc)%flds(n1), compglc, compocn,  mapunset, 'one', glc2ocn_rmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compglc)%flds(n1), compglc, compocn,  mapfiler, 'one', glc2ocn_rmapname)
 
     longname = 'glc frozen runoff flux to ocean'
     stdname  = 'glacier_frozen_runoff_flux_to_ocean'
     units    = 'kg m-2 s-1'
     call shr_nuopc_fldList_AddMetadata(fldname='Fogg_rofi', longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compglc)%flds, 'Fogg_rofi', fldindex=n1)
-    call shr_nuopc_fldList_AddMap(fldListFr(compglc)%flds(n1), compglc, compocn,  mapunset, 'one', glc2ocn_rmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compglc)%flds(n1), compglc, compocn,  mapfiler, 'one', glc2ocn_rmapname)
 
     !-----------------------------
     ! glc -> ice
@@ -1699,7 +1717,7 @@ contains
     units    = 'kg m-2 s-1'
     call shr_nuopc_fldList_AddMetadata(fldname='Figg_rofi', longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compglc)%flds, 'Figg_rofi', fldindex=n1)
-    call shr_nuopc_fldList_AddMap(fldListFr(compglc)%flds(n1), compglc, compice,  mapunset, 'one', glc2ice_rmapname)
+    call shr_nuopc_fldList_AddMap(fldListFr(compglc)%flds(n1), compglc, compice,  mapfiler, 'one', glc2ice_rmapname)
 
     !-----------------------------
     ! glc -> lnd

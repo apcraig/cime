@@ -161,26 +161,28 @@ contains
        call ESMF_LogWrite(trim(subname)//" : FBAtm is on a mesh ", ESMF_LOGMSG_INFO, rc=rc)
        call ESMF_FieldGet(lfield, mesh=lmesh, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call ESMF_MeshGet(lmesh, spatialDim=spatialDim, numOwnedElements=numOwnedElements)
+       call ESMF_MeshGet(lmesh, spatialDim=spatialDim, numOwnedElements=numOwnedElements, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        lsize = size(swndr)
        if (numOwnedElements /= lsize) then
-          call ESMF_LogWrite(trim(subname)//": ERROR numOwnedElements not equal to local size", &
-               ESMF_LOGMSG_INFO, rc=rc)
+          call ESMF_LogWrite(trim(subname)//": ERROR numOwnedElements not equal to local size", ESMF_LOGMSG_INFO, rc=rc)
           rc = ESMF_FAILURE
           return
        end if
        allocate(ownedElemCoords(spatialDim*numOwnedElements))
        allocate(lons(numOwnedElements))
        allocate(lats(numOwnedElements))
-       call ESMF_MeshGet(lmesh, ownedElemCoords=ownedElemCoords)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       do n = 1,lsize
-          lons(n) = ownedElemCoords(2*n-1)
-          lats(n) = ownedElemCoords(2*n)
-       end do
+       ! tcraig tcx temporary until update esmf
+       lons = 0.0
+       lats = 0.0
+       ! call ESMF_MeshGet(lmesh, ownedElemCoords=ownedElemCoords)
+       ! if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       ! do n = 1,lsize
+       !    lons(n) = ownedElemCoords(2*n-1)
+       !    lats(n) = ownedElemCoords(2*n)
+       ! end do
     else if (geomtype == ESMF_GEOMTYPE_GRID) then
-       call ESMF_LogWrite(trim(subname)//" : FBAtm is on a grid ", ESMF_LOGMSG_INFO, rc=rc)
+       call ESMF_LogWrite(trim(subname)//" : FBATM is on a grid ", ESMF_LOGMSG_INFO, rc=rc)
        call ESMF_FieldGet(lfield, grid=lgrid, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_GridGet(lgrid, dimCount=dimCount, rc=rc)
@@ -190,8 +192,7 @@ contains
        call ESMF_GridGetCoord(lgrid, coordDim=2, farrayPtr=lats, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
-       call ESMF_LogWrite(trim(subname)//": ERROR FBAtm must be either on a grid or a mesh", &
-            ESMF_LOGMSG_INFO, rc=rc)
+      call ESMF_LogWrite(trim(subname)//": ERROR FBATM must be either on a grid or a mesh", ESMF_LOGMSG_INFO, rc=rc)
       rc = ESMF_FAILURE
       return
     end if
@@ -334,26 +335,26 @@ contains
 
     if (ESMF_RouteHandleIsCreated(is_local%wrap%RH(compatm,compocn,mapconsf), rc=rc)) then
        call shr_nuopc_methods_FB_FieldRegrid(&
-            is_local%wrap%FBMed_aoflux_a, 'Faxa_swvdf', &
-            is_local%wrap%FBMed_aoflux_o, 'Faxa_swvdf', &
+            is_local%wrap%FBImp(compatm,compatm), 'Faxa_swvdf', &
+            is_local%wrap%FBImp(compatm,compocn), 'Faxa_swvdf', &
             is_local%wrap%RH(compatm,compocn,mapconsf), rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        call shr_nuopc_methods_FB_FieldRegrid(&
-            is_local%wrap%FBMed_aoflux_a, 'Faxa_swndf', &
-            is_local%wrap%FBMed_aoflux_o, 'Faxa_swndf', &
+            is_local%wrap%FBImp(compatm,compatm), 'Faxa_swndf', &
+            is_local%wrap%FBImp(compatm,compocn), 'Faxa_swndf', &
             is_local%wrap%RH(compatm,compocn,mapconsf), rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        call shr_nuopc_methods_FB_FieldRegrid(&
-            is_local%wrap%FBMed_aoflux_a, 'Faxa_swvdr', &
-            is_local%wrap%FBMed_aoflux_o, 'Faxa_swvdr', &
+            is_local%wrap%FBImp(compatm,compatm), 'Faxa_swvdr', &
+            is_local%wrap%FBImp(compatm,compocn), 'Faxa_swvdr', &
             is_local%wrap%RH(compatm,compocn,mapconsf), rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        call shr_nuopc_methods_FB_FieldRegrid(&
-            is_local%wrap%FBMed_aoflux_a, 'Faxa_swndr', &
-            is_local%wrap%FBMed_aoflux_o, 'Faxa_swndr', &
+            is_local%wrap%FBImp(compatm,compatm), 'Faxa_swndr', &
+            is_local%wrap%FBImp(compatm,compocn), 'Faxa_swndr', &
             is_local%wrap%RH(compatm,compocn,mapconsf), rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else

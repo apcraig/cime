@@ -53,6 +53,7 @@ module med_phases_aofluxes_mod
   real(ESMF_KIND_R8) , pointer :: lats        (:) ! latitudes  (degrees)
   real(ESMF_KIND_R8) , pointer :: lons        (:) ! longitudes (degrees)
   integer            , pointer :: mask        (:) ! ocn domain mask: 0 <=> inactive cell
+  real(r8)           , pointer :: rmask       (:) ! ocn domain mask: 0 <=> inactive cell
   real(ESMF_KIND_R8) , pointer :: uocn        (:) ! ocn velocity, zonal
   real(ESMF_KIND_R8) , pointer :: vocn        (:) ! ocn velocity, meridional
   real(ESMF_KIND_R8) , pointer :: tocn        (:) ! ocean temperature
@@ -154,6 +155,8 @@ contains
     character(CL)          :: aoflux_grid
     type(InternalState)    :: is_local
     integer                :: nflds
+    integer                :: localPet
+    type(ESMF_VM)          :: vm
     character(CL), pointer :: fldnames(:)
     character(len=*),parameter :: subname='(med_phases_aofluxes_init)'
     !---------------------------------------
@@ -162,6 +165,11 @@ contains
        call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
     endif
     rc = ESMF_SUCCESS
+
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    call ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    mastertask = .false.
+    if (localPet == 0) mastertask=.true.
 
     ! Get the internal state from Component.
     nullify(is_local%wrap)
@@ -201,34 +209,14 @@ contains
 
     if (trim(aoflux_grid) == 'ocn') then
 
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compatm,compocn), value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       ! Regrid atm import field bundle from atm to ocn grid as input for ocn/atm flux calculation
-       call med_map_FB_Regrid_Norm( &
-            fldListFr(compatm)%flds, compocn,  &
-            is_local%wrap%FBImp(compatm,compatm), &
-            is_local%wrap%FBImp(compatm,compocn), &
-            is_local%wrap%FBFrac(compatm), &
-            is_local%wrap%FBNormOne(compatm,compocn,:), &
-            is_local%wrap%RH(compatm,compocn,:), &
-            string=trim(compname(compatm))//'2'//trim(compname(compocn)), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compatm,compocn), &
-               string=trim(subname) //' FBImp('//trim(compname(compatm))//','//trim(compname(compocn))//') ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
-
        ! Create FBMed_aoflux_o (field bundle on the ocean grid)
        call med_aofluxes_init(gcomp, &
-            is_local%wrap%FBImp(compatm,compocn), &
-            is_local%wrap%FBImp(compocn,compocn), &
-            is_local%wrap%FBfrac(compocn), &
-            is_local%wrap%FBMed_ocnalb_o, &
-            is_local%wrap%FBMed_aoflux_o, &
-            FBMed_aoflux_diurnl_o, rc=rc)
+            FBAtm=is_local%wrap%FBImp(compatm,compocn), &
+            FBOcn=is_local%wrap%FBImp(compocn,compocn), &
+            FBFrac=is_local%wrap%FBfrac(compocn), &
+            FBMed_ocnalb=is_local%wrap%FBMed_ocnalb_o, &
+            FBMed_aoflux=is_local%wrap%FBMed_aoflux_o, &
+            FBMed_aoflux_diurnl=FBMed_aoflux_diurnl_o, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     else if (trim(aoflux_grid) == 'atm') then
@@ -236,30 +224,14 @@ contains
        call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compocn,compatm), value=czero, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-       call med_map_FB_Regrid_Norm( &
-            fldListFr(compocn)%flds, compatm, &
-            is_local%wrap%FBImp(compocn,compocn), &
-            is_local%wrap%FBImp(compocn,compatm), &
-            is_local%wrap%FBFrac(compocn), &
-            is_local%wrap%FBNormOne(compocn,compatm,:), &
-            is_local%wrap%RH(compocn,compatm,:), &
-            string=trim(compname(compocn))//'2'//trim(compname(compatm)), rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compocn,compatm), &
-               string=trim(subname) //' FBImp('//trim(compname(compocn))//','//trim(compname(compatm))//') ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
-
        ! Create FBMed_aoflux_a (field bundle on the atmosphere grid)
        call med_aofluxes_init(gcomp, &
-            is_local%wrap%FBImp(compatm,compatm), &
-            is_local%wrap%FBImp(compocn,compatm), &
-            is_local%wrap%FBfrac(compatm), &
-            is_local%wrap%FBMed_ocnalb_a, &
-            is_local%wrap%FBMed_aoflux_a, &
-            FBMed_aoflux_diurnl_a, rc=rc)
+            FBAtm=is_local%wrap%FBImp(compatm,compatm), &
+            FBOcn=is_local%wrap%FBImp(compocn,compatm), &
+            FBFrac=is_local%wrap%FBfrac(compatm), &
+            FBMed_ocnalb=is_local%wrap%FBMed_ocnalb_a, &
+            FBMed_aoflux=is_local%wrap%FBMed_aoflux_a, &
+            FBMed_aoflux_diurnl=FBMed_aoflux_diurnl_a, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     else
@@ -343,6 +315,9 @@ contains
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        if (dbug_flag > 1) then
+          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compocn,compocn), &
+               string=trim(subname) //' FBImp('//trim(compname(compocn))//','//trim(compname(compocn))//') ', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compatm,compocn), &
                string=trim(subname) //' FBImp('//trim(compname(compatm))//','//trim(compname(compocn))//') ', rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -426,7 +401,6 @@ contains
     type(ESMF_GeomType_Flag) :: geomtype
     integer                  :: n
     integer                  :: lsize
-    real(r8), pointer        :: rmask(:)  ! ocn domain mask
     real(r8), pointer        :: ofrac(:)
     real(r8), pointer        :: ifrac(:)
     integer                  :: dimCount
@@ -455,10 +429,6 @@ contains
     call NUOPC_CompAttributeGet(gcomp, name='flds_wiso', value=cvalue, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
     read(cvalue,*) flds_wiso
-
-    call NUOPC_CompAttributeGet(gcomp, name='flux_diurnal', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
-    read(cvalue,*) do_flux_diurnal
 
     call NUOPC_CompAttributeGet(gcomp, name='aoflux_grid', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -567,6 +537,8 @@ contains
     ! Ocn import fields
     !----------------------------------
 
+    call shr_nuopc_methods_FB_GetFldPtr(FBOcn, fldname='So_omask', fldptr1=rmask, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_FB_GetFldPtr(FBOcn, fldname='So_t', fldptr1=tocn, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_nuopc_methods_FB_GetFldPtr(FBOcn, fldname='So_u', fldptr1=uocn, rc=rc)
@@ -638,49 +610,54 @@ contains
     ! ! Get lat, lon, which are time-invariant
     ! !----------------------------------
 
-    ! Get the first field from the field bundle - assumes that all fields
-    ! in FBMed_aoflux have the same grid - so only need to query field 1
-    call shr_nuopc_methods_FB_getFieldN(FBMed_aoflux, fieldnum=1, field=lfield, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    ! Determine if first field is on a grid or a mesh - default will be mesh
-    call ESMF_FieldGet(lfield, geomtype=geomtype, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (geomtype == ESMF_GEOMTYPE_MESH) then
-       call ESMF_LogWrite(trim(subname)//" : FBAtm is on a mesh ", ESMF_LOGMSG_INFO, rc=rc)
-       call ESMF_FieldGet(lfield, mesh=lmesh, rc=rc)
+    if (do_flux_diurnal) then
+       ! Get the first field from the field bundle - assumes that all fields
+       ! in FBMed_aoflux have the same grid - so only need to query field 1
+       call shr_nuopc_methods_FB_getFieldN(FBMed_aoflux, fieldnum=1, field=lfield, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call ESMF_MeshGet(lmesh, spatialDim=spatialDim, numOwnedElements=numOwnedElements)
+
+       ! Determine if first field is on a grid or a mesh - default will be mesh
+       call ESMF_FieldGet(lfield, geomtype=geomtype, rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       if (numOwnedElements /= lsize) then
-          call ESMF_LogWrite(trim(subname)//": ERROR numOwnedElements not equal to local size", ESMF_LOGMSG_INFO, rc=rc)
+
+       if (geomtype == ESMF_GEOMTYPE_MESH) then
+          call ESMF_LogWrite(trim(subname)//" : FBAtm is on a mesh ", ESMF_LOGMSG_INFO, rc=rc)
+          call ESMF_FieldGet(lfield, mesh=lmesh, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_MeshGet(lmesh, spatialDim=spatialDim, numOwnedElements=numOwnedElements, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          if (numOwnedElements /= lsize) then
+             call ESMF_LogWrite(trim(subname)//": ERROR numOwnedElements not equal to local size", ESMF_LOGMSG_INFO, rc=rc)
+             rc = ESMF_FAILURE
+             return
+          end if
+          allocate(ownedElemCoords(spatialDim*numOwnedElements))
+          allocate(lons(numOwnedElements))
+          allocate(lats(numOwnedElements))
+          ! tcraig tcx temporary until update esmf
+          lons = 0.0
+          lats = 0.0
+          ! call ESMF_MeshGet(lmesh, ownedElemCoords=ownedElemCoords)
+          ! if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          ! do n = 1,lsize
+          !    lons(n) = ownedElemCoords(2*n-1)
+          !    lats(n) = ownedElemCoords(2*n)
+          ! end do
+       else if (geomtype == ESMF_GEOMTYPE_GRID) then
+          call ESMF_LogWrite(trim(subname)//" : FBATM is on a grid ", ESMF_LOGMSG_INFO, rc=rc)
+          call ESMF_FieldGet(lfield, grid=lgrid, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_GridGet(lgrid, dimCount=dimCount, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_GridGetCoord(lgrid, coordDim=1, farrayPtr=lons, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+          call ESMF_GridGetCoord(lgrid, coordDim=2, farrayPtr=lats, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       else
+          call ESMF_LogWrite(trim(subname)//": ERROR FBATM must be either on a grid or a mesh", ESMF_LOGMSG_INFO, rc=rc)
           rc = ESMF_FAILURE
           return
        end if
-       allocate(ownedElemCoords(spatialDim*numOwnedElements))
-       allocate(lons(numOwnedElements))
-       allocate(lats(numOwnedElements))
-       call ESMF_MeshGet(lmesh, ownedElemCoords=ownedElemCoords)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       do n = 1,lsize
-          lons(n) = ownedElemCoords(2*n-1)
-          lats(n) = ownedElemCoords(2*n)
-       end do
-    else if (geomtype == ESMF_GEOMTYPE_GRID) then
-       call ESMF_LogWrite(trim(subname)//" : FBATM is on a grid ", ESMF_LOGMSG_INFO, rc=rc)
-       call ESMF_FieldGet(lfield, grid=lgrid, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call ESMF_GridGet(lgrid, dimCount=dimCount, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call ESMF_GridGetCoord(lgrid, coordDim=1, farrayPtr=lons, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       call ESMF_GridGetCoord(lgrid, coordDim=2, farrayPtr=lats, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    else
-      call ESMF_LogWrite(trim(subname)//": ERROR FBATM must be either on a grid or a mesh", ESMF_LOGMSG_INFO, rc=rc)
-      rc = ESMF_FAILURE
-      return
     end if
 
     !----------------------------------
@@ -694,29 +671,18 @@ contains
     ! setup the compute mask.
     !----------------------------------
 
-    ! prefer to compute just where ocean exists, so setup a mask here.
-    ! this could be run with either the ocean or atm grid so need to be careful.
-    ! really want the ocean mask on ocean grid or ocean mask mapped to atm grid,
-    ! but do not have access to the ocean mask mapped to the atm grid.
-    ! the dom mask is a good place to start, on ocean grid, it should be what we want,
-    ! on the atm grid, it's just all 1's so not very useful.
-    ! next look at ofrac+ifrac in fractions.  want to compute on all non-land points.
-    ! using ofrac alone will exclude points that are currently all sea ice but that later
-    ! could be less that 100% covered in ice.
-
     ! allocate grid mask fields
     ! default compute everywhere, then "turn off" gridcells
     allocate(mask(lsize))
     mask(:) = 1
 
-    ! use domain mask first
-    if (trim(aoflux_grid) == 'ocn') then
-       call shr_nuopc_methods_FB_getFldPtr(FBOcn, 'So_omask' , rmask, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    else
-       rmask(:) = 1._r8
-    end if
+    write(tmpstr,'(i12,g22.12,i12)') lsize,sum(rmask),sum(mask)
+    call ESMF_LogWrite(trim(subname)//" : maskA= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+
     where (rmask(:) == 0._r8) mask(:) = 0   ! like nint
+
+    write(tmpstr,'(i12,g22.12,i12)') lsize,sum(rmask),sum(mask)
+    call ESMF_LogWrite(trim(subname)//" : maskB= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
 
     ! TODO: need to check if this logic is correct
     ! then check ofrac + ifrac
@@ -759,20 +725,20 @@ contains
     real(r8)      :: gust_fac = huge(1.0_r8) ! wind gust factor
     logical       :: cold_start              ! .true. to initialize internal fields in shr_flux diurnal
     logical       :: read_restart            ! .true. => continue run
-    logical       :: flux_diurnal            ! .true. => turn on diurnal cycle in atm/ocn fluxes
     logical,save  :: first_call = .true.
-    character(*),parameter :: subName =   '(med_fluxes) '
+    character(*),parameter :: F01 = "('(med_aofluxes_run) ',a,i4,2x,d21.14)"
+    character(*),parameter :: F02 = "('(med_aofluxes_run) ',a,i4,2x,i4)"
+    character(*),parameter :: subName =   '(med_fluxes_run) '
     !-----------------------------------------------------------------------
 
     call seq_timemgr_EClockGetData( clock, curr_tod=tod, dtime=dt )
 
+    write(tmpstr,'(2i12)') tod,dt
+    call ESMF_LogWrite(trim(subname)//" : tod,dt= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+
     call NUOPC_CompAttributeGet(gcomp, name='gust_fac', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) gust_fac
-
-    call NUOPC_CompAttributeGet(gcomp, name='flux_diurnal', value=cvalue, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    read(cvalue,*) flux_diurnal
 
     call NUOPC_CompAttributeGet(gcomp, name='read_restart', value=cvalue, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -786,13 +752,42 @@ contains
        first_call = .false.
     end if
 
-    ! Determine local size
-    lsize = size(lons)
+    !----------------------------------
+    ! Determine the compute mask
+    !----------------------------------
 
+    ! Prefer to compute just where ocean exists, so setup a mask here.
+    ! this could be run with either the ocean or atm grid so need to be careful.
+    ! really want the ocean mask on ocean grid or ocean mask mapped to atm grid,
+    ! but do not have access to the ocean mask mapped to the atm grid.
+    ! the dom mask is a good place to start, on ocean grid, it should be what we want,
+    ! on the atm grid, it's just all 1's so not very useful.
+    ! next look at ofrac+ifrac in fractions.  want to compute on all non-land points.
+    ! using ofrac alone will exclude points that are currently all sea ice but that later
+    ! could be less that 100% covered in ice.
+
+    lsize = size(mask)
+
+    write(tmpstr,'(3L4,i12)') cold_start,first_call,dead_comps,lsize
+    call ESMF_LogWrite(trim(subname)//" : c,f,d,lsize= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+
+    write(tmpstr,'(i12,g22.12,i12)') lsize,sum(rmask),sum(mask)
+    call ESMF_LogWrite(trim(subname)//" : maskA= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+
+    mask(:) = 1
+    where (rmask(:) == 0._r8) mask(:) = 0   ! like nint
+
+    write(tmpstr,'(i12,g22.12,i12)') lsize,sum(rmask),sum(mask)
+    call ESMF_LogWrite(trim(subname)//" : maskB= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+
+    !----------------------------------
     ! Update ocean surface fluxes
+    !----------------------------------
+
     ! Must fabricate "reasonable" data (when using dead components)
 
     if (dead_comps) then
+       ! TODO: this should be done in the first_call block and not again
        do n = 1,lsize
           mask        (n) =   1      ! ocn domain mask            ~ 0 <=> inactive cell
           tocn        (n) = 290.0_r8 ! ocn temperature            ~ Kelvin
@@ -867,7 +862,7 @@ contains
        qref(n) = shr_const_spval
     end do
 
-    if (flux_diurnal) then
+    if (do_flux_diurnal) then
        do n = 1,lsize
           nInc(n) = 0._r8 ! needed for minval/maxval calculation
        end do
@@ -877,7 +872,7 @@ contains
             roce_16O, roce_HDO, roce_18O,    &
             evap , evap_16O, evap_HDO, evap_18O, taux , tauy, tref, qref , &
             uGust, lwdn , swdn , swup, prec, &
-            fswpen, ocnsal, ocn_prognostic, flux_diurnal,    &
+            fswpen, ocnsal, ocn_prognostic, do_flux_diurnal,    &
             lats, lons , warm , salt , speed, regime,       &
             warmMax, windMax, qSolAvg, windAvg,             &
             warmMaxInc, windMaxInc, qSolInc, windInc, nInc, &
@@ -889,6 +884,9 @@ contains
             !duu10n,ustar, re  , ssq, missval = 0.0_r8, &
             cold_start=cold_start)
     else
+       write(tmpstr,'(3i12)') lsize,size(mask),sum(mask)
+       call ESMF_LogWrite(trim(subname)//" : mask= "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+
        call shr_flux_atmocn (lsize , zbot , ubot, vbot, thbot, prec_gust, gust_fac, &
             shum , shum_16O , shum_HDO, shum_18O, dens , tbot, uocn, vocn , &
             tocn , mask, sen , lat , lwup , &

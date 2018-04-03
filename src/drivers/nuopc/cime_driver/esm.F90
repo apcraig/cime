@@ -72,8 +72,8 @@ module ESM
 #ifdef ESMFUSE_NOTYET_mosart
   use mosart_comp_nuopc, only: mosart_SS => SetServices
 #endif
-#ifdef ESMFUSE_NOTYET_mom6
-  use mom6_comp_nuopc, only:   mom6_SS => SetServices
+#ifdef ESMFUSE_mom
+  use mom_cap_mod, only:   mom_SS => SetServices
 #endif
 #ifdef ESMFUSE_NOTYET_ww3
   use  ww3_comp_nuopc, only:   ww3_SS => SetServices
@@ -468,7 +468,7 @@ module ESM
            return 
         end if
 
-        call AddAttributes(child, driver, config, compid, 'ATM', verbosity='high', rc=rc)
+        call AddAttributes(child, driver, config, compid, 'ATM', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -499,9 +499,9 @@ module ESM
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           is_set = .true.
 #endif
-        elseif (trim(model) == "mom6") then
-#ifdef ESMFUSE_NOTYET_mom6
-          call NUOPC_DriverAddComp(driver, "OCN", mom6_SS, petList=petList, comp=child, rc=rc)
+        elseif (trim(model) == "mom") then
+#ifdef ESMFUSE_mom
+          call NUOPC_DriverAddComp(driver, "OCN", mom_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           is_set = .true.
 #endif
@@ -516,7 +516,7 @@ module ESM
            return 
         end if
 
-        call AddAttributes(child, driver, config, compid, 'OCN', verbosity='high', rc=rc)
+        call AddAttributes(child, driver, config, compid, 'OCN', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -558,7 +558,7 @@ module ESM
            return 
         end if
 
-        call AddAttributes(child, driver, config, compid, 'ICE', verbosity='high', rc=rc)
+        call AddAttributes(child, driver, config, compid, 'ICE', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -600,7 +600,7 @@ module ESM
            return 
         end if
 
-        call AddAttributes(child, driver, config, compid, 'LND', verbosity='high', rc=rc)
+        call AddAttributes(child, driver, config, compid, 'LND', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -642,7 +642,7 @@ module ESM
            return 
         end if
 
-        call AddAttributes(child, driver, config, compid, 'WAV', verbosity='high', rc=rc)
+        call AddAttributes(child, driver, config, compid, 'WAV', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -678,7 +678,7 @@ module ESM
            return 
         end if
 
-        call AddAttributes(child, driver, config, compid, 'GLC', verbosity='high', rc=rc)
+        call AddAttributes(child, driver, config, compid, 'GLC', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -726,7 +726,7 @@ module ESM
            return 
         end if
 
-        call AddAttributes(child, driver, config, compid, 'ROF', verbosity='high', rc=rc)
+        call AddAttributes(child, driver, config, compid, 'ROF', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
       !--------
@@ -747,7 +747,7 @@ module ESM
           return  ! bail out
         endif
 
-        call AddAttributes(child, driver, config, compid, 'MED', verbosity='high', rc=rc)
+        call AddAttributes(child, driver, config, compid, 'MED', rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
         ! Print out present flags to mediator log file
@@ -1672,7 +1672,7 @@ module ESM
 
   !===============================================================================
 
-  subroutine AddAttributes(gcomp, driver, config, compid, compname, verbosity, rc)
+  subroutine AddAttributes(gcomp, driver, config, compid, compname, rc)
 
     ! Add specific set of attributes to gcomp from driver attributes
 
@@ -1682,7 +1682,6 @@ module ESM
     type(ESMF_Config)   , intent(in)    :: config
     integer             , intent(in)    :: compid
     character(len=*)    , intent(in)    :: compname 
-    character(len=*)    , intent(in)    :: verbosity 
     integer             , intent(inout) :: rc
 
     ! locals
@@ -1719,9 +1718,6 @@ module ESM
     enddo
 
     ! Now add component specific attributes
-    call NUOPC_CompAttributeSet(gcomp, name="Verbosity", value=trim(verbosity), rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
     call ReadAttributes(gcomp, config, trim(compname)//"_attributes::", rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
