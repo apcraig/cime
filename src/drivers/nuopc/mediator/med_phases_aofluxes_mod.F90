@@ -17,7 +17,6 @@ module med_phases_aofluxes_mod
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_init
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_getFieldN
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_GetFldPtr
-  use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_reset
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_diagnose
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_GetScalar
@@ -221,9 +220,6 @@ contains
 
     else if (trim(aoflux_grid) == 'atm') then
 
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compocn,compatm), value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
        ! Create FBMed_aoflux_a (field bundle on the atmosphere grid)
        call med_aofluxes_init(gcomp, &
             FBAtm=is_local%wrap%FBImp(compatm,compatm), &
@@ -299,13 +295,9 @@ contains
 
     if (trim(aoflux_grid) == 'ocn') then
 
-       ! Reset the field bundle on the destination grid to zero
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compatm,compocn), value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
        ! Regrid atm import field bundle from atm to ocn grid as input for ocn/atm flux calculation
        call med_map_FB_Regrid_Norm( &
-            fldListFr(compatm)%flds, compocn, &
+            fldListFr(compatm)%flds, compatm, compocn, &
             is_local%wrap%FBImp(compatm,compatm), &
             is_local%wrap%FBImp(compatm,compocn), &
             is_local%wrap%FBFrac(compatm), &
@@ -313,15 +305,6 @@ contains
             is_local%wrap%RH(compatm,compocn,:), &
             string=trim(compname(compatm))//'2'//trim(compname(compocn)), rc=rc)
        if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       if (dbug_flag > 1) then
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compocn,compocn), &
-               string=trim(subname) //' FBImp('//trim(compname(compocn))//','//trim(compname(compocn))//') ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-          call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBImp(compatm,compocn), &
-               string=trim(subname) //' FBImp('//trim(compname(compatm))//','//trim(compname(compocn))//') ', rc=rc)
-          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-       end if
 
        ! Calculate atm/ocn fluxes on the destination grid
        call med_aofluxes_run(gcomp, clock, ocn_prognostic, dead_comps, rc)
@@ -334,11 +317,8 @@ contains
 
     else if (trim(aoflux_grid) == 'atm') then
 
-       call shr_nuopc_methods_FB_reset(is_local%wrap%FBImp(compocn,compatm), value=czero, rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
        call med_map_FB_Regrid_Norm( &
-            fldListFr(compocn)%flds, compatm, &
+            fldListFr(compocn)%flds, compocn, compatm, &
             is_local%wrap%FBImp(compocn,compocn), &
             is_local%wrap%FBImp(compocn,compatm), &
             is_local%wrap%FBFrac(compocn), &

@@ -72,6 +72,7 @@ module shr_nuopc_methods_mod
   public shr_nuopc_methods_FB_GetFldPtr
   public shr_nuopc_methods_FB_getNameN
   public shr_nuopc_methods_FB_getFieldN
+  public shr_nuopc_methods_FB_Field_diagnose
   public shr_nuopc_methods_State_reset
   public shr_nuopc_methods_State_diagnose
   public shr_nuopc_methods_State_GeomPrint
@@ -2206,6 +2207,70 @@ module shr_nuopc_methods_mod
     endif
 
   end subroutine shr_nuopc_methods_State_diagnose
+
+  !-----------------------------------------------------------------------------
+
+  subroutine shr_nuopc_methods_FB_Field_diagnose(FB, fieldname, string, rc)
+    ! ----------------------------------------------
+    ! Diagnose status of State
+    ! ----------------------------------------------
+    type(ESMF_FieldBundle), intent(inout)  :: FB
+    character(len=*), intent(in)           :: fieldname
+    character(len=*), intent(in), optional :: string
+    integer         , intent(out)          :: rc
+
+    ! local variables
+    integer                         :: lrank
+    character(len=64)               :: lstring
+    real(ESMF_KIND_R8), pointer     :: dataPtr1d(:)
+    real(ESMF_KIND_R8), pointer     :: dataPtr2d(:,:)
+    character(len=*),parameter      :: subname='(shr_nuopc_methods_FB_FieldDiagnose)'
+    ! ----------------------------------------------
+
+    if (dbug_flag > 10) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+    rc = ESMF_SUCCESS
+
+    lstring = ''
+    if (present(string)) then
+       lstring = trim(string)
+    endif
+
+    call shr_nuopc_methods_FB_GetFldPtr(FB, fieldname, dataPtr1d, dataPtr2d, lrank, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (lrank == 0) then
+       ! no local data
+    elseif (lrank == 1) then
+       if (size(dataPtr1d) > 0) then
+          write(msgString,'(A,3g14.7,i8)') trim(subname)//' '//trim(lstring)//': '//trim(fieldname), &
+               minval(dataPtr1d), maxval(dataPtr1d), sum(dataPtr1d), size(dataPtr1d)
+       else
+          write(msgString,'(A,a)') trim(subname)//' '//trim(lstring)//': '//trim(fieldname), &
+               " no data"
+       endif
+    elseif (lrank == 2) then
+       if (size(dataPtr2d) > 0) then
+          write(msgString,'(A,3g14.7,i8)') trim(subname)//' '//trim(lstring)//': '//trim(fieldname), &
+               minval(dataPtr2d), maxval(dataPtr2d), sum(dataPtr2d), size(dataPtr2d)
+       else
+          write(msgString,'(A,a)') trim(subname)//' '//trim(lstring)//': '//trim(fieldname), &
+               " no data"
+       endif
+    else
+       call ESMF_LogWrite(trim(subname)//": ERROR rank not supported ", ESMF_LOGMSG_ERROR, line=__LINE__, &
+            file=u_FILE_u, rc=dbrc)
+       rc = ESMF_FAILURE
+       return
+    endif
+    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=dbrc)
+
+    if (dbug_flag > 10) then
+      call ESMF_LogWrite(trim(subname)//": done", ESMF_LOGMSG_INFO, rc=dbrc)
+    endif
+
+  end subroutine shr_nuopc_methods_FB_Field_diagnose
 
   !-----------------------------------------------------------------------------
 

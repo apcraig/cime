@@ -18,6 +18,7 @@ module med_map_mod
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_FieldRegrid
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_getFieldN
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_FldChk
+  use shr_nuopc_methods_mod , only: shr_nuopc_methods_FB_Field_diagnose
   use shr_nuopc_methods_mod , only: shr_nuopc_methods_ChkErr
   use med_internalstate_mod , only: InternalState
   use med_constants_mod           
@@ -464,7 +465,7 @@ contains
 
   !================================================================================
 
-  subroutine med_map_FB_Regrid_Norm(fldsSrc, destcomp, &
+  subroutine med_map_FB_Regrid_Norm(fldsSrc, srccomp, destcomp, &
        FBSrc, FBDst, FBFrac, FBNormOne, RouteHandles, string, rc)
 
     ! ----------------------------------------------
@@ -472,6 +473,7 @@ contains
     ! ----------------------------------------------
 
     type(shr_nuopc_fldList_entry_type) , pointer       :: fldsSrc(:)
+    integer                            , intent(in)    :: srccomp
     integer                            , intent(in)    :: destcomp
     type(ESMF_FieldBundle)             , intent(inout) :: FBSrc
     type(ESMF_FieldBundle)             , intent(inout) :: FBDst
@@ -512,7 +514,15 @@ contains
     rc = ESMF_SUCCESS
 
     !---------------------------------------
-    ! Loop over all fields in the field bundle
+    ! First - reset the field bundle on the destination grid to zero
+    !---------------------------------------
+
+    call shr_nuopc_methods_FB_reset(FBDst, value=czero, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    !---------------------------------------
+    ! Loop over all fields in the source field bundle and map them to
+    ! the destination field bundle accordingly
     !---------------------------------------
     do n = 1,size(fldsSrc)
 
@@ -571,16 +581,26 @@ contains
              !-------------------------------------------------
 
              ! create a temporary field bundle that will contain normalization on the source grid
+             call ESMF_LogWrite(trim(subname)//'DEBUG: i am here1a with mapnorm= '//trim(mapnorm), ESMF_LOGMSG_INFO, rc=dbrc)
+
              call shr_nuopc_methods_FB_init(FBout=FBNormSrc, flds_scalar_name=flds_scalar_name, &
                   FBgeom=FBSrc, fieldNameList=(/trim(mapnorm)/), rc=rc)
              if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+
+             call ESMF_LogWrite(trim(subname)//'DEBUG: i am here1b with mapnorm= '//trim(mapnorm), ESMF_LOGMSG_INFO, rc=dbrc)
+
              call shr_nuopc_methods_FB_reset(FBNormSrc, value=czero, rc=rc)
              if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
 
              ! create a temporary field bundle that will contain normalization on the destination grid
+             call ESMF_LogWrite(trim(subname)//'DEBUG: i am here2a with mapnorm= '//trim(mapnorm), ESMF_LOGMSG_INFO, rc=dbrc)
+
              call shr_nuopc_methods_FB_init(FBout=FBNormDst, flds_scalar_name=flds_scalar_name, &
                   FBgeom=FBDst, fieldNameList=(/trim(mapnorm)/), rc=rc)
              if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
+
+             call ESMF_LogWrite(trim(subname)//'DEBUG: i am here2b with mapnorm= '//trim(mapnorm), ESMF_LOGMSG_INFO, rc=dbrc)
+
              call shr_nuopc_methods_FB_reset(FBNormDst, value=czero, rc=rc)
              if (shr_nuopc_methods_chkerr(rc,__line__,u_file_u)) return
 
@@ -675,6 +695,13 @@ contains
 
           end if ! mapnorm is 'one' or 'nne'
        end if ! mapindex is not mapfcopy and field exists
+
+       if (dbug_flag > 1) then
+          call shr_nuopc_methods_FB_Field_diagnose(FBDst, fldname, &
+               string=trim(subname) //' FBImp('//trim(compname(srccomp))//','//trim(compname(destcomp))//') ', rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       end if
+
     end do  ! loop over fields
 
     ! Clean up temporary field bundle

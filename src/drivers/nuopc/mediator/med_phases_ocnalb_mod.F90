@@ -16,7 +16,6 @@ module med_phases_ocnalb_mod
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_init
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_getFieldN
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_GetFldPtr
-  use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_reset
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_diagnose
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_FB_FieldRegrid
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_GetScalar
@@ -498,13 +497,9 @@ contains
     call ESMF_GridCompGetInternalState(gcomp, is_local, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    ! Reset the ocean albedo field bundle
-    call shr_nuopc_methods_FB_reset(is_local%wrap%FBMed_ocnalb_a, value=czero, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    
     ! Map the field bundle from the ocean to the atm grid
     call med_map_FB_Regrid_Norm( &
-         fldListMed_ocnalb_o%flds, compatm, &
+         fldListMed_ocnalb_o%flds, compocn, compatm, &
          is_local%wrap%FBMed_ocnalb_o, &
          is_local%wrap%FBMed_ocnalb_a, &
          is_local%wrap%FBFrac(compocn), &
@@ -512,16 +507,6 @@ contains
          is_local%wrap%RH(compocn,compatm,:), &
          string='FBMed_ocnalb_o_To_FBMed_ocnalb_a', rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    
-    if (dbug_flag > 1) then
-       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBMed_ocnalb_o, string=trim(subname)//&
-            ' FBMed_ocnalb_o ', rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-
-       call shr_nuopc_methods_FB_diagnose(is_local%wrap%FBMed_ocnalb_a, string=trim(subname)//&
-            ' FBMed_ocnalb_a ', rc=rc)
-       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
     
   end subroutine med_phases_ocnalb_mapo2a
 

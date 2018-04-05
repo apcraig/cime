@@ -17,6 +17,11 @@ module dwav_comp_nuopc
   use esmFlds               , only : flds_scalar_index_nx
   use esmFlds               , only : flds_scalar_index_ny
   use esmFlds               , only : flds_scalar_index_dead_comps
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Realize
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Concat
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Deactivate
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Getnumflds
+  use shr_nuopc_fldList_mod , only : shr_nuopc_fldList_Getfldinfo
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_Clock_TimePrint
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
   use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_SetScalar, shr_nuopc_methods_State_Diagnose
@@ -219,18 +224,6 @@ module dwav_comp_nuopc
     else
        inst_suffix = ''
     end if
-
-    !----------------------------------------------------------------------------
-    ! set logunit
-    !----------------------------------------------------------------------------
-
-    if (my_task == master_task) then
-       inquire(FILE='wav_modelio.nml'//trim(inst_suffix), exist=exists)
-       if (exists) then
-         logUnit = shr_file_getUnit()
-         call shr_file_setIO('wav_modelio.nml'//trim(inst_suffix),logUnit)
-       end if
-    endif
 
     !----------------------------------------------------------------------------
     ! set logunit and set shr logging to my log file
