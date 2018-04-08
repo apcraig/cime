@@ -98,7 +98,7 @@ contains
 
   !-----------------------------------------------------------------------------
 
-  subroutine shr_nuopc_grid_DEInit(gcomp, nx_global, ny_global, mpicom, compid, gindex, Egrid, rc)
+  subroutine shr_nuopc_grid_DEInit(gcomp, nx_global, ny_global, mpicom, gindex, Egrid, rc)
 
     !-----------------------------------------
     ! create a Egrid object for Fields
@@ -108,7 +108,6 @@ contains
     integer         , intent(in)    :: nx_global
     integer         , intent(in)    :: ny_global
     integer         , intent(in)    :: mpicom
-    integer         , intent(in)    :: compid
     integer         , intent(in)    :: gindex(:)
     type(ESMF_Grid) , intent(inout) :: Egrid
     integer         , intent(inout) :: rc
@@ -341,7 +340,7 @@ contains
 
   !-----------------------------------------------------------------------------
 
-  subroutine shr_nuopc_grid_MeshInit(gcomp, nx_global, ny_global, mpicom, compid, gindex, lon, lat, Emesh, rc)
+  subroutine shr_nuopc_grid_MeshInit(gcomp, nx_global, ny_global, mpicom, gindex, lon, lat, Emesh, rc)
 
     !-----------------------------------------
     ! create an Emesh object for Fields
@@ -351,7 +350,6 @@ contains
     integer           , intent(in)    :: nx_global
     integer           , intent(in)    :: ny_global
     integer           , intent(in)    :: mpicom
-    integer           , intent(in)    :: compid
     integer           , intent(in)    :: gindex(:)
     real(r8), pointer , intent(in)    :: lon(:)
     real(r8), pointer , intent(in)    :: lat(:)

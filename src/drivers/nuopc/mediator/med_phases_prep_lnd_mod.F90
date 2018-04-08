@@ -116,7 +116,7 @@ module med_phases_prep_lnd_mod
                fldListFr(n1)%flds, n1, complnd, &
                is_local%wrap%FBImp(n1,n1), &
                is_local%wrap%FBImp(n1,complnd), &
-               is_local%wrap%FBFrac(complnd), &
+               is_local%wrap%FBFrac(n1), &
                is_local%wrap%FBNormOne(n1,complnd,:), &
                is_local%wrap%RH(n1,complnd,:), &
                string=trim(compname(n1))//'2'//trim(compname(complnd)), rc=rc)

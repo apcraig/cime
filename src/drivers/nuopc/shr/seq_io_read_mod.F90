@@ -1,7 +1,3 @@
-!===============================================================================
-! SVN $Id: seq_io_mod.F90 50621 2013-08-30 02:53:41Z mvertens $
-! SVN $URL: https://svn-ccsm-models.cgd.ucar.edu/drv/seq_mct/branches/comptype/shr/seq_io_mod.F90 $
-!===============================================================================
 !BOP ===========================================================================
 !
 ! !MODULE: seq_io_read_mod -- reads integer, real arrays and chacter of driver files

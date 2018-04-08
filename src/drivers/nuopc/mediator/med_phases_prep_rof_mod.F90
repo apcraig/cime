@@ -112,7 +112,7 @@ module med_phases_prep_rof_mod
                fldListFr(n1)%flds, n1, comprof, &
                is_local%wrap%FBImp(n1,n1), &
                is_local%wrap%FBImp(n1,comprof), &
-               is_local%wrap%FBFrac(comprof), &
+               is_local%wrap%FBFrac(n1), &
                is_local%wrap%FBNormOne(n1,comprof,:), &
                is_local%wrap%RH(n1,comprof,:), &
                string=trim(compname(n1))//'2'//trim(compname(comprof)), rc=rc)

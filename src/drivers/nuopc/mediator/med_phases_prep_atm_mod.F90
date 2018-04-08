@@ -115,7 +115,7 @@ module med_phases_prep_atm_mod
     end if
 
     !---------------------------------------
-    !--- map import field bundles to atm grid - FBimp(:,compatm)
+    !--- map import field bundles from n1 grid to atm grid - FBimp(:,compatm)
     !---------------------------------------
 
     do n1 = 1,ncomps
@@ -133,7 +133,7 @@ module med_phases_prep_atm_mod
     enddo
 
     !---------------------------------------
-    !--- map FBMed_ocnalb_o to atm grid
+    !--- map ocean albedos from ocn to atm grid
     !---------------------------------------
 
     if (is_local%wrap%med_coupling_active(compocn,compatm)) then
@@ -141,15 +141,16 @@ module med_phases_prep_atm_mod
     end if
 
     !---------------------------------------
-    !--- map FBMed_aoflux_o to atm grid
+    !--- map atm/ocn fluxes from ocn to atm grid
     !---------------------------------------
+    ! TODO: should only do this if the fluxes are computed on the ocean grid
 
     if (is_local%wrap%med_coupling_active(compocn,compatm)) then
        call med_map_FB_Regrid_Norm(&
             fldListMed_aoflux_o%flds, compocn, compatm, &
             is_local%wrap%FBMed_aoflux_o, &
             is_local%wrap%FBMed_aoflux_a, &
-            is_local%wrap%FBFrac(compatm), &
+            is_local%wrap%FBFrac(compocn), &
             is_local%wrap%FBNormOne(compocn,compatm,:), &
             is_local%wrap%RH(compocn,compatm,:), &
             string='FBMed_aoflux_o_To_FBMEd_aoflux_a', rc=rc)
@@ -157,7 +158,7 @@ module med_phases_prep_atm_mod
     endif
 
     !---------------------------------------
-    !--- auto merges
+    !--- merge all fields to atm
     !---------------------------------------
 
     call shr_nuopc_methods_FB_reset(is_local%wrap%FBExp(compatm), value=czero, rc=rc)

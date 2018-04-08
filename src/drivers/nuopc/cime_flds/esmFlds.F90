@@ -153,7 +153,6 @@ contains
     character(len=CX)      :: rof2ocn_ice_rmapname
     character(len=CX)      :: rof2ocn_liq_rmapname
     character(len=CX)      :: wav2ocn_smapname
-    character(len=CX)      :: wav2ocn_fmapname
     logical                :: flds_co2a  ! use case
     logical                :: flds_co2b  ! use case
     logical                :: flds_co2c  ! use case
@@ -302,6 +301,10 @@ contains
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('glc2ocn_rmapname = '// trim(glc2ocn_rmapname), ESMF_LOGMSG_INFO, rc=dbrc)
 
+    call NUOPC_CompAttributeGet(gcomp, name='wav2ocn_smapname', value=wav2ocn_smapname, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call ESMF_LogWrite('wav2ocn_smapname = '// trim(wav2ocn_smapname), ESMF_LOGMSG_INFO, rc=dbrc)
+
     call NUOPC_CompAttributeGet(gcomp, name='rof2ocn_fmapname', value=rof2ocn_fmapname, rc=rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_LogWrite('rof2ocn_fmapname = '// trim(rof2ocn_fmapname), ESMF_LOGMSG_INFO, rc=dbrc)
@@ -400,7 +403,7 @@ contains
     call shr_nuopc_fldList_AddDomain(shr_flds_dom_other,'frac', longname, stdname, units=units)
 
     !----------------------------------------------------------
-    ! Masks and Fractions
+    ! Masks from components
     !----------------------------------------------------------
 
     longname = 'Surface fraction in land'
@@ -409,18 +412,6 @@ contains
     call shr_nuopc_fldList_AddMetadata(fldname="Sl_lfrin", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(complnd)%flds, 'Sl_lfrin')
 
-    longname = 'Surface land fraction'
-    stdname  = 'land_area_fraction'
-    units    = '1'
-    call shr_nuopc_fldList_AddMetadata(fldname="Sl_lfrac", longname=longname, stdname=stdname, units=units)
-    call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, 'Sl_lfrac')
-
-    longname = 'Surface ocean fraction'
-    stdname  = 'sea_area_fraction'
-    units    = '1'
-    call shr_nuopc_fldList_AddMetadata(fldname="So_ofrac", longname=longname, stdname=stdname, units=units)
-    call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, 'So_ofrac')
-
     longname = 'Sea surface mask'
     stdname  = 'sea_surface_mask'
     units    = '1'
@@ -428,21 +419,44 @@ contains
     call shr_nuopc_fldList_AddFld(fldListFr(compocn)%flds, 'So_omask', fldindex=n1)
     call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
 
-    longname = 'Sea Ice mask'
+    longname = 'Sea ice mask'
     stdname  = 'sea_ice_mask'
     units    = '1'
     call shr_nuopc_fldList_AddMetadata(fldname="Si_imask", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compice)%flds, 'Si_imask')
 
+    !----------------------------------------------------------
+    ! Fractions sent to atm
+    !----------------------------------------------------------
+
+    ! TODO: these names should be changed to Sa_lfrac, Sa_ifrac, Sa_ofrac once new merging rules are in place
+    longname = 'Surface land fraction'
+    stdname  = 'land_area_fraction'
+    units    = '1'
+    call shr_nuopc_fldList_AddMetadata(fldname="Sl_lfrac", longname=longname, stdname=stdname, units=units)
+    call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, 'Sl_lfrac')
+
+    longname = 'Surface ice fraction'
+    stdname  = 'sea_ice_area_fraction'
+    call shr_nuopc_fldList_AddMetadata(fldname="Si_ifrac", longname=longname, stdname=stdname, units=units)
+    call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, 'Si_ifrac')
+
+    longname = 'Surface ocean fraction'
+    stdname  = 'sea_area_fraction'
+    units    = '1'
+    call shr_nuopc_fldList_AddMetadata(fldname="So_ofrac", longname=longname, stdname=stdname, units=units)
+    call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, 'So_ofrac')
+
+    !----------------------------------------------------------
+    ! Fractional ice coverage wrt ocean sent to ocn and wav
+    !----------------------------------------------------------
     longname = 'Fractional ice coverage wrt ocean'
     stdname  = 'sea_ice_area_fraction'
     units    = '1'
     call shr_nuopc_fldList_AddMetadata(fldname="Si_ifrac", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compice)%flds, 'Si_ifrac', fldindex=n1)
-    call shr_nuopc_fldList_AddFld(fldListTo(compatm)%flds, 'Si_ifrac')
     call shr_nuopc_fldList_AddFld(fldListTo(compocn)%flds, 'Si_ifrac')
     call shr_nuopc_fldList_AddFld(fldListTo(compwav)%flds, 'Si_ifrac')
-   !call shr_nuopc_fldList_AddMap(fldListFr(compice)%flds(n1), compice, compatm,  mapconsf, 'ifrac', ice2atm_fmapname)
     call shr_nuopc_fldList_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
     !----------------------------------------------------------
@@ -1323,7 +1337,7 @@ contains
     call shr_nuopc_fldList_AddMap(fldListFr(compice)%flds(n1), compice, compocn,  mapfcopy, 'unset', 'unset')
 
     !-----------------------------
-    ! ocn -> ice exchange
+    ! ocn -> ice exchange (some of these fields are also used in the atm/ocn flux computation)
     !-----------------------------
 
     longname = 'Sea surface salinity'
@@ -1332,14 +1346,6 @@ contains
     call shr_nuopc_fldList_AddMetadata(fldname="So_s", longname=longname, stdname=stdname, units=units)
     call shr_nuopc_fldList_AddFld(fldListFr(compocn)%flds, 'So_s', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'So_s')
-    call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
-
-    longname = 'Ocean melt and freeze potential'
-    stdname  = 'surface_snow_and_ice_melt_heat_flux'
-    units    = 'W m-2'
-    call shr_nuopc_fldList_AddMetadata(fldname="Fioo_q", longname=longname, stdname=stdname, units=units)
-    call shr_nuopc_fldList_AddFld(fldListFr(compocn)%flds, 'Fioo_q', fldindex=n1)
-    call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Fioo_q')
     call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
 
     longname = 'Zonal sea water velocity'
@@ -1393,6 +1399,14 @@ contains
     call shr_nuopc_fldList_AddFld(fldListFr(compocn)%flds , 'So_fswpen', fldindex=n1)
     call shr_nuopc_fldList_AddFld(fldListMed_aoflux_a%flds, 'So_fswpen')
     call shr_nuopc_fldList_AddFld(fldListMed_aoflux_o%flds, 'So_fswpen')
+    call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
+
+    longname = 'Ocean melt and freeze potential'
+    stdname  = 'surface_snow_and_ice_melt_heat_flux'
+    units    = 'W m-2'
+    call shr_nuopc_fldList_AddMetadata(fldname="Fioo_q", longname=longname, stdname=stdname, units=units)
+    call shr_nuopc_fldList_AddFld(fldListFr(compocn)%flds, 'Fioo_q', fldindex=n1)
+    call shr_nuopc_fldList_AddFld(fldListTo(compice)%flds, 'Fioo_q')
     call shr_nuopc_fldList_AddMap(fldListFr(compocn)%flds(n1), compocn, compice,  mapfcopy, 'unset', 'unset')
 
     !-----------------------------

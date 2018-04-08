@@ -205,14 +205,6 @@ module drof_comp_nuopc
     call mpi_comm_rank(mpicom, my_task, ierr)
 
     !----------------------------------------------------------------------------
-    ! get compid
-    !----------------------------------------------------------------------------
-
-    call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
-    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
-    read(cvalue,*) compid  ! convert from string to integer
-
-    !----------------------------------------------------------------------------
     ! determine instance information
     !----------------------------------------------------------------------------
 
@@ -365,6 +357,10 @@ module drof_comp_nuopc
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) read_restart
 
+    call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    read(cvalue,*) compid 
+
     call drof_comp_init(clock, x2d, d2x, &
          flds_x2r, flds_r2x, &
          SDROF, gsmap, ggrid, mpicom, compid, my_task, master_task, &
@@ -388,7 +384,7 @@ module drof_comp_nuopc
     call mct_gGrid_exportRattr(ggrid,'lat',lat,lsize)
     call mct_gsMap_OrderedPoints(gsMap_target, iam, gindex)
 
-    call shr_nuopc_grid_MeshInit(gcomp, nx_global, ny_global, mpicom, compid, gindex, lon, lat, Emesh, rc)
+    call shr_nuopc_grid_MeshInit(gcomp, nx_global, ny_global, mpicom, gindex, lon, lat, Emesh, rc)
     if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     deallocate(lon)

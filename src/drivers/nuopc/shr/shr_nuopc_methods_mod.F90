@@ -6,7 +6,8 @@ module shr_nuopc_methods_mod
 
   use ESMF
   use NUOPC
-  use seq_comm_mct, only : llogunit => logunit
+  use seq_comm_mct  , only : llogunit => logunit
+  use shr_string_mod, only : shr_string_listGetName
   use mpi
 
   implicit none
@@ -88,6 +89,7 @@ module shr_nuopc_methods_mod
   public shr_nuopc_methods_UpdateTimestamp
   public shr_nuopc_methods_ChkErr
   public shr_nuopc_methods_Distgrid_Match
+  public shr_nuopc_methods_Print_FieldExchInfo
 
   private shr_nuopc_methods_Grid_Write
   private shr_nuopc_methods_Grid_Print
@@ -656,6 +658,7 @@ module shr_nuopc_methods_mod
     if (present(name)) then
       lname = trim(name)
     endif
+    lname = 'FB '//trim(lname)
 
     !---------------------------------
     ! check argument consistency and
@@ -833,7 +836,8 @@ module shr_nuopc_methods_mod
         call ESMF_FieldBundleAdd(FBout, (/field/), rc=rc)
         if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
         if (dbug_flag > 1) then
-          call ESMF_LogWrite(trim(subname)//":"//trim(lname)//": add  "//trim(lfieldNameList(n)), ESMF_LOGMSG_INFO, rc=dbrc)
+          call ESMF_LogWrite(trim(subname)//":"//trim(lname)//" adding field "//trim(lfieldNameList(n)), &
+               ESMF_LOGMSG_INFO, rc=dbrc)
         endif
 
       enddo  ! fieldCount
@@ -4090,5 +4094,60 @@ module shr_nuopc_methods_mod
     endif
 
   end function shr_nuopc_methods_ChkErr
+
+  !-----------------------------------------------------------------------------
+
+  subroutine shr_nuopc_methods_Print_FieldExchInfo(flag, values, logunit, fldlist, nflds, istr)
+
+    ! !DESCRIPTION:
+    ! Print out information about values to stdount
+    ! - flag sets the level of information:
+    ! - print out names of fields in values 2d array
+    ! - also print out local max and min of data in values 2d array
+    ! If optional argument istr is present, it will be output before any of the information.
+
+
+    ! !INPUT/OUTPUT PARAMETERS:
+    integer            , intent(in)          :: flag  ! info level flag
+    real(ESMF_KIND_R8) , intent(in)          :: values(:,:) ! arrays sent to/recieved from mediator
+    integer            , intent(in)          :: logunit
+    character(len=*)   , intent(in)          :: fldlist
+    integer            , intent(in)          :: nflds
+    character(*)       , intent(in),optional :: istr  ! string for print
+
+    !--- local ---
+    integer                    :: n           ! generic indicies
+    integer                    :: nsize       ! grid point in values array
+    real(ESMF_KIND_R8)         :: minl(nflds) ! local min
+    real(ESMF_KIND_R8)         :: maxl(nflds) ! local max
+    character(len=ESMF_MAXSTR) :: name
+
+    !--- formats ---
+    character(*),parameter :: subName = '(shr_nuopc_methods_Print_FieldExchInfo) '
+    character(*),parameter :: F00 = "('(shr_nuopc_methods_Print_FieldExchInfo) ',8a)"
+    character(*),parameter :: F01 = "('(shr_nuopc_methods_Print_FieldExchInfo) ',a,i9)"
+    character(*),parameter :: F02 = "('(shr_nuopc_methods_Print_FieldExchInfo) ',240a)"
+    character(*),parameter :: F03 = "('(shr_nuopc_methods_Print_FieldExchInfo) ',a,2es11.3,i4,2x,a)"
+    !-------------------------------------------------------------------------------
+
+    if (flag >= 1) then
+       if (present(istr)) then
+          write(logunit,*) trim(istr)
+       endif
+       nsize = size(values, dim=2)
+       write(logunit,F01) "local size =",nsize
+       write(logunit,F02) "Fldlist = ",trim(fldlist)
+    endif
+
+    if (flag >= 2) then
+       do n = 1, nflds
+          minl(n) = minval(values(n,:))
+          maxl(n) = maxval(values(n,:))
+          call shr_string_listGetName(fldlist, n, name)
+          write(logunit,F03) 'l min/max ',minl(n),maxl(n),n,trim(name)
+       enddo
+    endif
+
+  end subroutine shr_nuopc_methods_Print_FieldExchInfo
 
 end module shr_nuopc_methods_mod
