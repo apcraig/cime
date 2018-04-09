@@ -24,6 +24,7 @@ module shr_flux_mod
    use shr_sys_mod     ! shared system routines
    use shr_log_mod, only: s_loglev  => shr_log_Level
    use shr_log_mod, only: s_logunit => shr_log_Unit
+   use ESMF
 
    implicit none
 
@@ -68,6 +69,8 @@ module shr_flux_mod
    real(R8) :: loc_latvap = shr_const_latvap
    real(R8) :: loc_latice = shr_const_latice
    real(R8) :: loc_stebol = shr_const_stebol
+   integer :: rc
+   character(len=1024) :: tmpstr
 
 !===============================================================================
 contains
@@ -274,6 +277,9 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,  prec_gust, gust_
 
    al2 = log(zref/ztref)
 
+!   write(tmpstr,'(2i12)') nmax,sum(mask)
+!   call ESMF_LogWrite(trim(subname)//" : n,tcx0 "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+
    DO n=1,nMax
      if (mask(n) /= 0) then
 
@@ -385,6 +391,11 @@ SUBROUTINE shr_flux_atmOcn(nMax  ,zbot  ,ubot  ,vbot  ,thbot ,  prec_gust, gust_
         sen (n) =          cp * tau * tstar / ustar
         lat (n) =  loc_latvap * tau * qstar / ustar
         lwup(n) = -loc_stebol * ts(n)**4
+
+!        write(tmpstr,'(i6,4g16.7)') n,cp,tau,tstar,ustar
+!        call ESMF_LogWrite(trim(subname)//" : n,tcx1 "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
+!        write(tmpstr,'(i6,4g16.7)') n,sen(n),rbot(n),ubot(n),us(n)
+!        call ESMF_LogWrite(trim(subname)//" : n,tcx2 "//trim(tmpstr), ESMF_LOGMSG_INFO, rc=rc)
 
         !--- water flux ---
         evap(n) = lat(n)/loc_latvap

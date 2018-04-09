@@ -71,8 +71,8 @@ module ESM
 #ifdef ESMFUSE_NOTYET_mosart
   use mosart_comp_nuopc, only: mosart_SS => SetServices
 #endif
-#ifdef ESMFUSE_NOTYET_mom6
-  use mom6_comp_nuopc, only:   mom6_SS => SetServices
+#ifdef ESMFUSE_mom
+  use mom_cap_mod, only:   mom_SS => SetServices
 #endif
 #ifdef ESMFUSE_NOTYET_ww3
   use  ww3_comp_nuopc, only:   ww3_SS => SetServices
@@ -572,9 +572,9 @@ module ESM
             line=__LINE__, file=u_FILE_u, rcToReturn=rc)
           return  ! bail out
 #endif
-        elseif (trim(model) == "mom6") then
-#ifdef ESMFUSE_NOTYET_mom6
-          call NUOPC_DriverAddComp(driver, "OCN", mom6_SS, petList=petList, comp=child, rc=rc)
+        elseif (trim(model) == "mom") then
+#ifdef ESMFUSE_mom
+          call NUOPC_DriverAddComp(driver, "OCN", mom_SS, petList=petList, comp=child, rc=rc)
           if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 #else
           call ESMF_LogSetError(ESMF_RC_NOT_VALID, &

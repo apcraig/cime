@@ -228,6 +228,11 @@ contains
        fldlist%shortname(num) = trim(stdname)
     endif
 
+    write(infostr,'(i6)') fldlist%num
+    call ESMF_LogWrite(trim(subname)//":"//trim(tag)//":n="//trim(infostr)//":fld="//trim(stdname), &
+         ESMF_LOGMSG_INFO, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
   end subroutine shr_nuopc_fldList_Add
 
 !================================================================================

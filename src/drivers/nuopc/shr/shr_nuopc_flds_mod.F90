@@ -626,6 +626,7 @@ contains
     call fld_add(flds_a2x, flds_a2x_map, "Faxa_swndr", longname=longname, stdname=stdname, units=units)
     call fld_add(flds_x2i, flds_x2i_map, "Faxa_swndr")
     call fld_add(flds_x2l, flds_x2l_map, "Faxa_swndr")
+    call fld_add(flds_x2o, flds_x2o_map, "Foxx_swndr", longname=longname, stdname=stdname, units=units)
 
     ! direct visible incident solar radiation
     longname = 'Direct visible incident solar radiation'
@@ -633,7 +634,9 @@ contains
     units    = 'W m-2'
     call fld_add(flds_a2x, flds_a2x_map, "Faxa_swvdr", longname=longname, stdname=stdname, units=units)
     call fld_add(flds_x2i, flds_x2i_map, "Faxa_swvdr")
+    call fld_add(flds_x2o, flds_x2o_map, "Faxa_swvdr")
     call fld_add(flds_x2l, flds_x2l_map, "Faxa_swvdr")
+    call fld_add(flds_x2o, flds_x2o_map, "Foxx_swvdr", longname=longname, stdname=stdname, units=units)
 
     ! diffuse near-infrared incident solar radiation
     longname = 'Diffuse near-infrared incident solar radiation'
@@ -642,6 +645,7 @@ contains
     call fld_add(flds_a2x, flds_a2x_map, "Faxa_swndf", longname=longname, stdname=stdname, units=units)
     call fld_add(flds_x2i, flds_x2i_map, "Faxa_swndf")
     call fld_add(flds_x2l, flds_x2l_map, "Faxa_swndf")
+    call fld_add(flds_x2o, flds_x2o_map, "Foxx_swndf", longname=longname, stdname=stdname, units=units)
 
     ! diffuse visible incident solar radiation
     longname = 'Diffuse visible incident solar radiation'
@@ -650,6 +654,7 @@ contains
     call fld_add(flds_a2x, flds_a2x_map, "Faxa_swvdf", longname=longname, stdname=stdname, units=units)
     call fld_add(flds_x2i, flds_x2i_map, "Faxa_swvdf")
     call fld_add(flds_x2l, flds_x2l_map, "Faxa_swvdf")
+    call fld_add(flds_x2o, flds_x2o_map, "Foxx_swvdf", longname=longname, stdname=stdname, units=units)
 
     ! Net shortwave radiation
     longname = 'Net shortwave radiation'
