@@ -31,6 +31,10 @@ def redirect_stderr(new_target):
     finally:
         sys.stderr = old_target # restore to the previous value
 
+def copyifnewer(src, dest):
+    """ if dest does not exist or is older than src copy src to dest """
+    if not os.path.isfile(dest) or not filecmp.cmp(src, dest):
+        shutil.copy2(src, dest)
 
 def expect(condition, error_msg, exc_type=SystemExit, error_prefix="ERROR:"):
     """
@@ -426,6 +430,19 @@ def parse_test_name(test_name):
            "'{}' does not look like a CIME test name, expect TESTCASE.GRID.COMPSET[.MACHINE_COMPILER[.TESTMODS]]".format(test_name))
 
     return rv
+
+def filter_unicode(unistr):
+    """
+    Sometimes unicode chars can cause problems
+    """
+    return "".join([i if ord(i) < 128 else ' ' for i in unistr])
+
+def run_bld_cmd_ensure_logging(cmd, arg_logger, from_dir=None):
+    arg_logger.info(cmd)
+    stat, output, errput = run_cmd(cmd, from_dir=from_dir)
+    arg_logger.info(output)
+    arg_logger.info(errput)
+    expect(stat == 0, filter_unicode(errput))
 
 def get_full_test_name(partial_test, caseopts=None, grid=None, compset=None, machine=None, compiler=None, testmod=None):
     """
