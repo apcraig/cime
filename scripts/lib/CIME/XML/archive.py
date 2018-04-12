@@ -21,7 +21,7 @@ class Archive(GenericXML):
 
         GenericXML.__init__(self, infile, schema)
 
-    def setup(self, env_archive, components, files=None):
+    def setup(self, env_archive, components, files=None, driver=None):
         if files is None:
             files = Files()
 
@@ -34,7 +34,8 @@ class Archive(GenericXML):
             components.append('dart')
 
         for comp in components:
-            infile = files.get_value("ARCHIVE_SPEC_FILE", {"component":comp})
+            expect(driver != None, "must specify driver to acceptable value")
+            infile = files.get_value("ARCHIVE_SPEC_FILE", {"component":comp}, comp_interface=driver)
 
             if infile is not None and os.path.isfile(infile):
                 arch = Archive(infile=infile, files=files)
