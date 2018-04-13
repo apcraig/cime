@@ -6,14 +6,18 @@ module seq_timemgr_mod
   use ESMF
   use NUOPC
   use shr_cal_mod
-  use SHR_KIND_mod, only: SHR_KIND_IN, SHR_KIND_R8, SHR_KIND_CS
-  use SHR_KIND_mod, only: SHR_KIND_CL, SHR_KIND_I8
-  use seq_comm_mct, only: logunit, loglevel, seq_comm_iamin, CPLID
-  use seq_comm_mct, only: seq_comm_gloroot
-  use shr_sys_mod,  only: shr_sys_abort, shr_sys_flush
+  use shr_kind_mod          , only : SHR_KIND_IN, SHR_KIND_R8, SHR_KIND_CS
+  use shr_kind_mod          , only : SHR_KIND_CL, SHR_KIND_I8
+  use shr_sys_mod           , only : shr_sys_abort
+  use shr_log_mod           , only : logunit=>shr_log_Unit, loglevel=>shr_log_Level
+  use shr_file_mod          , only : shr_file_getunit, shr_file_freeunit
+  use shr_mpi_mod           , only : shr_mpi_bcast
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
+  use pio                   , only : file_desc_T
+  use seq_comm_mct          , only : seq_comm_iamin, seq_comm_gloroot, CPLID
+  use seq_io_read_mod
 
   implicit none
-
   private    ! default private
 
   ! MEMBER FUNCTIONS:
@@ -45,7 +49,6 @@ module seq_timemgr_mod
   private:: seq_timemgr_alarmInit
   private:: seq_timemgr_EClockInit
   private:: seq_timemgr_ESMFDebug
-  private:: seq_timemgr_ESMFCodeCheck
 
   ! PARAMETERS:
 
@@ -165,7 +168,8 @@ module seq_timemgr_mod
   integer                     :: seq_timemgr_pause_sig_index  ! Index of pause comp with smallest dt
   logical                     :: seq_timemgr_esp_run_on_pause ! Run ESP component on pause cycle
   logical                     :: seq_timemgr_end_restart      ! write restarts at end of run?
-  character(len=*) , parameter    :: u_FILE_u =  __FILE__
+  integer, parameter          :: dbug_flag = 10
+  character(len=*), parameter :: u_FILE_u =  __FILE__
 
 !===============================================================================
 contains
@@ -176,14 +180,6 @@ contains
        EClock_ice, Eclock_glc, Eclock_rof, EClock_wav, Eclock_esp)
 
     ! !DESCRIPTION:  Initializes clock
-
-    ! !USES:
-    use pio          , only : file_desc_T
-    use shr_file_mod , only : shr_file_getunit, shr_file_freeunit
-    use shr_mpi_mod  , only : shr_mpi_bcast
-    use seq_io_read_mod
-
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_GridComp),     intent(inout) :: driver
@@ -263,8 +259,13 @@ contains
     character(len=*), parameter :: subname = '(seq_timemgr_clockInit) '
     !-------------------------------------------------------------------------------
 
+    rc = ESMF_SUCCESS
+    if (dbug_flag > 5) then
+      call ESMF_LogWrite(trim(subname)//": called", ESMF_LOGMSG_INFO)
+    endif
+
     call NUOPC_CompAttributeGet(driver, name='read_restart', value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) read_restart
 
     call NUOPC_CompAttributeGet(driver, name="restart_file", value=restart_file, rc=rc)
@@ -275,39 +276,39 @@ contains
     !---------------------------------------------------------------------------
 
     call NUOPC_CompAttributeGet(driver, name="calendar", value=calendar, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(driver, name="stop_option", value=stop_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(driver, name="stop_n", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) stop_n
 
     call NUOPC_CompAttributeGet(driver, name="stop_ymd", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) stop_ymd
 
     call NUOPC_CompAttributeGet(driver, name="stop_tod", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) stop_tod
 
     call NUOPC_CompAttributeGet(driver, name="restart_option", value=restart_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(driver, name="restart_n", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) restart_n
 
     call NUOPC_CompAttributeGet(driver, name="restart_ymd", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) restart_ymd
 
     call NUOPC_CompAttributeGet(driver, name="pause_option", value=pause_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(driver, name="pause_n", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) pause_n
 
     ! TODO: currently this is not in namelist_definition_drv.xml
@@ -316,63 +317,63 @@ contains
     pause_component_list = ' '
 
     call NUOPC_CompAttributeGet(driver, name="history_option", value=history_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(driver, name="history_n", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) history_n
 
     call NUOPC_CompAttributeGet(driver, name="history_ymd", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) history_ymd
 
     call NUOPC_CompAttributeGet(driver, name="histavg_option", value=histavg_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(driver, name="histavg_n", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) histavg_n
 
     call NUOPC_CompAttributeGet(driver, name="histavg_ymd", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) histavg_ymd
 
     call NUOPC_CompAttributeGet(driver, name="barrier_option", value=barrier_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(driver, name="barrier_n", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) barrier_n
 
     call NUOPC_CompAttributeGet(driver, name="barrier_ymd", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) barrier_ymd
 
     call NUOPC_CompAttributeGet(driver, name="tprof_option", value=tprof_option, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(driver, name="tprof_n", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) tprof_n
 
     call NUOPC_CompAttributeGet(driver, name="tprof_ymd", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) tprof_ymd
 
     call NUOPC_CompAttributeGet(driver, name="start_ymd", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) start_ymd
 
     call NUOPC_CompAttributeGet(driver, name="start_tod", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) start_tod
 
     call NUOPC_CompAttributeGet(driver, name="ref_ymd", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) ref_ymd
 
     call NUOPC_CompAttributeGet(driver, name="ref_tod", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) ref_tod
 
     ! These do not appear in namelist_definition_drv.xml and its not clear they should
@@ -387,31 +388,31 @@ contains
     curr_tod = 0.0
 
     call NUOPC_CompAttributeGet(driver, name="atm_cpl_dt", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) atm_cpl_dt
 
     call NUOPC_CompAttributeGet(driver, name="lnd_cpl_dt", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) lnd_cpl_dt
 
     call NUOPC_CompAttributeGet(driver, name="ice_cpl_dt", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) ice_cpl_dt
 
     call NUOPC_CompAttributeGet(driver, name="ocn_cpl_dt", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) ocn_cpl_dt
 
     call NUOPC_CompAttributeGet(driver, name="glc_cpl_dt", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) glc_cpl_dt
 
     call NUOPC_CompAttributeGet(driver, name="rof_cpl_dt", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) rof_cpl_dt
 
     call NUOPC_CompAttributeGet(driver, name="wav_cpl_dt", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) wav_cpl_dt
 
     ! TODO: for now - this is not in the namelist_definition_drv.xml file
@@ -421,15 +422,15 @@ contains
     esp_cpl_dt = 0.
 
     call NUOPC_CompAttributeGet(driver, name="glc_avg_period", value=glc_avg_period, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) glc_avg_period
 
     call NUOPC_CompAttributeGet(driver, name="esp_run_on_pause", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) esp_run_on_pause
 
     call NUOPC_CompAttributeGet(driver, name="end_restart", value=cvalue, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=u_FILE_u)) call shr_sys_abort()
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) end_restart
 
     !---------------------------------------------------------------------------
@@ -676,7 +677,7 @@ contains
 
     seq_timemgr_cal = ESMF_CalendarCreate( name='CCSM_'//seq_timemgr_calendar, &
          calkindflag=esmf_caltype, rc=rc )
-    call seq_timemgr_ESMFCodeCheck( rc, subname//': error return from ESMF_CalendarCreate' )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! --- Initialize start, ref, and current date ---
 
@@ -737,7 +738,7 @@ contains
 
     do n = 1,max_clocks
        call ESMF_TimeIntervalSet( TimeStep, s=dtime(n), rc=rc )
-       call seq_timemgr_ESMFCodeCheck( rc, subname//': error ESMF_TimeIntervalSet' )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        call seq_timemgr_EClockInit( TimeStep, StartTime, RefTime, CurrTime, SyncClock%ECP(n)%EClock)
 
@@ -799,11 +800,15 @@ contains
             alarmname = trim(seq_timemgr_alarm_tprof))
 
        call ESMF_AlarmGet(SyncClock%EAlarm(n,seq_timemgr_nalarm_stop), RingTime=StopTime1, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_AlarmGet(SyncClock%EAlarm(n,seq_timemgr_nalarm_datestop), RingTime=StopTime2, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        if (StopTime2 < StopTime1) then
-          call ESMF_ClockSet(SyncClock%ECP(n)%EClock, StopTime=StopTime2)
+          call ESMF_ClockSet(SyncClock%ECP(n)%EClock, StopTime=StopTime2, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        else
-          call ESMF_ClockSet(SyncClock%ECP(n)%EClock, StopTime=StopTime1)
+          call ESMF_ClockSet(SyncClock%ECP(n)%EClock, StopTime=StopTime1, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        endif
 
        ! Set the pause option if pause/resume is active
@@ -841,7 +846,6 @@ contains
        curr_cday, next_cday, curr_time, prev_time, calendar)
 
     ! !DESCRIPTION: Get various values from the clock.
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Clock),     intent(IN)            :: EClock     ! Input clock object
@@ -898,13 +902,13 @@ contains
          advanceCount=advSteps, prevTime=previousTime, TimeStep=timeStep, &
          startTime=StartTime, stopTime=stopTime, refTime=RefTime, &
          AlarmCount=acount, rc=rc )
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_ClockGet" )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_TimeGet( CurrentTime, yy=yy, mm=mm, dd=dd, s=sec, dayofyear_r8=doy, rc=rc )
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_TimeGet" )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call seq_timemgr_ETimeGet( CurrentTime, ymd=ymd, tod=tod )
     call ESMF_TimeIntervalGet( timeStep, s=ldtime, rc=rc )
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_TimeIntervalGet" )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if ( present(curr_yr)  ) curr_yr  = yy
     if ( present(curr_mon) ) curr_mon = mm
@@ -919,12 +923,12 @@ contains
 
     if ( present(next_cday)) then
        call ESMF_TimeSet(tmpTime, yy=yy, mm=mm, dd=dd, s=tod, calendar=seq_timemgr_cal, rc=rc )
-       call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from TimeSet tmpTime")
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeIntervalSet( tmpDTime, d=1, rc=rc )
-       call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from TimeIntSet tmpDTime")
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        tmpTime = tmpTime + tmpDTime
        call ESMF_TimeGet(tmpTime, dayOfYear_r8=tmpdoy, rc=rc)
-       call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from TimeGet tmpdoy")
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        next_cday = tmpdoy
     endif
 
@@ -932,7 +936,7 @@ contains
     if ( present(curr_time)) then
        timediff = CurrentTime - RefTime
        call ESMF_TimeIntervalGet(timediff, d=days, s=seconds, rc=rc)
-       call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from  TimeIntervalGet timediff")
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        curr_time = days + seconds/real(SecPerDay,SHR_KIND_R8)
     end if
 
@@ -940,7 +944,7 @@ contains
     if ( present(prev_time)) then
        timediff = PreviousTime - RefTime
        call ESMF_TimeIntervalGet(timediff, d=days, s=seconds, rc=rc)
-       call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from  TimeIntervalGet timediff")
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        prev_time = days + seconds/real(SecPerDay,SHR_KIND_R8)
     end if
 
@@ -979,7 +983,6 @@ contains
   subroutine seq_timemgr_alarmInit( EClock, EAlarm, option, opt_n, opt_ymd, opt_tod, RefTime, alarmname)
 
     ! !DESCRIPTION: Setup an alarm in a clock
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Clock)             , intent(INOUT) :: EClock    ! clock
@@ -1029,8 +1032,11 @@ contains
     endif
 
     call ESMF_ClockGet(EClock, CurrTime=CurrTime, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_TimeGet(CurrTime, yy=cyy, mm=cmm, dd=cdd, s=csec, rc=rc )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_TimeGet(CurrTime, yy=nyy, mm=nmm, dd=ndd, s=nsec, rc=rc )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! --- initial guess of next alarm, this will be updated below ---
     if (present(RefTime)) then
@@ -1047,14 +1053,18 @@ contains
        !--- tcx seems we need an alarm interval or the alarm create fails,
        !--- problem in esmf_wrf_timemgr?
        call ESMF_TimeIntervalSet(AlarmInterval, yy=9999, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeSet( NextAlarm, yy=9999, mm=12, dd=1, s=0, calendar=seq_timemgr_cal, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        update_nextalarm  = .false.
 
     case (seq_timemgr_optNever)
        !--- tcx seems we need an alarm interval or the alarm create fails,
        !--- problem in esmf_wrf_timemgr?
        call ESMF_TimeIntervalSet(AlarmInterval, yy=9999, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeSet( NextAlarm, yy=9999, mm=12, dd=1, s=0, calendar=seq_timemgr_cal, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        update_nextalarm  = .false.
 
     case (seq_timemgr_optDate)
@@ -1063,7 +1073,9 @@ contains
        if (.not. present(opt_ymd)) call shr_sys_abort(subname//trim(option)//' requires opt_ymd')
        if (lymd < 0 .or. ltod < 0) call shr_sys_abort(subname//trim(option)//'opt_ymd, opt_tod invalid')
        call ESMF_TimeIntervalSet(AlarmInterval, yy=9999, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call seq_timemgr_ETimeInit(NextAlarm, lymd, ltod, "optDate")
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        update_nextalarm  = .false.
 
     case (seq_timemgr_optIfdays0)
@@ -1071,30 +1083,36 @@ contains
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_TimeIntervalSet(AlarmInterval, mm=1, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeSet( NextAlarm, yy=cyy, mm=cmm, dd=opt_n, s=0, calendar=seq_timemgr_cal, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     case (seq_timemgr_optNSteps)
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_ClockGet(EClock, TimeStep=AlarmInterval, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optNStep)
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_ClockGet(EClock, TimeStep=AlarmInterval, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optNSeconds)
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_TimeIntervalSet(AlarmInterval, s=1, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optNSecond)
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_TimeIntervalSet(AlarmInterval, s=1, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optNMinutes)
@@ -1107,63 +1125,76 @@ contains
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_TimeIntervalSet(AlarmInterval, s=60, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optNHours)
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_TimeIntervalSet(AlarmInterval, s=3600, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optNHour)
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_TimeIntervalSet(AlarmInterval, s=3600, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optNDays)
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_TimeIntervalSet(AlarmInterval, d=1, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optNDay)
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_TimeIntervalSet(AlarmInterval, d=1, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optNMonths)
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_TimeIntervalSet(AlarmInterval, mm=1, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optNMonth)
        call ESMF_TimeIntervalSet(AlarmInterval, mm=1, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optMonthly)
        call ESMF_TimeIntervalSet(AlarmInterval, mm=1, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeSet( NextAlarm, yy=cyy, mm=cmm, dd=1, s=0, calendar=seq_timemgr_cal, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     case (seq_timemgr_optNYears)
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_TimeIntervalSet(AlarmInterval, yy=1, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optNYear)
        if (.not.present(opt_n)) call shr_sys_abort(subname//trim(option)//' requires opt_n')
        if (opt_n <= 0)  call shr_sys_abort(subname//trim(option)//' invalid opt_n')
        call ESMF_TimeIntervalSet(AlarmInterval, yy=1, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        AlarmInterval = AlarmInterval * opt_n
 
     case (seq_timemgr_optYearly)
        call ESMF_TimeIntervalSet(AlarmInterval, yy=1, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeSet( NextAlarm, yy=cyy, mm=1, dd=1, s=0, calendar=seq_timemgr_cal, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     case (seq_timemgr_optEnd)
        call shr_sys_abort(subname//'deprecated option '//trim(option))
@@ -1187,10 +1218,8 @@ contains
        enddo
     endif
 
-    EAlarm = ESMF_AlarmCreate( name=lalarmname, clock=EClock, &
-                               ringTime=NextAlarm, ringInterval=AlarmInterval, rc=rc)
-
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_AlarmCreate" )
+    EAlarm = ESMF_AlarmCreate( name=lalarmname, clock=EClock, ringTime=NextAlarm, ringInterval=AlarmInterval, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
   end subroutine seq_timemgr_AlarmInit
 
@@ -1200,7 +1229,6 @@ contains
        IntSec, IntMon, IntYrs, name)
 
     ! !DESCRIPTION: Get informationn from the alarm
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Alarm)    , intent(INOUT)            :: EAlarm   ! Input Alarm object
@@ -1225,17 +1253,17 @@ contains
 
     if (present(name)) then
        call ESMF_AlarmGet( EAlarm, name=name, rc=rc)
-       call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_AlarmGet name" )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     endif
 
     call ESMF_AlarmGet( EAlarm, RingTime=RingTime, rc=rc )
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_AlarmGet RingTime" )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call seq_timemgr_ETimeGet( RingTime, ymd=ymd, tod=tod)
     if ( present(next_ymd) ) next_ymd = ymd
     if ( present(next_tod) ) next_tod = tod
 
     call ESMF_AlarmGet( EAlarm, PrevRingTime=RingTime, rc=rc )
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_AlarmGet PrevRingTime")
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call seq_timemgr_ETimeGet( RingTime, ymd=ymd, tod=tod)
     if ( present(prev_ymd) ) prev_ymd = ymd
     if ( present(prev_tod) ) prev_tod = tod
@@ -1245,9 +1273,9 @@ contains
     dd = 0
     sec = 0
     call ESMF_AlarmGet( EAlarm, RingInterval=AlarmInterval, rc=rc )
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_AlarmGet RingInterval")
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call ESMF_TimeIntervalGet( alarmInterval, yy=yy, mm=mm, d=dd, s=sec, rc=rc )
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_TimeIntervalGet" )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     sec = sec + dd*(SecPerDay)
 
     ! --- If want restart next interval information -------------------------
@@ -1262,7 +1290,6 @@ contains
   subroutine seq_timemgr_AlarmSetOn( EClock, alarmname)
 
     ! !DESCRIPTION: turn alarm on
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Clock), intent(INOUT) :: EClock      ! clock/alarm
@@ -1300,11 +1327,12 @@ contains
     allocate(EAlarm_list(AlarmCount))
     call ESMF_ClockGetAlarmList(EClock, alarmListFlag=ESMF_ALARMLIST_ALL, &
          alarmList=EAlarm_list, alarmCount=AlarmCount, rc=rc)
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_ClockGetAlarmList" )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     do n = 1,AlarmCount
        found = .false.
        if (present(alarmname)) then
-          call ESMF_AlarmGet(EAlarm_list(n), name=name)
+          call ESMF_AlarmGet(EAlarm_list(n), name=name, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           if (trim(name) == trim(alarmname)) found = .true.
        else
           found = .true.
@@ -1312,13 +1340,12 @@ contains
        if (found) then
           set = .true.
           call ESMF_AlarmRingerOn( EAlarm_list(n), rc=rc )
-          call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_AlarmRingerOn" )
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        endif
     enddo
 
     if (present(alarmname) .and. .not. set) then
-       write(logunit,*) subname,' ERROR in alarmname ',trim(alarmname)
-       call shr_sys_abort()
+       call shr_sys_abort(subname//' ERROR in alarmname '//trim(alarmname))
     endif
     deallocate(EAlarm_list)
 
@@ -1329,7 +1356,6 @@ contains
   subroutine seq_timemgr_AlarmSetOff( EClock, alarmname)
 
     ! !DESCRIPTION: turn alarm off
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
 
@@ -1362,11 +1388,12 @@ contains
     allocate(EAlarm_list(AlarmCount))
     call ESMF_ClockGetAlarmList(EClock, alarmListFlag=ESMF_ALARMLIST_ALL, &
          alarmList=EAlarm_list, alarmCount=AlarmCount, rc=rc)
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_ClockGetAlarmList" )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     do n = 1,AlarmCount
        found = .false.
        if (present(alarmname)) then
-          call ESMF_AlarmGet(EAlarm_list(n), name=name)
+          call ESMF_AlarmGet(EAlarm_list(n), name=name, rc=rc)
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           if (trim(name) == trim(alarmname)) found = .true.
        else
           found = .true.
@@ -1374,7 +1401,7 @@ contains
        if (found) then
           set = .true.
           call ESMF_AlarmRingerOff( EAlarm_list(n), rc=rc )
-          call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_AlarmRingerOff" )
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        endif
     enddo
 
@@ -1391,7 +1418,6 @@ contains
   logical function seq_timemgr_alarmIsOn( EClock, alarmname)
 
     ! !DESCRIPTION: check if an alarm is ringing
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Clock), intent(IN) :: EClock     ! clock/alarm
@@ -1424,24 +1450,25 @@ contains
 
     call ESMF_ClockGetAlarmList(EClock, alarmListFlag=ESMF_ALARMLIST_ALL, &
          alarmList=EAlarm_list, alarmCount=AlarmCount, rc=rc)
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_ClockGetAlarmList" )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     do n = 1,AlarmCount
        name = trim(xalarm)
-       call ESMF_AlarmGet(EAlarm_list(n), name=name)
+       call ESMF_AlarmGet(EAlarm_list(n), name=name, rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        if (trim(name) == trim(alarmname)) then
           found = .true.
 
           seq_timemgr_alarmIsOn = ESMF_AlarmIsRinging(alarm=EAlarm_list(n),rc=rc)
-          call seq_timemgr_ESMFCodeCheck( rc, msg=subname// "Error from ESMF_AlarmIsRinging" )
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
           ! --- make sure the datestop will always stop with dates >= stop_date
           if (trim(alarmname) == trim(seq_timemgr_alarm_datestop)) then
              call ESMF_ClockGet(EClock, CurrTime = ETime1, rc=rc)
-             call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_ClockGet CurrTime" )
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
              call ESMF_AlarmGet(EAlarm_list(n), RingTime = ETime2, rc=rc)
-             call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_AlarmGet RingTime" )
+             if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
              if (ETime1 >= ETime2) seq_timemgr_alarmIsOn = .true.
           endif
 
@@ -1460,7 +1487,6 @@ contains
   logical function seq_timemgr_restartAlarmIsOn( EClock)
 
     ! !DESCRIPTION: check if restart alarm is ringing
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Clock) , intent(IN) :: EClock     ! clock/alarm
@@ -1477,7 +1503,6 @@ contains
   logical function seq_timemgr_stopAlarmIsOn( EClock)
 
     ! !DESCRIPTION: check if stop alarm is ringing
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Clock) , intent(IN) :: EClock     ! clock/alarm
@@ -1494,7 +1519,6 @@ contains
   logical function seq_timemgr_historyAlarmIsOn( EClock)
 
     ! !DESCRIPTION: check if history alarm is ringing
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Clock) , intent(IN) :: EClock     ! clock/alarm
@@ -1511,7 +1535,6 @@ contains
   logical function seq_timemgr_pauseAlarmIsOn( EClock)
 
     ! !DESCRIPTION: check if pause alarm is ringing
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Clock) , intent(IN) :: EClock     ! clock/alarm
@@ -1589,7 +1612,6 @@ contains
     ! !DESCRIPTION: Create the ESMF_Time object corresponding to the given input time, given in
     !               YMD (Year Month Day) and TOD (Time-of-day) format.
     !               Set the time by an integer as YYYYMMDD and integer seconds in the day
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Time) , intent(inout) :: ETime     ! Time
@@ -1623,10 +1645,8 @@ contains
 
     call shr_cal_date2ymd(ymd,yr,mon,day)
 
-    call ESMF_TimeSet( ETime, yy=yr, mm=mon, dd=day, s=ltod, &
-         calendar=seq_timemgr_cal, rc=rc )
-    call seq_timemgr_ESMFCodeCheck(rc, subname//': error return from '// &
-         'ESMF_TimeSet: setting '//trim(ldesc))
+    call ESMF_TimeSet( ETime, yy=yr, mm=mon, dd=day, s=ltod, calendar=seq_timemgr_cal, rc=rc )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
   end subroutine seq_timemgr_ETimeInit
 
@@ -1634,7 +1654,6 @@ contains
   subroutine seq_timemgr_ETimeGet( ETime, offset, ymd, tod )
 
     ! !DESCRIPTION: Get the date in YYYYMMDD format from a ESMF time object.
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Time),   intent(IN)  :: ETime   ! Input ESMF time
@@ -1657,20 +1676,17 @@ contains
     if ( present(offset) )then
        if ( offset > 0 )then
           call ESMF_TimeIntervalSet( ETimeOff, s=offset, rc=rc )
-          call seq_timemgr_ESMFCodeCheck( rc, msg=subname// &
-               ": Error from ESMF_TimeIntervalSet" )
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           ETimeAdd = ETime + ETimeOff
        else if ( offset < 0 )then
           call ESMF_TimeIntervalSet( ETimeOff, s=-offset, rc=rc )
-          call seq_timemgr_ESMFCodeCheck( rc, msg=subname// &
-               ": Error from ESMF_TimeIntervalSet" )
+          if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
           ETimeAdd = ETime - ETimeOff
        end if
     end if
 
     call ESMF_TimeGet( ETimeAdd, yy=year, mm=month, dd=day, s=sec, rc=rc )
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname// &
-         ": Error from ESMF_TimeGet" )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! shr_cal has restrictions and then "stops", so override that
 
@@ -1687,7 +1703,6 @@ contains
   subroutine seq_timemgr_EClockInit( TimeStep, StartTime, RefTime, CurrTime, EClock )
 
     ! !DESCRIPTION: Setup the ESMF clock
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_TimeInterval), intent(IN)  :: TimeStep    ! Time-step of clock
@@ -1712,18 +1727,17 @@ contains
     call seq_timemgr_ETimeInit(clocktime,  99990101, 0, "artificial stop date")
 
     EClock = ESMF_ClockCreate(name=trim(description), &
-                              TimeStep=TimeStep, startTime=StartTime, &
-                              refTime=RefTime, stopTime=clocktime, rc=rc)
-    call seq_timemgr_ESMFCodeCheck( rc, msg=subname//': Error from ESMF_ClockCreate')
+         TimeStep=TimeStep, startTime=StartTime, refTime=RefTime, stopTime=clocktime, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! ------ Advance clock to the current time (in case of a restart) -------
     call ESMF_ClockGet(EClock, currTime=clocktime, rc=rc )
-    call seq_timemgr_ESMFCodeCheck(rc, subname//': Error from ESMF_ClockGet')
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     do while( clocktime < CurrTime)
        call ESMF_ClockAdvance( EClock, rc=rc )
-       call seq_timemgr_ESMFCodeCheck(rc, subname//': Error from ESMF_ClockAdvance')
-       call ESMF_ClockGet( EClock, currTime=clocktime )
-       call seq_timemgr_ESMFCodeCheck(rc, subname//': Error from ESMF_ClockGet')
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_ClockGet( EClock, currTime=clocktime, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end do
 
     if (clocktime /= CurrTime) then
@@ -1736,7 +1750,6 @@ contains
   logical function seq_timemgr_EClockDateInSync( EClock, ymd, tod, prev)
 
     ! !DESCRIPTION: Check that the given input date/time is in sync with clock time
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Clock), intent(IN) :: Eclock   ! Input clock to compare
@@ -1779,7 +1792,6 @@ contains
   subroutine seq_timemgr_clockPrint( SyncClock )
 
     ! !DESCRIPTION: Print clock information out.
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(seq_timemgr_type), intent(in) :: SyncClock   ! Input clock to print
@@ -1834,7 +1846,7 @@ contains
        allocate(EAlarm_list(AlarmCount))
        call ESMF_ClockGetAlarmList(SyncClock%ECP(n)%EClock, alarmListFlag=ESMF_ALARMLIST_ALL, &
             alarmList=EAlarm_list, alarmCount=AlarmCount, rc=rc)
-       call seq_timemgr_ESMFCodeCheck( rc, msg=subname//"Error from ESMF_ClockGetAlarmList" )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
        write(logunit,F09) subname,"Clock = "//seq_timemgr_clocks(n),n
        write(logunit,F08) subname,"  Start Time  = ", start_ymd, start_tod
@@ -1865,7 +1877,6 @@ contains
   subroutine seq_timemgr_ESMFDebug( EClock, ETime, ETimeInterval, istring )
 
     ! !DESCRIPTION: Print ESMF stuff for debugging
-    implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
     type(ESMF_Clock)        , optional, intent(in)    :: EClock        ! ESMF Clock
@@ -1899,57 +1910,49 @@ contains
 
     if (present(EClock)) then
        write(logunit,*) subname,' EClock ',trim(istring)
-       call ESMF_ClockGet( EClock, StartTime=LTime )
+
+       call ESMF_ClockGet( EClock, StartTime=LTime, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeGet(LTime, yy=yy,mm=mm,dd=dd,s=s,timestring=timestring,rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        write(logunit,*) subname,rc,'start ymds=',yy,mm,dd,s,trim(timestring)
-       call ESMF_ClockGet( EClock, CurrTime=LTime )
+
+       call ESMF_ClockGet( EClock, CurrTime=LTime, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeGet(LTime, yy=yy,mm=mm,dd=dd,s=s,timestring=timestring,rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        write(logunit,*) subname,rc,'curr ymds=',yy,mm,dd,s,trim(timestring)
-       call ESMF_ClockGet( EClock, StopTime=LTime )
+
+       call ESMF_ClockGet( EClock, StopTime=LTime, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeGet(LTime, yy=yy,mm=mm,dd=dd,s=s,timestring=timestring,rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        write(logunit,*) subname,rc,'stop ymds=',yy,mm,dd,s,trim(timestring)
-       call ESMF_ClockGet( EClock, PrevTime=LTime )
+
+       call ESMF_ClockGet( EClock, PrevTime=LTime, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeGet(LTime, yy=yy,mm=mm,dd=dd,s=s,timestring=timestring,rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        write(logunit,*) subname,rc,'prev ymds=',yy,mm,dd,s,trim(timestring)
-       call ESMF_ClockGet( EClock, RefTime=LTime )
+
+       call ESMF_ClockGet( EClock, RefTime=LTime, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeGet(LTime, yy=yy,mm=mm,dd=dd,s=s,timestring=timestring,rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        write(logunit,*) subname,rc,'ref ymds=',yy,mm,dd,s,trim(timestring)
-       call ESMF_ClockGet( EClock, TimeStep=LTimeInterval )
+
+       call ESMF_ClockGet( EClock, TimeStep=LTimeInterval, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        call ESMF_TimeIntervalGet(LTimeInterval, yy=yy,mm=mm,d=dd,s=s,timestring=timestring,rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        write(logunit,*) subname,rc,'tint ymds=',yy,mm,dd,s,trim(timestring)
-       call ESMF_ClockGet( EClock, AdvanceCount=LStep )
+
+       call ESMF_ClockGet( EClock, AdvanceCount=LStep, rc=rc )
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        write(logunit,*) subname,rc,'advcnt =',LStep
     endif
 
   end subroutine seq_timemgr_ESMFDebug
-
-  !===============================================================================
-
-  subroutine seq_timemgr_ESMFCodeCheck( rc, msg )
-
-    ! !DESCRIPTION: Check ESMF return code and abort if not successful.
-    implicit none
-
-    ! !INPUT/OUTPUT PARAMETERS:
-    integer, intent(in)          :: rc   ! return code from ESMF
-    character(len=*),optional,intent(in) :: msg  ! error message
-
-    !----- local -----
-    character(len=*),parameter :: subname = 'seq_timemgr_ESMFCodeCheck'
-    !-------------------------------------------------------------------------------
-    ! Notes:
-    !-------------------------------------------------------------------------------
-
-    if ( rc == ESMF_SUCCESS ) return
-    if ( present(msg)) then
-       write(logunit,*) trim(subname),' error= ',rc,trim(msg)
-    else
-       write(logunit,*) trim(subname),' error= ',rc
-    endif
-    call shr_sys_flush(logunit)
-    call shr_sys_abort(trim(subname))
-
-  end subroutine seq_timemgr_ESMFCodeCheck
 
   !===============================================================================
 

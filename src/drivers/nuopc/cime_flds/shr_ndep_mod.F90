@@ -9,21 +9,20 @@ module shr_ndep_mod
   !USES:
   use shr_sys_mod,   only : shr_sys_abort
   use shr_log_mod,   only : s_loglev  => shr_log_Level
+  use shr_log_mod  , only : s_logunit => shr_log_Unit
   use shr_kind_mod,  only : r8 => shr_kind_r8, CS => SHR_KIND_CS, CX => SHR_KIND_CX
 
   implicit none
-  save
-
   private
 
   ! !PUBLIC MEMBER FUNCTIONS
   public :: shr_ndep_readnl       ! Read namelist
-  !====================================================================================
 
+!====================================================================================
 CONTAINS
+!====================================================================================
 
-  !====================================================================================
-  subroutine shr_ndep_readnl(NLFilename, ID, ndep_fields, add_ndep_fields)
+  subroutine shr_ndep_readnl(NLFilename, mpicom, mastertask, ndep_fields, add_ndep_fields)
 
     !========================================================================
     ! reads ndep_inparm namelist and sets up driver list of fields for
@@ -31,14 +30,13 @@ CONTAINS
     !========================================================================
 
     use shr_file_mod , only : shr_file_getUnit, shr_file_freeUnit
-    use shr_log_mod  , only : s_logunit => shr_log_Unit
-    use seq_comm_mct , only : seq_comm_iamroot, seq_comm_setptrs
     use shr_mpi_mod  , only : shr_mpi_bcast
     use shr_nl_mod   , only : shr_nl_find_group_name
     implicit none
 
     character(len=*), intent(in)  :: NLFilename ! Namelist filename
-    integer         , intent(in)  :: ID         ! seq_comm ID
+    integer         , intent(in)  :: mpicom
+    logical         , intent(in)  :: mastertask
     character(len=*), intent(out) :: ndep_fields
     logical         , intent(out) :: add_ndep_fields
 
@@ -48,7 +46,6 @@ CONTAINS
     integer :: ierr             ! error code
     logical :: exists           ! if file exists or not
     character(len=8) :: token   ! dry dep field name to add
-    integer :: mpicom           ! MPI communicator
 
     integer, parameter :: maxspc = 100             ! Maximum number of species
     character(len=32)  :: ndep_list(maxspc) = ''   ! List of ndep species
@@ -69,8 +66,8 @@ CONTAINS
     if ( len_trim(NLFilename) == 0 ) then
        call shr_sys_abort( subName//'ERROR: nlfilename not set' )
     end if
-    call seq_comm_setptrs(ID,mpicom=mpicom)
-    if (seq_comm_iamroot(ID)) then
+
+    if (mastertask) then
        inquire( file=trim(NLFileName), exist=exists)
        if ( exists ) then
           unitn = shr_file_getUnit()

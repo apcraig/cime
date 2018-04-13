@@ -504,7 +504,7 @@ CONTAINS
 
 !====================================================================================
 
-  subroutine seq_drydep_readnl(NLFilename, ID, seq_drydep_fields)
+  subroutine seq_drydep_readnl(NLFilename, mpicom, mastertask, seq_drydep_fields)
 
     !========================================================================
     ! reads drydep_inparm namelist and sets up CCSM driver list of fields for
@@ -516,13 +516,13 @@ CONTAINS
 
     use shr_file_mod,only : shr_file_getUnit, shr_file_freeUnit
     use shr_log_mod, only : s_logunit => shr_log_Unit
-    use seq_comm_mct,only : seq_comm_iamroot, seq_comm_setptrs
     use shr_mpi_mod, only : shr_mpi_bcast
     use shr_nl_mod, only : shr_nl_find_group_name
     implicit none
 
     character(len=*), intent(in)  :: NLFilename ! Namelist filename
-    integer         , intent(in)  :: ID         ! seq_comm ID
+    integer         , intent(in)  :: mpicom
+    logical         , intent(in)  :: mastertask
     character(len=*), intent(out) :: seq_drydep_fields
 
     !----- local -----
@@ -531,7 +531,6 @@ CONTAINS
     integer :: ierr             ! error code
     logical :: exists           ! if file exists or not
     character(len=8) :: token   ! dry dep field name to add
-    integer :: mpicom           ! MPI communicator
 
     !----- formats -----
     character(*),parameter :: subName = '(seq_drydep_read) '
@@ -549,8 +548,8 @@ CONTAINS
     if ( len_trim(NLFilename) == 0  )then
        call shr_sys_abort( subName//'ERROR: nlfilename not set' )
     end if
-    call seq_comm_setptrs(ID,mpicom=mpicom)
-    if (seq_comm_iamroot(ID)) then
+
+    if (mastertask) then
        inquire( file=trim(NLFileName), exist=exists)
        if ( exists ) then
           unitn = shr_file_getUnit()
@@ -594,13 +593,14 @@ CONTAINS
     !--- Make sure method is valid and determine if land is passing drydep fields ---
     lnd_drydep = n_drydep>0 .and. drydep_method == DD_XLND
 
-    if ( s_loglev > 0 ) then
-       write(s_logunit,*) 'seq_drydep_read: drydep_method: ', trim(drydep_method)
-       if ( n_drydep == 0 )then
-          write(s_logunit,F00) 'No dry deposition fields will be transfered'
-       else
-          write(s_logunit,FI1) 'Number of dry deposition fields transfered is ', &
-                                n_drydep
+    if (mastertask) then
+       if ( s_loglev > 0 ) then
+          write(s_logunit,*) 'seq_drydep_read: drydep_method: ', trim(drydep_method)
+          if ( n_drydep == 0 )then
+             write(s_logunit,F00) 'No dry deposition fields will be transfered'
+          else
+             write(s_logunit,FI1) 'Number of dry deposition fields transfered is ', n_drydep
+          end if
        end if
     end if
 

@@ -7,10 +7,11 @@
 !================================================================================
 module shr_fire_emis_mod
 
-  use shr_kind_mod,only : r8 => shr_kind_r8
-  use shr_kind_mod,only : CL => SHR_KIND_CL, CX => SHR_KIND_CX, CS => SHR_KIND_CS
-  use shr_sys_mod, only : shr_sys_abort
-  use shr_log_mod, only : loglev  => shr_log_Level
+  use shr_kind_mod , only : r8 => shr_kind_r8
+  use shr_kind_mod , only : CL => SHR_KIND_CL, CX => SHR_KIND_CX, CS => SHR_KIND_CS
+  use shr_sys_mod  , only : shr_sys_abort
+  use shr_log_mod  , only : loglev  => shr_log_Level
+  use shr_log_mod  , only : logunit => shr_log_Unit
 
   implicit none
   save
@@ -87,36 +88,29 @@ contains
   !     corresponding chemical tracers.
   !
   !-------------------------------------------------------------------------
-  subroutine shr_fire_emis_readnl( NLFileName, ID, emis_fields )
+  subroutine shr_fire_emis_readnl( NLFileName, mpicom, mastertask, emis_fields )
 
     use shr_nl_mod,     only : shr_nl_find_group_name
     use shr_file_mod,   only : shr_file_getUnit, shr_file_freeUnit
-    use seq_comm_mct,   only : seq_comm_iamroot, seq_comm_setptrs, logunit
     use shr_mpi_mod,    only : shr_mpi_bcast
 
     character(len=*), intent(in)  :: NLFileName  ! name of namelist file
-    integer         , intent(in)  :: ID          ! seq_comm ID
+    integer         , intent(in)  :: mpicom
+    logical         , intent(in)  :: mastertask
     character(len=*), intent(out) :: emis_fields ! emis flux fields
 
     integer :: unitn            ! namelist unit number
     integer :: ierr             ! error code
     logical :: exists           ! if file exists or not
-    integer :: mpicom           ! MPI communicator
-
-    integer, parameter :: maxspc = 100
-
-    character(len=2*CX) :: fire_emis_specifier(maxspc) = ' '
-    character(len=CL) :: fire_emis_factors_file = ' '
-
+    integer, parameter     :: maxspc = 100
+    character(len=2*CX)    :: fire_emis_specifier(maxspc) = ' '
+    character(len=CL)      :: fire_emis_factors_file = ' '
+    logical                :: fire_emis_elevated = .true.
     character(*),parameter :: F00   = "('(shr_fire_emis_readnl) ',2a)"
-
-    logical :: fire_emis_elevated = .true.
 
     namelist /fire_emis_nl/ fire_emis_specifier, fire_emis_factors_file, fire_emis_elevated
 
-    call seq_comm_setptrs(ID,mpicom=mpicom)
-    if (seq_comm_iamroot(ID)) then
-
+    if (mastertask) then
        inquire( file=trim(NLFileName), exist=exists)
 
        if ( exists ) then

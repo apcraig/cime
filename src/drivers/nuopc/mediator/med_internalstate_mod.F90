@@ -5,43 +5,26 @@ module med_internalstate_mod
   !-----------------------------------------------------------------------------
 
   use ESMF
-  use shr_nuopc_fldList_mod, only: shr_nuopc_fldList_type
+  use esmFlds               , only: ncomps
+  use shr_nuopc_fldList_mod , only: nmappers
 
   implicit none
-
   public
 
-  !--- Component arrays ---
+  integer :: logunit  ! logunit for mediator log output
+  integer :: loglevel ! loglevel for mediator log output
 
-  ! This defines the components and med_mapping_allowed is a starting point for what is
+  ! Active coupling definitions
+  ! This defines the med_mapping_allowed is a starting point for what is
   ! allowed in this coupled system.  It will be revised further after the system
   ! starts, but any coupling set to false will never be allowed.  As new connections
-  ! are allowed, just update the table below.  The rows are the destination of
-  ! coupling, the columns are the source of coupling.  So, the second column
-  ! indicates which models the atm is coupled to.  And the second row indicates
-  ! which models are coupled to the atm.
-  ! The mediator is not connected to any components in CESM because the mediator
+  ! are allowed, just update the table below.
+  ! - the rows are the destination of coupling
+  ! - the columns are the source of coupling
+  ! - So, the second column indicates which models the atm is coupled to.
+  ! - And the second row indicates which models are coupled to the atm.
+  ! The mediator is not connected to any components because the mediator
   ! doesn't have it's own grid and only acts as a hub.
-
-  integer, parameter :: ncomps=8
-  integer, parameter :: compmed=1
-  integer, parameter :: compatm=2
-  integer, parameter :: complnd=3
-  integer, parameter :: compocn=4
-  integer, parameter :: compice=5
-  integer, parameter :: comprof=6
-  integer, parameter :: compwav=7
-  integer, parameter :: compglc=8
-
-  character(len=*),parameter :: compname(ncomps) = &
-   (/ 'med', &
-      'atm', &
-      'lnd', &
-      'ocn', &
-      'ice', &
-      'rof', &
-      'wav', &
-      'glc' /)
 
   ! tcraig, turned off glc2ocn and glc2ice for time being
   logical, parameter :: med_coupling_allowed(ncomps,ncomps) = &
@@ -53,20 +36,7 @@ module med_internalstate_mod
       .false., .false., .true. , .false., .false., .false., .false., .false., &  ! rof
       .false., .true. , .false., .true. , .true. , .false., .false., .false., &  ! wav
       .false., .false., .true. , .false., .false., .false., .false., .false.  /) ! glc
-!       med      atm      lnd      ocn      ice      rof      wav      glc
-
-  !--- RH arrays ---
-  integer, parameter :: nmappers=5
-  integer, parameter :: mapbilnr=1
-  integer, parameter :: mapconsf=2
-  integer, parameter :: mapconsd=3
-  integer, parameter :: mappatch=4
-  integer, parameter :: mapfcopy=5
-
-  !--- fld lists ---
-  type (shr_nuopc_fldList_Type) :: fldsTo(ncomps)
-  type (shr_nuopc_fldList_Type) :: fldsFr(ncomps)
-  type (shr_nuopc_fldList_Type) :: fldsAtmOcn
+   !   med      atm      lnd      ocn      ice      rof      wav      glc
 
   ! private internal state to keep instance data
   type InternalStateStruct
@@ -80,6 +50,9 @@ module med_internalstate_mod
 
     logical               :: comp_present(ncomps)               ! comp present flag
     logical               :: med_coupling_active(ncomps,ncomps) ! computes the active coupling
+    type(ESMF_RouteHandle):: RH(ncomps,ncomps,nmappers)         ! Routehandles for pairs of components and different mappers
+    type(ESMF_FieldBundle):: FBfrac(ncomps)                     ! Fraction data for various components, on their grid
+    type(ESMF_FieldBundle):: FBNormOne(ncomps,ncomps,nmappers)  ! Unity static normalization
     type(ESMF_State)      :: NStateImp(ncomps)                  ! Import data from various component, on their grid
     type(ESMF_State)      :: NStateExp(ncomps)                  ! Export data to various component, on their grid
     type(ESMF_FieldBundle):: FBImp(ncomps,ncomps)               ! Import data from various components interpolated to various grids
@@ -88,16 +61,14 @@ module med_internalstate_mod
     type(ESMF_FieldBundle):: FBExp(ncomps)                      ! Export data for various components, on their grid
     type(ESMF_FieldBundle):: FBExpAccum(ncomps)                 ! Accumulator for various components export on their grid
     integer               :: FBExpAccumcnt(ncomps)              ! Accumulator counter for each FBExpAccum
+    type(ESMF_FieldBundle):: FBMed_ocnalb_o                     ! Ocn albedo on ocn grid
+    type(ESMF_FieldBundle):: FBMed_ocnalb_a                     ! Ocn albedo on atm grid
+    type(ESMF_FieldBundle):: FBMed_aoflux_o                     ! Ocn/Atm flux fields on ocn grid
+    type(ESMF_FieldBundle):: FBMed_aoflux_a                     ! Ocn/Atm flux fields on atm grid
+    type(ESMF_FieldBundle):: FBMed_l2x_to_glc_l                 ! FB only in mediator- Land->glc on lnd grid
+    type(ESMF_FieldBundle):: FBMed_l2x_to_glc_accum_l           ! FB only in mediator- Land->glc accumulator on lnd grid
     integer               :: conn_prep_cnt(ncomps)              ! Connector prep count
     integer               :: conn_post_cnt(ncomps)              ! Connector post count
-    type(ESMF_FieldBundle):: FBfrac(ncomps)                     ! Fraction data for various components, on their grid
-    type(ESMF_RouteHandle):: RH(ncomps,ncomps,nmappers)         ! Routehandles for pairs of components and different mappers
-
-    type(ESMF_RouteHandle):: RH_r2ol_consf                      ! rof to ocn liquid
-    type(ESMF_RouteHandle):: RH_r2oi_consf                      ! rof to ocn frozen
-    type(ESMF_FieldBundle):: FBAtmOcn_o                         ! Atm/Ocn flux fields on ocn grid
-    type(ESMF_FieldBundle):: FBAtmOcn_a                         ! Atm/Ocn flux fields on atm grid
-    type(ESMF_FieldBundle):: FBaccumAtmOcn                      ! accumulator of atm export data
     integer               :: mpicom
   end type
 
